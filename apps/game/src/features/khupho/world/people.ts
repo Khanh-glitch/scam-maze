@@ -8,6 +8,7 @@ import { motorbike } from './furniture';
 import { mulberry32, clamp } from './util';
 import { mat } from './materials';
 import { BikeRiderInstance, type BikeRiderTemplate } from './bikeRider';
+import type { HumanActor, HumanLibrary, HumanModelId } from './humans';
 
 export interface Life { update(dt: number, t: number): void }
 
@@ -244,6 +245,83 @@ class Static {
   update(t: number, hour: number) { const v = !this.hours || (hour >= this.hours[0] && hour < this.hours[1]); this.p.g.visible = v; if (v) pose(this.p, this.poseName, t, 0, 0); }
 }
 
+/** Slowest and fastest playback of a walk clip before its legs look wrong. */
+const WALK_CLIP_RANGE: [number, number] = [0.8, 1.45];
+
+/** A character model walking back and forth along `pts` (same path logic as Walker). */
+class ModelWalker {
+  a: HumanActor; i = 0;
+  pts: THREE.Vector3[];
+  sp: number;
+  ctx: Ctx;
+  constructor(actor: HumanActor, pts: THREE.Vector3[], sp: number, ctx: Ctx) {
+    this.a = actor; this.pts = pts; this.sp = sp; this.ctx = ctx;
+    actor.object.position.copy(pts[0]); ctx.root.add(actor.object);
+    // The clip speed follows the ground speed so the feet do not slide. A clip is sped up or slowed
+    // down by at most WALK_CLIP_RANGE; past that the walker moves at the clip's pace instead.
+    let ts = 1;
+    if (actor.walkSpeed > 0) {
+      ts = THREE.MathUtils.clamp(sp / actor.walkSpeed, WALK_CLIP_RANGE[0], WALK_CLIP_RANGE[1]);
+      this.sp = actor.walkSpeed * ts;
+    }
+    actor.play('walk', { fade: 0, timeScale: ts });
+  }
+  update(dt: number, player: THREE.Vector3) {
+    const g = this.a.object, n = this.pts[this.i], dx = n.x - g.position.x, dz = n.z - g.position.z, d = Math.hypot(dx, dz);
+    if (d < 0.15) { this.i = (this.i + 1) % this.pts.length; }
+    else {
+      const want = Math.atan2(dx, dz); let dy = want - g.rotation.y; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
+      g.rotation.y += dy * Math.min(1, dt * 6); const st = this.sp * dt; g.position.x += (dx / d) * st; g.position.z += (dz / d) * st;
+      const fy = this.ctx.phys.floorAt(g.position.x, g.position.z, 2, 0.6).y; g.position.y += (fy - g.position.y) * Math.min(1, dt * 8);
+    }
+    this.a.update(dt, g.position.distanceTo(player));
+  }
+}
+
+/** Seconds between the vendor's own little actions (looking for customers, preparing bread). */
+const VENDOR_FIDGET: [number, number] = [9, 16];
+/** The vendor greets the player who comes within this distance (m), at most once per cooldown. */
+const VENDOR_GREET_DISTANCE = 3.2;
+const VENDOR_GREET_COOLDOWN = 25;
+
+/** The banh mi vendor beside the cart: idle, an occasional action, and a greeting when the player comes close. */
+class Vendor {
+  a: HumanActor;
+  hours: [number, number];
+  private next = 4;
+  private greetT = 0;
+  private near = false;
+  constructor(actor: HumanActor, ctx: Ctx, x: number, y: number, z: number, yaw: number, hours: [number, number]) {
+    this.a = actor; this.hours = hours;
+    actor.object.position.set(x, y, z); actor.object.rotation.y = yaw; ctx.root.add(actor.object);
+    actor.play('idle', { fade: 0 });
+  }
+  private once(role: 'welcome' | 'invite' | 'prepare' | 'lookAround') {
+    if (!this.a.can(role)) return;
+    this.a.play(role, { once: true, fade: 0.35, then: () => this.a.play('idle', { fade: 0.45 }) });
+  }
+  update(dt: number, hour: number, player: THREE.Vector3) {
+    const v = hour >= this.hours[0] && hour < this.hours[1];
+    this.a.object.visible = v;
+    if (!v) return;
+    const d = this.a.object.position.distanceTo(player);
+    this.greetT -= dt;
+    const near = d < VENDOR_GREET_DISTANCE && player.y < 1.2;
+    if (near && !this.near && this.greetT <= 0) {
+      this.greetT = VENDOR_GREET_COOLDOWN;
+      this.once(Math.random() < 0.5 ? 'welcome' : 'invite');
+      this.next = VENDOR_FIDGET[0];
+    }
+    this.near = near;
+    this.next -= dt;
+    if (this.next <= 0 && this.a.playing === 'idle') {
+      this.next = VENDOR_FIDGET[0] + Math.random() * (VENDOR_FIDGET[1] - VENDOR_FIDGET[0]);
+      this.once(Math.random() < 0.55 ? 'lookAround' : 'prepare');
+    }
+    this.a.update(dt, d);
+  }
+}
+
 class Bike {
   g: THREE.Group; speed = 0; base: number; dir: 1 | -1; lane: number; x: number; info: { pos: THREE.Vector3; speed: number };
   /** The scanned scooter and rider when its file loaded; otherwise the procedural bike and person below. */
@@ -285,10 +363,11 @@ class Bike {
   }
 }
 
-export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vector3; speed: number }[], audio: AudioSys, bikeRider: BikeRiderTemplate | null = null): Life {
+export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vector3; speed: number }[], audio: AudioSys, bikeRider: BikeRiderTemplate | null = null, humans: HumanLibrary | null = null): Life {
   PERSON_GROUPS.length = 0;
   const r = mulberry32(99);
   const residents: Resident[] = [], walkers: Walker[] = [], statics: Static[] = [], bikes: Bike[] = [];
+  const modelWalkers: ModelWalker[] = [], vendors: Vendor[] = [];
   houses.filter((h) => !h.spec.lite).forEach((h, i) => {
     const shop = ['grocery', 'cafe', 'pho', 'repair', 'hair'].includes(h.spec.ground);
     const list: Slot[][] = shop ? [SHOP, MOM, h.n > 1 ? KID : DAD] : i % 3 === 0 ? [MOM, DAD, KID] : i % 3 === 1 ? [MOM, ELDER] : [ELDER, DAD, MOM];
@@ -296,15 +375,22 @@ export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vect
   });
   residents.forEach((res) => { const act = pickSlot(res.sched, ctx.env.hour); res.cur = ''; res.begin(act, false); });
   const V = (x: number, z: number) => new THREE.Vector3(x, 0.15, z);
-  const sid = (zz: number, a: number, b: number, sp: number, o: ConstructorParameters<typeof Walker>[4] = {}) => walkers.push(new Walker([V(a, zz), V(b, zz)], sp, ctx, r, o));
-  sid(4.7, -50, 50, 1.2, { hat: true }); sid(-4.6, 45, -50, 1.1); sid(4.3, 40, -30, 1.3, { kid: true }); sid(-4.3, -45, 40, 0.8, { pole: true, hat: true });
-  sid(4.9, -20, 30, 1.0, { elder: true }); sid(-5.0, 20, -40, 1.25, { hat: true }); sid(4.5, 45, -45, 1.4);
+  const sid = (zz: number, a: number, b: number, sp: number, o: ConstructorParameters<typeof Walker>[4] = {}, model?: HumanModelId) => {
+    // A sidewalk walker uses a character model when it loaded, otherwise a procedural person.
+    const actor = model ? humans?.spawn(model) : null;
+    if (actor && actor.can('walk')) modelWalkers.push(new ModelWalker(actor, [V(a, zz), V(b, zz)], sp, ctx));
+    else walkers.push(new Walker([V(a, zz), V(b, zz)], sp, ctx, r, o));
+  };
+  sid(4.7, -50, 50, 1.2, { hat: true }); sid(-4.6, 45, -50, 1.1, {}, 'juno3'); sid(4.3, 40, -30, 1.3, { kid: true }); sid(-4.3, -45, 40, 0.8, { pole: true, hat: true });
+  sid(4.9, -20, 30, 1.0, { elder: true }); sid(-5.0, 20, -40, 1.25, { hat: true }, 'manVN'); sid(4.5, 45, -45, 1.4, {}, 'rowan');
   const alley = (a: number, b: number, sp: number, x: number, o: ConstructorParameters<typeof Walker>[4] = {}) => walkers.push(new Walker([new THREE.Vector3(x, 0.02, a), new THREE.Vector3(x, 0.02, b)], sp, ctx, r, o));
   alley(8, 45, 1.0, 10.1, { hat: true }); alley(44, 8, 1.2, 9.3); alley(20, 46, 0.7, 10.7, { elder: true }); alley(12, 38, 1.5, 9.8, { kid: true });
   const cafe = houses.filter((h) => !h.spec.lite)[3];
   if (cafe) { const cx = cafe.ox - cafe.W / 2; statics.push(new Static(ctx, r, cx - 1.5, 0.15, 4.5, Math.PI / 2, 'sip', { elder: true }, [6, 21])); statics.push(new Static(ctx, r, cx + 0.5, 0.15, 5.0, -Math.PI / 2, 'sip', {}, [7, 20])); }
   // Banh mi vendor beside the cart from streetProps.ts.
-  statics.push(new Static(ctx, r, -1.75, 0.15, -4.9, 0, 'stand', { hat: true }, [6, 20]));
+  const vendorActor = humans?.spawn('banhmiVendor');
+  if (vendorActor) vendors.push(new Vendor(vendorActor, ctx, -1.75, 0.15, -4.9, 0, [6, 20]));
+  else statics.push(new Static(ctx, r, -1.75, 0.15, -4.9, 0, 'stand', { hat: true }, [6, 20]));
   statics.push(new Static(ctx, r, 6.6, 0.02, 46.2, 0.5, 'exercise', { elder: true }, [4.8, 7.5]));
   statics.push(new Static(ctx, r, 20.6, 0.02, 45.8, Math.PI, 'sit', { elder: true }, [6, 22]));
   statics.push(new Static(ctx, r, 10.3, 0.02, 14.0, -Math.PI / 2, 'sweep', {}, [5.5, 7.2]));
@@ -317,6 +403,8 @@ export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vect
       const hour = ctx.env.hour, pp = ctx.eye;
       for (const rs of residents) rs.update(dt, t, hour, pp);
       for (const w of walkers) w.update(dt, t);
+      for (const w of modelWalkers) w.update(dt, pp);
+      for (const v of vendors) v.update(dt, hour, pp);
       for (const s of statics) s.update(t, hour);
       for (const b of bikes) b.update(dt, pp, audio);
       acc -= dt; if (acc > 0) return; acc = 0.6;

@@ -211,6 +211,21 @@ Resolved:
 
 ## Task History
 
+### 2026-11-14 — Khupho: banh mi vendor model and a character model system
+
+- **Objective:** owner request: replace the procedural woman beside the banh mi cart with `banhmi_vendor_animated.glb`, and bring the other people in `Asset3D/human` (manVN, juno3, rowan) into the neighborhood through a system that more models can join later.
+- **Completed:**
+  - `apps/game/scripts/optimize-characters.cjs`: one config list for all characters; keeps skin and clips; WebP textures (vendor color 2048, rest 1024), optional Meshopt decimation with an error cap, resample, quantize, meshopt; 5 MB gate per file. Results: vendor 6.51 → 1.19 MB (102,860 → 53,797 triangles), manVN 2.33 → 0.83 MB, juno3 27.98 → 2.10 MB (67,157 → 40,283), rowan 32.48 → 2.19 MB (68,448 → 41,068).
+  - `features/khupho/world/humans.ts`: `HUMAN_MODELS` registry (file, height, clip name per role, optional stated walk speed), `HumanLibrary` (loads, stands each model on its feet at its height, measures the walk clip's ground speed from the planted foot when the source does not state it), `HumanActor` (SkeletonUtils clone, cross-faded roles, animation at 1/3 rate past 18 m and paused past 55 m).
+  - `people.ts`: `Vendor` at the cart (idle, an occasional look-for-customer or prepare-bread clip every 9-16 s, a welcome or invite clip when the player comes within 3.2 m, 25 s cooldown, visible 6:00-20:00 as before). `ModelWalker`: three sidewalk walkers now use juno3, manVN and rowan; the walk clip speed follows the ground speed within 0.8-1.45x, beyond that the walker moves at the clip's pace (manVN's clip is slow, 0.51 m/s, so he strolls at ~0.74 m/s). Every model falls back to the procedural person if it does not load.
+  - `engine.ts` loads the characters in parallel with the world build. Sources in `apps/game/assets-src/characters/` (Git LFS) with `SOURCE.md` (how to add a character).
+- **Files:** `apps/game/scripts/optimize-characters.cjs`, `apps/game/assets-src/characters/**`, `apps/game/assets-src/README.md`, `apps/game/public/assets/3d/optimized/characters/*.optimized.glb`, `apps/game/src/config/assetPaths.ts`, `apps/game/src/features/khupho/world/{humans,people,engine}.ts`, this file.
+- **Validation:** `pnpm typecheck`, `pnpm build`, `vitest --run src/features/khupho src/features/prologue src/app` (33 passed). Headless `/khupho` screenshots: the vendor stands beside the cart at a believable size facing the street; manVN walks along the sidewalk facing his direction. The foot-speed measurement matches the stated speeds of juno3 (1.26 vs 1.28 m/s) and rowan (1.38 vs 1.43 m/s).
+- **Not verified:** frame rate on a real GPU; foot sliding by eye in motion (headless frames are too slow); the licenses (owner-supplied, not stated; juno3/rowan clips are retargeted Mixamo captures).
+- **Deviations:** photographic-style models next to the stylized street (owner's choice). Changing the walker list changes the seeded random sequence after it, so the 12 bikes get different lanes, speeds and start positions than before (same logic).
+- **Follow-up:** shirt recoloring (analysis done earlier, not started); blink and face morphs for juno3/rowan are not used.
+
+
 ### 2026-11-15 — Room v2 reached through a white doorway in house no. 59
 - **Objective:** Make the `/roomv2` apartment the player's room in house no. 59 of `/khupho`, without rebuilding any room of the street world (owner direction after two heavier attempts).
 - **Completed:** The master bedroom is untouched. The other second-floor room (rear bedroom) keeps its door, and behind the open door stands a plain white panel like a portal. Stepping into it whites out the screen and shows the room from `/roomv2` exactly as it was; its own door whites the screen out again and puts the player back in the hall, with the door closed behind them. The room is built in standby (shaders compiled, reflections baked, no loop) when the player comes within 30 m of the house, so it is ready when needed, and is kept for the next visit. `/roomv2` and the prologue behave as before. The earlier attempts (live street through the window, snapshot picture, balcony door, weather-driven light) were removed.
