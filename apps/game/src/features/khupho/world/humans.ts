@@ -14,7 +14,7 @@ import { STOOL_LOW_HEIGHT } from './streetFurniture';
  * clip can only stand (like the vendor); `idle` is required. A model without clips (the street
  * NPCs) names a `clipsFrom` model whose idle, walk and wave are retargeted onto its skeleton.
  */
-export type HumanRole = 'idle' | 'walk' | 'wave' | 'welcome' | 'invite' | 'prepare' | 'lookAround' | 'thank' | 'sit';
+export type HumanRole = 'idle' | 'walk' | 'wave' | 'welcome' | 'invite' | 'prepare' | 'lookAround' | 'thank' | 'sit' | 'sitHigh';
 
 export interface HumanModelSpec {
   /** File name under CHARACTERS_GLB_BASE. */
@@ -74,7 +74,7 @@ export const HUMAN_MODELS = {
 export type HumanModelId = keyof typeof HUMAN_MODELS;
 
 function street(file: string): HumanModelSpec {
-  return { file, clips: { idle: 'idle', walk: 'walk', wave: 'wave', sit: 'sit' }, clipsFrom: 'juno3', outfit: true, glasses: true };
+  return { file, clips: { idle: 'idle', walk: 'walk', wave: 'wave', sit: 'sit', sitHigh: 'sitHigh' }, clipsFrom: 'juno3', outfit: true, glasses: true };
 }
 
 /** Clothing parts `spawn` can recolor, by mesh name. */
@@ -84,6 +84,8 @@ const OUTFIT_PART: Record<OutfitPart, RegExp> = { top: /^Asset_(top|fullbody)_/,
 const DETAIL_PART = /^Asset_(eyes|eyebrows|eyelashes|glasses)_/;
 /** Sunglasses fitted onto models with `glasses: true`. */
 const SUNGLASSES_FILE = 'accessory-sunglasses.optimized.glb';
+/** Seat height (m) of the shop counter stools, where shopkeepers sit (`sitHigh`). */
+export const HIGH_SEAT = 0.42;
 
 /** World-space box of a mesh at rest (skinned meshes include their bind pose). */
 function restBox(mesh: THREE.Mesh): THREE.Box3 {
@@ -250,9 +252,11 @@ export class HumanLibrary {
         const box = new THREE.Box3().setFromObject(scene);
         const scale = spec.height ? spec.height / Math.max(0.01, box.max.y - box.min.y) : 1;
         // A still sitting pose on the low stool, built from the rig (the street NPCs have no sit clip).
-        if (spec.clips.sit && !animations.some((c) => c.name === spec.clips.sit)) {
-          const sit = sitClip(cloneSkinned(scene), STOOL_LOW_HEIGHT / scale + box.min.y, spec.clips.sit);
-          if (sit) animations = [...animations, sit];
+        for (const [role, seatH] of [['sit', STOOL_LOW_HEIGHT], ['sitHigh', HIGH_SEAT]] as const) {
+          const name = spec.clips[role];
+          if (!name || animations.some((c) => c.name === name)) continue;
+          const clip = sitClip(cloneSkinned(scene), seatH / scale + box.min.y, name);
+          if (clip) animations = [...animations, clip];
         }
         const clips = new Map(animations.map((c) => [c.name, c]));
         for (const role of Object.keys(spec.clips) as HumanRole[]) {
