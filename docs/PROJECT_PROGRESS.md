@@ -211,6 +211,99 @@ Resolved:
 
 ## Task History
 
+### 2026-11-15 — Fix cut-apart parked bikes; noodle shop table set; model shop staff
+
+- **Objective:** the owner reported parked bikes sunk into the ground, asked for the table set in the noodle shop, and asked for shop staff back using the 3D NPC models.
+- **Completed:**
+  - `streetFurniture.ts` `prepare()`: quantized, normalized vertex attributes are converted to Float32 before the node matrix is baked. Baking into normalized 16-bit positions clamped them to [-1, 1], which cut the bikes apart and made them look sunk.
+  - `rooms.ts`: the noodle shop's two low tables and stools are replaced by one `tableSet`; the repair shop stool moved to z 3.4.
+  - `people.ts`: new `ShopStaff` (keeper at each shop's `shop` spot, plus a helper in the cafe and the noodle shop) using the street NPC models; visible 6:00–21:00 within 35 m. The procedural shopkeeper stays as the fallback when the models do not load. Cafe customers re-positioned to the cafe tables.
+  - `humans.ts`: `sitHigh` role and clip (`HIGH_SEAT` 0.42 m) for keepers on counter stools.
+- **Files modified:** `apps/game/src/features/khupho/world/{streetFurniture,rooms,people,humans}.ts`, `docs/PROJECT_PROGRESS.md`.
+- **Validation:** `pnpm typecheck`, `pnpm build` and `npx vitest --run src/features/khupho src/features/prologue src/app src/config` (40 tests) passed. Headless SwiftShader screenshots of the noodle shop, the cafe and a parked Super Cub showed whole bikes on the floor, the table set and the staff in place.
+- **Not verified:** FPS on a real GPU; the `sitHigh` pose up close.
+- **Follow-up:** owner review of staff placement and poses.
+
+### 2026-11-15 — Commit the parked bike and tall chair source files
+
+- **Objective:** owner request: put the bike source files on GitHub.
+- **Completed:** `super-cub-c90.glb`, `fat-boy-cruiser.glb` (CC-BY 4.0), `xyn-custom-bobber.glb`, `honda-pcx.glb` (no license stated; owner decision) and `ghecao.glb` (CC-BY 4.0, 67 MB) added to Git LFS. `honda-cg-125.glb` stays git-ignored: its Sketchfab Standard license forbids redistributing the model file (its optimized copy is already in the game and the repo).
+- **Files:** `.gitignore`, `apps/game/assets-src/{README.md,props/furniture/SOURCE.md,props/furniture/ghecao.glb,vehicles/parked/SOURCE.md,vehicles/parked/*.glb}`, this file.
+- **Validation:** `git lfs ls-files` lists the new files; no code change.
+- **Not verified:** licenses of the bobber and PCX. **Deviations:** none. **Follow-up:** none.
+
+
+### 2026-11-15 — Khupho: model stools, table sets and parked bikes; horn; seated NPCs; walkers avoid solids
+
+- **Objective:** owner requests: walkers went through the banh mi cart; the first bike held up by the player honks `horn.mp3` with pauses; tall plastic chair by the vendor; low stools replace the stools at the shops; fewer people inside the shops, swapped for the street NPC models; table sets at the shops with single stools under seated people; the elderly NPC 1.5 m tall; every decorative bike replaced by the supplied models, fewer of them, optimized.
+- **Completed:**
+  - `scripts/optimize-street-props.cjs`: 8 props (low stool, tall chair, table set, Super Cub, CG 125, Fat Boy, bobber, PCX); drops physical extensions, animations and the PCX brand-logo and plate textures, per-primitive Meshopt simplification (sloppy pass for dense parts, off for the thin-shell chair), palette + join, WebP 512. Sizes: e.g. tall chair 67.45 → 0.42 MB, CG 125 19.16 → 0.61 MB, PCX 13.63 → 0.30 MB.
+  - `streetFurniture.ts`: loads the props before the world is built; `Builder.prop` records placements, the furniture helpers (`stool`, new `tableSet`, parked `motorbike`) use them when the model loaded (procedural fallback otherwise, colliders kept); all placements drawn as `InstancedMesh` per material and 24 m chunk. The distance culler skips instanced meshes.
+  - Parked bikes: at most one per house (same random draws, so the layout is unchanged), variants weighted toward scooters and step-throughs; 18 bikes in the street now (before up to 2 per house). Inside-room bikes (garage, repair shop) use models too.
+  - Cafe/pho fronts and the alley tea stall use table sets; shop counter stools keep a 0.42 m seat (procedural shopkeepers sit there).
+  - People: shops keep only the shopkeeper resident; the two cafe customers and the alley tea-stall sitter are street NPC models (nguoigia, archetype, freya) sitting on single low stools with a new generated sit pose (`retarget.ts` `sitClip`, leg IK from the rig); nguoigia scaled to 1.5 m; the tall chair stands next to the vendor with a collider.
+  - Walkers (`PathFollower`): probe 0.55 m and 1.2 m ahead for solids and take the nearest clear side offset (up to 1.4 m), wait and turn back if none, and are pushed out of solids every frame; standing and seated people count as people to side-step.
+  - Bikes: only the first bike held up by the player honks (`horn.mp3`, first after 0.6-1.2 s, then every 4-6.5 s); `AudioSys.horn` plays the recording positionally.
+  - Credits (`config/credits.ts`, en/vi) for the CC-BY props and the bikes; `SOURCE.md` for furniture and parked bikes; bike sources and the 67 MB chair are git-ignored local files.
+- **Files:** `.gitignore`, `apps/game/scripts/optimize-street-props.cjs`, `apps/game/assets-src/{README.md,props/furniture/{ghelun,set_table_chair}.glb,props/furniture/SOURCE.md,vehicles/parked/SOURCE.md}`, `apps/game/public/assets/3d/optimized/props/*.optimized.glb`, `apps/game/public/audio/horn.mp3`, `apps/game/src/config/{assetPaths,credits}.ts`, `apps/game/src/i18n/locales/{en,vi}/credits.ts`, `apps/game/src/features/khupho/world/{streetFurniture,builder,furniture,neighborhood,rooms,people,humans,retarget,audio,engine,distanceCull}.ts`, this file.
+- **Validation:** `pnpm typecheck`, `pnpm build`, `vitest --run src/features/khupho src/features/prologue src/app src/config` (40 passed). Headless `/khupho`: 900 simulated steps, 0 frames with a walker inside a solid; a lane held up 60 s: 6 bikes queued, only the first honked (11 honks, 4.5-6 s apart); screenshots: vendor with the tall chair and a walker passing in front of the cart; two seated customers on low stools facing each other. Props render as 8 instanced kinds (bikes 82 draws in total, stools 6).
+- **Not verified:** real-GPU frame rate (props add ~400k triangles when every chunk is in view; chunks out of view are culled); the sit pose up close for every NPC; licenses of the bobber and PCX models (not stated); possible small badge details left in the CG 125 / Super Cub textures.
+- **Deviations:** the CG 125 source (Sketchfab Standard) is not committed. **Follow-up:** owner review of bike mix and counts.
+
+
+### 2026-11-14 — Khupho: sunglasses on every street NPC, four more street NPCs
+
+- **Objective:** owner request: the street NPCs (not the first models) all wear black sunglasses because their eyes have no iris; add the `_new` files; `_dontchangecolor` keeps its clothing colors but also wears sunglasses.
+- **Completed:** optimizer cuts the round sunglasses out of `lin_mei_removeHair.glb` into `accessory-sunglasses.optimized.glb` (10 KB) with the eye reference; `humans.ts` fits a copy onto each street NPC's eyes at load (eye-width scale, attached to the head bone, hidden past 12 m with the other face parts). New NPCs blackguy (outfit recolor off), freya, nguoigia, sofia optimized (2.4-3.1 MB → 0.37-0.52 MB); full-body garments recolor as the top. nguoigia replaces the procedural elderly sidewalk walker; blackguy, freya and sofia are added sidewalk walkers. juno3, rowan, manVN and the vendor are unchanged.
+- **Files:** `apps/game/scripts/optimize-characters.cjs`, `apps/game/assets-src/characters/{street/*_new.glb,SOURCE.md}`, `apps/game/public/assets/3d/optimized/characters/{npc-blackguy,npc-freya,npc-nguoigia,npc-sofia,accessory-sunglasses}.optimized.glb` (all npc files rebuilt), `apps/game/src/features/khupho/world/{humans,people}.ts`, this file.
+- **Validation:** `pnpm typecheck`, `pnpm build`, `vitest --run src/features/khupho src/features/prologue src/app` (33 passed). Headless `/khupho`: 11 of 11 street NPCs have sunglasses; close-up of yoshida shows them on the eyes, following the head.
+- **Not verified:** the fit on each of the 11 faces one by one (only yoshida was looked at up close); real-GPU frame rate; licenses.
+- **Deviations:** none. **Follow-up:** owner review of the fit on the shortest (nguoigia 1.23 m) and tallest (freya 1.94 m) models.
+
+
+### 2026-11-14 — Khupho: native character heights, walker side-stepping, bike braking and colliders
+
+- **Objective:** owner requests: people keep their normal (authored) heights; walking NPCs step aside when they meet someone; bikes must not pass through each other or the player, have a collider box, and stop for the player.
+- **Completed:**
+  - `humans.ts`: no height override for manVN, juno3, rowan and the 7 street NPCs (authored size). Only the banh mi vendor stays scaled (her file is 1.18 m tall).
+  - Bikes (`people.ts`): the old stop check compared the camera height (`ctx.eye`, ~1.6 m above the feet) with `< 1`, so bikes never stopped on the street. Now each bike brakes (4.5 m/s² planning) to stop 0.8 m short of the player in or next to its lane and of the next bike in the same lane (also across the street loop), never steps into either, and honks while stopped close to the player. Each bike has a moving 1.9 x 0.84 x 1.5 m box in the new `Physics.dynamic` list, which `collide` checks, so the player cannot walk through a bike.
+  - Walkers (`PathFollower`, shared by procedural and model walkers): look 2.8 m ahead; someone in their way (another walker or the player) makes them step 0.7 m aside, away from that person or to the right when straight ahead, so people walking toward each other pass; a side blocked by a solid is not taken; slower while passing close; with both sides blocked they wait, then squeeze past slowly after 2.5 s; back on the path after 1.2 s clear. Model walkers switch to idle while waiting and slow their walk clip with their pace.
+  - `Life.stats()` exposes walker and bike positions for checks.
+- **Files:** `apps/game/src/features/khupho/world/{humans,people,physics}.ts`, this file.
+- **Validation:** `pnpm typecheck`, `pnpm build`, `vitest --run src/features/khupho src/features/prologue src/app` (33 passed). Headless simulation (600 steps of 1/30 s, player standing in a lane 10 m ahead of a bike): the bike stopped 0.80 m before the player and stayed at 0 m/s; 0 frames with two bikes overlapping; 15 walkers, closest pair 0.77 m, 0 frames under 0.45 m. A point inside a stopped bike's box was pushed 0.70 m out by `Physics.collide`.
+- **Not verified:** how the side-step looks in motion on a real screen; residents walking inside houses do not avoid each other (unchanged).
+- **Deviations:** none. **Follow-up:** none required.
+
+
+### 2026-11-14 — Khupho: street NPCs with separate meshes, outfit colors and retargeted walks
+
+- **Objective:** owner request: add the seven `Asset3D/human/streetNPC` people; drop the parts named in the file names (`*_removeHair`, `*_RemoveSunglasses`); vary clothing colors for more people; optimize.
+- **Completed:**
+  - `optimize-characters.cjs` street mode: removes the named parts (alan and lin_mei hair, arthur glasses) plus teeth, tongue, the transparent eye cornea and napole's two debug line/point meshes; strips clearcoat/sheen/ior; eyebrows and eyelashes alpha cutout; gray, normalized top/bottom/shoe textures so colors can be set directly; WebP. Each file ~2.5 MB → 0.35-0.46 MB, 20-30% fewer triangles (table in `assets-src/characters/SOURCE.md`).
+  - `retarget.ts`: the files have no clips, so juno3's Mixamo idle, walk and wave are retargeted at load onto the 53-bone rig (world-space rotation deltas with per-bone rest-direction alignment, hips offset scaled by leg length).
+  - `humans.ts`: street NPC specs (heights 1.5-1.72 m), `spawn(id, outfit)` recolors top/bottom/shoes per actor, meshes of one actor share one skeleton, eyes/brows/lashes hidden past 12 m, small parts cast no shadow.
+  - `people.ts`: 3 procedural walkers replaced (one sidewalk, two alley adults) and 4 sidewalk walkers added, each with a random outfit from its own seeded stream; model walkers are not drawn past 60 m.
+- **Files:** `apps/game/scripts/optimize-characters.cjs`, `apps/game/assets-src/characters/{street/*.glb,SOURCE.md}`, `apps/game/public/assets/3d/optimized/characters/npc-*.optimized.glb`, `apps/game/src/features/khupho/world/{retarget,humans,people}.ts`, this file.
+- **Validation:** `pnpm typecheck`, `pnpm build`, `vitest --run src/features/khupho src/features/prologue src/app` (33 passed). Headless `/khupho` screenshots: yoshida and alan walk with natural strides, arms down, facing their direction; outfit colors applied; alan bald as requested. Walk speeds measured from the retargeted clips: 1.24-1.49 m/s.
+- **Not verified:** frame rate on a real GPU (SwiftShader timings varied 224-420 ms between runs of the same view, so they are not a comparison); faces up close (eyebrows/lashes cutout); licenses (not provided).
+- **Deviations:** none. **Follow-up:** owner review of hair-less alan/lin_mei; optional body decimation if more NPCs are added.
+
+
+### 2026-11-14 — Khupho: banh mi vendor model and a character model system
+
+- **Objective:** owner request: replace the procedural woman beside the banh mi cart with `banhmi_vendor_animated.glb`, and bring the other people in `Asset3D/human` (manVN, juno3, rowan) into the neighborhood through a system that more models can join later.
+- **Completed:**
+  - `apps/game/scripts/optimize-characters.cjs`: one config list for all characters; keeps skin and clips; WebP textures (vendor color 2048, rest 1024), optional Meshopt decimation with an error cap, resample, quantize, meshopt; 5 MB gate per file. Results: vendor 6.51 → 1.19 MB (102,860 → 53,797 triangles), manVN 2.33 → 0.83 MB, juno3 27.98 → 2.10 MB (67,157 → 40,283), rowan 32.48 → 2.19 MB (68,448 → 41,068).
+  - `features/khupho/world/humans.ts`: `HUMAN_MODELS` registry (file, height, clip name per role, optional stated walk speed), `HumanLibrary` (loads, stands each model on its feet at its height, measures the walk clip's ground speed from the planted foot when the source does not state it), `HumanActor` (SkeletonUtils clone, cross-faded roles, animation at 1/3 rate past 18 m and paused past 55 m).
+  - `people.ts`: `Vendor` at the cart (idle, an occasional look-for-customer or prepare-bread clip every 9-16 s, a welcome or invite clip when the player comes within 3.2 m, 25 s cooldown, visible 6:00-20:00 as before). `ModelWalker`: three sidewalk walkers now use juno3, manVN and rowan; the walk clip speed follows the ground speed within 0.8-1.45x, beyond that the walker moves at the clip's pace (manVN's clip is slow, 0.51 m/s, so he strolls at ~0.74 m/s). Every model falls back to the procedural person if it does not load.
+  - `engine.ts` loads the characters in parallel with the world build. Sources in `apps/game/assets-src/characters/` (Git LFS) with `SOURCE.md` (how to add a character).
+- **Files:** `apps/game/scripts/optimize-characters.cjs`, `apps/game/assets-src/characters/**`, `apps/game/assets-src/README.md`, `apps/game/public/assets/3d/optimized/characters/*.optimized.glb`, `apps/game/src/config/assetPaths.ts`, `apps/game/src/features/khupho/world/{humans,people,engine}.ts`, this file.
+- **Validation:** `pnpm typecheck`, `pnpm build`, `vitest --run src/features/khupho src/features/prologue src/app` (33 passed). Headless `/khupho` screenshots: the vendor stands beside the cart at a believable size facing the street; manVN walks along the sidewalk facing his direction. The foot-speed measurement matches the stated speeds of juno3 (1.26 vs 1.28 m/s) and rowan (1.38 vs 1.43 m/s).
+- **Not verified:** frame rate on a real GPU; foot sliding by eye in motion (headless frames are too slow); the licenses (owner-supplied, not stated; juno3/rowan clips are retargeted Mixamo captures).
+- **Deviations:** photographic-style models next to the stylized street (owner's choice). Changing the walker list changes the seeded random sequence after it, so the 12 bikes get different lanes, speeds and start positions than before (same logic).
+- **Follow-up:** shirt recoloring (analysis done earlier, not started); blink and face morphs for juno3/rowan are not used.
+
+
 ### 2026-11-15 — Room v2 reached through a white doorway in house no. 59
 - **Objective:** Make the `/roomv2` apartment the player's room in house no. 59 of `/khupho`, without rebuilding any room of the street world (owner direction after two heavier attempts).
 - **Completed:** The master bedroom is untouched. The other second-floor room (rear bedroom) keeps its door, and behind the open door stands a plain white panel like a portal. Stepping into it whites out the screen and shows the room from `/roomv2` exactly as it was; its own door whites the screen out again and puts the player back in the hall, with the door closed behind them. The room is built in standby (shaders compiled, reflections baked, no loop) when the player comes within 30 m of the house, so it is ready when needed, and is kept for the next visit. `/roomv2` and the prologue behave as before. The earlier attempts (live street through the window, snapshot picture, balcony door, weather-driven light) were removed.

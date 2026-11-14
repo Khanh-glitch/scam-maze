@@ -11,5 +11,7 @@ dist
 apps/game/.voice-cache/
 # Large third-party source exports (production assets live in apps/game/public)
 apps/game/assets-src/vehicles/*-gltf/
+# Local-only source: the Sketchfab Standard license does not allow redistributing the model file (see SOURCE.md)
+apps/game/assets-src/vehicles/parked/honda-cg-125.glb
 # Playwright MCP output (screenshots, console logs, page snapshots from QA runs)
 .kiro/qa-output/

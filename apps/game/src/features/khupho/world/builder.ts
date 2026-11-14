@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mat } from './materials';
 import { mulberry32 } from './util';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { queueProps, type PropKind, type PropPlacement } from './streetFurniture';
 
 export type FaceKey = 'px' | 'nx' | 'py' | 'ny' | 'pz' | 'nz';
 export type Faces = Partial<Record<FaceKey, string | null>>;
@@ -20,6 +21,13 @@ export class Builder {
   surfs: Surf[] = [];
   M = new THREE.Matrix4();
   private stack: THREE.Matrix4[] = [];
+  /** Model props recorded by the furniture helpers (drawn instanced, see streetFurniture.ts). */
+  props: PropPlacement[] = [];
+  /** Records a model prop at (x, y, z), turned by `yaw` and scaled by `scale`, in the current frame. */
+  prop(kind: PropKind, x: number, y: number, z: number, yaw = 0, scale = 1) {
+    const local = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw), new THREE.Vector3(scale, scale, scale));
+    this.props.push({ kind, matrix: this.M.clone().multiply(local) });
+  }
 
   push(x = 0, y = 0, z = 0, ry = 0, rx = 0, rz = 0) {
     this.stack.push(this.M.clone());
@@ -265,6 +273,7 @@ export class Builder {
 
   build(parent: THREE.Object3D, opts: { shadows?: boolean } = {}): THREE.Mesh[] {
     const out: THREE.Mesh[] = [];
+    queueProps(parent, this.props); this.props = [];
     this.buckets.forEach((b, key) => {
       if (!b.idx.length) return;
       const g = new THREE.BufferGeometry();

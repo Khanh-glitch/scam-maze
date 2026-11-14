@@ -3,13 +3,19 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import type { Ctx } from './types';
 import type { House } from './house';
 import type { AudioSys } from './audio';
-import { makeGroup } from './builder';
+import { makeGroup, type Col } from './builder';
 import { motorbike } from './furniture';
 import { mulberry32, clamp } from './util';
 import { mat } from './materials';
 import { BikeRiderInstance, type BikeRiderTemplate } from './bikeRider';
+import type { HumanActor, HumanLibrary, HumanModelId, OutfitPart } from './humans';
+import { hasProp, propSize, queueWorldProp } from './streetFurniture';
 
-export interface Life { update(dt: number, t: number): void }
+export interface Life {
+  update(dt: number, t: number): void;
+  /** Positions of the path walkers and the bikes (dev checks and tests). */
+  stats(): { people: readonly THREE.Vector3[]; bikes: { x: number; lane: number; dir: number; speed: number }[] };
+}
 
 const SKIN = ['#e0ac84', '#d49a72', '#c98d68', '#e8bb96', '#a8714f'];
 const SHIRT = ['#3f6fa8', '#b5473b', '#e0c36a', '#5f9a6a', '#d8d4c8', '#7a5a9a', '#2f2f35', '#d98a4a', '#6aa6b8', '#c4688a', '#f2efe6'];
@@ -202,13 +208,128 @@ class Resident {
   }
 }
 
-class Walker {
-  p: Person; i = 0; ph = Math.random() * 6;
-  pts: THREE.Vector3[];
+/** How far ahead (m) a walker looks for people in its way, and how wide its way is (to each side). */
+const AVOID_LOOK = 2.8;
+const AVOID_WIDTH = 0.7;
+/** Side step (m) off the path to pass someone, and how fast (m/s) the walker moves sideways. */
+const SIDESTEP = 0.7;
+const SIDESTEP_SPEED = 0.9;
+/** Seconds without anyone in the way before a walker drifts back onto its path. */
+const AVOID_CLEAR = 1.2;
+/** Side offsets (m) tried to get around a solid obstacle on the path. */
+const OBSTACLE_OFFSETS = [0, 0.6, -0.6, 1.0, -1.0, 1.4, -1.4];
+/** A walker that cannot step aside waits at most this long (s), then squeezes past slowly. */
+const AVOID_WAIT = 2.5;
+
+/**
+ * Walks back and forth along `pts`, stepping to one side when a person (another walker or the
+ * player) is in the way: away from where that person is, to the right when they are straight ahead,
+ * so two people walking toward each other pass. A side blocked by a solid (tree, parked bike, wall)
+ * is not taken; with both sides blocked the walker waits, then squeezes past slowly.
+ */
+class PathFollower {
+  i = 0;
+  /** Point on the path the walker is abreast of; the walker stands `offset` m to its right. */
+  private readonly base: THREE.Vector3;
+  private offset = 0;
+  private target = 0;
+  private clearT = 0;
+  private decideT = Math.random() * 0.15;
+  private waitT = 0;
+  private stuckT = 0;
+  /** Share of the walking speed used now (slower while passing close, 0 while waiting). */
+  pace = 1;
+  private readonly probe = { x: 0, z: 0 };
+  readonly pts: THREE.Vector3[];
   sp: number;
-  ctx: Ctx;
-  constructor(pts: THREE.Vector3[], sp: number, ctx: Ctx, r: () => number, o: { hat?: boolean; kid?: boolean; elder?: boolean; pole?: boolean; shirt?: string } = {}) { this.pts = pts; this.sp = sp; this.ctx = ctx;
-    this.p = makePerson(r, o); ctx.root.add(this.p.g); this.p.g.position.copy(pts[0]);
+  private readonly ctx: Ctx;
+  readonly g: THREE.Object3D;
+  constructor(pts: THREE.Vector3[], sp: number, ctx: Ctx, g: THREE.Object3D) {
+    this.pts = pts; this.sp = sp; this.ctx = ctx; this.g = g;
+    this.base = pts[0].clone(); g.position.copy(pts[0]);
+  }
+  /** True when a 0.25 m body at (x, z) would be pushed out of a solid. */
+  private solidAt(x: number, z: number) {
+    this.probe.x = x; this.probe.z = z;
+    this.ctx.phys.collide(this.probe, this.base.y, 0.25);
+    return Math.abs(this.probe.x - x) + Math.abs(this.probe.z - z) > 0.05;
+  }
+  /** Moves the walker; returns the distance walked this frame. `people` are all walkers' positions. */
+  step(dt: number, people: readonly THREE.Vector3[], player: THREE.Vector3): number {
+    const g = this.g, n = this.pts[this.i];
+    let dx = n.x - this.base.x, dz = n.z - this.base.z, d = Math.hypot(dx, dz);
+    if (d < 0.15) {
+      // Turning around: the right-hand side flips, so the same spot is now on the other side.
+      this.i = (this.i + 1) % this.pts.length; this.offset = -this.offset; this.target = -this.target;
+      const m = this.pts[this.i]; dx = m.x - this.base.x; dz = m.z - this.base.z; d = Math.max(1e-4, Math.hypot(dx, dz));
+    }
+    const fx = dx / d, fz = dz / d, rx = -fz, rz = fx;
+    this.decideT -= dt;
+    if (this.decideT <= 0) {
+      this.decideT = 0.15;
+      let along = Infinity, lat = 0;
+      const look = (px: number, pz: number) => {
+        const ox = px - g.position.x, oz = pz - g.position.z, a = ox * fx + oz * fz, l = ox * rx + oz * rz;
+        if (a > -0.3 && a < AVOID_LOOK && Math.abs(l) < AVOID_WIDTH && a < along) { along = a; lat = l; }
+      };
+      for (const q of people) if (q !== g.position) look(q.x, q.z);
+      if (player.y - 1.62 < this.base.y + 1) look(player.x, player.z);
+      if (along !== Infinity) {
+        // Away from the person; to the right when they are straight ahead.
+        const side = lat > 0.1 ? -1 : 1;
+        const free = (o: number) => !this.solidAt(this.base.x + rx * o + fx * 0.5, this.base.z + rz * o + fz * 0.5);
+        if (free(side * SIDESTEP)) this.target = side * SIDESTEP;
+        else if (free(-side * SIDESTEP)) this.target = -side * SIDESTEP;
+        const close = along < 0.9 && Math.abs(lat - (this.target - this.offset)) < 0.55;
+        const blocked = close && Math.abs(this.target - this.offset) < 0.1 && along < 0.7;
+        this.waitT = blocked ? this.waitT + 0.15 : 0;
+        this.pace = blocked ? (this.waitT > AVOID_WAIT ? 0.35 : 0) : close ? 0.45 : 0.85;
+        this.clearT = AVOID_CLEAR;
+      } else {
+        this.clearT -= 0.15;
+        this.pace = 1; this.waitT = 0;
+        if (this.clearT <= 0) this.target = 0;
+      }
+      // Solid things on the way (the banh mi cart, tables, parked bikes): walk around them. The
+      // offset closest to the planned one whose next 1.2 m is clear wins; with none, wait, then turn back.
+      const clear = (o: number) => !this.solidAt(this.base.x + rx * o + fx * 0.55, this.base.z + rz * o + fz * 0.55)
+        && !this.solidAt(this.base.x + rx * o + fx * 1.2, this.base.z + rz * o + fz * 1.2);
+      if (!clear(this.target)) {
+        const options = OBSTACLE_OFFSETS.filter(clear).sort((a, b) => Math.abs(a - this.target) - Math.abs(b - this.target));
+        if (options.length) { this.target = options[0]; this.clearT = AVOID_CLEAR; this.stuckT = 0; }
+        else {
+          this.pace = 0; this.stuckT += 0.15;
+          if (this.stuckT > AVOID_WAIT) { this.stuckT = 0; this.i = (this.i + 1) % this.pts.length; this.offset = -this.offset; this.target = -this.target; }
+        }
+      } else this.stuckT = 0;
+    }
+    const before = this.offset;
+    const ds = SIDESTEP_SPEED * dt;
+    this.offset += THREE.MathUtils.clamp(this.target - this.offset, -ds, ds);
+    const st = Math.min(this.sp * this.pace * dt, d);
+    this.base.x += fx * st; this.base.z += fz * st;
+    const side = this.offset - before;
+    const nx = this.base.x + rx * this.offset, nz = this.base.z + rz * this.offset;
+    const mx = fx * st + rx * side, mz = fz * st + rz * side;
+    // Never stand inside a solid, whatever the plan said.
+    this.probe.x = nx; this.probe.z = nz; this.ctx.phys.collide(this.probe, this.base.y, 0.22);
+    g.position.x = this.probe.x; g.position.z = this.probe.z;
+    if (mx * mx + mz * mz > 1e-8) {
+      const want = Math.atan2(mx, mz); let dy = want - g.rotation.y; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
+      g.rotation.y += dy * Math.min(1, dt * 6);
+    }
+    const fy = this.ctx.phys.floorAt(g.position.x, g.position.z, 2, 0.6).y; g.position.y += (fy - g.position.y) * Math.min(1, dt * 8);
+    this.base.y = g.position.y;
+    return Math.hypot(st, side);
+  }
+}
+
+class Walker {
+  p: Person; ph = Math.random() * 6;
+  path: PathFollower;
+  constructor(pts: THREE.Vector3[], sp: number, ctx: Ctx, r: () => number, o: { hat?: boolean; kid?: boolean; elder?: boolean; pole?: boolean; shirt?: string } = {}) {
+    this.p = makePerson(r, o); ctx.root.add(this.p.g);
+    this.path = new PathFollower(pts, sp, ctx, this.p.g);
     if (o.pole) {
       // carrying pole with two baskets (gánh hàng rong)
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 1.4, 6), mat('woodP:#8a6a3a'));
@@ -221,15 +342,9 @@ class Walker {
       }
     }
   }
-  update(dt: number, t: number) {
-    const g = this.p.g, n = this.pts[this.i], dx = n.x - g.position.x, dz = n.z - g.position.z, d = Math.hypot(dx, dz);
-    if (d < 0.15) { this.i = (this.i + 1) % this.pts.length; }
-    else {
-      const want = Math.atan2(dx, dz); let dy = want - g.rotation.y; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
-      g.rotation.y += dy * Math.min(1, dt * 6); const st = this.sp * dt; g.position.x += (dx / d) * st; g.position.z += (dz / d) * st; this.ph += st * 5.4;
-      const fy = this.ctx.phys.floorAt(g.position.x, g.position.z, 2, 0.6).y; g.position.y += (fy - g.position.y) * Math.min(1, dt * 8);
-    }
-    pose(this.p, 'walk', t, this.ph, 1);
+  update(dt: number, t: number, people: readonly THREE.Vector3[], player: THREE.Vector3) {
+    this.ph += this.path.step(dt, people, player) * 5.4;
+    pose(this.p, 'walk', t, this.ph, this.path.pace > 0 ? 1 : 0);
   }
 }
 
@@ -244,8 +359,164 @@ class Static {
   update(t: number, hour: number) { const v = !this.hours || (hour >= this.hours[0] && hour < this.hours[1]); this.p.g.visible = v; if (v) pose(this.p, this.poseName, t, 0, 0); }
 }
 
+/** Clothing colors for street NPCs (each walker draws its own top, bottom and shoes). */
+const OUTFIT_TOP = ['#f2efe6', '#3f6fa8', '#b5473b', '#5f9a6a', '#2f2f35', '#d8d4c8', '#c4688a', '#e0c36a', '#6aa6b8', '#7a5a9a', '#d98a4a'];
+const OUTFIT_BOTTOM = ['#2d3445', '#4a4036', '#6b6f78', '#25292f', '#8a7a62', '#1f2a3a', '#5a4a3a', '#d8d0c0'];
+const OUTFIT_SHOES = ['#1b1b1b', '#3a2a20', '#e8e4dc', '#5a4a3a'];
+/** Model walkers farther than this (m) are not drawn. */
+const WALKER_HIDE_DISTANCE = 60;
+
+/** Slowest and fastest playback of a walk clip before its legs look wrong. */
+const WALK_CLIP_RANGE: [number, number] = [0.8, 1.45];
+
+/** A character model walking back and forth along `pts` (same path logic as Walker). */
+class ModelWalker {
+  a: HumanActor;
+  path: PathFollower;
+  private clipScale = 1;
+  constructor(actor: HumanActor, pts: THREE.Vector3[], sp: number, ctx: Ctx) {
+    this.a = actor; ctx.root.add(actor.object);
+    // The clip speed follows the ground speed so the feet do not slide. A clip is sped up or slowed
+    // down by at most WALK_CLIP_RANGE; past that the walker moves at the clip's pace instead.
+    let ts = 1;
+    if (actor.walkSpeed > 0) {
+      ts = THREE.MathUtils.clamp(sp / actor.walkSpeed, WALK_CLIP_RANGE[0], WALK_CLIP_RANGE[1]);
+      sp = actor.walkSpeed * ts;
+    }
+    this.clipScale = ts;
+    this.path = new PathFollower(pts, sp, ctx, actor.object);
+    actor.play('walk', { fade: 0, timeScale: ts });
+  }
+  update(dt: number, player: THREE.Vector3, people: readonly THREE.Vector3[]) {
+    const g = this.a.object;
+    this.path.step(dt, people, player);
+    // Waiting for someone: stand; walking slower to pass close: slower steps, so the feet do not slide.
+    const pace = this.path.pace;
+    if (pace === 0) { if (this.a.playing !== 'idle') this.a.play('idle', { fade: 0.25 }); }
+    else if (this.a.playing !== 'walk') this.a.play('walk', { fade: 0.25, timeScale: this.clipScale * pace });
+    else this.a.setTimeScale(this.clipScale * pace);
+    const away = g.position.distanceTo(player);
+    g.visible = away < WALKER_HIDE_DISTANCE;
+    this.a.update(dt, away);
+  }
+}
+
+/** Seconds between the vendor's own little actions (looking for customers, preparing bread). */
+const VENDOR_FIDGET: [number, number] = [9, 16];
+/** The vendor greets the player who comes within this distance (m), at most once per cooldown. */
+const VENDOR_GREET_DISTANCE = 3.2;
+const VENDOR_GREET_COOLDOWN = 25;
+
+/** The banh mi vendor beside the cart: idle, an occasional action, and a greeting when the player comes close. */
+class Vendor {
+  a: HumanActor;
+  hours: [number, number];
+  private next = 4;
+  private greetT = 0;
+  private near = false;
+  constructor(actor: HumanActor, ctx: Ctx, x: number, y: number, z: number, yaw: number, hours: [number, number]) {
+    this.a = actor; this.hours = hours;
+    actor.object.position.set(x, y, z); actor.object.rotation.y = yaw; ctx.root.add(actor.object);
+    actor.play('idle', { fade: 0 });
+  }
+  private once(role: 'welcome' | 'invite' | 'prepare' | 'lookAround') {
+    if (!this.a.can(role)) return;
+    this.a.play(role, { once: true, fade: 0.35, then: () => this.a.play('idle', { fade: 0.45 }) });
+  }
+  update(dt: number, hour: number, player: THREE.Vector3) {
+    const v = hour >= this.hours[0] && hour < this.hours[1];
+    this.a.object.visible = v;
+    if (!v) return;
+    const d = this.a.object.position.distanceTo(player);
+    this.greetT -= dt;
+    const near = d < VENDOR_GREET_DISTANCE && player.y < 1.2;
+    if (near && !this.near && this.greetT <= 0) {
+      this.greetT = VENDOR_GREET_COOLDOWN;
+      this.once(Math.random() < 0.5 ? 'welcome' : 'invite');
+      this.next = VENDOR_FIDGET[0];
+    }
+    this.near = near;
+    this.next -= dt;
+    if (this.next <= 0 && this.a.playing === 'idle') {
+      this.next = VENDOR_FIDGET[0] + Math.random() * (VENDOR_FIDGET[1] - VENDOR_FIDGET[0]);
+      this.once(Math.random() < 0.55 ? 'lookAround' : 'prepare');
+    }
+    this.a.update(dt, d);
+  }
+}
+
+/** Half length and half width (m) of a bike with rider, used for its collider and for braking. */
+const BIKE_HALF_LEN = 0.95;
+const BIKE_HALF_WIDTH = 0.42;
+/** Collision radius of the player (Player.update uses 0.28). */
+const PLAYER_RADIUS = 0.28;
+/** Distance (m) a bike keeps to the player or to the bike ahead once stopped. */
+const BIKE_STOP_GAP = 0.8;
+/** Braking deceleration (m/s²) a bike plans with; it brakes harder only when it must. */
+const BIKE_DECEL = 4.5;
+/** How far ahead (m) a bike looks for the player and for other bikes. */
+const BIKE_LOOK = 18;
+/** Street loop: bikes leave at +/-STREET_END and come back on the other end. */
+const STREET_END = 72;
+/** Height of the camera above the feet (Player.eyeH). */
+const EYE_HEIGHT = 1.62;
+
+/** Delay (s) before a held-up bike's first honk, and between honks (horn.mp3 lasts 2.5 s). */
+const HORN_FIRST: [number, number] = [0.6, 1.2];
+const HORN_EVERY: [number, number] = [4, 6.5];
+
+/** Highest speed that still stops `gap` meters ahead at BIKE_DECEL (0 when the gap is used up). */
+const speedForGap = (gap: number) => (gap <= BIKE_STOP_GAP ? 0 : Math.sqrt(2 * BIKE_DECEL * (gap - BIKE_STOP_GAP)));
+
+/** A character model sitting on a low stool (the stool is placed with it), visible during `hours`. */
+class Sitter {
+  a: HumanActor;
+  hours: [number, number];
+  constructor(actor: HumanActor, ctx: Ctx, x: number, y: number, z: number, yaw: number, hours: [number, number]) {
+    this.a = actor; this.hours = hours;
+    actor.object.position.set(x, y, z); actor.object.rotation.y = yaw; ctx.root.add(actor.object);
+    actor.play('sit', { fade: 0 });
+    queueWorldProp('stool-low', x, y, z, yaw);
+  }
+  update(dt: number, hour: number, player: THREE.Vector3) {
+    const v = hour >= this.hours[0] && hour < this.hours[1];
+    this.a.object.visible = v;
+    if (v) this.a.update(dt, this.a.object.position.distanceTo(player));
+  }
+}
+
+/** Shop staff are not drawn past this distance (m); they are inside, behind the shop front. */
+const STAFF_HIDE_DISTANCE = 35;
+/** Hours a shop is staffed (the procedural shopkeeper's schedule runs 6:00-21:00). */
+const STAFF_HOURS: [number, number] = [6, 21];
+
+/** A street NPC model working in a shop: sits on the counter stool or stands at its spot while the shop is open. */
+class ShopStaff {
+  a: HumanActor;
+  constructor(actor: HumanActor, h: House, spot: House['spots'][string], ctx: Ctx) {
+    this.a = actor;
+    const w = h.wp(spot.x, 0, spot.z);
+    actor.object.position.set(w.x, h.F(spot.k) + (spot.y ?? 0), w.z);
+    actor.object.rotation.y = spot.yaw + h.rot;
+    ctx.root.add(actor.object);
+    // The counter stool is 0.42 m high; the other spots (cooking, repairing, on the phone) are standing.
+    if (!(spot.pose === 'sit' && actor.play('sitHigh', { fade: 0 }))) actor.play('idle', { fade: 0 });
+  }
+  update(dt: number, hour: number, player: THREE.Vector3) {
+    const d = this.a.object.position.distanceTo(player);
+    const v = hour >= STAFF_HOURS[0] && hour < STAFF_HOURS[1] && d < STAFF_HIDE_DISTANCE;
+    this.a.object.visible = v;
+    if (v) this.a.update(dt, d);
+  }
+}
+
+/** Street NPC models used as shop staff, in turn. */
+const STAFF_MODELS: HumanModelId[] = ['npcYoshida', 'npcAlice', 'npcLinMei', 'npcArthur', 'npcSofia', 'npcAlan', 'npcNapole', 'npcFreya', 'npcArchetype'];
+
 class Bike {
   g: THREE.Group; speed = 0; base: number; dir: 1 | -1; lane: number; x: number; info: { pos: THREE.Vector3; speed: number };
+  /** Box the player collides with (Physics.dynamic), moved with the bike. */
+  col: Col;
   /** The scanned scooter and rider when its file loaded; otherwise the procedural bike and person below. */
   private model: BikeRiderInstance | null = null;
   constructor(ctx: Ctx, r: () => number, dir: 1 | -1, x: number, vehicles: { pos: THREE.Vector3; speed: number }[], template: BikeRiderTemplate | null) {
@@ -264,14 +535,54 @@ class Bike {
     this.dir = dir; this.lane = dir > 0 ? 1.8 + r() * 0.5 : -1.8 - r() * 0.5; this.x = x; this.base = 4.5 + r() * 5;
     this.g.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2; ctx.root.add(this.g);
     this.info = { pos: this.g.position, speed: 0 }; vehicles.push(this.info);
+    this.col = { x0: 0, x1: 0, y0: 0, y1: 1.5, z0: this.lane - BIKE_HALF_WIDTH, z1: this.lane + BIKE_HALF_WIDTH, enabled: true, tag: 'bike' };
+    ctx.phys.dynamic.push(this.col);
+    this.placeCollider();
   }
-  update(dt: number, player: THREE.Vector3, audio: AudioSys) {
-    let target = this.base;
-    const ahead = (player.x - this.x) * this.dir;
-    if (ahead > 0 && ahead < 9 && Math.abs(player.z - this.lane) < 1.3 && player.y < 1) target = 0;
-    this.speed += (target - this.speed) * Math.min(1, dt * (target ? 1.2 : 3));
-    this.x += this.dir * this.speed * dt; if (this.x > 72) this.x = -72; if (this.x < -72) this.x = 72;
+  private placeCollider() { this.col.x0 = this.x - BIKE_HALF_LEN; this.col.x1 = this.x + BIKE_HALF_LEN; }
+  /** Free road (m) in front of this bike's nose up to `x`, along its direction, across the street loop. */
+  private aheadOf(x: number) { const L = STREET_END * 2; return (((x - this.x) * this.dir) % L + L) % L; }
+  /**
+   * Speed limit from what is ahead: the player standing in (or next to) the lane, and the next
+   * bike in the same lane. Bikes brake to stop BIKE_STOP_GAP short of either.
+   */
+  private limit(player: THREE.Vector3, bikes: readonly Bike[]): { v: number; playerGap: number; bikeGap: number } {
+    let v = this.base, playerGap = Infinity, bikeGap = Infinity;
+    const feet = player.y - EYE_HEIGHT;
+    if (feet < 0.8 && Math.abs(player.z - this.lane) < BIKE_HALF_WIDTH + PLAYER_RADIUS + 0.35) {
+      const along = (player.x - this.x) * this.dir;
+      // Also while overlapping from behind the nose (the player stepped onto the bike): stand still.
+      if (along > -BIKE_HALF_LEN - PLAYER_RADIUS && along < BIKE_LOOK) {
+        playerGap = along - BIKE_HALF_LEN - PLAYER_RADIUS;
+        v = Math.min(v, speedForGap(playerGap));
+      }
+    }
+    for (const o of bikes) {
+      if (o === this || o.dir !== this.dir || Math.abs(o.lane - this.lane) > BIKE_HALF_WIDTH * 2 + 0.25) continue;
+      const gap = this.aheadOf(o.x) - BIKE_HALF_LEN * 2;
+      bikeGap = Math.min(bikeGap, gap);
+      if (gap < BIKE_LOOK) v = Math.min(v, Math.max(0, Math.min(o.speed + speedForGap(gap) * 0.5, speedForGap(gap))));
+    }
+    return { v, playerGap, bikeGap };
+  }
+  /** Seconds to the next honk while this bike is held up by the player (NaN when not held up). */
+  private hornT = NaN;
+  update(dt: number, player: THREE.Vector3, audio: AudioSys, bikes: readonly Bike[]) {
+    const { v, playerGap, bikeGap } = this.limit(player, bikes);
+    // Brake at once to the limit when it is below the speed; speed up gently otherwise.
+    if (v < this.speed) this.speed = Math.max(v, this.speed - BIKE_DECEL * 2.5 * dt);
+    else this.speed += (v - this.speed) * Math.min(1, dt * 1.2);
+    let step = this.speed * dt;
+    // Never move into the player or the bike ahead, whatever the speed was.
+    if (playerGap !== Infinity) step = Math.min(step, Math.max(0, playerGap - BIKE_STOP_GAP * 0.5));
+    for (const o of bikes) {
+      if (o === this || o.dir !== this.dir || Math.abs(o.lane - this.lane) > BIKE_HALF_WIDTH * 2 + 0.25) continue;
+      step = Math.min(step, Math.max(0, this.aheadOf(o.x) - BIKE_HALF_LEN * 2 - 0.3));
+    }
+    if (step < this.speed * dt) this.speed = step / Math.max(dt, 1e-4);
+    this.x += this.dir * step; if (this.x > STREET_END) this.x -= STREET_END * 2; if (this.x < -STREET_END) this.x += STREET_END * 2;
     this.g.position.set(this.x, 0, this.lane); this.info.speed = this.speed;
+    this.placeCollider();
     if (this.model) {
       // While stopped, the rider looks at the player (yaw in the bike's own frame, 0 = ahead).
       let look: number | null = null;
@@ -281,44 +592,121 @@ class Bike {
       }
       this.model.update(dt, this.speed, look);
     }
-    if (this.speed < 0.5 && ahead > 0 && ahead < 9) audio.horn(this.g.position);
+    // Only the first bike held up by the player honks (the ones queued behind wait quietly):
+    // a first honk soon after stopping, then one every few seconds with a pause between.
+    const heldUp = this.speed < 0.5 && playerGap < 4 && playerGap < bikeGap;
+    if (!heldUp) this.hornT = NaN;
+    else {
+      if (Number.isNaN(this.hornT)) this.hornT = HORN_FIRST[0] + Math.random() * (HORN_FIRST[1] - HORN_FIRST[0]);
+      this.hornT -= dt;
+      if (this.hornT <= 0) { audio.horn(this.g.position); this.hornT = HORN_EVERY[0] + Math.random() * (HORN_EVERY[1] - HORN_EVERY[0]); }
+    }
   }
 }
 
-export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vector3; speed: number }[], audio: AudioSys, bikeRider: BikeRiderTemplate | null = null): Life {
+export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vector3; speed: number }[], audio: AudioSys, bikeRider: BikeRiderTemplate | null = null, humans: HumanLibrary | null = null): Life {
   PERSON_GROUPS.length = 0;
   const r = mulberry32(99);
   const residents: Resident[] = [], walkers: Walker[] = [], statics: Static[] = [], bikes: Bike[] = [];
+  const modelWalkers: ModelWalker[] = [], vendors: Vendor[] = [], sitters: Sitter[] = [], staff: ShopStaff[] = [];
+  // Outfits for model people come from their own random stream (see below); staff draw from it too.
+  const staffRng = mulberry32(777);
+  let staffN = 0;
   houses.filter((h) => !h.spec.lite).forEach((h, i) => {
     const shop = ['grocery', 'cafe', 'pho', 'repair', 'hair'].includes(h.spec.ground);
-    const list: Slot[][] = shop ? [SHOP, MOM, h.n > 1 ? KID : DAD] : i % 3 === 0 ? [MOM, DAD, KID] : i % 3 === 1 ? [MOM, ELDER] : [ELDER, DAD, MOM];
+    if (shop && humans) {
+      // Shop staff are street NPC models (owner): the shopkeeper at the shop spot, plus a helper
+      // at the lounge spot in the cafe and the noodle shop. Without models: the procedural shopkeeper.
+      const keeper = h.spots['shop'];
+      // Helper: cafe customer seat by the TV; noodle shop server standing beside the table set (rooms.ts).
+      const helper = !keeper ? undefined
+        : h.spec.ground === 'cafe' ? h.spots['tv']
+        : h.spec.ground === 'pho' ? { ...keeper, x: 1.95, z: 2.55, yaw: -Math.PI / 2, pose: 'stand', device: undefined }
+        : undefined;
+      const spots = [keeper, helper].filter(Boolean) as House['spots'][string][];
+      let placed = 0;
+      for (const sp of spots) {
+        const id = STAFF_MODELS[staffN++ % STAFF_MODELS.length];
+        const actor = humans.spawn(id, { top: pick(staffRng, OUTFIT_TOP), bottom: pick(staffRng, OUTFIT_BOTTOM), shoes: pick(staffRng, OUTFIT_SHOES) });
+        if (actor) { staff.push(new ShopStaff(actor, h, sp, ctx)); placed++; }
+      }
+      if (placed) return;
+    }
+    // Shops keep only the shopkeeper inside (owner: too many people in the shops).
+    const list: Slot[][] = shop ? [SHOP] : i % 3 === 0 ? [MOM, DAD, KID] : i % 3 === 1 ? [MOM, ELDER] : [ELDER, DAD, MOM];
     list.forEach((s, j) => residents.push(new Resident(h, s, ctx, r, { female: j === 0, kid: s === KID, elder: s === ELDER })));
   });
   residents.forEach((res) => { const act = pickSlot(res.sched, ctx.env.hour); res.cur = ''; res.begin(act, false); });
   const V = (x: number, z: number) => new THREE.Vector3(x, 0.15, z);
-  const sid = (zz: number, a: number, b: number, sp: number, o: ConstructorParameters<typeof Walker>[4] = {}) => walkers.push(new Walker([V(a, zz), V(b, zz)], sp, ctx, r, o));
-  sid(4.7, -50, 50, 1.2, { hat: true }); sid(-4.6, 45, -50, 1.1); sid(4.3, 40, -30, 1.3, { kid: true }); sid(-4.3, -45, 40, 0.8, { pole: true, hat: true });
-  sid(4.9, -20, 30, 1.0, { elder: true }); sid(-5.0, 20, -40, 1.25, { hat: true }); sid(4.5, 45, -45, 1.4);
-  const alley = (a: number, b: number, sp: number, x: number, o: ConstructorParameters<typeof Walker>[4] = {}) => walkers.push(new Walker([new THREE.Vector3(x, 0.02, a), new THREE.Vector3(x, 0.02, b)], sp, ctx, r, o));
-  alley(8, 45, 1.0, 10.1, { hat: true }); alley(44, 8, 1.2, 9.3); alley(20, 46, 0.7, 10.7, { elder: true }); alley(12, 38, 1.5, 9.8, { kid: true });
+  // Street NPCs get their own random stream for outfits, so adding one does not reshuffle the rest of the world.
+  const outfitRng = mulberry32(4242);
+  const outfit = (model: HumanModelId): Partial<Record<OutfitPart, string>> | undefined => model.startsWith('npc')
+    ? { top: pick(outfitRng, OUTFIT_TOP), bottom: pick(outfitRng, OUTFIT_BOTTOM), shoes: pick(outfitRng, OUTFIT_SHOES) }
+    : undefined;
+  /** A path walker using a character model when it loaded; otherwise a procedural person, or nobody when `fallback` is false. */
+  const walk = (pts: THREE.Vector3[], sp: number, o: ConstructorParameters<typeof Walker>[4], model?: HumanModelId, fallback = true) => {
+    const actor = model ? humans?.spawn(model, outfit(model)) : null;
+    if (actor && actor.can('walk')) modelWalkers.push(new ModelWalker(actor, pts, sp, ctx));
+    else if (fallback) walkers.push(new Walker(pts, sp, ctx, r, o));
+  };
+  const sid = (zz: number, a: number, b: number, sp: number, o: ConstructorParameters<typeof Walker>[4] = {}, model?: HumanModelId, fallback = true) => walk([V(a, zz), V(b, zz)], sp, o, model, fallback);
+  sid(4.7, -50, 50, 1.2, { hat: true }, 'npcYoshida'); sid(-4.6, 45, -50, 1.1, {}, 'juno3'); sid(4.3, 40, -30, 1.3, { kid: true }); sid(-4.3, -45, 40, 0.8, { pole: true, hat: true });
+  sid(4.9, -20, 30, 1.0, { elder: true }, 'npcNguoiGia'); sid(-5.0, 20, -40, 1.25, { hat: true }, 'manVN'); sid(4.5, 45, -45, 1.4, {}, 'rowan');
+  const alley = (a: number, b: number, sp: number, x: number, o: ConstructorParameters<typeof Walker>[4] = {}, model?: HumanModelId) => walk([new THREE.Vector3(x, 0.02, a), new THREE.Vector3(x, 0.02, b)], sp, o, model);
+  alley(8, 45, 1.0, 10.1, { hat: true }, 'npcArthur'); alley(44, 8, 1.2, 9.3, {}, 'npcAlice'); alley(20, 46, 0.7, 10.7, { elder: true }); alley(12, 38, 1.5, 9.8, { kid: true });
+  // Extra sidewalk walkers from the street NPC set (only when their model loaded).
+  sid(-4.9, -30, 35, 1.15, {}, 'npcAlan', false); sid(4.6, 10, -45, 1.05, {}, 'npcLinMei', false);
+  sid(-4.4, 0, 55, 1.2, {}, 'npcNapole', false); sid(4.2, -40, 20, 1.3, {}, 'npcArchetype', false);
+  sid(-4.7, 40, -20, 1.2, {}, 'npcBlackGuy', false); sid(4.4, -10, 50, 1.1, {}, 'npcFreya', false); sid(-4.5, -50, 0, 1.0, {}, 'npcSofia', false);
+  /**
+   * Someone sitting on a single low stool: a street NPC model when it loaded (with a stool model),
+   * otherwise the procedural person on a procedural-height stool.
+   */
+  const seat = (x: number, y: number, z: number, yaw: number, poseName: string, o: { elder?: boolean }, hours: [number, number], model: HumanModelId) => {
+    const actor = humans?.spawn(model, outfit(model));
+    if (actor && actor.can('sit') && hasProp('stool-low')) { sitters.push(new Sitter(actor, ctx, x, y, z, yaw, hours)); return; }
+    statics.push(new Static(ctx, r, x, y, z, yaw, poseName, o, hours));
+  };
   const cafe = houses.filter((h) => !h.spec.lite)[3];
-  if (cafe) { const cx = cafe.ox - cafe.W / 2; statics.push(new Static(ctx, r, cx - 1.5, 0.15, 4.5, Math.PI / 2, 'sip', { elder: true }, [6, 21])); statics.push(new Static(ctx, r, cx + 0.5, 0.15, 5.0, -Math.PI / 2, 'sip', {}, [7, 20])); }
-  // Banh mi vendor beside the cart from streetProps.ts.
-  statics.push(new Static(ctx, r, -1.75, 0.15, -4.9, 0, 'stand', { hat: true }, [6, 20]));
+  if (cafe) {
+    // In front of the cafe itself, beside its table set (neighborhood.ts puts the set at cx + 0.7).
+    const south = cafe.rot === 0, sgn = south ? 1 : -1, cx = (south ? cafe.ox : cafe.ox - cafe.W) + cafe.W / 2;
+    seat(cx - 1.4, 0.15, sgn * 4.7, Math.PI / 2, 'sip', { elder: true }, [6, 21], 'npcNguoiGia');
+    seat(cx - 0.55, 0.15, sgn * 4.7, -Math.PI / 2, 'sip', {}, [7, 20], 'npcArchetype');
+  }
+  // Banh mi vendor beside the cart from streetProps.ts, with the tall plastic chair next to her.
+  const vendorActor = humans?.spawn('banhmiVendor');
+  if (vendorActor) vendors.push(new Vendor(vendorActor, ctx, -1.75, 0.15, -4.9, 0, [6, 20]));
+  else statics.push(new Static(ctx, r, -1.75, 0.15, -4.9, 0, 'stand', { hat: true }, [6, 20]));
+  if (hasProp('stool-high')) {
+    const cx = -1.0, cz = -5.25, sz = propSize('stool-high')!;
+    queueWorldProp('stool-high', cx, 0.15, cz, -0.5);
+    ctx.phys.addCol({ x0: cx - sz.x * 0.45, x1: cx + sz.x * 0.45, y0: 0.15, y1: 0.15 + sz.y, z0: cz - sz.z * 0.45, z1: cz + sz.z * 0.45, enabled: true });
+  }
   statics.push(new Static(ctx, r, 6.6, 0.02, 46.2, 0.5, 'exercise', { elder: true }, [4.8, 7.5]));
-  statics.push(new Static(ctx, r, 20.6, 0.02, 45.8, Math.PI, 'sit', { elder: true }, [6, 22]));
+  seat(20.6, 0.02, 45.8, Math.PI, 'sit', { elder: true }, [6, 22], 'npcFreya');
   statics.push(new Static(ctx, r, 10.3, 0.02, 14.0, -Math.PI / 2, 'sweep', {}, [5.5, 7.2]));
   statics.push(new Static(ctx, r, 15.3, 0.02, 45.0, 0, 'phone', { kid: true }, [15.5, 22]));
   for (let i = 0; i < 12; i++) bikes.push(new Bike(ctx, r, i % 2 ? 1 : -1, -70 + i * 12 + r() * 6, vehicles, bikeRider));
+  // Everyone walking a path, for side-stepping (each walker skips its own entry).
+  const people: THREE.Vector3[] = [...walkers.map((w) => w.p.g.position), ...modelWalkers.map((w) => w.a.object.position)];
+  // People standing or sitting still on the street are in the way too (vendor, seated customers, statics).
+  const still: THREE.Vector3[] = [...vendors.map((v) => v.a.object.position), ...sitters.map((s) => s.a.object.position), ...statics.map((s) => s.p.g.position)];
+  const inWay: THREE.Vector3[] = [...people, ...still];
   let acc = 0;
   const occ = new Map<object, number>();
   return {
+    stats: () => ({ people, bikes: bikes.map((b) => ({ x: b.x, lane: b.lane, dir: b.dir, speed: b.speed })) }),
     update(dt, t) {
       const hour = ctx.env.hour, pp = ctx.eye;
       for (const rs of residents) rs.update(dt, t, hour, pp);
-      for (const w of walkers) w.update(dt, t);
+      for (const w of walkers) w.update(dt, t, inWay, pp);
+      for (const w of modelWalkers) w.update(dt, pp, inWay);
+      for (const s of sitters) s.update(dt, hour, pp);
+      for (const s of staff) s.update(dt, hour, pp);
+      for (const v of vendors) v.update(dt, hour, pp);
       for (const s of statics) s.update(t, hour);
-      for (const b of bikes) b.update(dt, pp, audio);
+      for (const b of bikes) b.update(dt, pp, audio, bikes);
       acc -= dt; if (acc > 0) return; acc = 0.6;
       occ.clear();
       for (const rs of residents) {
