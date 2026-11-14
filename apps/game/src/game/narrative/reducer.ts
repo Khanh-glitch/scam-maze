@@ -212,11 +212,9 @@ function findRecordIndex(state: ChapterState, callId: CallId): number {
   return -1;
 }
 
-/** True when the call was picked up before (answered, or answered and ended). */
-function wasAnswered(state: ChapterState, callId: CallId): boolean {
-  return state.call.log.some(
-    (record) => record.callId === callId && (record.status === "answered" || record.status === "ended"),
-  );
+/** True when the call has any record in the call log (it rang before, whatever happened to it). */
+function hasRung(state: ChapterState, callId: CallId): boolean {
+  return state.call.log.some((record) => record.callId === callId);
 }
 
 /** True when an accepted VERIFY_CLAIM with this method is in the Event_Log. */
@@ -360,8 +358,8 @@ function applyAction(state: ChapterState, action: CoreAction, scenario: Scenario
       const def = scenario.calls[callId];
       if (def.direction !== "incoming") return reject(REASONS.callNotYet);
       if (state.decision !== null) return reject(REASONS.decisionAlreadyMade);
-      // A call that was picked up never rings again; a declined call may ring again while `ringWhen` holds.
-      if (wasAnswered(state, callId)) return reject(REASONS.callAlreadyRang);
+      // Every incoming call rings at most once: answered, declined, missed or ended calls never ring again.
+      if (hasRung(state, callId)) return reject(REASONS.callAlreadyRang);
       if (!def.ringWhen.some((all) => evaluateConditions(all, state, scenario))) {
         return reject(REASONS.callNotYet);
       }

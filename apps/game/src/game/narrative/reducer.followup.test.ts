@@ -73,7 +73,7 @@ describe("RING_CALL for call.recovery through ringWhen", () => {
     expectRejected(decided, RING_RECOVERY, REASONS.decisionAlreadyMade);
   });
 
-  it("does not ring again after it was answered, but may ring again after a decline", () => {
+  it("does not ring again after it was answered, and not after a decline either", () => {
     const base = play(afterAlex(), [INSPECT_ORIGIN]);
     const answered = play(base, [RING_RECOVERY, ANSWER, option("rec.trust")]);
     expectRejected(answered, RING_RECOVERY, REASONS.callAlreadyRang);
@@ -82,8 +82,7 @@ describe("RING_CALL for call.recovery through ringWhen", () => {
 
     const declined = play(base, [RING_RECOVERY, END_CALL]);
     expect(declined.call.log.at(-1)?.status).toBe("declined");
-    const again = play(declined, [RING_RECOVERY]);
-    expect(again.call.log.at(-1)).toMatchObject({ callId: "call.recovery", status: "ringing", ringCount: 2 });
+    expectRejected(declined, RING_RECOVERY, REASONS.callAlreadyRang);
   });
 
   it("hanging up the second call records the hung-up tag without touching the first-call flag twice", () => {

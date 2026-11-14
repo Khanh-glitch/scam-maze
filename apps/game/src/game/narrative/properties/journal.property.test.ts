@@ -1,4 +1,4 @@
-// Re-enabled in task 7.4 and 7.6 to 7.17 once the scenario is assembled (all tests in this file are skipped until then).
+// Feature: chapter-01-double-deception, journal shows only discovered evidence (Requirements 4.5, 7.6)
 import { describe, expect, it } from "vitest";
 import {
   CORE_PROPERTY_RUNS,
@@ -72,7 +72,7 @@ function firstViolatingState(actions: readonly unknown[]): { index: number; viol
 /** Seeded property runs can exceed Vitest's 5 s default when the machine is loaded. */
 const PROPERTY_TIMEOUT_MS = 60_000;
 
-describe.skip("chapter core properties", () => {
+describe("chapter core properties", () => {
   // Feature: chapter-01-the-urgent-call, Property 10: The journal shows exactly the discovered evidence in order
   it("shows exactly the discovered evidence in discovery order, with notes once unlocked", () => {
     // **Validates: Requirements 11.7, 11.8**

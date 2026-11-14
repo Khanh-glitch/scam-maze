@@ -3,7 +3,9 @@
 // Validates: Requirements 3.7, 5.7, 9.8, 11.3, 12.2.
 //
 // The fixture is small (about 500 states), so the full solver runs once per file in `beforeAll`.
-// Shipped Chapter 1 data is analyzed when it is assembled (task 7.3), not here.
+// Shipped Chapter 1 data is analyzed in `chapter1/scenario.test.ts` (all endings, no unreachable
+// node or option, no soft lock; about 46 s), not here. Real-scenario random walks are in
+// `properties/noSoftLock.property.test.ts`.
 // The seeded tests walk the real reducer on the fixture and do not call the solver again.
 
 import { beforeAll, describe, expect, it } from "vitest";

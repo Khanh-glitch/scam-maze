@@ -1,9 +1,9 @@
-// Re-enabled in task 7.4 and 7.6 to 7.17 once the scenario is assembled (all tests in this file are skipped until then).
-// Property 11 (design.md, "Correctness Properties"): the debrief is derived only from data and
-// the Event_Log. Each case runs a seeded random action sequence, then completes the chapter with
-// the guided policy, and checks `buildDebrief` against values computed here from Scenario_Data,
-// `state.discovered` and `state.events`. It also checks that the debrief is the same when built
-// twice and when built from a state rebuilt by replaying the Event_Log actions.
+// Feature: chapter-01-double-deception, Property 14: Debrief is derived and honest
+// Validates: Requirements 16.1, 16.2, 16.3, 16.4
+// Each case runs a seeded random action sequence, then completes the chapter with the guided
+// policy, and checks `buildDebrief` against values computed here from Scenario_Data,
+// `state.discovered` and `state.events`. The scripted endings A to D (with variants) cover all
+// four outcomes. Failure messages carry the seed and the case index.
 
 import { describe, expect, it } from "vitest";
 
@@ -14,117 +14,142 @@ import {
   caseSeed,
   completeChapterFrom,
   generateActionSequence,
+  reachEndingA,
+  reachEndingB,
+  reachEndingC,
+  reachEndingD,
   runSequence,
 } from "../../../test/chapterRuns";
 import { createLcg, randomInt } from "../../../test/seededRandom";
+import { BEAT_TAG_PREFIX } from "../beats";
 import { CHAPTER_1_SCENARIO } from "../chapter1/scenario";
-import type { EvidenceId, WarningSignId } from "../chapter1/ids";
-import { evaluateConditions } from "../conditions";
+import { OUTCOME_IDS, type EvidenceId } from "../chapter1/ids";
 import { buildDebrief } from "../debrief";
-import { chapterReducer, createInitialState } from "../reducer";
 import type { ChapterState } from "../types";
 
 /** Seed offset so this file's sequences differ from other core property files. */
-const SEED = (CORE_PROPERTY_SEED ^ 0x000b) >>> 0;
-
-const scenario = CHAPTER_1_SCENARIO;
-
-/** Rebuilds a state by dispatching every Event_Log action from the initial state. */
-function replayEventLog(state: ChapterState): ChapterState {
-  let rebuilt = createInitialState();
-  for (const entry of state.events) {
-    const result = chapterReducer(rebuilt, entry.action, scenario);
-    if (!result.accepted) {
-      throw new Error(`Replay of event ${entry.seq} was rejected: ${result.reason ?? ""}`);
-    }
-    rebuilt = result.state;
-  }
-  return rebuilt;
-}
-
-function checkDebrief(state: ChapterState, label: string): void {
-  const outcome = state.outcome;
-  expect(outcome, `${label}: completed state has an outcome`).not.toBeNull();
-  if (outcome === null) return;
-
-  const view = buildDebrief(state, scenario);
-  expect(view, `${label}: debrief exists`).not.toBeNull();
-  if (view === null) return;
-
-  // Evidence found equals the discovered set, in discovery order.
-  expect(view.evidenceFound.map((item) => item.id), `${label}: evidence found`).toEqual(state.discovered);
-  for (const item of view.evidenceFound) {
-    expect(item.title, `${label}: evidence title ${item.id}`).toBe(scenario.evidence[item.id].title);
-  }
-
-  // Every decision line comes from decisionNotes for a tag present in that Event_Log entry,
-  // and every tagged entry with a note is listed.
-  const expectedDecisions = state.events.flatMap((entry) =>
-    entry.derived.debriefTags
-      .filter((tag) => Object.hasOwn(scenario.debrief.decisionNotes, tag))
-      .map((tag) => ({ seq: entry.seq, tag, text: scenario.debrief.decisionNotes[tag] })),
-  );
-  for (const line of view.decisions) {
-    const entry = state.events[line.seq];
-    expect(entry?.derived.debriefTags ?? [], `${label}: decision tag ${line.tag} in event ${line.seq}`).toContain(
-      line.tag,
-    );
-    expect(line.text, `${label}: decision text for ${line.tag}`).toBe(scenario.debrief.decisionNotes[line.tag]);
-  }
-  expect(view.decisions, `${label}: decision lines`).toEqual(expectedDecisions);
-
-  // Warning signs equal the union over the discovered evidence.
-  const expectedSigns = new Set<WarningSignId>(
-    state.discovered.flatMap((id) => scenario.evidence[id].warningSigns),
-  );
-  const noticed = view.warningSignsNoticed.map((sign) => sign.id);
-  expect(new Set(noticed).size, `${label}: warning signs have no duplicates`).toBe(noticed.length);
-  expect(new Set(noticed), `${label}: warning signs`).toEqual(expectedSigns);
-  for (const sign of view.warningSignsNoticed) {
-    expect(sign.label, `${label}: warning sign label ${sign.id}`).toBe(scenario.warningSigns[sign.id].label);
-  }
-
-  // Clues missed equal the undiscovered evidence that has a debrief hint, in scenario order.
-  const expectedMissed = (Object.keys(scenario.evidence) as EvidenceId[])
-    .filter((id) => Boolean(scenario.evidence[id].debriefHint) && !state.discovered.includes(id))
-    .map((id) => ({ id, title: scenario.evidence[id].title, hint: scenario.evidence[id].debriefHint }));
-  expect(view.cluesMissed, `${label}: clues missed`).toEqual(expectedMissed);
-
-  // Outcome summary and consequence variant match Scenario_Data.
-  const ending = scenario.endings[outcome];
-  expect(view.outcome.id).toBe(outcome);
-  expect(view.outcome.title).toBe(ending.title);
-  expect(view.outcome.summary).toBe(scenario.debrief.outcomeSummaries[outcome] ?? "");
-  expect(view.outcome.simulationLabel).toBe(ending.simulationLabel);
-  const variant = ending.variants.find((candidate) => evaluateConditions(candidate.when, state, scenario));
-  expect(variant, `${label}: a consequence variant matches`).toBeDefined();
-  expect(view.outcome.consequence, `${label}: consequence variant`).toEqual(
-    variant ? { id: variant.id, text: variant.text } : null,
-  );
-  expect(view.mechanism).toBe(scenario.debrief.mechanism);
-  expect(view.saferAlternatives).toEqual(scenario.debrief.saferAlternatives);
-
-  // Building twice gives a deep-equal view; replaying the Event_Log gives the same view.
-  expect(buildDebrief(state, scenario), `${label}: built twice`).toEqual(view);
-  const rebuilt = replayEventLog(state);
-  expect(rebuilt, `${label}: replayed state`).toEqual(state);
-  expect(buildDebrief(rebuilt, scenario), `${label}: debrief from replayed state`).toEqual(view);
-}
+const SEED = (CORE_PROPERTY_SEED ^ 0x000e) >>> 0;
 
 /** Seeded property runs can exceed Vitest's 5 s default when the machine is loaded. */
 const PROPERTY_TIMEOUT_MS = 60_000;
 
-describe.skip("Property 11: The debrief is derived only from data and the Event_Log", () => {
-  it("builds the debrief only from Scenario_Data and the Event_Log for random completed runs", () => {
-    // Feature: chapter-01-the-urgent-call, Property 11: The debrief is derived only from data and the Event_Log
+const scenario = CHAPTER_1_SCENARIO;
+
+/** Returns one message per violated check for a state that has an outcome. */
+function debriefProblems(state: ChapterState): string[] {
+  const problems: string[] = [];
+  const check = (ok: boolean, message: string): void => {
+    if (!ok) problems.push(message);
+  };
+
+  const eventsBefore = JSON.stringify(state.events);
+  const stateBefore = JSON.stringify(state);
+  const view = buildDebrief(state, scenario);
+  if (view === null) return ["debrief is null for a state with an outcome"];
+
+  // Pure: same state gives an equal debrief, the input is not mutated, the event log is unchanged.
+  check(JSON.stringify(buildDebrief(state, scenario)) === JSON.stringify(view), "debrief differs when built twice");
+  check(JSON.stringify(state) === stateBefore, "buildDebrief mutated the state");
+  check(JSON.stringify(state.events) === eventsBefore, "buildDebrief rewrote the event log");
+
+  // Timeline: seq order, one entry per event with a non-beat tag, no beat entries.
+  const seqs = view.timeline.map((entry) => entry.seq);
+  check(seqs.every((seq, i) => i === 0 || seq > seqs[i - 1]), `timeline is not in seq order: ${seqs.join(",")}`);
+  const expectedSeqs = state.events
+    .filter((entry) => entry.derived.debriefTags.some((tag) => !tag.startsWith(BEAT_TAG_PREFIX)))
+    .map((entry) => entry.seq);
+  check(JSON.stringify(seqs) === JSON.stringify(expectedSeqs), `timeline seqs ${seqs.join(",")} != tagged events ${expectedSeqs.join(",")}`);
+  for (const entry of view.timeline) {
+    const event = state.events[entry.seq];
+    check(event !== undefined, `timeline entry ${entry.seq} has no event`);
+    check(!entry.tag.startsWith(BEAT_TAG_PREFIX), `timeline entry ${entry.seq} is a beat (${entry.tag})`);
+    check(event?.derived.debriefTags.includes(entry.tag) === true, `timeline tag ${entry.tag} is not on event ${entry.seq}`);
+    check(entry.text.trim() !== "", `timeline entry ${entry.seq} (${entry.tag}) has empty text`);
+    check(
+      Object.hasOwn(scenario.debrief.decisionNotes, entry.tag) && entry.text === scenario.debrief.decisionNotes[entry.tag],
+      `timeline entry ${entry.seq} text for ${entry.tag} is not from scenario data`,
+    );
+  }
+
+  // Found evidence equals discovered evidence exactly.
+  check(
+    JSON.stringify(view.evidenceFound.map((item) => item.id)) === JSON.stringify(state.discovered),
+    "evidenceFound differs from state.discovered",
+  );
+
+  // Missed clues: only undiscovered, disjoint from found, exactly the hinted undiscovered items.
+  const foundIds = new Set<string>(view.evidenceFound.map((item) => item.id));
+  for (const clue of view.cluesMissed) {
+    check(!state.discovered.includes(clue.id), `missed clue ${clue.id} was discovered`);
+    check(!foundIds.has(clue.id), `missed clue ${clue.id} is also in evidenceFound`);
+  }
+  const expectedMissed = (Object.keys(scenario.evidence) as EvidenceId[]).filter(
+    (id) => Boolean(scenario.evidence[id].debriefHint) && !state.discovered.includes(id),
+  );
+  check(
+    JSON.stringify(view.cluesMissed.map((clue) => clue.id)) === JSON.stringify(expectedMissed),
+    "cluesMissed is not the hinted undiscovered evidence",
+  );
+
+  // Analysis.
+  const flags = state.flags;
+  const first = flags.code_shared === true;
+  const second = flags.money_moved === true || flags.second_caller_trusted === true;
+  const expectedTrap = first && second ? "both" : first ? "first" : second ? "second" : "none";
+  check(view.analysis.trapEntered === expectedTrap, `trapEntered ${view.analysis.trapEntered} != ${expectedTrap}`);
+  check(view.analysis.thirdCallerIndependent === false, "thirdCallerIndependent is not false");
+  check(view.analysis.pressureLevel === state.pressure, "pressureLevel differs from state.pressure");
+  for (const [name, text] of Object.entries({
+    pressureBuilt: view.analysis.pressureBuilt,
+    whyWarningLooked: view.analysis.whyWarningLooked,
+    thirdCallerNote: view.analysis.thirdCallerNote,
+    trapNote: view.analysis.trapNote,
+  })) {
+    check(text.trim() !== "", `analysis.${name} is empty`);
+  }
+  check(view.analysis.verifyNextTime.length > 0, "analysis.verifyNextTime is empty");
+  return problems;
+}
+
+describe("Property 14: Debrief is derived and honest", () => {
+  it("is a pure, honest function of the state for random completed runs", () => {
+    const outcomes = new Set<string>();
+    const failures: string[] = [];
     for (let index = 0; index < CORE_PROPERTY_RUNS; index += 1) {
       const seed = caseSeed(SEED, index);
       const length = randomInt(createLcg(seed ^ 0x5a5a5a5a), 0, CORE_SEQUENCE_MAX_LENGTH);
-      const run = runSequence(generateActionSequence(seed, length));
-      const { outcomeState, final } = completeChapterFrom(run.final);
-      const label = `seed ${seed}, case ${index}`;
-      checkDebrief(outcomeState, `${label} (outcome state)`);
-      checkDebrief(final, `${label} (finished state)`);
+      const { outcomeState, final } = completeChapterFrom(runSequence(generateActionSequence(seed, length)).final);
+      for (const [name, state] of [["outcome state", outcomeState], ["finished state", final]] as const) {
+        if (name === "outcome state" && state.outcome !== null) outcomes.add(state.outcome);
+        for (const problem of debriefProblems(state)) failures.push(`seed ${seed}, case ${index} (${name}): ${problem}`);
+      }
     }
+    expect(failures, failures.slice(0, 10).join("\n")).toEqual([]);
   }, PROPERTY_TIMEOUT_MS);
+
+  it("holds for all four endings and their variants", () => {
+    const runs = {
+      A: reachEndingA(),
+      B: reachEndingB(),
+      C: reachEndingC(),
+      "C case-report": reachEndingC({ caseReport: true }),
+      D: reachEndingD(),
+      "D evidence-built": reachEndingD({ evidenceBuilt: true }),
+    };
+    const failures: string[] = [];
+    const reached = new Set<string>();
+    for (const [name, run] of Object.entries(runs)) {
+      reached.add(run.outcomeState.outcome ?? "none");
+      for (const state of [run.outcomeState, run.final]) {
+        for (const problem of debriefProblems(state)) failures.push(`ending ${name}: ${problem}`);
+      }
+    }
+    expect(failures, failures.join("\n")).toEqual([]);
+    expect([...reached].sort()).toEqual([...OUTCOME_IDS].sort());
+  }, PROPERTY_TIMEOUT_MS);
+
+  it("returns null when there is no outcome", () => {
+    const run = runSequence([{ type: "START_CHAPTER" }]);
+    expect(buildDebrief(run.final, scenario)).toBeNull();
+  });
 });

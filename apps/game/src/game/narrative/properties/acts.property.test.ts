@@ -1,7 +1,8 @@
-// @ts-nocheck -- uses the old street-chapter IDs; rewritten when the scenario is assembled (spec chapter-01-double-deception, task 2.1 placeholder).
-// Re-enabled in task 7.4 and 7.6 to 7.17 once the scenario is assembled (all tests in this file are skipped until then).
+// Feature: chapter-01-voice-narrative, Property 1: Act progression is monotonic
+// Feature: chapter-01-double-deception, acts advance only by their exit conditions (Requirements 4.1, 8.3)
 import { describe, expect, it } from "vitest";
-import { ACT_IDS } from "../chapter1/ids";
+import { CHAPTER_1_SCENARIO } from "../chapter1/scenario";
+import { evaluateConditions } from "../conditions";
 import { selectCurrentAct } from "../selectors";
 import {
   CORE_PROPERTY_RUNS,
@@ -18,39 +19,55 @@ import { createLcg, randomInt } from "../../../test/seededRandom";
 /** Seeded property runs can exceed Vitest's 5 s default when the machine is loaded. */
 const PROPERTY_TIMEOUT_MS = 60_000;
 
+const ACTS = CHAPTER_1_SCENARIO.acts;
+const actIndex = (id: string): number => ACTS.findIndex((act) => act.id === id);
+
 /**
- * Replays `actions` and checks, over the accepted steps, that the act index never decreases and
- * that `act.6` is selected exactly when an outcome exists. Returns the first problem or `null`.
+ * Replays `actions` and checks that the act index never decreases, that moving from act i to a
+ * later act needs the exit condition of act i, and that staying in act i means its exit
+ * condition does not hold. Returns the first problem or `null`.
  */
 function firstProblem(actions: readonly unknown[]): string | null {
   const { states, results } = runSequence(actions);
-  const indexOf = (state: (typeof states)[number]) => ACT_IDS.indexOf(selectCurrentAct(state).id);
-
-  const initialAct = selectCurrentAct(states[0]).id;
-  if ((initialAct === "act.6") !== (states[0].outcome !== null)) {
-    return `initial state: act ${initialAct} with outcome ${String(states[0].outcome)}`;
-  }
-
-  let previous = indexOf(states[0]);
+  let previous = actIndex(selectCurrentAct(states[0]).id);
   for (let i = 0; i < results.length; i += 1) {
     const state = states[i + 1];
-    const act = selectCurrentAct(state).id;
-    if ((act === "act.6") !== (state.outcome !== null)) {
-      return `after action ${i}: act ${act} with outcome ${String(state.outcome)}`;
+    const current = actIndex(selectCurrentAct(state).id);
+    if (!results[i].accepted) {
+      if (current !== previous) return `after rejected action ${i}: act index changed ${previous} to ${current}`;
+      continue;
     }
-    if (!results[i].accepted) continue;
-    const current = ACT_IDS.indexOf(act);
-    if (current < previous) {
-      return `after action ${i}: act index went from ${previous} to ${current} (${act})`;
+    if (current < previous) return `after action ${i}: act index went from ${previous} to ${current}`;
+    // Acts can be skipped (for example the third caller rings before the notification is handled),
+    // so only the next act needs the exit condition; a later act needs its own enter condition.
+    if (current === previous + 1 && !evaluateConditions(ACTS[previous].exitWhen, state, CHAPTER_1_SCENARIO)) {
+      return `after action ${i}: left ${ACTS[previous].id} without its exit condition`;
+    }
+    if (current > previous && !evaluateConditions(ACTS[current].enterWhen, state, CHAPTER_1_SCENARIO)) {
+      return `after action ${i}: entered ${ACTS[current].id} without its enter condition`;
+    }
+    if (current === previous && current < ACTS.length - 1) {
+      if (evaluateConditions(ACTS[current].exitWhen, state, CHAPTER_1_SCENARIO)) {
+        return `after action ${i}: exit condition of ${ACTS[current].id} holds but the act did not advance`;
+      }
     }
     previous = current;
   }
   return null;
 }
 
-describe.skip("act progression properties", () => {
+describe("act progression properties", () => {
+  it("each act's exit condition equals the next act's enter condition", () => {
+    for (let i = 0; i < ACTS.length - 1; i += 1) {
+      expect(JSON.stringify(ACTS[i].exitWhen), `${ACTS[i].id} exit vs ${ACTS[i + 1].id} enter`).toBe(
+        JSON.stringify(ACTS[i + 1].enterWhen),
+      );
+    }
+  });
+
   // Feature: chapter-01-voice-narrative, Property 1: Act progression is monotonic
-  it("never moves to an earlier act, and selects act.6 exactly when an outcome exists", () => {
+  it("never moves to an earlier act and advances only by the exit condition", () => {
+    // **Validates: Requirements 4.1, 8.3**
     for (let run = 0; run < CORE_PROPERTY_RUNS; run += 1) {
       const seed = caseSeed(CORE_PROPERTY_SEED, run);
       const length = randomInt(createLcg(seed ^ 0x5f3759df), 1, CORE_SEQUENCE_MAX_LENGTH);
