@@ -18,7 +18,10 @@ export type HumanRole = 'idle' | 'walk' | 'wave' | 'welcome' | 'invite' | 'prepa
 export interface HumanModelSpec {
   /** File name under CHARACTERS_GLB_BASE. */
   file: string;
-  /** Standing height in meters; the model is scaled to it. Without it the model keeps its own size. Always stood on its feet. */
+  /**
+   * Standing height in meters; the model is scaled to it. Leave it out to keep the authored size
+   * (owner: people keep their own heights). Always stood on its feet.
+   */
   height?: number;
   /**
    * Model whose clips are retargeted onto this one (Mixamo -> street NPC rig, see retarget.ts).
@@ -39,27 +42,27 @@ export interface HumanModelSpec {
 export const HUMAN_MODELS = {
   banhmiVendor: {
     file: 'banhmi-vendor.optimized.glb',
+    // The only resized model: the vendor file is authored 1.18 m tall, which reads as a child next to the cart.
     height: 1.55,
     clips: { idle: 'VendorIdle', welcome: 'Welcome', invite: 'Invite', prepare: 'PrepareBread', lookAround: 'LookForCustomer', thank: 'ThankCustomer' },
   },
-  manVN: { file: 'manvn.optimized.glb', height: 1.68, clips: { idle: 'Idle', walk: 'Walk', wave: 'Wave' } },
-  juno3: { file: 'juno3.optimized.glb', height: 1.6, clips: { idle: 'idle', walk: 'walk', wave: 'wave' }, walkSpeed: 1.359 },
-  rowan: { file: 'rowan.optimized.glb', height: 1.76, clips: { idle: 'idle', walk: 'walk', wave: 'wave' }, walkSpeed: 1.445 },
-  // Street NPCs (separate meshes, one 53-bone rig, no clips of their own). Authored at 1.5-1.9 m;
-  // brought to everyday heights for the street.
-  npcAlan: street('npc-alan.optimized.glb', 1.72),
-  npcAlice: street('npc-alice.optimized.glb', 1.6),
-  npcArchetype: street('npc-archetype.optimized.glb', 1.7),
-  npcArthur: street('npc-arthur.optimized.glb', 1.72),
-  npcLinMei: street('npc-linmei.optimized.glb', 1.58),
-  npcNapole: street('npc-napole.optimized.glb', 1.5),
-  npcYoshida: street('npc-yoshida.optimized.glb', 1.62),
+  manVN: { file: 'manvn.optimized.glb', clips: { idle: 'Idle', walk: 'Walk', wave: 'Wave' } },
+  juno3: { file: 'juno3.optimized.glb', clips: { idle: 'idle', walk: 'walk', wave: 'wave' }, walkSpeed: 1.359 },
+  rowan: { file: 'rowan.optimized.glb', clips: { idle: 'idle', walk: 'walk', wave: 'wave' }, walkSpeed: 1.445 },
+  // Street NPCs (separate meshes, one 53-bone rig, no clips of their own), at their authored size.
+  npcAlan: street('npc-alan.optimized.glb'),
+  npcAlice: street('npc-alice.optimized.glb'),
+  npcArchetype: street('npc-archetype.optimized.glb'),
+  npcArthur: street('npc-arthur.optimized.glb'),
+  npcLinMei: street('npc-linmei.optimized.glb'),
+  npcNapole: street('npc-napole.optimized.glb'),
+  npcYoshida: street('npc-yoshida.optimized.glb'),
 } satisfies Record<string, HumanModelSpec>;
 
 export type HumanModelId = keyof typeof HUMAN_MODELS;
 
-function street(file: string, height: number): HumanModelSpec {
-  return { file, height, clips: { idle: 'idle', walk: 'walk', wave: 'wave' }, clipsFrom: 'juno3', outfit: true };
+function street(file: string): HumanModelSpec {
+  return { file, clips: { idle: 'idle', walk: 'walk', wave: 'wave' }, clipsFrom: 'juno3', outfit: true };
 }
 
 /** Clothing parts `spawn` can recolor, by mesh name. */

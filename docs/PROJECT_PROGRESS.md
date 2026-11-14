@@ -211,6 +211,20 @@ Resolved:
 
 ## Task History
 
+### 2026-11-14 — Khupho: native character heights, walker side-stepping, bike braking and colliders
+
+- **Objective:** owner requests: people keep their normal (authored) heights; walking NPCs step aside when they meet someone; bikes must not pass through each other or the player, have a collider box, and stop for the player.
+- **Completed:**
+  - `humans.ts`: no height override for manVN, juno3, rowan and the 7 street NPCs (authored size). Only the banh mi vendor stays scaled (her file is 1.18 m tall).
+  - Bikes (`people.ts`): the old stop check compared the camera height (`ctx.eye`, ~1.6 m above the feet) with `< 1`, so bikes never stopped on the street. Now each bike brakes (4.5 m/s² planning) to stop 0.8 m short of the player in or next to its lane and of the next bike in the same lane (also across the street loop), never steps into either, and honks while stopped close to the player. Each bike has a moving 1.9 x 0.84 x 1.5 m box in the new `Physics.dynamic` list, which `collide` checks, so the player cannot walk through a bike.
+  - Walkers (`PathFollower`, shared by procedural and model walkers): look 2.8 m ahead; someone in their way (another walker or the player) makes them step 0.7 m aside, away from that person or to the right when straight ahead, so people walking toward each other pass; a side blocked by a solid is not taken; slower while passing close; with both sides blocked they wait, then squeeze past slowly after 2.5 s; back on the path after 1.2 s clear. Model walkers switch to idle while waiting and slow their walk clip with their pace.
+  - `Life.stats()` exposes walker and bike positions for checks.
+- **Files:** `apps/game/src/features/khupho/world/{humans,people,physics}.ts`, this file.
+- **Validation:** `pnpm typecheck`, `pnpm build`, `vitest --run src/features/khupho src/features/prologue src/app` (33 passed). Headless simulation (600 steps of 1/30 s, player standing in a lane 10 m ahead of a bike): the bike stopped 0.80 m before the player and stayed at 0 m/s; 0 frames with two bikes overlapping; 15 walkers, closest pair 0.77 m, 0 frames under 0.45 m. A point inside a stopped bike's box was pushed 0.70 m out by `Physics.collide`.
+- **Not verified:** how the side-step looks in motion on a real screen; residents walking inside houses do not avoid each other (unchanged).
+- **Deviations:** none. **Follow-up:** none required.
+
+
 ### 2026-11-14 — Khupho: street NPCs with separate meshes, outfit colors and retargeted walks
 
 - **Objective:** owner request: add the seven `Asset3D/human/streetNPC` people; drop the parts named in the file names (`*_removeHair`, `*_RemoveSunglasses`); vary clothing colors for more people; optimize.
