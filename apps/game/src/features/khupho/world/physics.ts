@@ -9,6 +9,11 @@ export class Physics {
   private grid = new Map<number, Col[]>();
   private sgrid = new Map<number, Surf[]>();
   bounds = { x0: -64, x1: 64, z0: -58, z1: 58 };
+  /**
+   * Boxes that move every frame (street bikes). Kept out of the grid and checked by `collide` only,
+   * so the player cannot walk through them; `blocked` (line of sight) ignores them.
+   */
+  dynamic: Col[] = [];
 
   addCol(c: Col) {
     this.cols.push(c);
@@ -51,6 +56,7 @@ export class Physics {
   collide(p: { x: number; z: number }, feet: number, r: number, hgt = 1.7) {
     for (let it = 0; it < 3; it++) {
       const cs = this.near(p.x - r, p.z - r, p.x + r, p.z + r);
+      for (const c of this.dynamic) if (p.x + r > c.x0 && p.x - r < c.x1 && p.z + r > c.z0 && p.z - r < c.z1) cs.push(c);
       for (const c of cs) {
         if (!c.enabled || c.tag === 'glass' && false) continue;
         if (feet + 0.32 >= c.y1 || feet + hgt <= c.y0) continue;

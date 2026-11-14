@@ -68,7 +68,8 @@ export class DistanceCuller {
     const visit = (o: THREE.Object3D, house: House | null) => {
       const h = houseOf.get(o) ?? house;
       const mesh = o as THREE.Mesh;
-      if (mesh.isMesh && !this.seen.has(mesh)) {
+      // Instanced props span a whole chunk; their geometry sphere says nothing about where they are.
+      if (mesh.isMesh && !(mesh as THREE.InstancedMesh).isInstancedMesh && !this.seen.has(mesh)) {
         const material = mesh.material as THREE.Material | THREE.Material[];
         const geometry = mesh.geometry;
         if (!geometry.boundingSphere) geometry.computeBoundingSphere();

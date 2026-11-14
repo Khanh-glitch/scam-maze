@@ -1,0 +1,240 @@
+/**
+ * SCAMMAZE character optimization (people in the /khupho neighborhood and the prologue).
+ *
+ * Input:  apps/game/assets-src/characters/<id>/<file>.glb (never modified)
+ * Output: apps/game/public/assets/3d/optimized/characters/<id>.optimized.glb
+ *
+ * Every character keeps its skeleton, skin and animation clips. Per character:
+ * 1. Textures: longest side at most `colorSize` (base color) or `dataSize` (normal, ORM), WebP
+ *    (quality 88 color, 92 data), `EXT_texture_webp` required.
+ * 2. Optional decimation (`ratio` < 1) with the Meshopt simplifier and an error cap, for dense scans.
+ * 3. prune, dedup, weld, resample (drops redundant keyframes), quantize, reorder, meshopt.
+ *
+ * Street NPCs (`street: true`, from an online character creator: one skeleton, separate meshes
+ * for body, eyes, teeth, hair, clothes...) also get, before the steps above:
+ * - `remove`: mesh nodes dropped by name, as the source file names ask (alan_removerHair, ...), plus
+ *   STREET_ALWAYS_REMOVE (teeth, tongue: never seen with the mouth closed), the transparent eye
+ *   cornea, and primitives that are not triangles (napole carries debug lines and points).
+ * - Physical material extensions (clearcoat, sheen, ior) removed: plain PBR is cheaper to shade.
+ * - Eyebrows and eyelashes: alpha blending becomes alpha cutout (no sorting, cheaper).
+ * - Tintable parts (top, bottom, shoes): the weave texture is made gray with a mean of
+ *   TINT_TEXTURE_MEAN and the color factor rescaled, so the look is unchanged and the game can set
+ *   any clothing color directly (see humans.ts).
+ *
+ * To add a character: put its .glb in assets-src/characters/<id>/, add an entry to CHARACTERS
+ * below, run this script, then register it in src/features/khupho/world/humans.ts.
+ *
+ * Run from the workspace root: node apps/game/scripts/optimize-characters.cjs [id ...]
+ */
+
+const fs = require("fs");
+const path = require("path");
+const { NodeIO } = require("@gltf-transform/core");
+const { ALL_EXTENSIONS, EXTTextureWebP } = require("@gltf-transform/extensions");
+const { prune, dedup, weld, resample, quantize, reorder, meshopt, simplify } = require("@gltf-transform/functions");
+const { MeshoptEncoder, MeshoptDecoder, MeshoptSimplifier } = require("meshoptimizer");
+const sharp = require("sharp");
+
+const SRC = path.resolve(__dirname, "../assets-src/characters");
+const OUT = path.resolve(__dirname, "../public/assets/3d/optimized/characters");
+/** Per-file size gate. */
+const MAX_OUTPUT_BYTES = 5_242_880;
+
+/**
+ * `colorSize`: the banh mi vendor is seen at arm's length when the story starts, so she keeps
+ * 2048 px color; people walking past use 1024 px.
+ */
+/** Street NPC parts removed from every file. */
+const STREET_ALWAYS_REMOVE = [/^Asset_teeth_/, /^Asset_tongue_/];
+/** Street NPC parts whose blended alpha becomes a cutout. */
+const STREET_MASK = /^Asset_(eyebrows|eyelashes)_/;
+/** Street NPC parts the game recolors (a full-body garment counts as the top). */
+const STREET_TINT = /^Asset_(top|fullbody|bottom|shoes)_/;
+/** Linear mean of a normalized tint texture (the factor carries the color). */
+const TINT_TEXTURE_MEAN = 0.8;
+const street = (id, file, remove = []) => ({ id, file: `street/${file}`, colorSize: 512, dataSize: 512, ratio: 1, street: true, remove });
+
+const CHARACTERS = [
+  { id: "banhmi-vendor", file: "banhmi-vendor/banhmi_vendor_animated.glb", colorSize: 2048, dataSize: 1024, ratio: 0.5, error: 0.0015 },
+  { id: "manvn", file: "manvn/manVN_rigged_animated.glb", colorSize: 1024, dataSize: 1024, ratio: 1 },
+  { id: "juno3", file: "juno3/juno3.glb", colorSize: 1024, dataSize: 1024, ratio: 0.6, error: 0.001 },
+  { id: "rowan", file: "rowan/rowan.glb", colorSize: 1024, dataSize: 1024, ratio: 0.6, error: 0.001 },
+  street("npc-alan", "alan_removerHair.glb", [/^Asset_hair_/]),
+  street("npc-alice", "alice.glb"),
+  street("npc-archetype", "archetype.glb"),
+  street("npc-arthur", "arthur_RemoveSunglasses.glb", [/^Asset_glasses_/]),
+  street("npc-linmei", "lin_mei_removeHair.glb", [/^Asset_hair_/]),
+  street("npc-napole", "napole.glb"),
+  street("npc-yoshida", "yoshida.glb"),
+  street("npc-blackguy", "blackguy_dontchangecolor_new.glb"),
+  street("npc-freya", "freya_new.glb"),
+  street("npc-nguoigia", "nguoigia_new.glb"),
+  street("npc-sofia", "sofia_new.glb"),
+];
+
+/**
+ * Accessories cut out of a street NPC file and fitted onto the others at load (humans.ts). The
+ * node keeps the source's eye center and eye width (rest pose, meters) in its extras for fitting.
+ */
+const ACCESSORIES = [
+  { id: "accessory-sunglasses", file: "street/lin_mei_removeHair.glb", node: /^Asset_glasses_acc_round_sun$/, eyes: /^Asset_eyes_/ },
+];
+
+const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+const linearToSrgb = (c) => (c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055);
+
+/** Gray version of `image` with linear mean TINT_TEXTURE_MEAN; returns it and the old linear mean. */
+async function normalizeTint(image) {
+  const { data, info } = await sharp(image).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const n = info.width * info.height, lum = new Float32Array(n);
+  let mean = 0;
+  for (let i = 0; i < n; i++) {
+    const r = srgbToLinear(data[i * 4] / 255), g = srgbToLinear(data[i * 4 + 1] / 255), b = srgbToLinear(data[i * 4 + 2] / 255);
+    lum[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b; mean += lum[i];
+  }
+  mean = Math.max(1e-4, mean / n);
+  const out = Buffer.alloc(n * 4);
+  for (let i = 0; i < n; i++) {
+    const v = Math.round(linearToSrgb(Math.min(1, (lum[i] / mean) * TINT_TEXTURE_MEAN)) * 255);
+    out[i * 4] = out[i * 4 + 1] = out[i * 4 + 2] = v; out[i * 4 + 3] = data[i * 4 + 3];
+  }
+  return { png: await sharp(out, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer(), mean };
+}
+
+/** Street NPC cleanup, see the header. Returns a log line. */
+async function cleanStreetNpc(doc, c) {
+  const root = doc.getRoot();
+  const removed = [];
+  for (const node of root.listNodes()) {
+    const mesh = node.getMesh();
+    if (!mesh) continue;
+    const name = node.getName();
+    if ([...STREET_ALWAYS_REMOVE, ...c.remove].some((re) => re.test(name))) { removed.push(name); node.dispose(); continue; }
+    for (const prim of mesh.listPrimitives()) {
+      const material = prim.getMaterial();
+      const cornea = /^Asset_eyes_/.test(name) && material && material.getAlphaMode() === "BLEND";
+      if (prim.getMode() !== 4 || cornea) { mesh.removePrimitive(prim); prim.dispose(); }
+    }
+    if (!mesh.listPrimitives().length) { removed.push(name || "(unnamed non-triangle mesh)"); node.dispose(); }
+  }
+  for (const ext of root.listExtensionsUsed()) {
+    if (["KHR_materials_clearcoat", "KHR_materials_sheen", "KHR_materials_ior"].includes(ext.extensionName)) ext.dispose();
+  }
+  const tinted = [];
+  for (const node of root.listNodes()) {
+    const mesh = node.getMesh();
+    if (!mesh) continue;
+    const name = node.getName();
+    for (const prim of mesh.listPrimitives()) {
+      const material = prim.getMaterial();
+      if (!material) continue;
+      material.setExtras({});
+      if (STREET_MASK.test(name)) material.setAlphaMode("MASK").setAlphaCutoff(0.35);
+      if (STREET_TINT.test(name)) {
+        const tex = material.getBaseColorTexture();
+        let mean = 1;
+        if (tex && tex.getImage()) {
+          const own = tex.listParents().filter((p) => p.propertyType === "Material").length > 1 ? tex.clone() : tex;
+          const res = await normalizeTint(own.getImage());
+          own.setImage(res.png).setMimeType("image/png");
+          if (own !== tex) material.setBaseColorTexture(own);
+          mean = res.mean / TINT_TEXTURE_MEAN;
+        }
+        const f = material.getBaseColorFactor();
+        material.setBaseColorFactor([f[0] * mean, f[1] * mean, f[2] * mean, f[3]]);
+        tinted.push(name.replace(/^Asset_/, ""));
+      }
+    }
+  }
+  return `removed [${removed.join(", ")}], tintable [${tinted.join(", ")}]`;
+}
+
+
+const mb = (n) => `${(n / 1048576).toFixed(2)} MB`;
+const triangles = (doc) => doc.getRoot().listMeshes().reduce((s, m) => s + m.listPrimitives().reduce((t, p) => t + (p.getIndices() ? p.getIndices().getCount() / 3 : 0), 0), 0);
+
+async function optimize(io, c) {
+  const input = path.join(SRC, c.file);
+  if (!fs.existsSync(input)) throw new Error(`Input not found: ${input}`);
+  const output = path.join(OUT, `${c.id}.optimized.glb`);
+  const doc = await io.read(input);
+  const root = doc.getRoot();
+  const before = triangles(doc);
+  const note = c.street ? await cleanStreetNpc(doc, c) : "";
+
+  doc.createExtension(EXTTextureWebP).setRequired(true);
+  const colorTextures = new Set(root.listMaterials().map((m) => m.getBaseColorTexture()).filter(Boolean));
+  for (const texture of root.listTextures()) {
+    const image = texture.getImage();
+    if (!image) continue;
+    const isColor = colorTextures.has(texture);
+    const size = isColor ? c.colorSize : c.dataSize;
+    const webp = await sharp(image).resize({ width: size, height: size, fit: "inside", withoutEnlargement: true }).webp({ quality: isColor ? 88 : 92, effort: 4 }).toBuffer();
+    texture.setImage(webp).setMimeType("image/webp");
+    if (texture.getURI()) texture.setURI(texture.getURI().replace(/\.[a-z]+$/i, ".webp"));
+  }
+
+  const steps = [prune(), dedup(), weld({ tolerance: 0.0001 })];
+  if (c.ratio < 1) steps.push(simplify({ simplifier: MeshoptSimplifier, ratio: c.ratio, error: c.error ?? 0.001 }));
+  steps.push(resample(), quantize(), reorder({ encoder: MeshoptEncoder }), meshopt({ encoder: MeshoptEncoder, level: "medium" }));
+  await doc.transform(...steps);
+
+  await io.write(output, doc);
+  const bytes = fs.statSync(output).size;
+  const clips = root.listAnimations().map((a) => a.getName()).join(", ");
+  console.log(`${c.id}: ${mb(fs.statSync(input).size)} -> ${mb(bytes)} | triangles ${before.toLocaleString("en-US")} -> ${triangles(doc).toLocaleString("en-US")} | skins ${root.listSkins().length} | meshes ${root.listMeshes().length} | clips: ${clips || "none"}${note ? ` | ${note}` : ""}`);
+  if (root.listSkins().length === 0) throw new Error(`${c.id}: the skin was lost`);
+  if (bytes > MAX_OUTPUT_BYTES) throw new Error(`${c.id}: ${bytes} bytes is above the ${MAX_OUTPUT_BYTES} byte limit`);
+}
+
+/** Writes one accessory: only its node, unskinned, with the eye reference in its extras. */
+async function extractAccessory(io, a) {
+  const input = path.join(SRC, a.file);
+  const output = path.join(OUT, `${a.id}.optimized.glb`);
+  const doc = await io.read(input);
+  const root = doc.getRoot();
+  const eyesNode = root.listNodes().find((n) => n.getMesh() && a.eyes.test(n.getName()));
+  const keep = root.listNodes().find((n) => n.getMesh() && a.node.test(n.getName()));
+  if (!eyesNode || !keep) throw new Error(`${a.id}: accessory or eyes node not found in ${a.file}`);
+  const pos = eyesNode.getMesh().listPrimitives()[0].getAttribute("POSITION");
+  const min = pos.getMin([]), max = pos.getMax([]);
+  const eyeCenter = [0, 1, 2].map((k) => (min[k] + max[k]) / 2), eyeWidth = max[0] - min[0];
+  const scene = doc.createScene(a.id);
+  keep.setSkin(null);
+  for (const prim of keep.getMesh().listPrimitives()) { prim.setAttribute("JOINTS_0", null); prim.setAttribute("WEIGHTS_0", null); }
+  keep.setName(a.id).setExtras({ eyeCenter, eyeWidth });
+  for (const p of keep.listParents()) if (p.propertyType === "Node") p.removeChild(keep);
+  scene.addChild(keep);
+  for (const s of root.listScenes()) if (s !== scene) s.dispose();
+  for (const n of root.listNodes()) if (n !== keep) n.dispose();
+  for (const s of root.listSkins()) s.dispose();
+  for (const ext of root.listExtensionsUsed()) {
+    if (["KHR_materials_clearcoat", "KHR_materials_sheen", "KHR_materials_ior"].includes(ext.extensionName)) ext.dispose();
+  }
+  for (const m of root.listMaterials()) m.setExtras({});
+  root.setDefaultScene(scene);
+  await doc.transform(prune(), dedup(), weld({ tolerance: 0.0001 }), quantize(), reorder({ encoder: MeshoptEncoder }), meshopt({ encoder: MeshoptEncoder, level: "medium" }));
+  await io.write(output, doc);
+  console.log(`${a.id}: ${(fs.statSync(output).size / 1024).toFixed(1)} KB | triangles ${triangles(doc).toLocaleString("en-US")} | eye center [${eyeCenter.map((v) => v.toFixed(3)).join(", ")}], eye width ${eyeWidth.toFixed(3)}`);
+}
+
+async function main() {
+  await Promise.all([MeshoptEncoder.ready, MeshoptSimplifier.ready]);
+  fs.mkdirSync(OUT, { recursive: true });
+  const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({
+    "meshopt.encoder": MeshoptEncoder,
+    "meshopt.decoder": MeshoptDecoder,
+  });
+  const only = process.argv.slice(2);
+  const list = only.length ? CHARACTERS.filter((c) => only.includes(c.id)) : CHARACTERS;
+  const accessories = only.length ? ACCESSORIES.filter((a) => only.includes(a.id)) : ACCESSORIES;
+  if (!list.length && !accessories.length) throw new Error(`Unknown id. Known: ${[...CHARACTERS, ...ACCESSORIES].map((c) => c.id).join(", ")}`);
+  console.log("=== SCAMMAZE CHARACTER OPTIMIZER ===");
+  for (const c of list) await optimize(io, c);
+  for (const a of accessories) await extractAccessory(io, a);
+}
+
+main().catch((err) => {
+  console.error("Optimization failed:", err.message || err);
+  process.exit(1);
+});

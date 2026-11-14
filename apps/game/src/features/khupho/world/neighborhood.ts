@@ -220,10 +220,16 @@ export function buildNeighborhood(ctx: Ctx) {
     const x0 = south ? h.ox : h.ox - h.W;
     const shops = ['grocery', 'cafe', 'pho', 'repair', 'hair'].includes(h.spec.ground);
     const nb = shops ? 1 + Math.floor(r() * 2) : Math.floor(r() * 3);
-    for (let i = 0; i < nb; i++) F.motorbike(NB, x0 + 0.8 + i * 1.0 + r() * 0.3, 0.15, z + sgn * (h.yardD > 0 ? 0 : r() * 0.2), south ? Math.PI : 0, cols[Math.floor(r() * cols.length)]);
+    // At most one parked bike per house now (owner: fewer, model bikes). The random draws stay the
+    // same so the rest of the street keeps its layout.
+    for (let i = 0; i < nb; i++) {
+      const bx = x0 + 0.8 + i * 1.0 + r() * 0.3, bz = z + sgn * (h.yardD > 0 ? 0 : r() * 0.2), bc = cols[Math.floor(r() * cols.length)];
+      if (i === 0) F.motorbike(NB, bx, 0.15, bz, south ? Math.PI : 0, bc);
+    }
     if (h.spec.ground === 'cafe' || h.spec.ground === 'pho') {
       const cx = x0 + h.W / 2;
-      for (let i = 0; i < 2; i++) { const tx = cx - 1 + i * 1.5, tz = sgn * 4.5; F.lowTable(NB, tx, 0.15, tz, i ? '#e8b02a' : '#3b78d6'); F.stool(NB, tx - 0.5, 0.15, tz, '#d9382a'); F.stool(NB, tx + 0.5, 0.15, tz, '#2a9fd6'); F.stool(NB, tx, 0.15, tz + sgn * 0.5, '#e8c02a'); }
+      // One table-and-stools set in front of each cafe and pho shop, close to the shop so people can pass.
+      F.tableSet(NB, cx + 0.7, 0.15, sgn * 5.1, 0);
     }
     if (h.spec.ground === 'repair') { for (let i = 0; i < 4; i++) NB.cyl(x0 + 0.5, 0.15 + i * 0.2, sgn * 5.35, 0.3, 0.2, 'r:#1a1a1a', 14); F.motorbike(NB, x0 + 2.2, 0.15, sgn * 4.6, south ? Math.PI * 0.8 : Math.PI * 1.8, '#3a3a3e'); }
     if (h.spec.ground === 'grocery') { NB.box(x0 + h.W - 0.8, 0.15, sgn * 5.0 - 0.4, 0.8, 0.9, 0.8, 'g:#e8ecee'); NB.col(x0 + h.W - 0.8, 0.15, sgn * 5.0 - 0.4, 0.8, 0.9, 0.8); for (let i = 0; i < 5; i++) NB.cyl(x0 + 0.5 + i * 0.3, 0.15, sgn * 5.4, 0.12, 0.7, ['g:#2f6fc0', 'g:#d6362a', 'g:#2f9a52', 'g:#f2c230', 'g:#e87a2a'][i], 8); }
@@ -237,8 +243,7 @@ export function buildNeighborhood(ctx: Ctx) {
   }
   F.motorbike(NB, 9.0, 0.02, 14.5, 0, '#c92f2a'); F.motorbike(NB, 11.05, 0.02, 20, Math.PI, '#2a5aa0'); F.motorbike(NB, 9.0, 0.02, 31.4, 0.02, '#e8e6e0');
   for (let i = 0; i < 3; i++) F.stool(NB, 10.7 + (i % 2) * 0.1, 0.02, 37 + i * 0.6, ['#d9382a', '#2a9fd6', '#e8c02a'][i]);
-  F.lowTable(NB, 17.5, 0.02, 47.5, '#3b78d6'); F.stool(NB, 17.0, 0.02, 47.5, '#d9382a'); F.stool(NB, 18.0, 0.02, 47.5, '#2a9fd6'); F.stool(NB, 17.5, 0.02, 48.1, '#e8c02a');
-  F.lowTable(NB, 19.2, 0.02, 45.5, '#e8b02a'); F.stool(NB, 19.2, 0.02, 46.1, '#2a9fd6'); F.stool(NB, 18.6, 0.02, 45.5, '#d9382a');
+  F.tableSet(NB, 17.5, 0.02, 47.6, 0); F.tableSet(NB, 18.4, 0.02, 45.3, Math.PI / 2);
   // tea stall kettle + ice bucket
   NB.box(20.2, 0.02, 44.7, 1.4, 0.8, 0.6, 'woodF:#7a5a3a'); NB.col(20.2, 0.02, 44.7, 1.4, 0.9, 0.6); NB.cyl(20.6, 0.82, 45.0, 0.12, 0.2, 'm:#b8bcc0', 12); NB.cyl(21.0, 0.82, 45.0, 0.16, 0.3, 'g:#2a9fd6', 12);
   NB.quad('cloth:#d03a2a', [19.8, 2.4, 44.1], [21.8, 2.4, 44.1], [21.8, 2.1, 46.1], [19.8, 2.1, 46.1]);
