@@ -6,7 +6,7 @@ import { SAVE_FORMAT_VERSION_V2, SAVE_STORAGE_KEY_V2, START_CHECKPOINT_ID } from
 import { TEST_CHAPTER } from "../test/fakeAssets";
 
 // Routing tests for the App shell (Requirements 1.1, 1.2, 1.3, 1.7). The 3D canvas, the chapter
-// loader flow and the chapter page are replaced by small stubs; the menu and placeholder are real.
+// loader flow is replaced by small stubs; the menu and placeholder are real.
 
 const harness = vi.hoisted(() => ({
   /** Chapter ID the loading stub puts in the session it hands to the App. */
@@ -55,16 +55,6 @@ vi.mock("../features/loading/ChapterLoadingFlow", () => ({
   },
 }));
 
-vi.mock("../features/chapter1/ChapterOnePage", () => ({
-  ChapterOnePage: (props: { session: ChapterSession; onReturnToMenu: () => void }) => (
-    <div data-testid="chapter-one-page" data-chapter-id={props.session.chapterId}>
-      <button type="button" onClick={props.onReturnToMenu}>
-        Stub return to menu
-      </button>
-    </div>
-  ),
-}));
-
 // The real registry plus one test chapter whose gameplay is not available.
 vi.mock("../game/chapters/chapterRegistry", async (importOriginal) => {
   const original = await importOriginal<typeof import("../game/chapters/chapterRegistry")>();
@@ -109,12 +99,11 @@ describe("App chapter routing", () => {
     expect(continueButton().disabled).toBe(true);
   });
 
-  it("renders the Chapter 1 page, not the placeholder, after New Game loading", () => {
+  it("renders the placeholder for Chapter 1 while the rebuilt chapter page is not wired", () => {
     render(<App />);
     startNewGameAndEnterChapter();
 
-    expect(screen.getByTestId("chapter-one-page").getAttribute("data-chapter-id")).toBe("chapter-1");
-    expect(screen.queryByText("Gameplay for this chapter is still in development.")).toBeNull();
+    expect(screen.getByText("Gameplay for this chapter is still in development.")).toBeTruthy();
     expect(screen.queryByRole("navigation", { name: "Game Main Menu" })).toBeNull();
     // The menu canvas stays mounted underneath.
     expect(screen.getByTestId("menu-canvas")).toBeTruthy();
@@ -127,10 +116,9 @@ describe("App chapter routing", () => {
 
     expect(screen.getByText("Gameplay for this chapter is still in development.")).toBeTruthy();
     expect(screen.getByRole("heading", { name: TEST_CHAPTER.title })).toBeTruthy();
-    expect(screen.queryByTestId("chapter-one-page")).toBeNull();
   });
 
-  it("returns to the menu from the chapter page and re-reads Continue availability", () => {
+  it("returns to the menu from the chapter placeholder and re-reads Continue availability", async () => {
     render(<App />);
     expect(continueButton().disabled).toBe(true);
     startNewGameAndEnterChapter();
@@ -147,11 +135,10 @@ describe("App chapter routing", () => {
       }),
     );
     act(() => {
-      fireEvent.click(screen.getByRole("button", { name: "Stub return to menu" }));
+      fireEvent.click(screen.getByRole("button", { name: /Return to menu/i }));
     });
 
-    expect(screen.queryByTestId("chapter-one-page")).toBeNull();
-    expect(screen.getByRole("navigation", { name: "Game Main Menu" })).toBeTruthy();
+    expect(await screen.findByRole("navigation", { name: "Game Main Menu" })).toBeTruthy();
     expect(continueButton().disabled).toBe(false);
   });
 
@@ -161,7 +148,6 @@ describe("App chapter routing", () => {
     startNewGameAndEnterChapter();
 
     expect(await screen.findByTestId("prologue-page")).toBeTruthy();
-    expect(screen.queryByTestId("chapter-one-page")).toBeNull();
     act(() => {
       fireEvent.click(screen.getByRole("button", { name: "Stub prologue back" }));
     });

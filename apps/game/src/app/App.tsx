@@ -8,7 +8,6 @@ import { HuePage } from "../features/hue";
 import { MenuStartupLoading } from "../features/loading/MenuStartupLoading";
 import { ChapterLoadingFlow } from "../features/loading/ChapterLoadingFlow";
 import { ChapterPlaceholder } from "../features/chapter/ChapterPlaceholder";
-import { ChapterOnePage } from "../features/chapter1/ChapterOnePage";
 import { shouldPlayPrologue } from "../features/prologue/prologueGate";
 import type { PrologueBuildProgress } from "../features/prologue/ProloguePage";
 import type { LoadingHold } from "../features/loading/ChapterLoadingFlow";
@@ -602,24 +601,13 @@ export const App: React.FC = () => {
       )}
 
       {/*
-        A playable chapter replaces the menu. The menu canvas stays mounted and paused
-        (frameloop "never") underneath, so returning to the menu needs no reload.
-        A chapter without a playable scene (gameplayAvailable is false) ends at the placeholder.
+        Chapter 1 is being rebuilt (spec chapter-01-double-deception). Until task 12.4 wires the
+        new chapter page, every chapter ends at the placeholder. The old street page is parked
+        under src/legacy/urgent-call-street.
       */}
-
-      {screen.kind === "chapter" &&
-        (getChapter(screen.session.chapterId)?.gameplayAvailable ? (
-          <div className="absolute inset-0 z-40">
-            <ChapterOnePage
-              session={screen.session}
-              settings={settings}
-              onReturnToMenu={handleReturnToMenu}
-            />
-          </div>
-        ) : (
-          <ChapterPlaceholder session={screen.session} onBackToMenu={handleReturnToMenu} />
-        ))}
-
+      {screen.kind === "chapter" && (
+        <ChapterPlaceholder session={screen.session} onBackToMenu={handleReturnToMenu} />
+      )}
       {/* Startup screen for the menu's own 3D scene */}
       {showLoading && (
         <MenuStartupLoading

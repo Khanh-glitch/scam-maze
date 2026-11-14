@@ -7,7 +7,6 @@
 //   environment map or post-processing, and never writes the camera pose (Requirements 1.6,
 //   11.3, 11.4, 11.5; Requirement 6.7 resolved by the owner-accepted design).
 // - No file under `src/` points at the unoptimized phone candidates (Requirement 9.11).
-// - `ChapterOneCanvas.tsx` passes `aria-hidden` to `Canvas` (Requirement 7.9).
 // Modeled on `game/narrative/boundaries.test.ts`.
 // See .kiro/specs/game-3d-phone-call-ui/tasks.md, task 11.7.
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -357,12 +356,5 @@ describe("3D phone call UI import boundaries", () => {
       return CANDIDATE_PATHS.some((path) => text.includes(path));
     });
     expect(offenders.map(toSrcPath)).toEqual([]);
-  });
-
-  it("ChapterOneCanvas passes aria-hidden to Canvas", () => {
-    const source = readFileSync(join(CALL_DIR, "..", "ChapterOneCanvas.tsx"), "utf8");
-    const tag = canvasOpeningTag(source);
-    expect(tag).not.toBeNull();
-    expect(hasAriaHidden(tag!)).toBe(true);
   });
 });
