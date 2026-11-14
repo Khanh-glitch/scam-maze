@@ -16,7 +16,6 @@ const SCANNED_FILES = [
   "call/CallSubtitleOverlay.tsx",
   "call/PlayerChoiceOverlay.tsx",
   "call/CallPresentation.tsx",
-  "dialogue/DialoguePanel.tsx",
   "hud/SaveTrimmedNotice.tsx",
   "voice/useVoicePlayback.ts",
   "voice/useCallAudio.ts",
