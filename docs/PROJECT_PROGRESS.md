@@ -211,6 +211,15 @@ Resolved:
 
 ## Task History
 
+### 2026-11-15 — Commit the parked bike and tall chair source files
+
+- **Objective:** owner request: put the bike source files on GitHub.
+- **Completed:** `super-cub-c90.glb`, `fat-boy-cruiser.glb` (CC-BY 4.0), `xyn-custom-bobber.glb`, `honda-pcx.glb` (no license stated; owner decision) and `ghecao.glb` (CC-BY 4.0, 67 MB) added to Git LFS. `honda-cg-125.glb` stays git-ignored: its Sketchfab Standard license forbids redistributing the model file (its optimized copy is already in the game and the repo).
+- **Files:** `.gitignore`, `apps/game/assets-src/{README.md,props/furniture/SOURCE.md,props/furniture/ghecao.glb,vehicles/parked/SOURCE.md,vehicles/parked/*.glb}`, this file.
+- **Validation:** `git lfs ls-files` lists the new files; no code change.
+- **Not verified:** licenses of the bobber and PCX. **Deviations:** none. **Follow-up:** none.
+
+
 ### 2026-11-15 — Khupho: model stools, table sets and parked bikes; horn; seated NPCs; walkers avoid solids
 
 - **Objective:** owner requests: walkers went through the banh mi cart; the first bike held up by the player honks `horn.mp3` with pauses; tall plastic chair by the vendor; low stools replace the stools at the shops; fewer people inside the shops, swapped for the street NPC models; table sets at the shops with single stools under seated people; the elderly NPC 1.5 m tall; every decorative bike replaced by the supplied models, fewer of them, optimized.
