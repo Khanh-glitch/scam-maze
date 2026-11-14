@@ -3,14 +3,18 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import type { Ctx } from './types';
 import type { House } from './house';
 import type { AudioSys } from './audio';
-import { makeGroup } from './builder';
+import { makeGroup, type Col } from './builder';
 import { motorbike } from './furniture';
 import { mulberry32, clamp } from './util';
 import { mat } from './materials';
 import { BikeRiderInstance, type BikeRiderTemplate } from './bikeRider';
 import type { HumanActor, HumanLibrary, HumanModelId, OutfitPart } from './humans';
 
-export interface Life { update(dt: number, t: number): void }
+export interface Life {
+  update(dt: number, t: number): void;
+  /** Positions of the path walkers and the bikes (dev checks and tests). */
+  stats(): { people: readonly THREE.Vector3[]; bikes: { x: number; lane: number; dir: number; speed: number }[] };
+}
 
 const SKIN = ['#e0ac84', '#d49a72', '#c98d68', '#e8bb96', '#a8714f'];
 const SHIRT = ['#3f6fa8', '#b5473b', '#e0c36a', '#5f9a6a', '#d8d4c8', '#7a5a9a', '#2f2f35', '#d98a4a', '#6aa6b8', '#c4688a', '#f2efe6'];
@@ -203,13 +207,111 @@ class Resident {
   }
 }
 
-class Walker {
-  p: Person; i = 0; ph = Math.random() * 6;
-  pts: THREE.Vector3[];
+/** How far ahead (m) a walker looks for people in its way, and how wide its way is (to each side). */
+const AVOID_LOOK = 2.8;
+const AVOID_WIDTH = 0.7;
+/** Side step (m) off the path to pass someone, and how fast (m/s) the walker moves sideways. */
+const SIDESTEP = 0.7;
+const SIDESTEP_SPEED = 0.9;
+/** Seconds without anyone in the way before a walker drifts back onto its path. */
+const AVOID_CLEAR = 1.2;
+/** A walker that cannot step aside waits at most this long (s), then squeezes past slowly. */
+const AVOID_WAIT = 2.5;
+
+/**
+ * Walks back and forth along `pts`, stepping to one side when a person (another walker or the
+ * player) is in the way: away from where that person is, to the right when they are straight ahead,
+ * so two people walking toward each other pass. A side blocked by a solid (tree, parked bike, wall)
+ * is not taken; with both sides blocked the walker waits, then squeezes past slowly.
+ */
+class PathFollower {
+  i = 0;
+  /** Point on the path the walker is abreast of; the walker stands `offset` m to its right. */
+  private readonly base: THREE.Vector3;
+  private offset = 0;
+  private target = 0;
+  private clearT = 0;
+  private decideT = Math.random() * 0.15;
+  private waitT = 0;
+  /** Share of the walking speed used now (slower while passing close, 0 while waiting). */
+  pace = 1;
+  private readonly probe = { x: 0, z: 0 };
+  readonly pts: THREE.Vector3[];
   sp: number;
-  ctx: Ctx;
-  constructor(pts: THREE.Vector3[], sp: number, ctx: Ctx, r: () => number, o: { hat?: boolean; kid?: boolean; elder?: boolean; pole?: boolean; shirt?: string } = {}) { this.pts = pts; this.sp = sp; this.ctx = ctx;
-    this.p = makePerson(r, o); ctx.root.add(this.p.g); this.p.g.position.copy(pts[0]);
+  private readonly ctx: Ctx;
+  readonly g: THREE.Object3D;
+  constructor(pts: THREE.Vector3[], sp: number, ctx: Ctx, g: THREE.Object3D) {
+    this.pts = pts; this.sp = sp; this.ctx = ctx; this.g = g;
+    this.base = pts[0].clone(); g.position.copy(pts[0]);
+  }
+  /** True when a 0.25 m body at (x, z) would be pushed out of a solid. */
+  private solidAt(x: number, z: number) {
+    this.probe.x = x; this.probe.z = z;
+    this.ctx.phys.collide(this.probe, this.base.y, 0.25);
+    return Math.abs(this.probe.x - x) + Math.abs(this.probe.z - z) > 0.05;
+  }
+  /** Moves the walker; returns the distance walked this frame. `people` are all walkers' positions. */
+  step(dt: number, people: readonly THREE.Vector3[], player: THREE.Vector3): number {
+    const g = this.g, n = this.pts[this.i];
+    let dx = n.x - this.base.x, dz = n.z - this.base.z, d = Math.hypot(dx, dz);
+    if (d < 0.15) {
+      // Turning around: the right-hand side flips, so the same spot is now on the other side.
+      this.i = (this.i + 1) % this.pts.length; this.offset = -this.offset; this.target = -this.target;
+      const m = this.pts[this.i]; dx = m.x - this.base.x; dz = m.z - this.base.z; d = Math.max(1e-4, Math.hypot(dx, dz));
+    }
+    const fx = dx / d, fz = dz / d, rx = -fz, rz = fx;
+    this.decideT -= dt;
+    if (this.decideT <= 0) {
+      this.decideT = 0.15;
+      let along = Infinity, lat = 0;
+      const look = (px: number, pz: number) => {
+        const ox = px - g.position.x, oz = pz - g.position.z, a = ox * fx + oz * fz, l = ox * rx + oz * rz;
+        if (a > -0.3 && a < AVOID_LOOK && Math.abs(l) < AVOID_WIDTH && a < along) { along = a; lat = l; }
+      };
+      for (const q of people) if (q !== g.position) look(q.x, q.z);
+      if (player.y - 1.62 < this.base.y + 1) look(player.x, player.z);
+      if (along !== Infinity) {
+        // Away from the person; to the right when they are straight ahead.
+        const side = lat > 0.1 ? -1 : 1;
+        const free = (o: number) => !this.solidAt(this.base.x + rx * o + fx * 0.5, this.base.z + rz * o + fz * 0.5);
+        if (free(side * SIDESTEP)) this.target = side * SIDESTEP;
+        else if (free(-side * SIDESTEP)) this.target = -side * SIDESTEP;
+        const close = along < 0.9 && Math.abs(lat - (this.target - this.offset)) < 0.55;
+        const blocked = close && Math.abs(this.target - this.offset) < 0.1 && along < 0.7;
+        this.waitT = blocked ? this.waitT + 0.15 : 0;
+        this.pace = blocked ? (this.waitT > AVOID_WAIT ? 0.35 : 0) : close ? 0.45 : 0.85;
+        this.clearT = AVOID_CLEAR;
+      } else {
+        this.clearT -= 0.15;
+        this.pace = 1; this.waitT = 0;
+        if (this.clearT <= 0) this.target = 0;
+      }
+    }
+    const before = this.offset;
+    const ds = SIDESTEP_SPEED * dt;
+    this.offset += THREE.MathUtils.clamp(this.target - this.offset, -ds, ds);
+    const st = Math.min(this.sp * this.pace * dt, d);
+    this.base.x += fx * st; this.base.z += fz * st;
+    const side = this.offset - before;
+    const nx = this.base.x + rx * this.offset, nz = this.base.z + rz * this.offset;
+    const mx = fx * st + rx * side, mz = fz * st + rz * side;
+    g.position.x = nx; g.position.z = nz;
+    if (mx * mx + mz * mz > 1e-8) {
+      const want = Math.atan2(mx, mz); let dy = want - g.rotation.y; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
+      g.rotation.y += dy * Math.min(1, dt * 6);
+    }
+    const fy = this.ctx.phys.floorAt(g.position.x, g.position.z, 2, 0.6).y; g.position.y += (fy - g.position.y) * Math.min(1, dt * 8);
+    this.base.y = g.position.y;
+    return Math.hypot(st, side);
+  }
+}
+
+class Walker {
+  p: Person; ph = Math.random() * 6;
+  path: PathFollower;
+  constructor(pts: THREE.Vector3[], sp: number, ctx: Ctx, r: () => number, o: { hat?: boolean; kid?: boolean; elder?: boolean; pole?: boolean; shirt?: string } = {}) {
+    this.p = makePerson(r, o); ctx.root.add(this.p.g);
+    this.path = new PathFollower(pts, sp, ctx, this.p.g);
     if (o.pole) {
       // carrying pole with two baskets (gánh hàng rong)
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 1.4, 6), mat('woodP:#8a6a3a'));
@@ -222,15 +324,9 @@ class Walker {
       }
     }
   }
-  update(dt: number, t: number) {
-    const g = this.p.g, n = this.pts[this.i], dx = n.x - g.position.x, dz = n.z - g.position.z, d = Math.hypot(dx, dz);
-    if (d < 0.15) { this.i = (this.i + 1) % this.pts.length; }
-    else {
-      const want = Math.atan2(dx, dz); let dy = want - g.rotation.y; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
-      g.rotation.y += dy * Math.min(1, dt * 6); const st = this.sp * dt; g.position.x += (dx / d) * st; g.position.z += (dz / d) * st; this.ph += st * 5.4;
-      const fy = this.ctx.phys.floorAt(g.position.x, g.position.z, 2, 0.6).y; g.position.y += (fy - g.position.y) * Math.min(1, dt * 8);
-    }
-    pose(this.p, 'walk', t, this.ph, 1);
+  update(dt: number, t: number, people: readonly THREE.Vector3[], player: THREE.Vector3) {
+    this.ph += this.path.step(dt, people, player) * 5.4;
+    pose(this.p, 'walk', t, this.ph, this.path.pace > 0 ? 1 : 0);
   }
 }
 
@@ -257,30 +353,30 @@ const WALK_CLIP_RANGE: [number, number] = [0.8, 1.45];
 
 /** A character model walking back and forth along `pts` (same path logic as Walker). */
 class ModelWalker {
-  a: HumanActor; i = 0;
-  pts: THREE.Vector3[];
-  sp: number;
-  ctx: Ctx;
+  a: HumanActor;
+  path: PathFollower;
+  private clipScale = 1;
   constructor(actor: HumanActor, pts: THREE.Vector3[], sp: number, ctx: Ctx) {
-    this.a = actor; this.pts = pts; this.sp = sp; this.ctx = ctx;
-    actor.object.position.copy(pts[0]); ctx.root.add(actor.object);
+    this.a = actor; ctx.root.add(actor.object);
     // The clip speed follows the ground speed so the feet do not slide. A clip is sped up or slowed
     // down by at most WALK_CLIP_RANGE; past that the walker moves at the clip's pace instead.
     let ts = 1;
     if (actor.walkSpeed > 0) {
       ts = THREE.MathUtils.clamp(sp / actor.walkSpeed, WALK_CLIP_RANGE[0], WALK_CLIP_RANGE[1]);
-      this.sp = actor.walkSpeed * ts;
+      sp = actor.walkSpeed * ts;
     }
+    this.clipScale = ts;
+    this.path = new PathFollower(pts, sp, ctx, actor.object);
     actor.play('walk', { fade: 0, timeScale: ts });
   }
-  update(dt: number, player: THREE.Vector3) {
-    const g = this.a.object, n = this.pts[this.i], dx = n.x - g.position.x, dz = n.z - g.position.z, d = Math.hypot(dx, dz);
-    if (d < 0.15) { this.i = (this.i + 1) % this.pts.length; }
-    else {
-      const want = Math.atan2(dx, dz); let dy = want - g.rotation.y; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
-      g.rotation.y += dy * Math.min(1, dt * 6); const st = this.sp * dt; g.position.x += (dx / d) * st; g.position.z += (dz / d) * st;
-      const fy = this.ctx.phys.floorAt(g.position.x, g.position.z, 2, 0.6).y; g.position.y += (fy - g.position.y) * Math.min(1, dt * 8);
-    }
+  update(dt: number, player: THREE.Vector3, people: readonly THREE.Vector3[]) {
+    const g = this.a.object;
+    this.path.step(dt, people, player);
+    // Waiting for someone: stand; walking slower to pass close: slower steps, so the feet do not slide.
+    const pace = this.path.pace;
+    if (pace === 0) { if (this.a.playing !== 'idle') this.a.play('idle', { fade: 0.25 }); }
+    else if (this.a.playing !== 'walk') this.a.play('walk', { fade: 0.25, timeScale: this.clipScale * pace });
+    else this.a.setTimeScale(this.clipScale * pace);
     const away = g.position.distanceTo(player);
     g.visible = away < WALKER_HIDE_DISTANCE;
     this.a.update(dt, away);
@@ -331,8 +427,29 @@ class Vendor {
   }
 }
 
+/** Half length and half width (m) of a bike with rider, used for its collider and for braking. */
+const BIKE_HALF_LEN = 0.95;
+const BIKE_HALF_WIDTH = 0.42;
+/** Collision radius of the player (Player.update uses 0.28). */
+const PLAYER_RADIUS = 0.28;
+/** Distance (m) a bike keeps to the player or to the bike ahead once stopped. */
+const BIKE_STOP_GAP = 0.8;
+/** Braking deceleration (m/s²) a bike plans with; it brakes harder only when it must. */
+const BIKE_DECEL = 4.5;
+/** How far ahead (m) a bike looks for the player and for other bikes. */
+const BIKE_LOOK = 18;
+/** Street loop: bikes leave at +/-STREET_END and come back on the other end. */
+const STREET_END = 72;
+/** Height of the camera above the feet (Player.eyeH). */
+const EYE_HEIGHT = 1.62;
+
+/** Highest speed that still stops `gap` meters ahead at BIKE_DECEL (0 when the gap is used up). */
+const speedForGap = (gap: number) => (gap <= BIKE_STOP_GAP ? 0 : Math.sqrt(2 * BIKE_DECEL * (gap - BIKE_STOP_GAP)));
+
 class Bike {
   g: THREE.Group; speed = 0; base: number; dir: 1 | -1; lane: number; x: number; info: { pos: THREE.Vector3; speed: number };
+  /** Box the player collides with (Physics.dynamic), moved with the bike. */
+  col: Col;
   /** The scanned scooter and rider when its file loaded; otherwise the procedural bike and person below. */
   private model: BikeRiderInstance | null = null;
   constructor(ctx: Ctx, r: () => number, dir: 1 | -1, x: number, vehicles: { pos: THREE.Vector3; speed: number }[], template: BikeRiderTemplate | null) {
@@ -351,14 +468,51 @@ class Bike {
     this.dir = dir; this.lane = dir > 0 ? 1.8 + r() * 0.5 : -1.8 - r() * 0.5; this.x = x; this.base = 4.5 + r() * 5;
     this.g.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2; ctx.root.add(this.g);
     this.info = { pos: this.g.position, speed: 0 }; vehicles.push(this.info);
+    this.col = { x0: 0, x1: 0, y0: 0, y1: 1.5, z0: this.lane - BIKE_HALF_WIDTH, z1: this.lane + BIKE_HALF_WIDTH, enabled: true, tag: 'bike' };
+    ctx.phys.dynamic.push(this.col);
+    this.placeCollider();
   }
-  update(dt: number, player: THREE.Vector3, audio: AudioSys) {
-    let target = this.base;
-    const ahead = (player.x - this.x) * this.dir;
-    if (ahead > 0 && ahead < 9 && Math.abs(player.z - this.lane) < 1.3 && player.y < 1) target = 0;
-    this.speed += (target - this.speed) * Math.min(1, dt * (target ? 1.2 : 3));
-    this.x += this.dir * this.speed * dt; if (this.x > 72) this.x = -72; if (this.x < -72) this.x = 72;
+  private placeCollider() { this.col.x0 = this.x - BIKE_HALF_LEN; this.col.x1 = this.x + BIKE_HALF_LEN; }
+  /** Free road (m) in front of this bike's nose up to `x`, along its direction, across the street loop. */
+  private aheadOf(x: number) { const L = STREET_END * 2; return (((x - this.x) * this.dir) % L + L) % L; }
+  /**
+   * Speed limit from what is ahead: the player standing in (or next to) the lane, and the next
+   * bike in the same lane. Bikes brake to stop BIKE_STOP_GAP short of either.
+   */
+  private limit(player: THREE.Vector3, bikes: readonly Bike[]): { v: number; playerGap: number } {
+    let v = this.base, playerGap = Infinity;
+    const feet = player.y - EYE_HEIGHT;
+    if (feet < 0.8 && Math.abs(player.z - this.lane) < BIKE_HALF_WIDTH + PLAYER_RADIUS + 0.35) {
+      const along = (player.x - this.x) * this.dir;
+      // Also while overlapping from behind the nose (the player stepped onto the bike): stand still.
+      if (along > -BIKE_HALF_LEN - PLAYER_RADIUS && along < BIKE_LOOK) {
+        playerGap = along - BIKE_HALF_LEN - PLAYER_RADIUS;
+        v = Math.min(v, speedForGap(playerGap));
+      }
+    }
+    for (const o of bikes) {
+      if (o === this || o.dir !== this.dir || Math.abs(o.lane - this.lane) > BIKE_HALF_WIDTH * 2 + 0.25) continue;
+      const gap = this.aheadOf(o.x) - BIKE_HALF_LEN * 2;
+      if (gap < BIKE_LOOK) v = Math.min(v, Math.max(0, Math.min(o.speed + speedForGap(gap) * 0.5, speedForGap(gap))));
+    }
+    return { v, playerGap };
+  }
+  update(dt: number, player: THREE.Vector3, audio: AudioSys, bikes: readonly Bike[]) {
+    const { v, playerGap } = this.limit(player, bikes);
+    // Brake at once to the limit when it is below the speed; speed up gently otherwise.
+    if (v < this.speed) this.speed = Math.max(v, this.speed - BIKE_DECEL * 2.5 * dt);
+    else this.speed += (v - this.speed) * Math.min(1, dt * 1.2);
+    let step = this.speed * dt;
+    // Never move into the player or the bike ahead, whatever the speed was.
+    if (playerGap !== Infinity) step = Math.min(step, Math.max(0, playerGap - BIKE_STOP_GAP * 0.5));
+    for (const o of bikes) {
+      if (o === this || o.dir !== this.dir || Math.abs(o.lane - this.lane) > BIKE_HALF_WIDTH * 2 + 0.25) continue;
+      step = Math.min(step, Math.max(0, this.aheadOf(o.x) - BIKE_HALF_LEN * 2 - 0.3));
+    }
+    if (step < this.speed * dt) this.speed = step / Math.max(dt, 1e-4);
+    this.x += this.dir * step; if (this.x > STREET_END) this.x -= STREET_END * 2; if (this.x < -STREET_END) this.x += STREET_END * 2;
     this.g.position.set(this.x, 0, this.lane); this.info.speed = this.speed;
+    this.placeCollider();
     if (this.model) {
       // While stopped, the rider looks at the player (yaw in the bike's own frame, 0 = ahead).
       let look: number | null = null;
@@ -368,7 +522,7 @@ class Bike {
       }
       this.model.update(dt, this.speed, look);
     }
-    if (this.speed < 0.5 && ahead > 0 && ahead < 9) audio.horn(this.g.position);
+    if (this.speed < 0.5 && playerGap < 4) audio.horn(this.g.position);
   }
 }
 
@@ -414,17 +568,20 @@ export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vect
   statics.push(new Static(ctx, r, 10.3, 0.02, 14.0, -Math.PI / 2, 'sweep', {}, [5.5, 7.2]));
   statics.push(new Static(ctx, r, 15.3, 0.02, 45.0, 0, 'phone', { kid: true }, [15.5, 22]));
   for (let i = 0; i < 12; i++) bikes.push(new Bike(ctx, r, i % 2 ? 1 : -1, -70 + i * 12 + r() * 6, vehicles, bikeRider));
+  // Everyone walking a path, for side-stepping (each walker skips its own entry).
+  const people: THREE.Vector3[] = [...walkers.map((w) => w.p.g.position), ...modelWalkers.map((w) => w.a.object.position)];
   let acc = 0;
   const occ = new Map<object, number>();
   return {
+    stats: () => ({ people, bikes: bikes.map((b) => ({ x: b.x, lane: b.lane, dir: b.dir, speed: b.speed })) }),
     update(dt, t) {
       const hour = ctx.env.hour, pp = ctx.eye;
       for (const rs of residents) rs.update(dt, t, hour, pp);
-      for (const w of walkers) w.update(dt, t);
-      for (const w of modelWalkers) w.update(dt, pp);
+      for (const w of walkers) w.update(dt, t, people, pp);
+      for (const w of modelWalkers) w.update(dt, pp, people);
       for (const v of vendors) v.update(dt, hour, pp);
       for (const s of statics) s.update(t, hour);
-      for (const b of bikes) b.update(dt, pp, audio);
+      for (const b of bikes) b.update(dt, pp, audio, bikes);
       acc -= dt; if (acc > 0) return; acc = 0.6;
       occ.clear();
       for (const rs of residents) {
