@@ -23,6 +23,30 @@ Confirm every license before a public release.
 | `juno3` | 27.98 MB → 2.10 MB | 67,157 → 40,283 | WebP 1024 |
 | `rowan` | 32.48 MB → 2.19 MB | 68,448 → 41,068 | WebP 1024 |
 
+## Street NPCs (`street/`, added 2026-11-14)
+
+Seven owner-supplied people from an online character creator (`Asset3D/human/streetNPC/`, exported
+with THREE.GLTFExporter r187): one 53-bone rig (`Root`, `pelvis`, `thigh_l`...), separate meshes
+(`HumanBody`, `Asset_eyes_*`, `Asset_teeth_*`, `Asset_tongue_*`, `Asset_eyebrows_*`,
+`Asset_eyelashes_*`, `Asset_hair_*`, `Asset_shoes_*`, `Asset_top_*`, `Asset_bottom_*`, sometimes
+`Asset_glasses_*`), **no animation clips**. License: not provided.
+
+| Id | Source | Removed (besides teeth, tongue, eye cornea) | Size | Triangles |
+|---|---|---|---|---|
+| `npc-alan` | `alan_removerHair.glb` | hair (file name) | 2.52 → 0.40 MB | 46,021 → 36,381 |
+| `npc-alice` | `alice.glb` | none | 2.42 → 0.41 MB | 40,380 → 31,832 |
+| `npc-archetype` | `archetype.glb` | none | 2.53 → 0.43 MB | 43,513 → 34,965 |
+| `npc-arthur` | `arthur_RemoveSunglasses.glb` | glasses (file name) | 2.82 → 0.46 MB | 48,632 → 38,672 |
+| `npc-linmei` | `lin_mei_removeHair.glb` | hair (file name) | 2.62 → 0.35 MB | 42,388 → 28,864 |
+| `npc-napole` | `napole.glb` | 2 unnamed non-triangle meshes (debug lines and points) | 2.46 → 0.40 MB | 38,724 → 30,176 |
+| `npc-yoshida` | `yoshida.glb` | none | 2.46 → 0.42 MB | 42,163 → 33,615 |
+
+- Materials: clearcoat, sheen and ior removed; eyebrows and eyelashes use alpha cutout; top,
+  bottom and shoe textures made gray (mean 0.8 linear) with the factor rescaled, so the game can
+  set clothing colors directly. Textures WebP, at most 512 px (the sources are 512 px or less).
+- Animation: `idle`, `walk` and `wave` are retargeted at load from `juno3`'s Mixamo clips
+  (`src/features/khupho/world/retarget.ts`).
+
 ## Adding a character
 
 1. Put the `.glb` in `characters/<id>/` (Git LFS) and add an entry to `CHARACTERS` in the script.

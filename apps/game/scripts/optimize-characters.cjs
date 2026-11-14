@@ -10,6 +10,17 @@
  * 2. Optional decimation (`ratio` < 1) with the Meshopt simplifier and an error cap, for dense scans.
  * 3. prune, dedup, weld, resample (drops redundant keyframes), quantize, reorder, meshopt.
  *
+ * Street NPCs (`street: true`, from an online character creator: one skeleton, separate meshes
+ * for body, eyes, teeth, hair, clothes...) also get, before the steps above:
+ * - `remove`: mesh nodes dropped by name, as the source file names ask (alan_removerHair, ...), plus
+ *   STREET_ALWAYS_REMOVE (teeth, tongue: never seen with the mouth closed), the transparent eye
+ *   cornea, and primitives that are not triangles (napole carries debug lines and points).
+ * - Physical material extensions (clearcoat, sheen, ior) removed: plain PBR is cheaper to shade.
+ * - Eyebrows and eyelashes: alpha blending becomes alpha cutout (no sorting, cheaper).
+ * - Tintable parts (top, bottom, shoes): the weave texture is made gray with a mean of
+ *   TINT_TEXTURE_MEAN and the color factor rescaled, so the look is unchanged and the game can set
+ *   any clothing color directly (see humans.ts).
+ *
  * To add a character: put its .glb in assets-src/characters/<id>/, add an entry to CHARACTERS
  * below, run this script, then register it in src/features/khupho/world/humans.ts.
  *
@@ -33,12 +44,99 @@ const MAX_OUTPUT_BYTES = 5_242_880;
  * `colorSize`: the banh mi vendor is seen at arm's length when the story starts, so she keeps
  * 2048 px color; people walking past use 1024 px.
  */
+/** Street NPC parts removed from every file. */
+const STREET_ALWAYS_REMOVE = [/^Asset_teeth_/, /^Asset_tongue_/];
+/** Street NPC parts whose blended alpha becomes a cutout. */
+const STREET_MASK = /^Asset_(eyebrows|eyelashes)_/;
+/** Street NPC parts the game recolors. */
+const STREET_TINT = /^Asset_(top|bottom|shoes)_/;
+/** Linear mean of a normalized tint texture (the factor carries the color). */
+const TINT_TEXTURE_MEAN = 0.8;
+const street = (id, file, remove = []) => ({ id, file: `street/${file}`, colorSize: 512, dataSize: 512, ratio: 1, street: true, remove });
+
 const CHARACTERS = [
   { id: "banhmi-vendor", file: "banhmi-vendor/banhmi_vendor_animated.glb", colorSize: 2048, dataSize: 1024, ratio: 0.5, error: 0.0015 },
   { id: "manvn", file: "manvn/manVN_rigged_animated.glb", colorSize: 1024, dataSize: 1024, ratio: 1 },
   { id: "juno3", file: "juno3/juno3.glb", colorSize: 1024, dataSize: 1024, ratio: 0.6, error: 0.001 },
   { id: "rowan", file: "rowan/rowan.glb", colorSize: 1024, dataSize: 1024, ratio: 0.6, error: 0.001 },
+  street("npc-alan", "alan_removerHair.glb", [/^Asset_hair_/]),
+  street("npc-alice", "alice.glb"),
+  street("npc-archetype", "archetype.glb"),
+  street("npc-arthur", "arthur_RemoveSunglasses.glb", [/^Asset_glasses_/]),
+  street("npc-linmei", "lin_mei_removeHair.glb", [/^Asset_hair_/]),
+  street("npc-napole", "napole.glb"),
+  street("npc-yoshida", "yoshida.glb"),
 ];
+
+const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+const linearToSrgb = (c) => (c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055);
+
+/** Gray version of `image` with linear mean TINT_TEXTURE_MEAN; returns it and the old linear mean. */
+async function normalizeTint(image) {
+  const { data, info } = await sharp(image).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const n = info.width * info.height, lum = new Float32Array(n);
+  let mean = 0;
+  for (let i = 0; i < n; i++) {
+    const r = srgbToLinear(data[i * 4] / 255), g = srgbToLinear(data[i * 4 + 1] / 255), b = srgbToLinear(data[i * 4 + 2] / 255);
+    lum[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b; mean += lum[i];
+  }
+  mean = Math.max(1e-4, mean / n);
+  const out = Buffer.alloc(n * 4);
+  for (let i = 0; i < n; i++) {
+    const v = Math.round(linearToSrgb(Math.min(1, (lum[i] / mean) * TINT_TEXTURE_MEAN)) * 255);
+    out[i * 4] = out[i * 4 + 1] = out[i * 4 + 2] = v; out[i * 4 + 3] = data[i * 4 + 3];
+  }
+  return { png: await sharp(out, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer(), mean };
+}
+
+/** Street NPC cleanup, see the header. Returns a log line. */
+async function cleanStreetNpc(doc, c) {
+  const root = doc.getRoot();
+  const removed = [];
+  for (const node of root.listNodes()) {
+    const mesh = node.getMesh();
+    if (!mesh) continue;
+    const name = node.getName();
+    if ([...STREET_ALWAYS_REMOVE, ...c.remove].some((re) => re.test(name))) { removed.push(name); node.dispose(); continue; }
+    for (const prim of mesh.listPrimitives()) {
+      const material = prim.getMaterial();
+      const cornea = /^Asset_eyes_/.test(name) && material && material.getAlphaMode() === "BLEND";
+      if (prim.getMode() !== 4 || cornea) { mesh.removePrimitive(prim); prim.dispose(); }
+    }
+    if (!mesh.listPrimitives().length) { removed.push(name || "(unnamed non-triangle mesh)"); node.dispose(); }
+  }
+  for (const ext of root.listExtensionsUsed()) {
+    if (["KHR_materials_clearcoat", "KHR_materials_sheen", "KHR_materials_ior"].includes(ext.extensionName)) ext.dispose();
+  }
+  const tinted = [];
+  for (const node of root.listNodes()) {
+    const mesh = node.getMesh();
+    if (!mesh) continue;
+    const name = node.getName();
+    for (const prim of mesh.listPrimitives()) {
+      const material = prim.getMaterial();
+      if (!material) continue;
+      material.setExtras({});
+      if (STREET_MASK.test(name)) material.setAlphaMode("MASK").setAlphaCutoff(0.35);
+      if (STREET_TINT.test(name)) {
+        const tex = material.getBaseColorTexture();
+        let mean = 1;
+        if (tex && tex.getImage()) {
+          const own = tex.listParents().filter((p) => p.propertyType === "Material").length > 1 ? tex.clone() : tex;
+          const res = await normalizeTint(own.getImage());
+          own.setImage(res.png).setMimeType("image/png");
+          if (own !== tex) material.setBaseColorTexture(own);
+          mean = res.mean / TINT_TEXTURE_MEAN;
+        }
+        const f = material.getBaseColorFactor();
+        material.setBaseColorFactor([f[0] * mean, f[1] * mean, f[2] * mean, f[3]]);
+        tinted.push(name.replace(/^Asset_/, ""));
+      }
+    }
+  }
+  return `removed [${removed.join(", ")}], tintable [${tinted.join(", ")}]`;
+}
+
 
 const mb = (n) => `${(n / 1048576).toFixed(2)} MB`;
 const triangles = (doc) => doc.getRoot().listMeshes().reduce((s, m) => s + m.listPrimitives().reduce((t, p) => t + (p.getIndices() ? p.getIndices().getCount() / 3 : 0), 0), 0);
@@ -50,6 +148,7 @@ async function optimize(io, c) {
   const doc = await io.read(input);
   const root = doc.getRoot();
   const before = triangles(doc);
+  const note = c.street ? await cleanStreetNpc(doc, c) : "";
 
   doc.createExtension(EXTTextureWebP).setRequired(true);
   const colorTextures = new Set(root.listMaterials().map((m) => m.getBaseColorTexture()).filter(Boolean));
@@ -71,7 +170,7 @@ async function optimize(io, c) {
   await io.write(output, doc);
   const bytes = fs.statSync(output).size;
   const clips = root.listAnimations().map((a) => a.getName()).join(", ");
-  console.log(`${c.id}: ${mb(fs.statSync(input).size)} -> ${mb(bytes)} | triangles ${before.toLocaleString("en-US")} -> ${triangles(doc).toLocaleString("en-US")} | skins ${root.listSkins().length} | clips: ${clips}`);
+  console.log(`${c.id}: ${mb(fs.statSync(input).size)} -> ${mb(bytes)} | triangles ${before.toLocaleString("en-US")} -> ${triangles(doc).toLocaleString("en-US")} | skins ${root.listSkins().length} | meshes ${root.listMeshes().length} | clips: ${clips || "none"}${note ? ` | ${note}` : ""}`);
   if (root.listSkins().length === 0) throw new Error(`${c.id}: the skin was lost`);
   if (bytes > MAX_OUTPUT_BYTES) throw new Error(`${c.id}: ${bytes} bytes is above the ${MAX_OUTPUT_BYTES} byte limit`);
 }
