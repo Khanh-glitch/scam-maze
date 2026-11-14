@@ -551,12 +551,13 @@ export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vect
   };
   const sid = (zz: number, a: number, b: number, sp: number, o: ConstructorParameters<typeof Walker>[4] = {}, model?: HumanModelId, fallback = true) => walk([V(a, zz), V(b, zz)], sp, o, model, fallback);
   sid(4.7, -50, 50, 1.2, { hat: true }, 'npcYoshida'); sid(-4.6, 45, -50, 1.1, {}, 'juno3'); sid(4.3, 40, -30, 1.3, { kid: true }); sid(-4.3, -45, 40, 0.8, { pole: true, hat: true });
-  sid(4.9, -20, 30, 1.0, { elder: true }); sid(-5.0, 20, -40, 1.25, { hat: true }, 'manVN'); sid(4.5, 45, -45, 1.4, {}, 'rowan');
+  sid(4.9, -20, 30, 1.0, { elder: true }, 'npcNguoiGia'); sid(-5.0, 20, -40, 1.25, { hat: true }, 'manVN'); sid(4.5, 45, -45, 1.4, {}, 'rowan');
   const alley = (a: number, b: number, sp: number, x: number, o: ConstructorParameters<typeof Walker>[4] = {}, model?: HumanModelId) => walk([new THREE.Vector3(x, 0.02, a), new THREE.Vector3(x, 0.02, b)], sp, o, model);
   alley(8, 45, 1.0, 10.1, { hat: true }, 'npcArthur'); alley(44, 8, 1.2, 9.3, {}, 'npcAlice'); alley(20, 46, 0.7, 10.7, { elder: true }); alley(12, 38, 1.5, 9.8, { kid: true });
   // Extra sidewalk walkers from the street NPC set (only when their model loaded).
   sid(-4.9, -30, 35, 1.15, {}, 'npcAlan', false); sid(4.6, 10, -45, 1.05, {}, 'npcLinMei', false);
   sid(-4.4, 0, 55, 1.2, {}, 'npcNapole', false); sid(4.2, -40, 20, 1.3, {}, 'npcArchetype', false);
+  sid(-4.7, 40, -20, 1.2, {}, 'npcBlackGuy', false); sid(4.4, -10, 50, 1.1, {}, 'npcFreya', false); sid(-4.5, -50, 0, 1.0, {}, 'npcSofia', false);
   const cafe = houses.filter((h) => !h.spec.lite)[3];
   if (cafe) { const cx = cafe.ox - cafe.W / 2; statics.push(new Static(ctx, r, cx - 1.5, 0.15, 4.5, Math.PI / 2, 'sip', { elder: true }, [6, 21])); statics.push(new Static(ctx, r, cx + 0.5, 0.15, 5.0, -Math.PI / 2, 'sip', {}, [7, 20])); }
   // Banh mi vendor beside the cart from streetProps.ts.

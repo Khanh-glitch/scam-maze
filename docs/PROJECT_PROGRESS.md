@@ -211,6 +211,16 @@ Resolved:
 
 ## Task History
 
+### 2026-11-14 — Khupho: sunglasses on every street NPC, four more street NPCs
+
+- **Objective:** owner request: the street NPCs (not the first models) all wear black sunglasses because their eyes have no iris; add the `_new` files; `_dontchangecolor` keeps its clothing colors but also wears sunglasses.
+- **Completed:** optimizer cuts the round sunglasses out of `lin_mei_removeHair.glb` into `accessory-sunglasses.optimized.glb` (10 KB) with the eye reference; `humans.ts` fits a copy onto each street NPC's eyes at load (eye-width scale, attached to the head bone, hidden past 12 m with the other face parts). New NPCs blackguy (outfit recolor off), freya, nguoigia, sofia optimized (2.4-3.1 MB → 0.37-0.52 MB); full-body garments recolor as the top. nguoigia replaces the procedural elderly sidewalk walker; blackguy, freya and sofia are added sidewalk walkers. juno3, rowan, manVN and the vendor are unchanged.
+- **Files:** `apps/game/scripts/optimize-characters.cjs`, `apps/game/assets-src/characters/{street/*_new.glb,SOURCE.md}`, `apps/game/public/assets/3d/optimized/characters/{npc-blackguy,npc-freya,npc-nguoigia,npc-sofia,accessory-sunglasses}.optimized.glb` (all npc files rebuilt), `apps/game/src/features/khupho/world/{humans,people}.ts`, this file.
+- **Validation:** `pnpm typecheck`, `pnpm build`, `vitest --run src/features/khupho src/features/prologue src/app` (33 passed). Headless `/khupho`: 11 of 11 street NPCs have sunglasses; close-up of yoshida shows them on the eyes, following the head.
+- **Not verified:** the fit on each of the 11 faces one by one (only yoshida was looked at up close); real-GPU frame rate; licenses.
+- **Deviations:** none. **Follow-up:** owner review of the fit on the shortest (nguoigia 1.23 m) and tallest (freya 1.94 m) models.
+
+
 ### 2026-11-14 — Khupho: native character heights, walker side-stepping, bike braking and colliders
 
 - **Objective:** owner requests: people keep their normal (authored) heights; walking NPCs step aside when they meet someone; bikes must not pass through each other or the player, have a collider box, and stop for the player.
