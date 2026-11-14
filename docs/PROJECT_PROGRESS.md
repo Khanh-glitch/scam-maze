@@ -211,6 +211,19 @@ Resolved:
 
 ## Task History
 
+### 2026-11-15 — Fix cut-apart parked bikes; noodle shop table set; model shop staff
+
+- **Objective:** the owner reported parked bikes sunk into the ground, asked for the table set in the noodle shop, and asked for shop staff back using the 3D NPC models.
+- **Completed:**
+  - `streetFurniture.ts` `prepare()`: quantized, normalized vertex attributes are converted to Float32 before the node matrix is baked. Baking into normalized 16-bit positions clamped them to [-1, 1], which cut the bikes apart and made them look sunk.
+  - `rooms.ts`: the noodle shop's two low tables and stools are replaced by one `tableSet`; the repair shop stool moved to z 3.4.
+  - `people.ts`: new `ShopStaff` (keeper at each shop's `shop` spot, plus a helper in the cafe and the noodle shop) using the street NPC models; visible 6:00–21:00 within 35 m. The procedural shopkeeper stays as the fallback when the models do not load. Cafe customers re-positioned to the cafe tables.
+  - `humans.ts`: `sitHigh` role and clip (`HIGH_SEAT` 0.42 m) for keepers on counter stools.
+- **Files modified:** `apps/game/src/features/khupho/world/{streetFurniture,rooms,people,humans}.ts`, `docs/PROJECT_PROGRESS.md`.
+- **Validation:** `pnpm typecheck`, `pnpm build` and `npx vitest --run src/features/khupho src/features/prologue src/app src/config` (40 tests) passed. Headless SwiftShader screenshots of the noodle shop, the cafe and a parked Super Cub showed whole bikes on the floor, the table set and the staff in place.
+- **Not verified:** FPS on a real GPU; the `sitHigh` pose up close.
+- **Follow-up:** owner review of staff placement and poses.
+
 ### 2026-11-15 — Commit the parked bike and tall chair source files
 
 - **Objective:** owner request: put the bike source files on GitHub.

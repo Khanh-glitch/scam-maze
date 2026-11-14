@@ -64,8 +64,19 @@ function prepare(kind: PropKind, scene: THREE.Object3D): PreparedProp {
   scene.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
-    const g = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
+    const g = mesh.geometry.clone();
     for (const name of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(name)) g.deleteAttribute(name);
+    // The files are quantized (normalized 16-bit positions, scaled back by the node matrix).
+    // Baking the matrix into such an attribute clamps every value to [-1, 1] and cuts the model
+    // apart, so the attributes become plain floats first.
+    for (const name of Object.keys(g.attributes)) {
+      const a = g.getAttribute(name) as THREE.BufferAttribute;
+      if (a.array instanceof Float32Array && !a.normalized) continue;
+      const out = new Float32Array(a.count * a.itemSize);
+      for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) out[i * a.itemSize + c] = a.getComponent(i, c);
+      g.setAttribute(name, new THREE.BufferAttribute(out, a.itemSize));
+    }
+    g.applyMatrix4(mesh.matrixWorld);
     if (!g.attributes.normal) g.computeVertexNormals();
     if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
     const m = mesh.material as THREE.Material;

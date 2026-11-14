@@ -485,6 +485,34 @@ class Sitter {
   }
 }
 
+/** Shop staff are not drawn past this distance (m); they are inside, behind the shop front. */
+const STAFF_HIDE_DISTANCE = 35;
+/** Hours a shop is staffed (the procedural shopkeeper's schedule runs 6:00-21:00). */
+const STAFF_HOURS: [number, number] = [6, 21];
+
+/** A street NPC model working in a shop: sits on the counter stool or stands at its spot while the shop is open. */
+class ShopStaff {
+  a: HumanActor;
+  constructor(actor: HumanActor, h: House, spot: House['spots'][string], ctx: Ctx) {
+    this.a = actor;
+    const w = h.wp(spot.x, 0, spot.z);
+    actor.object.position.set(w.x, h.F(spot.k) + (spot.y ?? 0), w.z);
+    actor.object.rotation.y = spot.yaw + h.rot;
+    ctx.root.add(actor.object);
+    // The counter stool is 0.42 m high; the other spots (cooking, repairing, on the phone) are standing.
+    if (!(spot.pose === 'sit' && actor.play('sitHigh', { fade: 0 }))) actor.play('idle', { fade: 0 });
+  }
+  update(dt: number, hour: number, player: THREE.Vector3) {
+    const d = this.a.object.position.distanceTo(player);
+    const v = hour >= STAFF_HOURS[0] && hour < STAFF_HOURS[1] && d < STAFF_HIDE_DISTANCE;
+    this.a.object.visible = v;
+    if (v) this.a.update(dt, d);
+  }
+}
+
+/** Street NPC models used as shop staff, in turn. */
+const STAFF_MODELS: HumanModelId[] = ['npcYoshida', 'npcAlice', 'npcLinMei', 'npcArthur', 'npcSofia', 'npcAlan', 'npcNapole', 'npcFreya', 'npcArchetype'];
+
 class Bike {
   g: THREE.Group; speed = 0; base: number; dir: 1 | -1; lane: number; x: number; info: { pos: THREE.Vector3; speed: number };
   /** Box the player collides with (Physics.dynamic), moved with the bike. */
@@ -580,9 +608,30 @@ export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vect
   PERSON_GROUPS.length = 0;
   const r = mulberry32(99);
   const residents: Resident[] = [], walkers: Walker[] = [], statics: Static[] = [], bikes: Bike[] = [];
-  const modelWalkers: ModelWalker[] = [], vendors: Vendor[] = [], sitters: Sitter[] = [];
+  const modelWalkers: ModelWalker[] = [], vendors: Vendor[] = [], sitters: Sitter[] = [], staff: ShopStaff[] = [];
+  // Outfits for model people come from their own random stream (see below); staff draw from it too.
+  const staffRng = mulberry32(777);
+  let staffN = 0;
   houses.filter((h) => !h.spec.lite).forEach((h, i) => {
     const shop = ['grocery', 'cafe', 'pho', 'repair', 'hair'].includes(h.spec.ground);
+    if (shop && humans) {
+      // Shop staff are street NPC models (owner): the shopkeeper at the shop spot, plus a helper
+      // at the lounge spot in the cafe and the noodle shop. Without models: the procedural shopkeeper.
+      const keeper = h.spots['shop'];
+      // Helper: cafe customer seat by the TV; noodle shop server standing beside the table set (rooms.ts).
+      const helper = !keeper ? undefined
+        : h.spec.ground === 'cafe' ? h.spots['tv']
+        : h.spec.ground === 'pho' ? { ...keeper, x: 1.95, z: 2.55, yaw: -Math.PI / 2, pose: 'stand', device: undefined }
+        : undefined;
+      const spots = [keeper, helper].filter(Boolean) as House['spots'][string][];
+      let placed = 0;
+      for (const sp of spots) {
+        const id = STAFF_MODELS[staffN++ % STAFF_MODELS.length];
+        const actor = humans.spawn(id, { top: pick(staffRng, OUTFIT_TOP), bottom: pick(staffRng, OUTFIT_BOTTOM), shoes: pick(staffRng, OUTFIT_SHOES) });
+        if (actor) { staff.push(new ShopStaff(actor, h, sp, ctx)); placed++; }
+      }
+      if (placed) return;
+    }
     // Shops keep only the shopkeeper inside (owner: too many people in the shops).
     const list: Slot[][] = shop ? [SHOP] : i % 3 === 0 ? [MOM, DAD, KID] : i % 3 === 1 ? [MOM, ELDER] : [ELDER, DAD, MOM];
     list.forEach((s, j) => residents.push(new Resident(h, s, ctx, r, { female: j === 0, kid: s === KID, elder: s === ELDER })));
@@ -619,7 +668,12 @@ export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vect
     statics.push(new Static(ctx, r, x, y, z, yaw, poseName, o, hours));
   };
   const cafe = houses.filter((h) => !h.spec.lite)[3];
-  if (cafe) { const cx = cafe.ox - cafe.W / 2; seat(cx - 1.5, 0.15, 4.5, Math.PI / 2, 'sip', { elder: true }, [6, 21], 'npcNguoiGia'); seat(cx + 0.5, 0.15, 5.0, -Math.PI / 2, 'sip', {}, [7, 20], 'npcArchetype'); }
+  if (cafe) {
+    // In front of the cafe itself, beside its table set (neighborhood.ts puts the set at cx + 0.7).
+    const south = cafe.rot === 0, sgn = south ? 1 : -1, cx = (south ? cafe.ox : cafe.ox - cafe.W) + cafe.W / 2;
+    seat(cx - 1.4, 0.15, sgn * 4.7, Math.PI / 2, 'sip', { elder: true }, [6, 21], 'npcNguoiGia');
+    seat(cx - 0.55, 0.15, sgn * 4.7, -Math.PI / 2, 'sip', {}, [7, 20], 'npcArchetype');
+  }
   // Banh mi vendor beside the cart from streetProps.ts, with the tall plastic chair next to her.
   const vendorActor = humans?.spawn('banhmiVendor');
   if (vendorActor) vendors.push(new Vendor(vendorActor, ctx, -1.75, 0.15, -4.9, 0, [6, 20]));
@@ -649,6 +703,7 @@ export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vect
       for (const w of walkers) w.update(dt, t, inWay, pp);
       for (const w of modelWalkers) w.update(dt, pp, inWay);
       for (const s of sitters) s.update(dt, hour, pp);
+      for (const s of staff) s.update(dt, hour, pp);
       for (const v of vendors) v.update(dt, hour, pp);
       for (const s of statics) s.update(t, hour);
       for (const b of bikes) b.update(dt, pp, audio, bikes);
