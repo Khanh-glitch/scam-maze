@@ -9,6 +9,7 @@ import { mulberry32, clamp } from './util';
 import { mat } from './materials';
 import { BikeRiderInstance, type BikeRiderTemplate } from './bikeRider';
 import type { HumanActor, HumanLibrary, HumanModelId, OutfitPart } from './humans';
+import { hasProp, propSize, queueWorldProp } from './streetFurniture';
 
 export interface Life {
   update(dt: number, t: number): void;
@@ -215,6 +216,8 @@ const SIDESTEP = 0.7;
 const SIDESTEP_SPEED = 0.9;
 /** Seconds without anyone in the way before a walker drifts back onto its path. */
 const AVOID_CLEAR = 1.2;
+/** Side offsets (m) tried to get around a solid obstacle on the path. */
+const OBSTACLE_OFFSETS = [0, 0.6, -0.6, 1.0, -1.0, 1.4, -1.4];
 /** A walker that cannot step aside waits at most this long (s), then squeezes past slowly. */
 const AVOID_WAIT = 2.5;
 
@@ -233,6 +236,7 @@ class PathFollower {
   private clearT = 0;
   private decideT = Math.random() * 0.15;
   private waitT = 0;
+  private stuckT = 0;
   /** Share of the walking speed used now (slower while passing close, 0 while waiting). */
   pace = 1;
   private readonly probe = { x: 0, z: 0 };
@@ -286,6 +290,18 @@ class PathFollower {
         this.pace = 1; this.waitT = 0;
         if (this.clearT <= 0) this.target = 0;
       }
+      // Solid things on the way (the banh mi cart, tables, parked bikes): walk around them. The
+      // offset closest to the planned one whose next 1.2 m is clear wins; with none, wait, then turn back.
+      const clear = (o: number) => !this.solidAt(this.base.x + rx * o + fx * 0.55, this.base.z + rz * o + fz * 0.55)
+        && !this.solidAt(this.base.x + rx * o + fx * 1.2, this.base.z + rz * o + fz * 1.2);
+      if (!clear(this.target)) {
+        const options = OBSTACLE_OFFSETS.filter(clear).sort((a, b) => Math.abs(a - this.target) - Math.abs(b - this.target));
+        if (options.length) { this.target = options[0]; this.clearT = AVOID_CLEAR; this.stuckT = 0; }
+        else {
+          this.pace = 0; this.stuckT += 0.15;
+          if (this.stuckT > AVOID_WAIT) { this.stuckT = 0; this.i = (this.i + 1) % this.pts.length; this.offset = -this.offset; this.target = -this.target; }
+        }
+      } else this.stuckT = 0;
     }
     const before = this.offset;
     const ds = SIDESTEP_SPEED * dt;
@@ -295,7 +311,9 @@ class PathFollower {
     const side = this.offset - before;
     const nx = this.base.x + rx * this.offset, nz = this.base.z + rz * this.offset;
     const mx = fx * st + rx * side, mz = fz * st + rz * side;
-    g.position.x = nx; g.position.z = nz;
+    // Never stand inside a solid, whatever the plan said.
+    this.probe.x = nx; this.probe.z = nz; this.ctx.phys.collide(this.probe, this.base.y, 0.22);
+    g.position.x = this.probe.x; g.position.z = this.probe.z;
     if (mx * mx + mz * mz > 1e-8) {
       const want = Math.atan2(mx, mz); let dy = want - g.rotation.y; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
       g.rotation.y += dy * Math.min(1, dt * 6);
@@ -443,8 +461,29 @@ const STREET_END = 72;
 /** Height of the camera above the feet (Player.eyeH). */
 const EYE_HEIGHT = 1.62;
 
+/** Delay (s) before a held-up bike's first honk, and between honks (horn.mp3 lasts 2.5 s). */
+const HORN_FIRST: [number, number] = [0.6, 1.2];
+const HORN_EVERY: [number, number] = [4, 6.5];
+
 /** Highest speed that still stops `gap` meters ahead at BIKE_DECEL (0 when the gap is used up). */
 const speedForGap = (gap: number) => (gap <= BIKE_STOP_GAP ? 0 : Math.sqrt(2 * BIKE_DECEL * (gap - BIKE_STOP_GAP)));
+
+/** A character model sitting on a low stool (the stool is placed with it), visible during `hours`. */
+class Sitter {
+  a: HumanActor;
+  hours: [number, number];
+  constructor(actor: HumanActor, ctx: Ctx, x: number, y: number, z: number, yaw: number, hours: [number, number]) {
+    this.a = actor; this.hours = hours;
+    actor.object.position.set(x, y, z); actor.object.rotation.y = yaw; ctx.root.add(actor.object);
+    actor.play('sit', { fade: 0 });
+    queueWorldProp('stool-low', x, y, z, yaw);
+  }
+  update(dt: number, hour: number, player: THREE.Vector3) {
+    const v = hour >= this.hours[0] && hour < this.hours[1];
+    this.a.object.visible = v;
+    if (v) this.a.update(dt, this.a.object.position.distanceTo(player));
+  }
+}
 
 class Bike {
   g: THREE.Group; speed = 0; base: number; dir: 1 | -1; lane: number; x: number; info: { pos: THREE.Vector3; speed: number };
@@ -479,8 +518,8 @@ class Bike {
    * Speed limit from what is ahead: the player standing in (or next to) the lane, and the next
    * bike in the same lane. Bikes brake to stop BIKE_STOP_GAP short of either.
    */
-  private limit(player: THREE.Vector3, bikes: readonly Bike[]): { v: number; playerGap: number } {
-    let v = this.base, playerGap = Infinity;
+  private limit(player: THREE.Vector3, bikes: readonly Bike[]): { v: number; playerGap: number; bikeGap: number } {
+    let v = this.base, playerGap = Infinity, bikeGap = Infinity;
     const feet = player.y - EYE_HEIGHT;
     if (feet < 0.8 && Math.abs(player.z - this.lane) < BIKE_HALF_WIDTH + PLAYER_RADIUS + 0.35) {
       const along = (player.x - this.x) * this.dir;
@@ -493,12 +532,15 @@ class Bike {
     for (const o of bikes) {
       if (o === this || o.dir !== this.dir || Math.abs(o.lane - this.lane) > BIKE_HALF_WIDTH * 2 + 0.25) continue;
       const gap = this.aheadOf(o.x) - BIKE_HALF_LEN * 2;
+      bikeGap = Math.min(bikeGap, gap);
       if (gap < BIKE_LOOK) v = Math.min(v, Math.max(0, Math.min(o.speed + speedForGap(gap) * 0.5, speedForGap(gap))));
     }
-    return { v, playerGap };
+    return { v, playerGap, bikeGap };
   }
+  /** Seconds to the next honk while this bike is held up by the player (NaN when not held up). */
+  private hornT = NaN;
   update(dt: number, player: THREE.Vector3, audio: AudioSys, bikes: readonly Bike[]) {
-    const { v, playerGap } = this.limit(player, bikes);
+    const { v, playerGap, bikeGap } = this.limit(player, bikes);
     // Brake at once to the limit when it is below the speed; speed up gently otherwise.
     if (v < this.speed) this.speed = Math.max(v, this.speed - BIKE_DECEL * 2.5 * dt);
     else this.speed += (v - this.speed) * Math.min(1, dt * 1.2);
@@ -522,7 +564,15 @@ class Bike {
       }
       this.model.update(dt, this.speed, look);
     }
-    if (this.speed < 0.5 && playerGap < 4) audio.horn(this.g.position);
+    // Only the first bike held up by the player honks (the ones queued behind wait quietly):
+    // a first honk soon after stopping, then one every few seconds with a pause between.
+    const heldUp = this.speed < 0.5 && playerGap < 4 && playerGap < bikeGap;
+    if (!heldUp) this.hornT = NaN;
+    else {
+      if (Number.isNaN(this.hornT)) this.hornT = HORN_FIRST[0] + Math.random() * (HORN_FIRST[1] - HORN_FIRST[0]);
+      this.hornT -= dt;
+      if (this.hornT <= 0) { audio.horn(this.g.position); this.hornT = HORN_EVERY[0] + Math.random() * (HORN_EVERY[1] - HORN_EVERY[0]); }
+    }
   }
 }
 
@@ -530,10 +580,11 @@ export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vect
   PERSON_GROUPS.length = 0;
   const r = mulberry32(99);
   const residents: Resident[] = [], walkers: Walker[] = [], statics: Static[] = [], bikes: Bike[] = [];
-  const modelWalkers: ModelWalker[] = [], vendors: Vendor[] = [];
+  const modelWalkers: ModelWalker[] = [], vendors: Vendor[] = [], sitters: Sitter[] = [];
   houses.filter((h) => !h.spec.lite).forEach((h, i) => {
     const shop = ['grocery', 'cafe', 'pho', 'repair', 'hair'].includes(h.spec.ground);
-    const list: Slot[][] = shop ? [SHOP, MOM, h.n > 1 ? KID : DAD] : i % 3 === 0 ? [MOM, DAD, KID] : i % 3 === 1 ? [MOM, ELDER] : [ELDER, DAD, MOM];
+    // Shops keep only the shopkeeper inside (owner: too many people in the shops).
+    const list: Slot[][] = shop ? [SHOP] : i % 3 === 0 ? [MOM, DAD, KID] : i % 3 === 1 ? [MOM, ELDER] : [ELDER, DAD, MOM];
     list.forEach((s, j) => residents.push(new Resident(h, s, ctx, r, { female: j === 0, kid: s === KID, elder: s === ELDER })));
   });
   residents.forEach((res) => { const act = pickSlot(res.sched, ctx.env.hour); res.cur = ''; res.begin(act, false); });
@@ -558,19 +609,36 @@ export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vect
   sid(-4.9, -30, 35, 1.15, {}, 'npcAlan', false); sid(4.6, 10, -45, 1.05, {}, 'npcLinMei', false);
   sid(-4.4, 0, 55, 1.2, {}, 'npcNapole', false); sid(4.2, -40, 20, 1.3, {}, 'npcArchetype', false);
   sid(-4.7, 40, -20, 1.2, {}, 'npcBlackGuy', false); sid(4.4, -10, 50, 1.1, {}, 'npcFreya', false); sid(-4.5, -50, 0, 1.0, {}, 'npcSofia', false);
+  /**
+   * Someone sitting on a single low stool: a street NPC model when it loaded (with a stool model),
+   * otherwise the procedural person on a procedural-height stool.
+   */
+  const seat = (x: number, y: number, z: number, yaw: number, poseName: string, o: { elder?: boolean }, hours: [number, number], model: HumanModelId) => {
+    const actor = humans?.spawn(model, outfit(model));
+    if (actor && actor.can('sit') && hasProp('stool-low')) { sitters.push(new Sitter(actor, ctx, x, y, z, yaw, hours)); return; }
+    statics.push(new Static(ctx, r, x, y, z, yaw, poseName, o, hours));
+  };
   const cafe = houses.filter((h) => !h.spec.lite)[3];
-  if (cafe) { const cx = cafe.ox - cafe.W / 2; statics.push(new Static(ctx, r, cx - 1.5, 0.15, 4.5, Math.PI / 2, 'sip', { elder: true }, [6, 21])); statics.push(new Static(ctx, r, cx + 0.5, 0.15, 5.0, -Math.PI / 2, 'sip', {}, [7, 20])); }
-  // Banh mi vendor beside the cart from streetProps.ts.
+  if (cafe) { const cx = cafe.ox - cafe.W / 2; seat(cx - 1.5, 0.15, 4.5, Math.PI / 2, 'sip', { elder: true }, [6, 21], 'npcNguoiGia'); seat(cx + 0.5, 0.15, 5.0, -Math.PI / 2, 'sip', {}, [7, 20], 'npcArchetype'); }
+  // Banh mi vendor beside the cart from streetProps.ts, with the tall plastic chair next to her.
   const vendorActor = humans?.spawn('banhmiVendor');
   if (vendorActor) vendors.push(new Vendor(vendorActor, ctx, -1.75, 0.15, -4.9, 0, [6, 20]));
   else statics.push(new Static(ctx, r, -1.75, 0.15, -4.9, 0, 'stand', { hat: true }, [6, 20]));
+  if (hasProp('stool-high')) {
+    const cx = -1.0, cz = -5.25, sz = propSize('stool-high')!;
+    queueWorldProp('stool-high', cx, 0.15, cz, -0.5);
+    ctx.phys.addCol({ x0: cx - sz.x * 0.45, x1: cx + sz.x * 0.45, y0: 0.15, y1: 0.15 + sz.y, z0: cz - sz.z * 0.45, z1: cz + sz.z * 0.45, enabled: true });
+  }
   statics.push(new Static(ctx, r, 6.6, 0.02, 46.2, 0.5, 'exercise', { elder: true }, [4.8, 7.5]));
-  statics.push(new Static(ctx, r, 20.6, 0.02, 45.8, Math.PI, 'sit', { elder: true }, [6, 22]));
+  seat(20.6, 0.02, 45.8, Math.PI, 'sit', { elder: true }, [6, 22], 'npcFreya');
   statics.push(new Static(ctx, r, 10.3, 0.02, 14.0, -Math.PI / 2, 'sweep', {}, [5.5, 7.2]));
   statics.push(new Static(ctx, r, 15.3, 0.02, 45.0, 0, 'phone', { kid: true }, [15.5, 22]));
   for (let i = 0; i < 12; i++) bikes.push(new Bike(ctx, r, i % 2 ? 1 : -1, -70 + i * 12 + r() * 6, vehicles, bikeRider));
   // Everyone walking a path, for side-stepping (each walker skips its own entry).
   const people: THREE.Vector3[] = [...walkers.map((w) => w.p.g.position), ...modelWalkers.map((w) => w.a.object.position)];
+  // People standing or sitting still on the street are in the way too (vendor, seated customers, statics).
+  const still: THREE.Vector3[] = [...vendors.map((v) => v.a.object.position), ...sitters.map((s) => s.a.object.position), ...statics.map((s) => s.p.g.position)];
+  const inWay: THREE.Vector3[] = [...people, ...still];
   let acc = 0;
   const occ = new Map<object, number>();
   return {
@@ -578,8 +646,9 @@ export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vect
     update(dt, t) {
       const hour = ctx.env.hour, pp = ctx.eye;
       for (const rs of residents) rs.update(dt, t, hour, pp);
-      for (const w of walkers) w.update(dt, t, people, pp);
-      for (const w of modelWalkers) w.update(dt, pp, people);
+      for (const w of walkers) w.update(dt, t, inWay, pp);
+      for (const w of modelWalkers) w.update(dt, pp, inWay);
+      for (const s of sitters) s.update(dt, hour, pp);
       for (const v of vendors) v.update(dt, hour, pp);
       for (const s of statics) s.update(t, hour);
       for (const b of bikes) b.update(dt, pp, audio, bikes);

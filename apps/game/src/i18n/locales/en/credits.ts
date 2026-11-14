@@ -52,6 +52,26 @@ const credits = {
       notes:
         "Handheld phone model used for phone calls. Optimized copy with the wallpaper removed and no visible brand marks.",
     },
+    plasticChairs: {
+      notes:
+        "Low stools and the tall chair on the neighborhood street. Simplified and converted to Meshopt + WebP. Tall chair: https://sketchfab.com/3d-models/vietnamese-plastic-chair-efa69b6b78cc48248f758aec21369447",
+    },
+    plasticTableSet: {
+      notes: "Table-and-stools sets in front of the neighborhood cafes and pho shops. Simplified and converted to Meshopt.",
+    },
+    superCub: {
+      notes: "Parked bike on the neighborhood street. Simplified and converted to Meshopt + WebP.",
+    },
+    fatBoyCruiser: {
+      notes: "Parked bike on the neighborhood street. Simplified and converted to Meshopt + WebP.",
+    },
+    hondaCg125: {
+      notes: "Parked bike on the neighborhood street. Simplified and converted to Meshopt + WebP; the source file is not redistributed.",
+    },
+    parkedBikesUnattributed: {
+      notes:
+        "Two parked bike models supplied without author or license information. The scooter's brand logo and license plate were removed.",
+    },
     chapter1Voices: {
       notes:
         "Synthetic voices for Chapter 1 dialogue: Microsoft David, Mark and Zira (en-US) and Microsoft An (vi-VN). No real person's voice was cloned. Redistribution terms for the generated audio have not been verified.",

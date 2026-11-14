@@ -48,7 +48,8 @@ export function furnishRoom(h: House, room: Room) {
     case 'shop': case 'cafe': case 'pho': {
       light(W / 2, 2.0, 'tube', 0xf6f8ff, 1.1); fan(W / 2, 3.7, 'fan'); sw(t, 0.6, 'px');
       F.counter(B, W - t - 0.85, y, 1.0, PI, 1.7, 0.6, 0.9, 'tile:#46484c', room.kind === 'pho' ? 'm:#aeb4ba' : 'woodF:#c9bfae');
-      F.stool(B, W - t - 0.85, y, 1.78, room.kind === 'cafe' ? '#2a7fd0' : '#d9382a');
+      // The shopkeeper sits here (procedural pose, seat ~0.42 m).
+      F.stool(B, W - t - 0.85, y, 1.78, room.kind === 'cafe' ? '#2a7fd0' : '#d9382a', 0.42);
       radio(h, id('radio'), W - t - 0.45, y + 0.93, 1.0, PI);
       F.calendar(B, W - t, y + 1.6, 3.4, -PI / 2);
       if (room.kind === 'shop') {
@@ -63,7 +64,7 @@ export function furnishRoom(h: House, room: Room) {
         F.shelfUnit(B, t + 0.2, y, 1.9, PI / 2, 2.0, 1.9, sp.seed + 2);
         B.box(W - t - 1.5, y + 0.93, 0.8, 0.4, 0.32, 0.35, 'm:#9aa0a5'); B.box(W - t - 1.45, y + 1.25, 0.82, 0.3, 0.05, 0.3, 'm:#444');
         for (let i = 0; i < 4; i++) { B.cyl(W - t - 0.5 + (i % 2) * 0.12, y + 0.93, 0.8 + Math.floor(i / 2) * 0.1, 0.035, 0.04, 'm:#cfd3d6', 8); B.cyl(W - t - 1.0 + i * 0.1, y + 0.93, 1.15, 0.03, 0.06, 'g:#f4f0e6', 8); }
-        F.lowTable(B, 0.95, y, 3.0, '#3b78d6'); F.stool(B, 0.95, y, 3.5, '#d9382a'); F.stool(B, 0.95, y, 2.5, '#2a9fd6'); F.stool(B, 1.45, y, 3.0, '#e8c02a');
+        F.lowTable(B, 0.95, y, 3.0, '#3b78d6'); F.stool(B, 0.95, y, 3.5, '#d9382a'); F.stool(B, 0.95, y, 2.5, '#2a9fd6'); F.stool(B, 1.45, y, 3.0, '#e8c02a', 0.42);
         F.lowTable(B, W - t - 0.55, y, 3.6, '#e8b02a'); F.stool(B, W - t - 1.05, y, 3.6, '#d9382a'); F.stool(B, W - t - 0.55, y, 4.15, '#2a7fd0');
         tv(h, room, id('tv'), t, y + 1.75, 4.2, PI / 2, 0.8);
         spot('shop', { x: W - t - 0.85, z: 1.78, yaw: PI, pose: 'sit', device: id('radio') });

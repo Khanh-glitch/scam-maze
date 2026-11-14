@@ -144,3 +144,72 @@ export function retargetClip(source: THREE.Object3D, target: THREE.Object3D, cli
   if (hipsS && hipsT) tracks.push(new THREE.VectorKeyframeTrack('pelvis.position', times, hipsPos));
   return new THREE.AnimationClip(name, clip.duration, tracks);
 }
+
+/**
+ * A still sitting pose for the street NPC rig (`pelvis`, `thigh_l`, `calf_l`, `foot_l`, ...) on a
+ * seat `seatHeight` m high, as a looping one-frame clip named `name`. Built from the model's own
+ * rest pose (feet on y = 0, facing +Z, model units = meters):
+ * - the pelvis drops so the hip joints sit `HIP_ABOVE_SEAT` above the seat;
+ * - each leg: the shin stands vertical with the ankle at its rest height, the thigh reaches from
+ *   the hip to the knee on top of it (knees rise above the hips on a low stool), feet stay flat;
+ * - the upper arms hang forward and the forearms rest toward the knees; spine and head keep the rest pose.
+ */
+const HIP_ABOVE_SEAT = 0.09;
+
+export function sitClip(target: THREE.Object3D, seatHeight: number, name = 'sit'): THREE.AnimationClip | null {
+  target.updateMatrixWorld(true);
+  const bones = boneMap(target);
+  const need = ['pelvis', 'thigh_l', 'calf_l', 'foot_l', 'thigh_r', 'calf_r', 'foot_r', 'upperarm_l', 'lowerarm_l', 'hand_l', 'upperarm_r', 'lowerarm_r', 'hand_r'];
+  if (need.some((n) => !bones.has(n))) return null;
+  const order: THREE.Bone[] = [];
+  target.traverse((o) => { if ((o as THREE.Bone).isBone) order.push(o as THREE.Bone); });
+  const wp = (n: string) => bones.get(n)!.getWorldPosition(new THREE.Vector3());
+  const restWorld = new Map<THREE.Bone, THREE.Quaternion>(), restLocal = new Map<THREE.Bone, THREE.Quaternion>();
+  for (const b of order) { restWorld.set(b, b.getWorldQuaternion(new THREE.Quaternion())); restLocal.set(b, b.quaternion.clone()); }
+
+  // Pelvis offset and the joint targets in world space.
+  const drop = seatHeight + HIP_ABOVE_SEAT - (wp('thigh_l').y + wp('thigh_r').y) / 2;
+  const shift = new THREE.Vector3(0, drop, -0.04);
+  const dirs = new Map<string, THREE.Vector3>();
+  for (const s of ['l', 'r']) {
+    const hip = wp(`thigh_${s}`).add(shift), knee0 = wp(`calf_${s}`), ankle0 = wp(`foot_${s}`);
+    const l1 = knee0.distanceTo(wp(`thigh_${s}`)), l2 = ankle0.distanceTo(knee0);
+    const kneeY = ankle0.y + l2;
+    const sinA = THREE.MathUtils.clamp((kneeY - hip.y) / l1, -0.95, 0.95);
+    const knee = new THREE.Vector3(hip.x * 1.08, kneeY, hip.z + l1 * Math.sqrt(1 - sinA * sinA));
+    const ankle = new THREE.Vector3(knee.x, ankle0.y, knee.z + 0.04);
+    dirs.set(`thigh_${s}`, knee.clone().sub(hip).normalize());
+    dirs.set(`calf_${s}`, ankle.clone().sub(knee).normalize());
+    dirs.set(`upperarm_${s}`, new THREE.Vector3(0, -0.82, 0.57).normalize());
+    dirs.set(`lowerarm_${s}`, new THREE.Vector3(s === 'l' ? -0.08 : 0.08, -0.35, 0.93).normalize());
+  }
+  const childOf: Record<string, string> = {};
+  for (const s of ['l', 'r']) Object.assign(childOf, { [`thigh_${s}`]: `calf_${s}`, [`calf_${s}`]: `foot_${s}`, [`upperarm_${s}`]: `lowerarm_${s}`, [`lowerarm_${s}`]: `hand_${s}` });
+  /** Bones kept at their rest world orientation (flat feet, level hands). */
+  const keepWorld = new Set(['foot_l', 'foot_r', 'ball_l', 'ball_r']);
+
+  const world = new Map<THREE.Bone, THREE.Quaternion>();
+  const tracks: THREE.KeyframeTrack[] = [];
+  const targetRoot = target.getWorldQuaternion(new THREE.Quaternion());
+  for (const b of order) {
+    const parentWorld = (b.parent && world.get(b.parent as THREE.Bone)) ?? (b.parent ? b.parent.getWorldQuaternion(new THREE.Quaternion()) : targetRoot);
+    let w: THREE.Quaternion;
+    const want = dirs.get(b.name);
+    if (want) {
+      const rest = bones.get(childOf[b.name])!.getWorldPosition(new THREE.Vector3()).sub(b.getWorldPosition(new THREE.Vector3())).normalize();
+      w = new THREE.Quaternion().setFromUnitVectors(rest, want).multiply(restWorld.get(b)!);
+    } else if (keepWorld.has(b.name)) {
+      w = restWorld.get(b)!.clone();
+    } else {
+      w = parentWorld.clone().multiply(restLocal.get(b)!);
+    }
+    world.set(b, w);
+    const local = parentWorld.clone().invert().multiply(w);
+    tracks.push(new THREE.QuaternionKeyframeTrack(`${b.name}.quaternion`, [0, 1], [local.x, local.y, local.z, local.w, local.x, local.y, local.z, local.w]));
+  }
+  const pelvis = bones.get('pelvis')!;
+  const p = pelvis.getWorldPosition(new THREE.Vector3()).add(shift);
+  if (pelvis.parent) pelvis.parent.worldToLocal(p);
+  tracks.push(new THREE.VectorKeyframeTrack('pelvis.position', [0, 1], [p.x, p.y, p.z, p.x, p.y, p.z]));
+  return new THREE.AnimationClip(name, 1, tracks);
+}

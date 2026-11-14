@@ -3,7 +3,8 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { CHARACTERS_GLB_BASE } from '../../../config/assetPaths';
-import { retargetClip } from './retarget';
+import { retargetClip, sitClip } from './retarget';
+import { STOOL_LOW_HEIGHT } from './streetFurniture';
 
 /**
  * Animated character models for the neighborhood (scripts/optimize-characters.cjs).
@@ -13,7 +14,7 @@ import { retargetClip } from './retarget';
  * clip can only stand (like the vendor); `idle` is required. A model without clips (the street
  * NPCs) names a `clipsFrom` model whose idle, walk and wave are retargeted onto its skeleton.
  */
-export type HumanRole = 'idle' | 'walk' | 'wave' | 'welcome' | 'invite' | 'prepare' | 'lookAround' | 'thank';
+export type HumanRole = 'idle' | 'walk' | 'wave' | 'welcome' | 'invite' | 'prepare' | 'lookAround' | 'thank' | 'sit';
 
 export interface HumanModelSpec {
   /** File name under CHARACTERS_GLB_BASE. */
@@ -65,14 +66,15 @@ export const HUMAN_MODELS = {
   // `_dontchangecolor` in the source name: keeps the authored clothing colors.
   npcBlackGuy: { ...street('npc-blackguy.optimized.glb'), outfit: false },
   npcFreya: street('npc-freya.optimized.glb'),
-  npcNguoiGia: street('npc-nguoigia.optimized.glb'),
+  // Authored 1.23 m tall; the owner asked for 1.5 m.
+  npcNguoiGia: { ...street('npc-nguoigia.optimized.glb'), height: 1.5 },
   npcSofia: street('npc-sofia.optimized.glb'),
 } satisfies Record<string, HumanModelSpec>;
 
 export type HumanModelId = keyof typeof HUMAN_MODELS;
 
 function street(file: string): HumanModelSpec {
-  return { file, clips: { idle: 'idle', walk: 'walk', wave: 'wave' }, clipsFrom: 'juno3', outfit: true, glasses: true };
+  return { file, clips: { idle: 'idle', walk: 'walk', wave: 'wave', sit: 'sit' }, clipsFrom: 'juno3', outfit: true, glasses: true };
 }
 
 /** Clothing parts `spawn` can recolor, by mesh name. */
@@ -247,6 +249,11 @@ export class HumanLibrary {
         }
         const box = new THREE.Box3().setFromObject(scene);
         const scale = spec.height ? spec.height / Math.max(0.01, box.max.y - box.min.y) : 1;
+        // A still sitting pose on the low stool, built from the rig (the street NPCs have no sit clip).
+        if (spec.clips.sit && !animations.some((c) => c.name === spec.clips.sit)) {
+          const sit = sitClip(cloneSkinned(scene), STOOL_LOW_HEIGHT / scale + box.min.y, spec.clips.sit);
+          if (sit) animations = [...animations, sit];
+        }
         const clips = new Map(animations.map((c) => [c.name, c]));
         for (const role of Object.keys(spec.clips) as HumanRole[]) {
           const name = spec.clips[role];
