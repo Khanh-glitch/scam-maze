@@ -1,23 +1,25 @@
 // Chapter reducer for the deterministic chapter core.
 // Pure TypeScript: no React, Three.js, R3F, Drei, Rapier, Zustand or Dexie imports.
-// See .kiro/specs/chapter-01-the-urgent-call/design.md, "Chapter core" (reducer pipeline and
-// guard summary) and "Data Models" (state invariants), and Requirements 5, 8, 10, 12 and 13.
+// See .kiro/specs/chapter-01-double-deception/design.md (core and reducer sections).
 //
 // Pipeline per dispatched value:
 // 1. Shape check (`isCoreAction`), otherwise "Unknown action."
 // 2. Outcome lock: once an Outcome is set, only FINISH_CHAPTER is accepted.
 // 3. Per-action guard from the design's guard table. A failing guard returns a reason.
 // 4. Apply the action (pure; the input state is never mutated).
-// 5. Objective manager (activations and completions).
-// 6. Outcome function, when a Decision exists and no Outcome is set yet.
-// 7. Append one Event_Log entry with the derived evidence, flags, objectives and debrief tags.
+// 5. Beats (pplyBeats): scripted state changes, each once; fired beats are tagged in the event.
+// 6. Objective manager (activations and completions).
+// 7. Outcome function, when a Decision exists and no Outcome is set yet.
+// 8. Append one Event_Log entry with the derived evidence, flags, objectives and debrief tags.
 //
 // A rejected action returns the same state object, `accepted: false` and a non-empty reason.
 
 import { CHAPTER_1_SCENARIO } from "./chapter1/scenario";
 import {
+  CALL_IDS,
   CLAIM_IDS,
   DECISION_IDS,
+  DEVICE_ACTION_IDS,
   EVIDENCE_IDS,
   FLAG_IDS,
   INTERACTABLE_IDS,
@@ -26,6 +28,7 @@ import {
   VERIFY_METHODS,
   type CallId,
   type ClaimId,
+  type DeviceActionId,
   type EvidenceId,
   type FlagId,
   type IncomingCallId,
@@ -33,7 +36,9 @@ import {
   type ObjectiveId,
   type VerifyMethod,
 } from "./chapter1/ids";
-import { applyEffect, evaluateCondition, evaluateConditions } from "./conditions";
+import { applyBeats, beatTag } from "./beats";
+import { applyEffect, applyEffects, evaluateConditions } from "./conditions";
+import { canRecordDeduction, matchDeduction } from "./deductions";
 import { endConversation, selectOption, startConversation } from "./dialogueEngine";
 import { canDiscover, discover, type DiscoveryTrigger } from "./evidence";
 import {
@@ -71,22 +76,25 @@ export const REASONS = {
   evidenceAlreadyRecorded: "Evidence already recorded.",
   phoneAlreadyOpen: "The phone is already open.",
   phoneAlreadyClosed: "The phone is already closed.",
-  scamCallAlreadyAnswered: "This call has already been answered.",
   callAlreadyRinging: "A call is already ringing.",
-  callbackNotYet: "The caller cannot call back yet.",
-  callbackAlreadyRang: "The caller has already called back.",
-  followupNotYet: "The case desk cannot call yet.",
-  followupAlreadyRang: "The case desk has already called.",
+  unknownCall: "This call does not exist.",
+  callNotYet: "This call cannot ring yet.",
+  callAlreadyRang: "This call has already been answered.",
   decisionAlreadyMade: "A decision has already been made.",
   noCallRinging: "No call is ringing.",
   noCallToEnd: "There is no call to end.",
   unknownNpc: "This person is not here.",
   needOfficialNumber: "You need the bank's official number first.",
-  noCallToVerify: "There is no call to check yet.",
   phoneClosed: "Open your phone first.",
   decisionUnavailable: "This decision is not available yet.",
   chapterNotEnded: "The chapter has not ended yet.",
   chapterAlreadyFinished: "The chapter is already finished.",
+  // Reason codes for DEVICE_ACTION and COMBINE_EVIDENCE.
+  unknownDeviceAction: "This device action does not exist.",
+  deviceActionUnavailable: "This action is not available yet.",
+  deviceActionAlreadyDone: "This action was already done.",
+  combinationInvalid: "These items do not combine.",
+  deductionAlreadyRecorded: "This deduction is already recorded.",
 } as const;
 
 /** Stable code of a core rejection reason; the UI translates by this code. */
@@ -97,7 +105,7 @@ export type ReasonCode = keyof typeof REASONS;
 // ---------------------------------------------------------------------------
 
 const RING_REASONS: readonly RingReason[] = ["first-interaction", "exploration-timer", "re-ring", "callback", "follow-up"];
-const INCOMING_CALL_IDS: readonly IncomingCallId[] = ["call.scam-1", "call.callback", "call.followup"];
+const INCOMING_CALL_IDS: readonly IncomingCallId[] = CALL_IDS.filter((id): id is IncomingCallId => id !== "call.official");
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -125,7 +133,8 @@ export function isCoreAction(value: unknown): value is CoreAction {
     case "RING_CALL":
       return isOneOf(INCOMING_CALL_IDS, value.callId) && isOneOf(RING_REASONS, value.reason);
     case "TALK_TO_NPC":
-      return isOneOf(NPC_IDS, value.npcId);
+      // No NPC exists in this chapter; the reducer rejects it with "This person is not here.".
+      return typeof value.npcId === "string";
     case "SELECT_DIALOGUE_OPTION":
       return typeof value.optionId === "string" && value.optionId.length > 0;
     case "VERIFY_CLAIM":
@@ -134,6 +143,16 @@ export function isCoreAction(value: unknown): value is CoreAction {
       return isOneOf(DECISION_IDS, value.decision);
     case "COMPLETE_OBJECTIVE":
       return isOneOf(OBJECTIVE_IDS, value.objectiveId);
+    case "DEVICE_ACTION":
+      return isOneOf(DEVICE_ACTION_IDS, value.deviceActionId);
+    case "COMBINE_EVIDENCE":
+      return (
+        Array.isArray(value.evidenceIds) &&
+        value.evidenceIds.length >= 2 &&
+        value.evidenceIds.length <= 3 &&
+        value.evidenceIds.every((id) => isOneOf(EVIDENCE_IDS, id)) &&
+        new Set(value.evidenceIds).size === value.evidenceIds.length
+      );
     default:
       return false;
   }
@@ -164,6 +183,7 @@ export function createInitialState(_scenario: ScenarioDefinition = CHAPTER_1_SCE
     discovered: [],
     claims: recordOf<ClaimId, ClaimStatus>(CLAIM_IDS, () => "unverified"),
     decision: null,
+    deductions: [],
     flags: recordOf<FlagId, boolean>(FLAG_IDS, () => false),
     pressure: 0,
     outcome: null,
@@ -192,18 +212,21 @@ function findRecordIndex(state: ChapterState, callId: CallId): number {
   return -1;
 }
 
-function hasRecord(state: ChapterState, callId: CallId): boolean {
-  return findRecordIndex(state, callId) !== -1;
-}
-
-function scam1Answered(state: ChapterState): boolean {
+/** True when the call was picked up before (answered, or answered and ended). */
+function wasAnswered(state: ChapterState, callId: CallId): boolean {
   return state.call.log.some(
-    (record) => record.callId === "call.scam-1" && (record.status === "answered" || record.status === "ended"),
+    (record) => record.callId === callId && (record.status === "answered" || record.status === "ended"),
   );
 }
 
-function scam1Ended(state: ChapterState): boolean {
-  return evaluateCondition({ kind: "callEnded", callId: "call.scam-1" }, state);
+/** True when an accepted VERIFY_CLAIM with this method is in the Event_Log. */
+function hasVerifiedBy(state: ChapterState, method: VerifyMethod): boolean {
+  return state.events.some((entry) => entry.action.type === "VERIFY_CLAIM" && entry.action.method === method);
+}
+
+/** True when an accepted DEVICE_ACTION with this ID is in the Event_Log. */
+function hasDoneDeviceAction(state: ChapterState, id: DeviceActionId): boolean {
+  return state.events.some((entry) => entry.action.type === "DEVICE_ACTION" && entry.action.deviceActionId === id);
 }
 
 /** Updates the latest record for `callId`, or appends a new one built from Scenario_Data. */
@@ -254,12 +277,11 @@ function discoverByTrigger(
 }
 
 /** Debrief tag recorded when the player hangs up an active call with END_CALL. */
-function hangUpTag(callId: CallId | null): string | null {
-  if (callId === "call.scam-1") return "hung-up";
-  if (callId === "call.callback") return "hung-up-on-callback";
-  if (callId === "call.followup") return "hung-up-on-followup";
-  return null;
-}
+const HANG_UP_TAG = "hung-up";
+
+/** Flag recorded when the player declines or hangs up the first call (Requirement 5, first call). */
+const FIRST_CALL_ID: CallId = "call.alex";
+const FIRST_CALL_REJECTED_FLAG: FlagId = "first_call_rejected";
 
 // ---------------------------------------------------------------------------
 // Per-action guard and apply
@@ -333,22 +355,17 @@ function applyAction(state: ChapterState, action: CoreAction, scenario: Scenario
       if (state.call.status === "ringing") return reject(REASONS.callAlreadyRinging);
       if (state.call.current !== null) return reject(REASONS.callInProgress);
       if (state.conversation !== null) return reject(REASONS.conversationInProgress);
-      if (action.callId === "call.scam-1") {
-        // Unlimited re-ring until the player answers (Requirement 8.4).
-        if (scam1Answered(state)) return reject(REASONS.scamCallAlreadyAnswered);
-      } else if (action.callId === "call.followup") {
-        if (hasRecord(state, "call.followup")) return reject(REASONS.followupAlreadyRang);
-        if (state.decision !== null) return reject(REASONS.decisionAlreadyMade);
-        const callbackIndex = findRecordIndex(state, "call.callback");
-        const callbackStatus = callbackIndex === -1 ? null : state.call.log[callbackIndex].status;
-        if (callbackStatus !== "ended" && callbackStatus !== "declined") return reject(REASONS.followupNotYet);
-      } else {
-        if (hasRecord(state, "call.callback")) return reject(REASONS.callbackAlreadyRang);
-        if (state.decision !== null) return reject(REASONS.decisionAlreadyMade);
-        if (!scam1Ended(state)) return reject(REASONS.callbackNotYet);
-      }
       const callId = action.callId;
-      let next: ChapterState = {
+      if (!Object.hasOwn(scenario.calls, callId)) return reject(REASONS.unknownCall);
+      const def = scenario.calls[callId];
+      if (def.direction !== "incoming") return reject(REASONS.callNotYet);
+      if (state.decision !== null) return reject(REASONS.decisionAlreadyMade);
+      // A call that was picked up never rings again; a declined call may ring again while `ringWhen` holds.
+      if (wasAnswered(state, callId)) return reject(REASONS.callAlreadyRang);
+      if (!def.ringWhen.some((all) => evaluateConditions(all, state, scenario))) {
+        return reject(REASONS.callNotYet);
+      }
+      const next: ChapterState = {
         ...state,
         call: {
           current: callId,
@@ -360,8 +377,6 @@ function applyAction(state: ChapterState, action: CoreAction, scenario: Scenario
           })),
         },
       };
-      if (callId === "call.scam-1") next = applyEffect(next, { kind: "setFlag", flag: "scam1_rang" }, scenario);
-      if (callId === "call.followup") next = applyEffect(next, { kind: "setFlag", flag: "followup_rang" }, scenario);
       return accept(next);
     }
 
@@ -389,8 +404,8 @@ function applyAction(state: ChapterState, action: CoreAction, scenario: Scenario
       const callId = state.call.current;
       if (callId === null) return reject(REASONS.noCallToEnd);
       if (state.call.status === "ringing") {
-        // Decline: the call record stays in the log as declined; the call can ring again.
-        return accept({
+        // Decline: the call record stays in the log as declined.
+        let declined: ChapterState = {
           ...state,
           call: {
             current: null,
@@ -400,7 +415,11 @@ function applyAction(state: ChapterState, action: CoreAction, scenario: Scenario
               status: "declined",
             })),
           },
-        });
+        };
+        if (callId === FIRST_CALL_ID) {
+          declined = applyEffect(declined, { kind: "setFlag", flag: FIRST_CALL_REJECTED_FLAG }, scenario);
+        }
+        return accept(declined);
       }
       // Hang up an active call: end its conversation at the current node.
       let next =
@@ -420,22 +439,15 @@ function applyAction(state: ChapterState, action: CoreAction, scenario: Scenario
           },
         };
       }
-      const tag = hangUpTag(callId);
-      return accept(next, tag ? [tag] : []);
+      if (callId === FIRST_CALL_ID) {
+        next = applyEffect(next, { kind: "setFlag", flag: FIRST_CALL_REJECTED_FLAG }, scenario);
+      }
+      return accept(next, [HANG_UP_TAG]);
     }
 
     case "TALK_TO_NPC": {
-      if (!Object.hasOwn(scenario.npcs, action.npcId)) return reject(REASONS.unknownNpc);
-      if (state.call.current !== null) return reject(REASONS.callInProgress);
-      if (state.conversation !== null) return reject(REASONS.conversationInProgress);
-      const npc = scenario.npcs[action.npcId];
-      const talked: ChapterState = {
-        ...state,
-        npc: { ...state.npc, [action.npcId]: { timesTalked: state.npc[action.npcId].timesTalked + 1 } },
-      };
-      let next = startConversation(talked, npc.graphId, scenario, { callId: null });
-      next = sweepDialogueEvidence(next, scenario);
-      return accept(next);
+      // This chapter has no NPC conversations (`NPC_IDS` is empty), so every NPC is unknown.
+      return reject(REASONS.unknownNpc);
     }
 
     case "SELECT_DIALOGUE_OPTION": {
@@ -445,7 +457,7 @@ function applyAction(state: ChapterState, action: CoreAction, scenario: Scenario
     }
 
     case "VERIFY_CLAIM":
-      return applyVerify(state, action.method, scenario);
+      return applyVerify(state, action.claimId, action.method, scenario);
 
     case "MAKE_DECISION": {
       if (state.decision !== null) return reject(REASONS.decisionAlreadyMade);
@@ -456,10 +468,7 @@ function applyAction(state: ChapterState, action: CoreAction, scenario: Scenario
       if (!evaluateConditions(def.requires, state, scenario)) {
         return reject(def.unavailableHint || REASONS.decisionUnavailable);
       }
-      let next: ChapterState = state;
-      if (action.decision === "follow-request") {
-        next = applyEffect(next, { kind: "setFlag", flag: "money_moved" }, scenario);
-      }
+      let next = applyEffects(state, def.effects, scenario);
       next = applyEffect(next, { kind: "recordDecision", decision: action.decision }, scenario);
       return accept(next, def.debriefTag ? [def.debriefTag] : []);
     }
@@ -484,21 +493,51 @@ function applyAction(state: ChapterState, action: CoreAction, scenario: Scenario
       if (state.status === "finished") return reject(REASONS.chapterAlreadyFinished);
       return accept({ ...state, status: "finished" });
     }
+
+    case "DEVICE_ACTION": {
+      if (!Object.hasOwn(scenario.deviceActions, action.deviceActionId)) {
+        return reject(REASONS.unknownDeviceAction);
+      }
+      const def = scenario.deviceActions[action.deviceActionId];
+      if (def.once && hasDoneDeviceAction(state, def.id)) return reject(REASONS.deviceActionAlreadyDone);
+      if (!evaluateConditions(def.requires, state, scenario)) return reject(REASONS.deviceActionUnavailable);
+      let next = applyEffects(state, def.effects, scenario);
+      next = discoverByTrigger(next, def.reveals, { via: "device", deviceActionId: def.id }, scenario);
+      return accept(next, def.debriefTag ? [def.debriefTag] : []);
+    }
+
+    case "COMBINE_EVIDENCE": {
+      const ids = action.evidenceIds;
+      if (!ids.every((id) => Object.hasOwn(scenario.evidence, id) && state.discovered.includes(id))) {
+        return reject(REASONS.evidenceNotAvailable);
+      }
+      const deduction = matchDeduction(ids, scenario);
+      if (deduction === null) return reject(REASONS.combinationInvalid);
+      if (state.deductions.includes(deduction.id)) return reject(REASONS.deductionAlreadyRecorded);
+      if (!canRecordDeduction(state, deduction, scenario)) return reject(REASONS.combinationInvalid);
+      const recorded: ChapterState = { ...state, deductions: [...state.deductions, deduction.id] };
+      return accept(applyEffects(recorded, deduction.effects, scenario), [deduction.debriefTag]);
+    }
   }
 }
 
-function applyVerify(state: ChapterState, method: VerifyMethod, scenario: ScenarioDefinition): ApplyResult {
-  if (method === "official-line") {
-    if (!state.discovered.includes("ev.bank-card") && !state.discovered.includes("ev.bank-letter")) {
+function applyVerify(
+  state: ChapterState,
+  claimId: ClaimId,
+  method: VerifyMethod,
+  scenario: ScenarioDefinition,
+): ApplyResult {
+  if (method === "saved-official-contact") {
+    // E03 (paper) or E03b (app): the saved official contact.
+    if (!state.discovered.includes("ev.official-contact-paper") && !state.discovered.includes("ev.official-contact-app")) {
       return reject(REASONS.needOfficialNumber);
     }
     if (state.call.current !== null) return reject(REASONS.callInProgress);
     if (state.conversation !== null) return reject(REASONS.conversationInProgress);
-    if (state.flags.scam1_rang !== true) return reject(REASONS.noCallToVerify);
     if (state.decision !== null) return reject(REASONS.decisionAlreadyMade);
-    // The player calls the official number: an outgoing Call linked to the official line graph
-    // (Requirement 10.8).
+    // The player calls the saved official contact: an outgoing Call linked to the official line graph.
     const callId: CallId = "call.official";
+    if (!Object.hasOwn(scenario.calls, callId)) return reject(REASONS.unknownCall);
     const calling: ChapterState = {
       ...state,
       call: {
@@ -520,16 +559,12 @@ function applyVerify(state: ChapterState, method: VerifyMethod, scenario: Scenar
   // bank-app
   if (!state.phone.open) return reject(REASONS.phoneClosed);
   if (state.call.current !== null) return reject(REASONS.callInProgress);
-  if (state.discovered.includes("ev.bank-app")) return reject(REASONS.evidenceAlreadyRecorded);
+  if (hasVerifiedBy(state, method)) return reject(REASONS.evidenceAlreadyRecorded);
   let next = discoverByTrigger(state, EVIDENCE_IDS, { via: "verify", method }, scenario);
-  // Requirement 12.5: the app is not an independent channel, so the result is `inconclusive`.
+  // The app is not an independent channel, so the result is `inconclusive`.
   // A `contradicted` status from the official line is kept, because it is the stronger result.
-  if (next.claims["claim.account-suspended"] !== "contradicted") {
-    next = applyEffect(
-      next,
-      { kind: "setClaimStatus", claimId: "claim.account-suspended", status: "inconclusive" },
-      scenario,
-    );
+  if (next.claims[claimId] !== "contradicted") {
+    next = applyEffect(next, { kind: "setClaimStatus", claimId, status: "inconclusive" }, scenario);
   }
   return accept(next);
 }
@@ -560,8 +595,12 @@ export function chapterReducer(
   const applied = applyAction(state, action, scenario);
   if (!applied.ok) return { state, accepted: false, reason: applied.reason };
 
-  // 5. Objective manager.
-  const manager = runObjectiveManager(state, applied.state, action, scenario);
+  // 5. Beats. The fired IDs are tagged in this entry so a beat never fires twice.
+  const beats = applyBeats(applied.state, scenario);
+  const debriefTags = [...applied.debriefTags, ...beats.fired.map(beatTag)];
+
+  // 6. Objective manager.
+  const manager = runObjectiveManager(state, beats.state, action, scenario);
   let next = manager.state;
   const objectivesCompleted: ObjectiveId[] = [...manager.completed];
   if (action.type === "COMPLETE_OBJECTIVE" && !objectivesCompleted.includes(action.objectiveId)) {
@@ -570,7 +609,7 @@ export function chapterReducer(
 
   // 6. Outcome (Requirement 13.6).
   if (next.outcome === null && next.decision !== null) {
-    const outcome = selectOutcome(next);
+    const outcome = selectOutcome(next, scenario);
     if (outcome !== null) {
       next = { ...next, outcome, status: next.status === "finished" ? "finished" : "ended" };
     }
@@ -585,7 +624,7 @@ export function chapterReducer(
       flags: FLAG_IDS.filter((flag) => next.flags[flag] === true && state.flags[flag] !== true),
       objectivesActivated: [...manager.activated],
       objectivesCompleted,
-      debriefTags: [...applied.debriefTags],
+      debriefTags,
     },
   };
   next = { ...next, events: [...state.events, entry] };

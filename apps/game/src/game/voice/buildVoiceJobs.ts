@@ -50,7 +50,7 @@ export const CHAPTER1_VOICE_CAST: VoiceCast = {
       vi: { voice: "Microsoft An", rate: 1.0, pitch: 1.0 },
     },
   },
-  "spk.case-officer": {
+  "spk.recovery": {
     phoneFilter: true,
     locales: {
       en: { voice: "Microsoft Mark", rate: 0.95, pitch: 0.9 },
@@ -64,7 +64,7 @@ export const CHAPTER1_VOICE_CAST: VoiceCast = {
       vi: { voice: "Microsoft An", rate: 1.0, pitch: 1.2 },
     },
   },
-  "spk.sam": {
+  "spk.narrator": {
     phoneFilter: false,
     locales: {
       en: { voice: "Microsoft Mark", rate: 0.95, pitch: 1.0 },

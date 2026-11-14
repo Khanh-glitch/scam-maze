@@ -4,10 +4,12 @@
 // moves of `enumerateCandidateActions`. It never re-implements game rules, so it cannot disagree
 // with the game. Pure and deterministic: no React, Three.js, i18n, audio, clock or randomness.
 
+import { BEAT_TAG_PREFIX } from "./beats";
+import { matchDeduction } from "./deductions";
 import { availableOptions } from "./dialogueEngine";
 import { chapterReducer, createInitialState } from "./reducer";
 import { enumerateCandidateActions } from "./selectors";
-import type { ChapterState, CoreAction, ScenarioDefinition } from "./types";
+import type { ChapterState, CoreAction, Effect, ScenarioDefinition } from "./types";
 
 /** Default state budget (design.md "Reachability solver"). */
 export const DEFAULT_MAX_STATES = 100_000;
@@ -30,6 +32,8 @@ export interface ReachabilityReport {
   truncated: boolean;
   /** Distinct `state.outcome` values seen in reachable states, sorted. */
   outcomesReached: string[];
+  /** Endings of the scenario that no explored state selected. Sorted. Not meaningful when `truncated`. */
+  unreachableOutcomes: string[];
   /** Node IDs that never became the current node or the end node of a conversation. Sorted. */
   unreachableNodes: string[];
   /** Authored option IDs that were never available in any reachable state. Sorted. */
@@ -42,8 +46,40 @@ export interface ReachabilityReport {
   minAvailableOptions: number;
 }
 
-/** Moves that only add evidence or open the phone. They never remove an option, so they are saturated. */
-function isFreeAction(action: CoreAction): boolean {
+/** Flags named by a `notFlag` Condition anywhere in the scenario: setting one can disable something. */
+function negatedFlags(scenario: ScenarioDefinition): Set<string> {
+  const found = new Set<string>();
+  const walk = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      for (const item of value) walk(item);
+      return;
+    }
+    if (value === null || typeof value !== "object") return;
+    const record = value as Record<string, unknown>;
+    if (record.kind === "notFlag" && typeof record.flag === "string") found.add(record.flag);
+    for (const child of Object.values(record)) walk(child);
+  };
+  walk(scenario);
+  return found;
+}
+
+/**
+ * True when every effect only adds: it sets flags that no `notFlag` Condition reads and discovers
+ * evidence. No Condition kind can turn false after evidence or such a flag appears, so applying
+ * the action first never removes a later option. Claim statuses and pressure are not additive.
+ */
+function isAdditive(effects: readonly Effect[], negated: ReadonlySet<string>): boolean {
+  return effects.every(
+    (effect) => (effect.kind === "setFlag" && !negated.has(effect.flag)) || effect.kind === "discoverEvidence",
+  );
+}
+
+/**
+ * Moves that only add evidence, flags or the open phone. They never remove an option, so they
+ * are saturated instead of branched on. Device actions and combinations are saturated only when
+ * their effects are additive (`isAdditive`); all others stay branching moves.
+ */
+function isFreeAction(action: CoreAction, scenario: ScenarioDefinition, negated: ReadonlySet<string>): boolean {
   switch (action.type) {
     case "INTERACT_OBJECT":
     case "INSPECT_EVIDENCE":
@@ -51,6 +87,14 @@ function isFreeAction(action: CoreAction): boolean {
       return true;
     case "VERIFY_CLAIM":
       return action.method === "bank-app";
+    case "DEVICE_ACTION": {
+      if (!Object.hasOwn(scenario.deviceActions, action.deviceActionId)) return false;
+      return isAdditive(scenario.deviceActions[action.deviceActionId].effects, negated);
+    }
+    case "COMBINE_EVIDENCE": {
+      const deduction = matchDeduction(action.evidenceIds, scenario);
+      return deduction !== null && isAdditive(deduction.effects, negated);
+    }
     default:
       return false;
   }
@@ -58,9 +102,11 @@ function isFreeAction(action: CoreAction): boolean {
 
 /**
  * Flags that engine code reads directly (reducer guards, candidate actions, objectives, outcome),
- * outside any scenario Condition. Keep this list in sync when the engine starts reading a new flag.
+ * outside any scenario Condition. The reducer itself only writes `first_call_rejected` (declining
+ * or hanging up the first call); the harm flags are kept because the debrief reads them.
+ * Keep this list in sync when the engine starts reading a new flag.
  */
-export const ENGINE_READ_FLAGS: readonly string[] = ["scam1_rang", "code_shared", "money_moved", "report_filed"];
+export const ENGINE_READ_FLAGS: readonly string[] = ["first_call_rejected", "code_shared", "money_moved"];
 
 /**
  * Flags that can influence which actions are possible or which Outcome is selected: every flag
@@ -107,16 +153,31 @@ function stateKey(state: ChapterState, flags: readonly string[]): string {
     state.conversation === null ? null : [state.conversation.graphId, state.conversation.nodeId],
     state.phone.open,
     [...state.interacted].sort(),
+    [...state.deductions].sort(),
+    [...state.objectives.completed].sort(),
+    // Beats that fired, and device actions that were done (a `once` action leaves the candidate list).
+    state.events
+      .flatMap((entry) =>
+        entry.derived.debriefTags.filter((tag) => tag.startsWith(BEAT_TAG_PREFIX)).concat(
+          entry.action.type === "DEVICE_ACTION" ? [`device:${entry.action.deviceActionId}`] : [],
+        ),
+      )
+      .sort(),
   ]);
 }
 
 /** Applies free actions until none of them changes the state key. */
-function saturate(initial: ChapterState, scenario: ScenarioDefinition, flags: readonly string[]): ChapterState {
+function saturate(
+  initial: ChapterState,
+  scenario: ScenarioDefinition,
+  flags: readonly string[],
+  negated: ReadonlySet<string>,
+): ChapterState {
   let state = initial;
   for (let pass = 0; pass < MAX_SATURATION_PASSES; pass += 1) {
     let progressed = false;
     for (const action of enumerateCandidateActions(state, scenario)) {
-      if (!isFreeAction(action)) continue;
+      if (!isFreeAction(action, scenario, negated)) continue;
       const before = stateKey(state, flags);
       const result = chapterReducer(state, action, scenario);
       if (result.accepted && stateKey(result.state, flags) !== before) {
@@ -130,9 +191,14 @@ function saturate(initial: ChapterState, scenario: ScenarioDefinition, flags: re
 }
 
 /** Moves that branch the search: everything except free actions, phone closing and finishing. */
-function branchingMoves(state: ChapterState, scenario: ScenarioDefinition): CoreAction[] {
+function branchingMoves(
+  state: ChapterState,
+  scenario: ScenarioDefinition,
+  negated: ReadonlySet<string>,
+): CoreAction[] {
   return enumerateCandidateActions(state, scenario).filter(
-    (action) => !isFreeAction(action) && action.type !== "CLOSE_PHONE" && action.type !== "FINISH_CHAPTER",
+    (action) =>
+      !isFreeAction(action, scenario, negated) && action.type !== "CLOSE_PHONE" && action.type !== "FINISH_CHAPTER",
   );
 }
 
@@ -146,6 +212,7 @@ export function analyzeReachability(
 ): ReachabilityReport {
   const maxStates = options.maxStates ?? DEFAULT_MAX_STATES;
   const flags = relevantFlags(scenario);
+  const negated = negatedFlags(scenario);
 
   const indexByKey = new Map<string, number>();
   const keys: string[] = [];
@@ -191,7 +258,7 @@ export function analyzeReachability(
   };
 
   const start = chapterReducer(createInitialState(scenario), { type: "START_CHAPTER" }, scenario);
-  const first = saturate(start.state, scenario, flags);
+  const first = saturate(start.state, scenario, flags, negated);
   observe(first);
   register(first);
 
@@ -200,10 +267,10 @@ export function analyzeReachability(
     const state = queue[head];
     if (state.outcome !== null) continue;
     const fromIndex = head;
-    for (const action of branchingMoves(state, scenario)) {
+    for (const action of branchingMoves(state, scenario, negated)) {
       const result = chapterReducer(state, action, scenario);
       if (!result.accepted) continue;
-      const next = saturate(result.state, scenario, flags);
+      const next = saturate(result.state, scenario, flags, negated);
       observe(next);
       const toIndex = register(next);
       if (toIndex !== null) reverseEdges[toIndex].push(fromIndex);
@@ -248,6 +315,9 @@ export function analyzeReachability(
     states: keys.length,
     truncated,
     outcomesReached: [...outcomes].sort(),
+    unreachableOutcomes: Object.keys(scenario.endings)
+      .filter((id) => !outcomes.has(id))
+      .sort(),
     unreachableNodes: allNodes.filter((id) => !seenNodes.has(id)).sort(),
     unreachableOptions: allOptions.filter((id) => !seenOptions.has(id)).sort(),
     softLocks,

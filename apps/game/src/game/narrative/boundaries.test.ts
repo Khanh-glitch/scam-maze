@@ -37,6 +37,7 @@ const TEST_OUTSIDE_ALLOWLIST = [
   ...NON_TEST_OUTSIDE_ALLOWLIST,
   "test/seededRandom.ts",
   "test/chapterRuns.ts",
+  "test/fixtureScenario.ts",
 ] as const;
 
 const SPECIFIER_PATTERNS: readonly RegExp[] = [

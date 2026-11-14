@@ -6,7 +6,7 @@
 // `discover` there). Both sides only use hoisted function declarations at call time, so the
 // cycle is safe under ES modules.
 
-import type { ClaimId, EvidenceId, InteractableId, VerifyMethod } from "./chapter1/ids";
+import type { ClaimId, DeviceActionId, EvidenceId, InteractableId, VerifyMethod } from "./chapter1/ids";
 import { evaluateConditions } from "./conditions";
 import type {
   ChapterState,
@@ -25,7 +25,8 @@ export type DiscoveryTrigger =
   | { via: "interact"; objectId: InteractableId }
   | { via: "inspect" }
   | { via: "dialogue-node"; nodeId: string }
-  | { via: "verify"; method: VerifyMethod };
+  | { via: "verify"; method: VerifyMethod }
+  | { via: "device"; deviceActionId: DeviceActionId };
 
 /** True when the dialogue node has been entered in the current or any finished conversation. */
 function hasReachedNode(state: ChapterState, nodeId: string): boolean {
@@ -42,6 +43,14 @@ function hasReachedNode(state: ChapterState, nodeId: string): boolean {
 function hasVerified(state: ChapterState, method: VerifyMethod): boolean {
   return state.events.some(
     (entry) => entry.action.type === "VERIFY_CLAIM" && entry.action.method === method,
+  );
+}
+
+/** True when an accepted DEVICE_ACTION with this ID is in the Event_Log. */
+function hasDoneDeviceAction(state: ChapterState, deviceActionId: DeviceActionId): boolean {
+  return state.events.some(
+    (entry) =>
+      entry.action.type === "DEVICE_ACTION" && entry.action.deviceActionId === deviceActionId,
   );
 }
 
@@ -83,6 +92,17 @@ export function canDiscover(
       return trigger?.via === "verify"
         ? trigger.method === discovery.method
         : hasVerified(state, discovery.method);
+    case "device": {
+      // A device action reveals evidence only through its `reveals` list, so the route holds only
+      // when the item's own action exists and lists it.
+      if (!Object.hasOwn(scenario.deviceActions, discovery.deviceActionId)) return false;
+      if (!scenario.deviceActions[discovery.deviceActionId].reveals.includes(evidenceId)) {
+        return false;
+      }
+      return trigger?.via === "device"
+        ? trigger.deviceActionId === discovery.deviceActionId
+        : hasDoneDeviceAction(state, discovery.deviceActionId);
+    }
   }
 }
 

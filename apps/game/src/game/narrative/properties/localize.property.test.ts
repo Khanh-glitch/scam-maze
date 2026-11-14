@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CORE_PROPERTY_RUNS, CORE_PROPERTY_SEED, caseSeed } from "../../../test/chapterRuns";
 import { createLcg, pick, randomInt } from "../../../test/seededRandom";
 import { CHAPTER_1_INTERACTION_PROMPTS } from "../chapter1/interactables";
-import { CHAPTER_1_SCENARIO } from "../chapter1/scenario";
+import { FIXTURE_SCENARIO } from "../../../test/fixtureScenario";
 import {
   localizeInteractionPrompts,
   localizeScenario,
@@ -31,7 +31,7 @@ const UNKNOWN_KEYS: readonly string[] = [
 /** Placeholder written into every Narrative_Text_Key field before the structural comparison. */
 const BLANK = "\u0000blank\u0000";
 
-const CANONICAL_ENTRIES = narrativeTextEntries(CHAPTER_1_SCENARIO, CHAPTER_1_INTERACTION_PROMPTS);
+const CANONICAL_ENTRIES = narrativeTextEntries(FIXTURE_SCENARIO, CHAPTER_1_INTERACTION_PROMPTS);
 const TEXT_KEYS = CANONICAL_ENTRIES.map((entry) => entry.key);
 
 /** Every Narrative_Text_Key mapped to BLANK. BLANK is non-empty, so it replaces every field. */
@@ -104,11 +104,24 @@ function stringLeafDifferences(expected: unknown, actual: unknown, path: string,
 const PROPERTY_TIMEOUT_MS = 60_000;
 
 describe("narrative localization", () => {
+  it("lists the provenance, hint, aftermath and debrief text fields", () => {
+    const keys = new Set(TEXT_KEYS);
+    for (const prefix of ["sources/", "deductions/", "deviceActions/", "endings/", "debrief/"]) {
+      expect(TEXT_KEYS.some((key) => key.startsWith(prefix)), prefix).toBe(true);
+    }
+    expect(TEXT_KEYS.some((key) => /^sources\/[^/]+\/claimedOrigin$/.test(key))).toBe(true);
+    expect(TEXT_KEYS.some((key) => /^deductions\/[^/]+\/statement$/.test(key))).toBe(true);
+    expect(TEXT_KEYS.some((key) => /^endings\/[^/]+\/aftermath\/caseReport$/.test(key))).toBe(true);
+    expect(TEXT_KEYS.some((key) => /^objectives\/[^/]+\/hint$/.test(key))).toBe(true);
+    expect(keys.size).toBe(TEXT_KEYS.length);
+  });
+
+
   it("replaces only text and falls back to English per field", () => {
     // Feature: game-i18n-en-vi, Property 6: Localization replaces only text and falls back per field
-    const scenarioSnapshot = structuredClone(CHAPTER_1_SCENARIO);
+    const scenarioSnapshot = structuredClone(FIXTURE_SCENARIO);
     const promptsSnapshot = structuredClone(CHAPTER_1_INTERACTION_PROMPTS);
-    const blankedCanonical = localizeScenario(CHAPTER_1_SCENARIO, BLANK_OVERLAY);
+    const blankedCanonical = localizeScenario(FIXTURE_SCENARIO, BLANK_OVERLAY);
     let translatedFields = 0;
     let fallbackFields = 0;
 
@@ -118,7 +131,7 @@ describe("narrative localization", () => {
       const { overlay, translated } = generateOverlay(seed);
       const overlaySnapshot = structuredClone(overlay);
 
-      const localized = localizeScenario(CHAPTER_1_SCENARIO, overlay);
+      const localized = localizeScenario(FIXTURE_SCENARIO, overlay);
       const localizedPrompts = localizeInteractionPrompts(CHAPTER_1_INTERACTION_PROMPTS, overlay);
 
       // (a) Everything except Narrative_Text_Key fields is unchanged.
@@ -128,7 +141,7 @@ describe("narrative localization", () => {
       // Independent check that does not use the walker: only string leaves differ, and each
       // differing leaf holds a translated overlay value.
       const differences: string[] = [];
-      stringLeafDifferences(CHAPTER_1_SCENARIO, localized, "", differences);
+      stringLeafDifferences(FIXTURE_SCENARIO, localized, "", differences);
       stringLeafDifferences(CHAPTER_1_INTERACTION_PROMPTS, localizedPrompts, "prompts", differences);
       const translatedValues = new Set(translated.values());
       for (const path of differences) {
@@ -156,7 +169,7 @@ describe("narrative localization", () => {
 
       // (c) Neither the input scenario, the prompts nor the overlay were modified.
       expect(overlay, `${where}: overlay modified`).toStrictEqual(overlaySnapshot);
-      expect(CHAPTER_1_SCENARIO, `${where}: scenario modified`).toStrictEqual(scenarioSnapshot);
+      expect(FIXTURE_SCENARIO, `${where}: scenario modified`).toStrictEqual(scenarioSnapshot);
       expect(CHAPTER_1_INTERACTION_PROMPTS, `${where}: prompts modified`).toStrictEqual(promptsSnapshot);
     }
 

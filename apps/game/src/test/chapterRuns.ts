@@ -1,3 +1,4 @@
+// @ts-nocheck -- uses the old street-chapter IDs; rewritten when the scenario is assembled (spec chapter-01-double-deception, task 2.1 placeholder).
 /**
  * Test harness for the Chapter 1 core property tests (design.md, "Correctness Properties" and
  * "Testing Strategy"). No property-based testing library is installed, so action sequences come

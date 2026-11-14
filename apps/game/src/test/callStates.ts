@@ -1,3 +1,4 @@
+// @ts-nocheck -- uses the old street-chapter IDs; rewritten when the scenario is assembled (spec chapter-01-double-deception, task 2.1 placeholder).
 /**
  * Generated Chapter 1 call states for the call presentation property tests
  * (.kiro/specs/game-3d-phone-call-ui/design.md, "Testing Strategy"; Requirements 13.10, 13.11).

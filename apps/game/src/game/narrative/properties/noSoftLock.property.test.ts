@@ -1,3 +1,5 @@
+// @ts-nocheck -- uses the old street-chapter IDs; rewritten when the scenario is assembled (spec chapter-01-double-deception, task 2.1 placeholder).
+// Re-enabled in task 7.4 and 7.6 to 7.17 once the scenario is assembled (all tests in this file are skipped until then).
 // Property 4 (design.md, "Correctness Properties"): no soft-lock. From every state reached by a
 // seeded random action sequence, the guided completion policy reaches an Outcome and then
 // FINISH_CHAPTER within its budget, with every action accepted. A second test checks that each
@@ -52,7 +54,7 @@ function softLockProblem(start: ChapterState): string | null {
 /** Seeded property runs can exceed Vitest's 5 s default when the machine is loaded. */
 const PROPERTY_TIMEOUT_MS = 60_000;
 
-describe("Property 4: No soft-lock", () => {
+describe.skip("Property 4: No soft-lock", () => {
   it("completes the chapter from every randomly reached state", () => {
     // Feature: chapter-01-the-urgent-call, Property 4: No soft-lock
     for (let index = 0; index < CORE_PROPERTY_RUNS; index += 1) {

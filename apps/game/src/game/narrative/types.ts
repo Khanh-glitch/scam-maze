@@ -7,6 +7,8 @@ import type {
   CallId,
   ClaimId,
   DecisionId,
+  DeductionId,
+  DeviceActionId,
   DialogueGraphId,
   EvidenceId,
   FlagId,
@@ -16,11 +18,13 @@ import type {
   NpcId,
   ObjectiveId,
   OutcomeId,
+  SourceId,
   SpeakerId,
   Tone,
   VerifyMethod,
   WarningSignId,
 } from "./chapter1/ids";
+import type { ProvenanceTrust } from "@scammaze/shared-types";
 
 // ---------------------------------------------------------------------------
 // Core actions and results
@@ -43,7 +47,11 @@ export type CoreAction =
   | { type: "VERIFY_CLAIM"; claimId: ClaimId; method: VerifyMethod }
   | { type: "MAKE_DECISION"; decision: DecisionId }
   | { type: "COMPLETE_OBJECTIVE"; objectiveId: ObjectiveId }
-  | { type: "FINISH_CHAPTER" };
+  | { type: "FINISH_CHAPTER" }
+  /** A laptop or phone action defined by `DeviceActionDef` (opens a record, inspects, compares). */
+  | { type: "DEVICE_ACTION"; deviceActionId: DeviceActionId }
+  /** Combines 2 to 3 unique evidence items into a deduction. Order does not matter. */
+  | { type: "COMBINE_EVIDENCE"; evidenceIds: EvidenceId[] };
 
 export type CoreActionType = CoreAction["type"];
 
@@ -102,6 +110,8 @@ export interface ChapterState {
   discovered: EvidenceId[];
   claims: Record<ClaimId, ClaimStatus>;
   decision: DecisionId | null;
+  /** Recorded deductions in recording order, no duplicates. */
+  deductions: DeductionId[];
   flags: Record<FlagId, boolean>;
   pressure: PressureLevel;
   outcome: OutcomeId | null;
@@ -135,6 +145,12 @@ export type Condition =
   | { kind: "claimStatus"; claimId: ClaimId; status: ClaimStatus }
   /** A call log record exists for the call. */
   | { kind: "callRang"; callId: CallId }
+  /** The call ended, was declined or was missed. */
+  | { kind: "callClosed"; callId: CallId }
+  /** The deduction is in `ChapterState.deductions`. */
+  | { kind: "deductionRecorded"; deductionId: DeductionId }
+  /** The recorded final decision equals `decision`. */
+  | { kind: "decisionIs"; decision: DecisionId }
   | { kind: "objectiveCompleted"; objectiveId: ObjectiveId }
   | { kind: "outcomeSet" }
   /** At least `count` of the listed evidence items are discovered. */
@@ -154,7 +170,9 @@ export type DiscoveryCondition =
   | { via: "interact"; objectId: InteractableId }
   | { via: "inspect"; requires: Condition[] }
   | { via: "dialogue-node"; nodeId: string }
-  | { via: "verify"; method: VerifyMethod };
+  | { via: "verify"; method: VerifyMethod }
+  /** Revealed by a device action that lists the item in its `reveals`. */
+  | { via: "device"; deviceActionId: DeviceActionId };
 
 export type DiscoveryVia = DiscoveryCondition["via"];
 
@@ -167,10 +185,16 @@ export interface Claim {
   text: string;
 }
 
-/** Objective text. Activation and completion predicates live in `narrative/objectives.ts`. */
+/** Data-driven objective: text plus activation and completion predicates. */
 export interface Objective {
   id: ObjectiveId;
   text: string;
+  /** All conditions must hold for the objective to become active. */
+  activateWhen: Condition[];
+  /** All conditions must hold for the objective to complete. */
+  completeWhen: Condition[];
+  /** Optional hint, shown only when the player opens hints. */
+  hint?: string;
 }
 
 export interface InteractableDef {
@@ -200,6 +224,8 @@ export interface EvidenceItem {
   discovery: DiscoveryCondition;
   relations: Array<{ claimId: ClaimId; stance: Stance; note: string }>;
   warningSigns: WarningSignId[];
+  /** Provenance source the item claims to come from. */
+  sourceId: SourceId;
   /** Educational relevance. */
   relevance: string;
   /** Shown in "clues missed" when not discovered. */
@@ -260,6 +286,8 @@ export interface CallDef {
   /** Fictional_Phone_Number, always starting with `+000`. */
   number: string;
   graphId: DialogueGraphId;
+  /** The call rings when any inner list has all its conditions true (OR of ANDs). Empty for outgoing calls. */
+  ringWhen: Condition[][];
 }
 
 export interface NpcDef {
@@ -303,7 +331,25 @@ export interface DecisionDef {
     requires: Condition[];
     unavailableHint: string;
   };
+  /** Effects applied when the decision is recorded (for example `money_moved`). */
+  effects?: Effect[];
   debriefTag?: string;
+}
+
+/** Ending aftermath: what happens next on the phone and laptop, with closing narration. */
+export interface Aftermath {
+  /** Narrative consequence shown in the ending. */
+  consequence: string;
+  /** Phone aftermath text. */
+  phone: string;
+  /** Laptop aftermath text. */
+  laptop: string;
+  /** Summary of the evidence the player had. */
+  evidenceSummary: string;
+  /** Case report text. */
+  caseReport: string;
+  /** Spoken closing node IDs in `dlg.aftermath`, played in order. */
+  narrationNodeIds: string[];
 }
 
 export interface EndingDef {
@@ -315,6 +361,12 @@ export interface EndingDef {
   simulationLabel: string;
   /** Extra conditions that must hold for this outcome. */
   unlockWhen?: Condition[];
+  /** All conditions must hold for this ending to be selected. */
+  selectWhen: Condition[];
+  /** Selection priority: the lowest matching `order` wins. */
+  order: number;
+  /** Aftermath content for this ending. */
+  aftermath: Aftermath;
 }
 
 export interface DebriefContent {
@@ -325,6 +377,24 @@ export interface DebriefContent {
   outcomeSummaries: Record<OutcomeId, string>;
   /** Debrief tag → decision note text. */
   decisionNotes: Record<string, string>;
+  /** Text for the forensic analysis section of the debrief. */
+  analysis: DebriefAnalysisContent;
+}
+
+/** Which of the two traps the player entered. `first` is the code request of the first caller. */
+export type DebriefTrap = "none" | "first" | "second" | "both";
+
+export interface DebriefAnalysisContent {
+  /** How the first caller built pressure. */
+  pressureBuilt: string;
+  /** Why the laptop warning and the later call looked trustworthy. */
+  whyWarningLooked: string;
+  /** Why the third caller gave no independent evidence. */
+  thirdCallerNote: string;
+  /** Text per trap outcome. */
+  trapNotes: Record<DebriefTrap, string>;
+  /** How to verify a similar claim. */
+  verifyNextTime: string[];
 }
 
 export interface ActDef {
@@ -337,6 +407,61 @@ export interface ActDef {
   exitWhen: Condition[];
   /** Each objective belongs to exactly one act. */
   objectives: ObjectiveId[];
+}
+
+export type SourceIdentifierKey = "case" | "contact" | "domain" | "app" | "callerId";
+
+/** Where a piece of evidence claims to come from. `trust` is authoring truth, shown only in the debrief. */
+export interface SourceDef {
+  id: SourceId;
+  label: string;
+  kind: "call" | "voicemail" | "notification" | "document" | "app" | "note" | "official-line" | "calendar";
+  /** What the source says it is, for example "Northgate Bank security". */
+  claimedOrigin: string;
+  trust: ProvenanceTrust;
+  identifiers: Array<{ key: SourceIdentifierKey; value: string }>;
+}
+
+/** What the validator checks between the input sources of a deduction. */
+export type DeductionBasis =
+  /** All input sources carry the same value for the key. */
+  | { kind: "shared-identifier"; key: SourceIdentifierKey }
+  /** The input sources carry different values for the key. */
+  | { kind: "conflicting-identifier"; key: SourceIdentifierKey };
+
+/** A reasoning step made by combining evidence. Effects: flags and `inconclusive` claim statuses only. */
+export interface DeductionDef {
+  id: DeductionId;
+  /** All required. */
+  inputs: EvidenceId[];
+  /** Exactly one of these must also be present. */
+  inputsAnyOf?: EvidenceId[];
+  requires: Condition[];
+  basis: DeductionBasis;
+  /** For example "These claims are not independently verified." */
+  statement: string;
+  effects: Effect[];
+  debriefTag: string;
+}
+
+/** An action on the laptop or the phone. Evidence is revealed only through `reveals`. */
+export interface DeviceActionDef {
+  id: DeviceActionId;
+  device: "laptop" | "phone";
+  label: string;
+  requires: Condition[];
+  effects: Effect[];
+  reveals: EvidenceId[];
+  /** When true the action is accepted once. */
+  once: boolean;
+  debriefTag?: string;
+}
+
+/** A scripted state change applied once, in order, when its conditions hold (for example the notification arrives). */
+export interface BeatDef {
+  id: string;
+  when: Condition[];
+  effects: Effect[];
 }
 
 export interface ScenarioDefinition {
@@ -357,4 +482,12 @@ export interface ScenarioDefinition {
   endings: Record<OutcomeId, EndingDef>;
   debrief: DebriefContent;
   acts: ActDef[];
+  /** Provenance sources by ID. */
+  sources: Record<SourceId, SourceDef>;
+  /** Deductions by ID. */
+  deductions: Record<DeductionId, DeductionDef>;
+  /** Laptop and phone actions by ID. */
+  deviceActions: Record<DeviceActionId, DeviceActionDef>;
+  /** Scripted beats, applied once in order. */
+  beats: BeatDef[];
 }
