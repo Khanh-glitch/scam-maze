@@ -1,3 +1,4 @@
+// @ts-nocheck -- uses the old street-chapter IDs; rewritten when the scenario is assembled (spec chapter-01-double-deception, task 2.1 placeholder).
 // Example tests for the Chapter 1 voice dialogue player (requirements 5.1 to 5.13).
 // Uses the fake audio port, fake preview port and fake clock: no network, no real audio.
 

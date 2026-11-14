@@ -1,16 +1,12 @@
-// Chapter 1 "The Urgent Call": the complete Scenario_Data.
-// Pure TypeScript data. See design.md, "Scenario data".
+// Chapter 1 "The Urgent Call: The False Victory": the Scenario_Data.
+// Placeholder assembly (task 2.1): the data modules are empty until the content tasks fill them.
+// Pure TypeScript data.
 
 import type { NpcDef, ScenarioDefinition } from "../types";
 import { CHAPTER_1_ACTS } from "./acts";
 import { CHAPTER_1_CLAIMS } from "./claims";
 import { CHAPTER_1_DEBRIEF } from "./debrief";
 import { CHAPTER_1_DECISIONS } from "./decisions";
-import { CALLBACK_DIALOGUE } from "./dialogues/callback";
-import { FOLLOWUP_DIALOGUE } from "./dialogues/followup";
-import { OFFICIAL_LINE_DIALOGUE } from "./dialogues/officialLine";
-import { SCAM_CALL_DIALOGUE } from "./dialogues/scamCall";
-import { SHOPKEEPER_DIALOGUE } from "./dialogues/shopkeeper";
 import { CHAPTER_1_ENDINGS } from "./endings";
 import { CHAPTER_1_EVIDENCE, CHAPTER_1_JOURNAL_NOTES, CHAPTER_1_WARNING_SIGNS } from "./evidence";
 import type { NpcId } from "./ids";
@@ -18,14 +14,8 @@ import { CHAPTER_1_INTERACTABLES } from "./interactables";
 import { CHAPTER_1_OBJECTIVES } from "./objectives";
 import { CHAPTER_1_CALLS, CHAPTER_1_PHONE } from "./phone";
 
-export const CHAPTER_1_NPCS: Record<NpcId, NpcDef> = {
-  "npc.sam": {
-    id: "npc.sam",
-    name: "Sam",
-    interactableId: "obj.shopkeeper",
-    graphId: "dlg.shopkeeper",
-  },
-};
+/** No NPC conversations in this chapter. */
+export const CHAPTER_1_NPCS = {} as Record<NpcId, NpcDef>;
 
 export const CHAPTER_1_SCENARIO: ScenarioDefinition = {
   id: "chapter-1",
@@ -39,16 +29,15 @@ export const CHAPTER_1_SCENARIO: ScenarioDefinition = {
   journalNotes: CHAPTER_1_JOURNAL_NOTES,
   calls: CHAPTER_1_CALLS,
   npcs: CHAPTER_1_NPCS,
-  dialogues: {
-    "dlg.scam-call": SCAM_CALL_DIALOGUE,
-    "dlg.callback": CALLBACK_DIALOGUE,
-    "dlg.shopkeeper": SHOPKEEPER_DIALOGUE,
-    "dlg.official-line": OFFICIAL_LINE_DIALOGUE,
-    "dlg.followup": FOLLOWUP_DIALOGUE,
-  },
+  dialogues: {} as ScenarioDefinition["dialogues"],
   phone: CHAPTER_1_PHONE,
   decisions: CHAPTER_1_DECISIONS,
   endings: CHAPTER_1_ENDINGS,
   debrief: CHAPTER_1_DEBRIEF,
   acts: CHAPTER_1_ACTS,
+  // Placeholders (task 2.2): filled by the content tasks.
+  sources: {} as ScenarioDefinition["sources"],
+  deductions: {} as ScenarioDefinition["deductions"],
+  deviceActions: {} as ScenarioDefinition["deviceActions"],
+  beats: [],
 };

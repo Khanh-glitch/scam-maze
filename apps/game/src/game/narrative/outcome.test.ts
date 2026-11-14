@@ -1,202 +1,122 @@
-// Unit tests for the outcome function, the consequence variants and decision gating
-// (Requirements 13.4-13.10, 18.1).
+// Unit tests for rule-driven ending selection and consequence variants
+// (spec chapter-01-double-deception, task 3.4). States are crafted from the fixture scenario.
 
 import { describe, expect, it } from "vitest";
 
-import { CHAPTER_1_SCENARIO } from "./chapter1/scenario";
-import type { DecisionId, FlagId } from "./chapter1/ids";
+import { FIXTURE_SCENARIO, fixtureState, withFlags } from "../../test/fixtureScenario";
+import type { DecisionId, DeductionId, FlagId } from "./chapter1/ids";
 import { selectConsequenceVariant, selectOutcome } from "./outcome";
-import { chapterReducer, createInitialState, REASONS } from "./reducer";
-import type { ChapterState, ClaimStatus, CoreAction } from "./types";
+import type { ChapterState, EndingDef, ScenarioDefinition } from "./types";
 
-function play(state: ChapterState, actions: readonly CoreAction[]): ChapterState {
-  let current = state;
-  for (const action of actions) {
-    const result = chapterReducer(current, action);
-    if (!result.accepted) throw new Error(`Rejected ${JSON.stringify(action)}: ${result.reason}`);
-    current = result.state;
-  }
-  return current;
-}
+const S = FIXTURE_SCENARIO;
 
-const option = (optionId: string): CoreAction => ({ type: "SELECT_DIALOGUE_OPTION", optionId });
-const decide = (decision: DecisionId): CoreAction => ({ type: "MAKE_DECISION", decision });
-const RING: CoreAction = { type: "RING_CALL", callId: "call.scam-1", reason: "exploration-timer" };
-const OFFICIAL: CoreAction = { type: "VERIFY_CLAIM", claimId: "claim.caller-identity", method: "official-line" };
-const OFFICIAL_TO_CONFIRM: CoreAction[] = [
-  OFFICIAL,
-  option("opt.official.greeting.wait"),
-  option("opt.official.agent.report"),
-];
-
-const started = (): ChapterState => play(createInitialState(), [{ type: "START_CHAPTER" }]);
-/** Card found, scam call answered and ended to verify; no flags beyond the ring. */
-const afterScamCall = (): ChapterState =>
-  play(started(), [
-    { type: "INTERACT_OBJECT", objectId: "obj.wallet" },
-    RING,
-    { type: "ANSWER_CALL" },
-    option("opt.scam.open.verify"),
-  ]);
-/** Card found, code read to the caller, then the player hung up at the guilt node. */
-const afterCodeShared = (): ChapterState =>
-  play(started(), [
-    { type: "INTERACT_OBJECT", objectId: "obj.wallet" },
-    RING,
-    { type: "ANSWER_CALL" },
-    option("opt.scam.open.yes-what"),
-    option("opt.scam.code.read-code"),
-    option("opt.scam.move.stop"),
-    option("opt.scam.guilt.hang-up"),
-  ]);
-
-/** Crafted state for the pure outcome function. */
 function crafted(
   decision: DecisionId | null,
-  flags: FlagId[],
-  identity: ClaimStatus = "unverified",
+  flags: FlagId[] = [],
+  deductions: DeductionId[] = [],
 ): ChapterState {
-  const base = createInitialState();
-  const next: ChapterState = {
-    ...base,
-    decision,
-    flags: { ...base.flags },
-    claims: { ...base.claims, "claim.caller-identity": identity },
-  };
-  for (const flag of flags) next.flags[flag] = true;
-  return next;
+  return { ...withFlags(fixtureState({ decision }), flags), deductions };
 }
 
-describe("selectOutcome (Requirements 13.7, 13.9, 13.10)", () => {
-  it("returns null without a Decision, even with a risky flag", () => {
-    expect(selectOutcome(crafted(null, []))).toBeNull();
-    expect(selectOutcome(crafted(null, ["code_shared"]))).toBeNull();
-    expect(selectOutcome(crafted(null, ["money_moved"], "contradicted"))).toBeNull();
+const BOTH: DeductionId[] = ["ded.same-source", "ded.notification-mismatch"];
+
+describe("selectOutcome", () => {
+  it("returns null without a decision, even with a risky flag", () => {
+    expect(selectOutcome(crafted(null), S)).toBeNull();
+    expect(selectOutcome(crafted(null, ["money_moved"]), S)).toBeNull();
   });
 
-  it("returns risky for any Decision with code_shared or money_moved", () => {
-    for (const decision of ["follow-request", "verify-independently", "stop-and-wait"] as DecisionId[]) {
-      expect(selectOutcome(crafted(decision, ["code_shared"], "contradicted"))).toBe("risky");
-      expect(selectOutcome(crafted(decision, ["money_moved"]))).toBe("risky");
-    }
+  it("selects the first ending whose rules hold, by ascending order", () => {
+    expect(selectOutcome(crafted("follow-recovery", ["money_moved"]), S)).toBe("false-victory");
+    expect(selectOutcome(crafted("verify-independently", ["official_channel_verified"], BOTH), S)).toBe(
+      "perfect-chain",
+    );
+    expect(selectOutcome(crafted("refuse-and-stop"), S)).toBe("break-the-chain");
   });
 
-  it("returns verified for verify-independently with the identity claim contradicted", () => {
-    expect(selectOutcome(crafted("verify-independently", [], "contradicted"))).toBe("verified");
-    expect(selectOutcome(crafted("verify-independently", [], "inconclusive"))).toBeNull();
+  it("prefers the lower order when several endings match", () => {
+    const state = crafted("verify-independently", ["official_channel_verified", "money_moved"], BOTH);
+    expect(selectOutcome(state, S)).toBe("false-victory");
   });
 
-  it("returns uncertain for stop-and-wait without a risky flag", () => {
-    expect(selectOutcome(crafted("stop-and-wait", []))).toBe("uncertain");
-    expect(selectOutcome(crafted("stop-and-wait", ["number_challenged"], "contradicted"))).toBe("uncertain");
-  });
-});
-
-describe("consequence variants through play", () => {
-  it("verified: official line, then verify-independently", () => {
-    const state = play(afterScamCall(), [...OFFICIAL_TO_CONFIRM, option("opt.official.confirm.block"), decide("verify-independently")]);
-    expect(state.outcome).toBe("verified");
-    expect(selectConsequenceVariant(state, CHAPTER_1_SCENARIO)?.id).toBe("verified.reported");
+  it("falls back to the last unconditional ending, so the result is total", () => {
+    expect(selectOutcome(crafted("verify-independently"), S)).toBe("unfinished-case");
+    expect(selectOutcome(crafted("refuse-and-stop", ["code_shared"]), S)).toBe("unfinished-case");
+    expect(selectOutcome(crafted("verify-independently", ["official_channel_verified"], ["ded.same-source"]), S)).toBe(
+      "unfinished-case",
+    );
   });
 
-  it("risky.money-moved: money moved inside the scam call", () => {
-    const state = play(started(), [
-      RING,
-      { type: "ANSWER_CALL" },
-      option("opt.scam.open.yes-what"),
-      option("opt.scam.code.read-code"),
-      option("opt.scam.move.move-money"),
-    ]);
-    expect(state.decision).toBe("follow-request");
-    expect(state.outcome).toBe("risky");
-    expect(state.status).toBe("ended");
-    expect(selectConsequenceVariant(state, CHAPTER_1_SCENARIO)?.id).toBe("risky.money-moved");
+  it("follows the data: changing `order` changes the result", () => {
+    const swapped = {
+      ...S,
+      endings: {
+        ...S.endings,
+        "false-victory": { ...S.endings["false-victory"], order: 10 },
+        "unfinished-case": { ...S.endings["unfinished-case"], order: 0 },
+      },
+    } as ScenarioDefinition;
+    expect(selectOutcome(crafted("follow-recovery", ["money_moved"]), swapped)).toBe("unfinished-case");
   });
 
-  it("risky.money-moved: follow-request from the decision panel (Requirement 13.8)", () => {
-    const state = play(afterScamCall(), [decide("follow-request")]);
-    expect(state.flags.money_moved).toBe(true);
-    expect(state.outcome).toBe("risky");
-    expect(selectConsequenceVariant(state, CHAPTER_1_SCENARIO)?.id).toBe("risky.money-moved");
+  it("is deterministic and does not mutate the state", () => {
+    const state = crafted("follow-recovery", ["money_moved"]);
+    const snapshot = JSON.stringify(state);
+    expect(selectOutcome(state, S)).toBe(selectOutcome(state, S));
+    expect(JSON.stringify(state)).toBe(snapshot);
   });
 
-  it("risky.code-shared-locked: code shared, then reported on the official line", () => {
-    const state = play(afterCodeShared(), [
-      ...OFFICIAL_TO_CONFIRM,
-      option("opt.official.confirm.code-shared"),
-      option("opt.official.locked.block"),
-      decide("verify-independently"),
-    ]);
-    expect(state.flags.account_locked).toBe(true);
-    expect(state.claims["claim.caller-identity"]).toBe("contradicted");
-    expect(state.outcome).toBe("risky");
-    expect(selectConsequenceVariant(state, CHAPTER_1_SCENARIO)?.id).toBe("risky.code-shared-locked");
-  });
-
-  it("risky.code-shared: code shared and never reported", () => {
-    const state = play(afterCodeShared(), [decide("stop-and-wait")]);
-    expect(state.outcome).toBe("risky");
-    expect(selectConsequenceVariant(state, CHAPTER_1_SCENARIO)?.id).toBe("risky.code-shared");
-  });
-
-  it("uncertain: decline, re-ring, hang up, stop-and-wait", () => {
-    const state = play(started(), [
-      RING,
-      { type: "END_CALL" },
-      { type: "RING_CALL", callId: "call.scam-1", reason: "re-ring" },
-      { type: "ANSWER_CALL" },
-      { type: "END_CALL" },
-      decide("stop-and-wait"),
-    ]);
-    expect(state.outcome).toBe("uncertain");
-    expect(selectConsequenceVariant(state, CHAPTER_1_SCENARIO)?.id).toBe("uncertain.stopped");
-  });
-
-  it("returns no variant without an Outcome", () => {
-    expect(selectConsequenceVariant(afterScamCall(), CHAPTER_1_SCENARIO)).toBeNull();
-  });
-
-  it("sets the Outcome on every accepted MAKE_DECISION (Requirement 13.6)", () => {
-    for (const decision of ["follow-request", "stop-and-wait"] as DecisionId[]) {
-      const state = play(afterScamCall(), [decide(decision)]);
-      expect(state.outcome).toBe(selectOutcome(state));
-      expect(state.outcome).not.toBeNull();
-    }
+  it("returns null only when no ending matches (broken data)", () => {
+    const noFallback = {
+      ...S,
+      endings: { "false-victory": S.endings["false-victory"] },
+    } as unknown as ScenarioDefinition;
+    expect(selectOutcome(crafted("refuse-and-stop"), noFallback)).toBeNull();
   });
 });
 
-describe("decision gating", () => {
-  it("rejects follow-request and stop-and-wait before the first call ends", () => {
-    const state = play(started(), [RING, { type: "END_CALL" }]);
-    for (const decision of ["follow-request", "stop-and-wait"] as DecisionId[]) {
-      const result = chapterReducer(state, decide(decision));
-      expect(result.accepted).toBe(false);
-      expect(result.reason).toBe("This option is available after the first call ends.");
-      expect(result.state).toBe(state);
-    }
+describe("selectConsequenceVariant", () => {
+  const withVariants = (ending: EndingDef): ScenarioDefinition => ({
+    ...S,
+    endings: { ...S.endings, "false-victory": ending },
   });
 
-  it("rejects verify-independently until the official confirmation is discovered (Requirement 13.4)", () => {
-    const state = afterScamCall();
-    const result = chapterReducer(state, decide("verify-independently"));
-    expect(result.accepted).toBe(false);
-    expect(result.reason).toBe("Call Northgate on the official number first.");
-    expect(result.state).toBe(state);
-    expect(state.outcome).toBeNull();
+  it("returns null without an outcome or without an ending", () => {
+    expect(selectConsequenceVariant(crafted("refuse-and-stop"), S)).toBeNull();
+    expect(selectConsequenceVariant(crafted("refuse-and-stop"), S, null)).toBeNull();
+    const missing = { ...S, endings: {} } as unknown as ScenarioDefinition;
+    expect(selectConsequenceVariant(crafted("refuse-and-stop"), missing, "false-victory")).toBeNull();
   });
 
-  it("rejects MAKE_DECISION during the official call, before the call is finished", () => {
-    const inCall = play(afterScamCall(), OFFICIAL_TO_CONFIRM);
-    expect(inCall.discovered).toContain("ev.official-confirmation");
-    const result = chapterReducer(inCall, decide("verify-independently"));
-    expect(result.reason).toBe(REASONS.conversationInProgress);
+  it("uses the outcome argument, defaulting to state.outcome", () => {
+    const state: ChapterState = { ...crafted("refuse-and-stop"), outcome: "break-the-chain" };
+    expect(selectConsequenceVariant(state, S)?.id).toBe("break-the-chain.default");
+    expect(selectConsequenceVariant(state, S, "unfinished-case")?.id).toBe("unfinished-case.default");
   });
 
-  it("rejects a second decision once the Outcome is set", () => {
-    const state = play(afterScamCall(), [decide("stop-and-wait")]);
-    const result = chapterReducer(state, decide("follow-request"));
-    expect(result.accepted).toBe(false);
-    expect(result.reason).toBe(REASONS.chapterEnded);
-    expect(result.state).toBe(state);
+  it("returns the first variant whose conditions hold", () => {
+    const base = S.endings["false-victory"];
+    const scenario = withVariants({
+      ...base,
+      variants: [
+        { id: "case-report", when: [{ kind: "flag", flag: "official_channel_verified" }], text: "Reported." },
+        { id: "contained-late", when: [{ kind: "flag", flag: "code_shared" }], text: "Late." },
+        { id: "default", when: [], text: "Default." },
+      ],
+    });
+    const state = (flags: FlagId[]): ChapterState => crafted("follow-recovery", flags);
+    expect(selectConsequenceVariant(state(["official_channel_verified", "code_shared"]), scenario, "false-victory")?.id).toBe(
+      "case-report",
+    );
+    expect(selectConsequenceVariant(state(["code_shared"]), scenario, "false-victory")?.id).toBe("contained-late");
+    expect(selectConsequenceVariant(state([]), scenario, "false-victory")?.id).toBe("default");
+  });
+
+  it("returns null when no variant matches", () => {
+    const scenario = withVariants({
+      ...S.endings["false-victory"],
+      variants: [{ id: "only", when: [{ kind: "flag", flag: "official_channel_verified" }], text: "Reported." }],
+    });
+    expect(selectConsequenceVariant(crafted("follow-recovery"), scenario, "false-victory")).toBeNull();
   });
 });

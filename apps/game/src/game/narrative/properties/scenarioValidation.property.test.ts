@@ -3,12 +3,14 @@
  *
  * The existing property files exercise the engine on the one real scenario. These properties
  * exercise the validator and the engine on GENERATED scenarios: seeded faults injected into a
- * copy of Chapter 1, seeded garbage, and seeded meaning-preserving variants.
+ * copy of the fixture scenario, seeded garbage, and seeded meaning-preserving variants.
  *
  * - SV1 Fault detection: every injected fault (dangling option target, missing start node, end
  *   node with options, pauseBeforeMs out of range, spoken node without a tone, duplicate option
- *   ID, one-node and two-node cycles with no exit) is reported with the right check code and
- *   names the mutated item.
+ *   ID, one-node and two-node cycles with no exit, plus the double-deception rules: unknown
+ *   deduction input, broken shared-identifier basis, deduction that sets a status other than
+ *   inconclusive, incoming call that never rings, node with only harmful options) is reported
+ *   with the right check code and names the mutated item.
  * - SV2 Robust engine: the reducer never throws on a faulty scenario; rejections return the same
  *   state with a reason, and the event log stays contiguous. The share of cases whose play
  *   reached the faulty dialogue graph is measured and must be above zero.
@@ -27,7 +29,11 @@
  * Change the case count (default 200, the repo's CORE_PROPERTY_RUNS): SCAMMAZE_PBT_RUNS=<n>.
  * Quick mode for hooks (one solver variant in SV5 instead of four): SCAMMAZE_PBT_QUICK=1.
  *
- * **Validates: Requirements 1.1-1.4, 2.1-2.3, 3.1-3.4, 4.1, 5.1-5.3 (scenario-validation spec)**
+ * Feature: chapter-01-double-deception, Property 8: Deductions are grounded in provenance
+ * (the fault kinds 8 to 12 above, run against the fixture scenario).
+ *
+ * **Validates: Requirements 1.1-1.4, 2.1-2.3, 3.1-3.4, 4.1, 5.1-5.3 (scenario-validation spec);
+ * Requirements 3.6, 3.7, 8.9, 11.4 (chapter-01-double-deception)**
  */
 import { isDeepStrictEqual } from "node:util";
 import { describe, expect, it } from "vitest";
@@ -39,7 +45,7 @@ import {
   generateActionSequence,
 } from "../../../test/chapterRuns";
 import { createLcg, pick, randomInt } from "../../../test/seededRandom";
-import { CHAPTER_1_SCENARIO } from "../chapter1/scenario";
+import { FIXTURE_SCENARIO } from "../../../test/fixtureScenario";
 import { OUTCOME_IDS } from "../chapter1/ids";
 import { MAX_PRESSURE, applyEffect } from "../conditions";
 import { analyzeReachability } from "../reachability";
@@ -71,7 +77,7 @@ function clone(scenario: ScenarioDefinition): ScenarioDefinition {
   return JSON.parse(JSON.stringify(scenario)) as ScenarioDefinition;
 }
 
-const ORIGINAL_JSON = JSON.stringify(CHAPTER_1_SCENARIO);
+const ORIGINAL_JSON = JSON.stringify(FIXTURE_SCENARIO);
 
 // ---------------------------------------------------------------------------
 // Generators over the scenario structure
@@ -176,21 +182,63 @@ const FAULTS: readonly FaultInjector[] = [
     node.options = node.options.map((o) => ({ ...o, next: node.id }));
     return { fault: "one-node cycle with no exit", check: "V3", mentions: `node "${node.id}" cannot reach an end node`, graphId: graph.id };
   },
-  // 7. Two-node cycle: A's options all go to B and B's options all go back to A.
-  (scenario, next) => {
-    const pairs = allNodes(scenario).flatMap(({ graph, node }) =>
-      isTrappable(node)
-        ? node.options
-            .map((o) => graph.nodes[o.next as string])
-            .filter((b): b is DialogueNode => b !== undefined && b.id !== node.id && isTrappable(b))
-            .map((b) => ({ graph, a: node, b }))
-        : [],
-    );
-    if (pairs.length === 0) return null;
-    const { graph, a, b } = pick(next, pairs);
-    a.options = a.options.map((o) => ({ ...o, next: b.id }));
-    b.options = b.options.map((o) => ({ ...o, next: a.id }));
+  // 7. Two-node cycle: A's only option goes to B and B's only option goes back to A. The two nodes
+  // are added to a seeded graph, copied from one of its spoken nodes, so the fixture needs no pair.
+  (scenario, next, seed) => {
+    const spoken = allNodes(scenario).filter(({ node }) => isSpoken(node) && node.tone !== undefined && node.options.length > 0);
+    if (spoken.length === 0) return null;
+    const { graph, node } = pick(next, spoken);
+    const option = node.options[0];
+    const a: DialogueNode = { ...node, id: `__cycle.a.${seed}`, pressure: false, end: undefined, onEnter: undefined, options: [{ ...option, id: `__cycle.a.opt.${seed}`, next: `__cycle.b.${seed}`, conditions: undefined, effects: undefined, debriefTag: undefined }] };
+    const b: DialogueNode = { ...a, id: `__cycle.b.${seed}`, options: [{ ...a.options[0], id: `__cycle.b.opt.${seed}`, next: a.id }] };
+    graph.nodes[a.id] = a;
+    graph.nodes[b.id] = b;
     return { fault: "two-node cycle with no exit", check: "V3", mentions: `node "${a.id}" cannot reach an end node`, graphId: graph.id };
+  },
+  // 8. Deduction input that does not exist.
+  (scenario, next, seed) => {
+    const deductions = Object.values(scenario.deductions);
+    if (deductions.length === 0) return null;
+    const deduction = pick(next, deductions);
+    const target = `ev.missing.${seed}`;
+    deduction.inputs = [target as never, ...deduction.inputs.slice(1)];
+    return { fault: "unknown deduction input", check: "V1", mentions: `references unknown evidence "${target}"`, graphId: "dlg.alex" };
+  },
+  // 9. Source identifier changed so a shared-identifier basis no longer holds.
+  (scenario, next) => {
+    const shared = Object.values(scenario.deductions).filter((d) => d.basis.kind === "shared-identifier");
+    if (shared.length === 0) return null;
+    const deduction = pick(next, shared);
+    const key = (deduction.basis as { key: string }).key;
+    const source = scenario.sources[scenario.evidence[deduction.inputs[0]].sourceId];
+    const identifier = source.identifiers.find((i) => i.key === key);
+    if (!identifier) return null;
+    identifier.value = `${identifier.value}-changed`;
+    return { fault: "shared-identifier basis broken", check: "V1", mentions: `claims a shared "${key}" identifier`, graphId: "dlg.alex" };
+  },
+  // 10. Deduction that sets a claim status other than inconclusive.
+  (scenario, next) => {
+    const deductions = Object.values(scenario.deductions);
+    if (deductions.length === 0) return null;
+    const deduction = pick(next, deductions);
+    deduction.effects = [...deduction.effects, { kind: "setClaimStatus", claimId: "claim.alex-identity", status: "contradicted" }];
+    return { fault: "deduction sets contradicted", check: "V1", mentions: `a deduction may only set "inconclusive"`, graphId: "dlg.alex" };
+  },
+  // 11. Incoming call with no ringWhen alternative.
+  (scenario, next) => {
+    const incoming = Object.values(scenario.calls).filter((c) => c.direction === "incoming");
+    if (incoming.length === 0) return null;
+    const call = pick(next, incoming);
+    call.ringWhen = [];
+    return { fault: "call that never rings", check: "V4", mentions: `Call "${call.id}" is incoming but has no ringWhen alternative`, graphId: call.graphId };
+  },
+  // 12. Every option of a node with an end is harmful.
+  (scenario, next) => {
+    const nodes = allNodes(scenario).filter(({ node }) => node.end === undefined && node.options.length > 0);
+    if (nodes.length === 0) return null;
+    const { graph, node } = pick(next, nodes);
+    node.options = node.options.map((o) => ({ ...o, effects: [{ kind: "setFlag", flag: "code_shared" } as Effect] }));
+    return { fault: "only harmful options", check: "V3", mentions: `node "${node.id}" needs a harmful option to reach an end`, graphId: graph.id };
   },
 ];
 
@@ -210,13 +258,13 @@ describe("Scenario validation properties", () => {
       let reachedFaultGraph = 0;
       for (const [index, seed] of seeds(1).entries()) {
         const next = createLcg(seed);
-        const scenario = clone(CHAPTER_1_SCENARIO);
+        const scenario = clone(FIXTURE_SCENARIO);
         // Cycle through the fault kinds so every kind is covered; the target is seeded.
         const kind = forcedKind !== undefined && forcedKind !== "" ? Number(forcedKind) : index % FAULTS.length;
         const repro = `SCAMMAZE_PBT_SEED=${seed} SCAMMAZE_PBT_FAULT=${kind}`;
         const injected = FAULTS[kind](scenario, next, seed);
         if (injected === null) {
-          failures.push(`${repro}: fault kind ${kind} found no target in Chapter 1`);
+          failures.push(`${repro}: fault kind ${kind} found no target in the fixture scenario`);
           continue;
         }
         cases += 1;
@@ -259,7 +307,7 @@ describe("Scenario validation properties", () => {
         }
       }
       // Mutations happen on clones only.
-      expect(JSON.stringify(CHAPTER_1_SCENARIO)).toBe(ORIGINAL_JSON);
+      expect(JSON.stringify(FIXTURE_SCENARIO)).toBe(ORIGINAL_JSON);
       expect(failures, failureReport(failures)).toEqual([]);
       // SV2 is only meaningful if play actually reaches faulty graphs in some cases.
       if (cases >= FAULTS.length) {
@@ -312,7 +360,7 @@ describe("Scenario validation properties", () => {
         const next = createLcg(seed);
         // A fifth of the cases replace the whole scenario with a value that is not an object.
         const rootJunk = next() < 0.2;
-        const scenario: unknown = rootJunk ? pick(next, NON_OBJECT_JUNK) : clone(CHAPTER_1_SCENARIO);
+        const scenario: unknown = rootJunk ? pick(next, NON_OBJECT_JUNK) : clone(FIXTURE_SCENARIO);
         const paths = rootJunk ? ["<root>"] : corrupt(scenario as Record<string, unknown>, next);
         const label = `SCAMMAZE_PBT_SEED=${seed} (corrupted ${paths.join(", ")})`;
         const before = structuredClone(scenario);
@@ -357,7 +405,7 @@ describe("Scenario validation properties", () => {
   // Feature: scenario-validation, Property SV4: pressure stays an integer in 0..MAX_PRESSURE
   it("keeps pressure an integer within 0..MAX_PRESSURE for any sequence of amounts", () => {
     const failures: string[] = [];
-    const started = chapterReducer(createInitialState(), { type: "START_CHAPTER" }, CHAPTER_1_SCENARIO).state;
+    const started = chapterReducer(createInitialState(), { type: "START_CHAPTER" }, FIXTURE_SCENARIO).state;
     for (const seed of seeds(3, CORE_PROPERTY_RUNS * 2)) {
       const next = createLcg(seed);
       // Any valid starting level (state invariants keep pressure in 0..3).
@@ -367,7 +415,7 @@ describe("Scenario validation properties", () => {
         const amount = pick(next, AMOUNTS);
         applied.push(JSON.stringify(amount) ?? "undefined");
         const effect = (amount === undefined ? { kind: "addPressure" } : { kind: "addPressure", amount }) as Effect;
-        state = applyEffect(state, effect, CHAPTER_1_SCENARIO);
+        state = applyEffect(state, effect, FIXTURE_SCENARIO);
         if (!Number.isInteger(state.pressure) || state.pressure < 0 || state.pressure > MAX_PRESSURE) {
           failures.push(`SCAMMAZE_PBT_SEED=${seed}: pressure ${String(state.pressure)} after amounts [${applied.join(", ")}]`);
           break;
@@ -387,7 +435,7 @@ describe("Scenario validation properties", () => {
    * by design, so reordering them would change the meaning; they are left alone on purpose.
    */
   function reorderedVariant(next: () => number): ScenarioDefinition {
-    const scenario = clone(CHAPTER_1_SCENARIO);
+    const scenario = clone(FIXTURE_SCENARIO);
     for (const graph of graphs(scenario)) {
       const entries = Object.entries(graph.nodes);
       if (next() < 0.5) entries.reverse();

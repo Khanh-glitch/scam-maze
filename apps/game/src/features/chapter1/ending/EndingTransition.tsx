@@ -4,7 +4,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, ArrowRight, CircleCheck, CircleHelp, FileCheck, Info } from "lucide-react";
+import { AlertTriangle, ArrowRight, CircleCheck, CircleHelp, Info } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { usePrefersReducedMotion } from "../../../components/ui/usePrefersReducedMotion";
 import type { DebriefView } from "../../../game/narrative/debrief";
@@ -36,10 +36,10 @@ export const ENDING_FADE_MS = 600;
  * meaning (icons.md, "Never rely on an icon or its color alone").
  */
 const ACCENTS: Record<OutcomeId, { icon: LucideIcon; text: string; border: string }> = {
-  verified: { icon: CircleCheck, text: UI.textPositive, border: "border-[#4fd1b5]/50" },
-  investigator: { icon: FileCheck, text: UI.textPositive, border: "border-[#4fd1b5]/50" },
-  risky: { icon: AlertTriangle, text: UI.textWarning, border: "border-[#f2b24b]/50" },
-  uncertain: { icon: CircleHelp, text: "text-[#b9a5f5]", border: "border-[#b9a5f5]/50" },
+  "break-the-chain": { icon: CircleCheck, text: UI.textPositive, border: "border-[#4fd1b5]/50" },
+  "perfect-chain": { icon: AlertTriangle, text: UI.textWarning, border: "border-[#f2b24b]/50" },
+  "false-victory": { icon: AlertTriangle, text: UI.textWarning, border: "border-[#f2b24b]/50" },
+  "unfinished-case": { icon: CircleHelp, text: "text-[#b9a5f5]", border: "border-[#b9a5f5]/50" },
 };
 
 export const EndingTransition: React.FC<EndingTransitionProps> = ({ outcome, onContinue }) => {

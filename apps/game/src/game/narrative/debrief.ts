@@ -10,7 +10,9 @@
 import { CHAPTER_1_SCENARIO } from "./chapter1/scenario";
 import type { EvidenceId, OutcomeId, WarningSignId } from "./chapter1/ids";
 import { selectConsequenceVariant } from "./outcome";
-import type { ChapterState, ScenarioDefinition } from "./types";
+import type { DebriefTimelineKind } from "@scammaze/shared-types";
+import { BEAT_TAG_PREFIX } from "./beats";
+import type { ChapterState, CoreAction, DebriefTrap, ScenarioDefinition } from "./types";
 
 export interface DebriefView {
   outcome: {
@@ -29,8 +31,58 @@ export interface DebriefView {
   warningSignsNoticed: Array<{ id: WarningSignId; label: string }>;
   /** Evidence with a debrief hint that was not discovered, in scenario order (Requirement 14.5). */
   cluesMissed: Array<{ id: EvidenceId; title: string; hint: string }>;
+  /** One entry per accepted action with a (non-beat) debrief tag, in `seq` order. */
+  timeline: DebriefTimelineEntry[];
+  analysis: DebriefAnalysis;
   mechanism: string;
   saferAlternatives: string[];
+}
+
+export interface DebriefTimelineEntry {
+  seq: number;
+  kind: DebriefTimelineKind;
+  tag: string;
+  /** Decision note for the tag, or an empty string when the scenario has none. */
+  text: string;
+}
+
+export interface DebriefAnalysis {
+  /** Authored text about how pressure was built. */
+  pressureBuilt: string;
+  /** Pressure reached in this run, 0..3. */
+  pressureLevel: number;
+  whyWarningLooked: string;
+  /** Warning signs of the evidence the player found, as unverified-source signals. */
+  unverifiedSignals: Array<{ id: WarningSignId; label: string }>;
+  /** The third caller never gives independent evidence. */
+  thirdCallerIndependent: false;
+  thirdCallerNote: string;
+  trapEntered: DebriefTrap;
+  trapNote: string;
+  verifyNextTime: string[];
+}
+
+/** Maps an action type to the timeline kind. */
+function timelineKind(action: CoreAction): DebriefTimelineKind {
+  switch (action.type) {
+    case "RING_CALL":
+    case "ANSWER_CALL":
+    case "END_CALL":
+    case "TALK_TO_NPC":
+    case "SELECT_DIALOGUE_OPTION":
+      return "call";
+    case "INTERACT_OBJECT":
+    case "INSPECT_EVIDENCE":
+      return "evidence";
+    case "COMBINE_EVIDENCE":
+      return "deduction";
+    case "VERIFY_CLAIM":
+      return "verification";
+    case "MAKE_DECISION":
+      return "decision";
+    default:
+      return "device";
+  }
 }
 
 /**
@@ -59,6 +111,17 @@ export function buildDebrief(
     }
   }
 
+  // Beat events carry `beat:<id>` tags. They are system events, not player actions, so they are
+  // excluded from the timeline.
+  const timeline: DebriefTimelineEntry[] = [];
+  for (const entry of state.events) {
+    const tags = entry.derived.debriefTags.filter((tag) => !tag.startsWith(BEAT_TAG_PREFIX));
+    if (tags.length === 0) continue;
+    const tag = tags.find((candidate) => Object.hasOwn(scenario.debrief.decisionNotes, candidate)) ?? tags[0];
+    const text = Object.hasOwn(scenario.debrief.decisionNotes, tag) ? scenario.debrief.decisionNotes[tag] : "";
+    timeline.push({ seq: entry.seq, kind: timelineKind(entry.action), tag, text });
+  }
+
   const signs: WarningSignId[] = [];
   for (const id of found) {
     for (const sign of scenario.evidence[id].warningSigns) {
@@ -74,6 +137,14 @@ export function buildDebrief(
     }
   }
 
+  const warningSignsNoticed = signs
+    .filter((id) => Object.hasOwn(scenario.warningSigns, id))
+    .map((id) => ({ id, label: scenario.warningSigns[id].label }));
+  const firstTrap = state.flags.code_shared === true;
+  const secondTrap = state.flags.money_moved === true || state.flags.second_caller_trusted === true;
+  const trapEntered: DebriefTrap = firstTrap && secondTrap ? "both" : firstTrap ? "first" : secondTrap ? "second" : "none";
+  const content = scenario.debrief.analysis;
+
   return {
     outcome: {
       id: outcomeId,
@@ -84,10 +155,20 @@ export function buildDebrief(
     },
     decisions,
     evidenceFound: found.map((id) => ({ id, title: scenario.evidence[id].title })),
-    warningSignsNoticed: signs
-      .filter((id) => Object.hasOwn(scenario.warningSigns, id))
-      .map((id) => ({ id, label: scenario.warningSigns[id].label })),
+    warningSignsNoticed,
     cluesMissed,
+    timeline,
+    analysis: {
+      pressureBuilt: content.pressureBuilt,
+      pressureLevel: state.pressure,
+      whyWarningLooked: content.whyWarningLooked,
+      unverifiedSignals: warningSignsNoticed,
+      thirdCallerIndependent: false,
+      thirdCallerNote: content.thirdCallerNote,
+      trapEntered,
+      trapNote: content.trapNotes[trapEntered],
+      verifyNextTime: [...content.verifyNextTime],
+    },
     mechanism: scenario.debrief.mechanism,
     saferAlternatives: [...scenario.debrief.saferAlternatives],
   };

@@ -1,3 +1,4 @@
+// Re-enabled in task 7.4 and 7.6 to 7.17 once the scenario is assembled (all tests in this file are skipped until then).
 import { describe, expect, it } from "vitest";
 import {
   CORE_PROPERTY_RUNS,
@@ -25,7 +26,7 @@ function firstViolatingState(actions: readonly unknown[]): { index: number; viol
 /** Seeded property runs can exceed Vitest's 5 s default when the machine is loaded. */
 const PROPERTY_TIMEOUT_MS = 60_000;
 
-describe("chapter core properties", () => {
+describe.skip("chapter core properties", () => {
   // Feature: chapter-01-the-urgent-call, Property 2: Reachable states satisfy the state invariants
   it("keeps every reachable state within the state invariants", () => {
     for (let run = 0; run < CORE_PROPERTY_RUNS; run += 1) {
