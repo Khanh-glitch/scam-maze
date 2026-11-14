@@ -1,0 +1,146 @@
+import * as THREE from 'three';
+
+/**
+ * Retargets animation clips between two humanoid skeletons with different bone names and rest
+ * poses (for example Mixamo T-pose clips onto the street NPCs' A-pose skeleton).
+ *
+ * Method: each mapped bone first gets a fixed alignment that turns its rest direction (toward its
+ * main child) onto the source bone's rest direction. Then, at every sample, the source bone's
+ * world rotation relative to its rest is applied on top:
+ *   targetWorld(t) = sourceWorld(t) * sourceWorldRest^-1 * align * targetWorldRest
+ * and converted back to a local rotation under the (already retargeted) parent. The hips also
+ * get the source's translation offset, scaled by the leg length ratio.
+ */
+
+/** Target bone -> source bone, for the street NPC rig (target) and Mixamo (source). */
+export const UE_FROM_MIXAMO: Record<string, string> = (() => {
+  const m: Record<string, string> = {
+    pelvis: 'Hips', spine_01: 'Spine', spine_02: 'Spine1', spine_03: 'Spine2', neck_01: 'Neck', head: 'Head',
+  };
+  for (const [s, side] of [['l', 'Left'], ['r', 'Right']] as const) {
+    Object.assign(m, {
+      [`clavicle_${s}`]: `${side}Shoulder`, [`upperarm_${s}`]: `${side}Arm`, [`lowerarm_${s}`]: `${side}ForeArm`, [`hand_${s}`]: `${side}Hand`,
+      [`thigh_${s}`]: `${side}UpLeg`, [`calf_${s}`]: `${side}Leg`, [`foot_${s}`]: `${side}Foot`, [`ball_${s}`]: `${side}ToeBase`,
+    });
+    for (const [f, F] of [['thumb', 'Thumb'], ['index', 'Index'], ['middle', 'Middle'], ['ring', 'Ring'], ['pinky', 'Pinky']] as const) {
+      for (const k of [1, 2, 3]) m[`${f}_0${k}_${s}`] = `${side}Hand${F}${k}`;
+    }
+  }
+  return m;
+})();
+
+/** The child whose direction defines a target bone's rest direction (leaf bones reuse their parent's alignment). */
+const MAIN_CHILD: Record<string, string> = (() => {
+  const c: Record<string, string> = { pelvis: 'spine_01', spine_01: 'spine_02', spine_02: 'spine_03', spine_03: 'neck_01', neck_01: 'head' };
+  for (const s of ['l', 'r']) {
+    Object.assign(c, {
+      [`clavicle_${s}`]: `upperarm_${s}`, [`upperarm_${s}`]: `lowerarm_${s}`, [`lowerarm_${s}`]: `hand_${s}`, [`hand_${s}`]: `middle_01_${s}`,
+      [`thigh_${s}`]: `calf_${s}`, [`calf_${s}`]: `foot_${s}`, [`foot_${s}`]: `ball_${s}`,
+    });
+    for (const f of ['thumb', 'index', 'middle', 'ring', 'pinky']) { c[`${f}_01_${s}`] = `${f}_02_${s}`; c[`${f}_02_${s}`] = `${f}_03_${s}`; }
+  }
+  return c;
+})();
+
+const stripPrefix = (n: string) => n.replace(/^mixamorig\d*:?/i, '');
+
+function boneMap(root: THREE.Object3D, strip = false): Map<string, THREE.Bone> {
+  const m = new Map<string, THREE.Bone>();
+  root.traverse((o) => { if ((o as THREE.Bone).isBone) m.set(strip ? stripPrefix(o.name) : o.name, o as THREE.Bone); });
+  return m;
+}
+
+function legLength(bones: Map<string, THREE.Bone>, thigh: string, foot: string): number {
+  const a = bones.get(thigh), b = bones.get(foot);
+  if (!a || !b) return 1;
+  return a.getWorldPosition(new THREE.Vector3()).distanceTo(b.getWorldPosition(new THREE.Vector3()));
+}
+
+/**
+ * Builds `clip` for `target` (an unanimated clone at rest) from `source` (a clone at rest) and
+ * returns a new clip named `name`. `map` is target bone -> source bone (source names without the
+ * Mixamo prefix). Both objects must be clones nobody else animates.
+ */
+export function retargetClip(source: THREE.Object3D, target: THREE.Object3D, clip: THREE.AnimationClip, name: string, map: Record<string, string> = UE_FROM_MIXAMO, fps = 30): THREE.AnimationClip {
+  source.updateMatrixWorld(true); target.updateMatrixWorld(true);
+  const src = boneMap(source, true), tgt = boneMap(target);
+  const order: THREE.Bone[] = [];
+  target.traverse((o) => { if ((o as THREE.Bone).isBone) order.push(o as THREE.Bone); });
+
+  // Rest data.
+  const q = () => new THREE.Quaternion();
+  const srcRest = new Map<string, THREE.Quaternion>(), tgtRest = new Map<string, THREE.Quaternion>(), align = new Map<string, THREE.Quaternion>();
+  const restLocal = new Map<THREE.Bone, THREE.Quaternion>();
+  for (const b of order) restLocal.set(b, b.quaternion.clone());
+  for (const [t, s] of Object.entries(map)) {
+    const tb = tgt.get(t), sb = src.get(s);
+    if (!tb || !sb) continue;
+    srcRest.set(t, sb.getWorldQuaternion(q()));
+    tgtRest.set(t, tb.getWorldQuaternion(q()));
+  }
+  for (const b of order) {
+    const t = b.name;
+    if (!tgtRest.has(t)) continue;
+    const child = MAIN_CHILD[t], tc = child && tgt.get(child), sc = child && map[child] && src.get(map[child]);
+    const sb = src.get(map[t])!;
+    if (tc && sc) {
+      const dt = tc.getWorldPosition(new THREE.Vector3()).sub(b.getWorldPosition(new THREE.Vector3())).normalize();
+      const ds = sc.getWorldPosition(new THREE.Vector3()).sub(sb.getWorldPosition(new THREE.Vector3())).normalize();
+      align.set(t, q().setFromUnitVectors(dt, ds));
+    } else {
+      // Leaf bone: reuse the parent's alignment so it keeps its rest pose relative to the parent.
+      const parent = b.parent as THREE.Bone | null;
+      align.set(t, (parent && align.get(parent.name)?.clone()) ?? q());
+    }
+  }
+  const hipsT = tgt.get('pelvis'), hipsS = src.get(map.pelvis ?? 'Hips');
+  const legRatio = legLength(tgt, 'thigh_l', 'foot_l') / legLength(src, 'LeftUpLeg', 'LeftFoot');
+  // Hips offsets are taken in world space (Mixamo files often have a scaled parent node).
+  const hipsRestS = hipsS ? hipsS.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3();
+  const hipsRestT = hipsT ? hipsT.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3();
+  const pos = new THREE.Vector3();
+
+  // Sample.
+  const mixer = new THREE.AnimationMixer(source);
+  mixer.clipAction(clip).play();
+  const frames = Math.max(2, Math.round(clip.duration * fps) + 1);
+  const times = new Float32Array(frames);
+  const values = new Map<string, Float32Array>();
+  for (const t of tgtRest.keys()) values.set(t, new Float32Array(frames * 4));
+  const hipsPos = new Float32Array(frames * 3);
+  const world = new Map<THREE.Bone, THREE.Quaternion>();
+  const tmp = q(), inv = q();
+  const targetRootQ = target.getWorldQuaternion(q());
+  for (let f = 0; f < frames; f++) {
+    const time = Math.min(clip.duration, f / fps);
+    times[f] = time;
+    mixer.setTime(time);
+    source.updateMatrixWorld(true);
+    world.clear();
+    for (const b of order) {
+      const parentWorld = (b.parent && world.get(b.parent as THREE.Bone)) ?? (b.parent ? b.parent.getWorldQuaternion(q()) : targetRootQ);
+      let w: THREE.Quaternion;
+      const t = b.name, sb = tgtRest.has(t) ? src.get(map[t]) : undefined;
+      if (sb) {
+        // sourceWorld(t) * sourceWorldRest^-1 * align * targetWorldRest
+        w = sb.getWorldQuaternion(q()).multiply(inv.copy(srcRest.get(t)!).invert()).multiply(align.get(t)!).multiply(tgtRest.get(t)!);
+        const local = tmp.copy(parentWorld).invert().multiply(w);
+        values.get(t)!.set([local.x, local.y, local.z, local.w], f * 4);
+      } else {
+        w = parentWorld.clone().multiply(restLocal.get(b)!);
+      }
+      world.set(b, w);
+    }
+    if (hipsS && hipsT) {
+      hipsS.getWorldPosition(pos).sub(hipsRestS).multiplyScalar(legRatio).add(hipsRestT);
+      if (hipsT.parent) hipsT.parent.worldToLocal(pos);
+      hipsPos.set([pos.x, pos.y, pos.z], f * 3);
+    }
+  }
+  mixer.stopAllAction();
+  mixer.uncacheRoot(source);
+  const tracks: THREE.KeyframeTrack[] = [];
+  for (const [t, v] of values) tracks.push(new THREE.QuaternionKeyframeTrack(`${t}.quaternion`, times, v));
+  if (hipsS && hipsT) tracks.push(new THREE.VectorKeyframeTrack('pelvis.position', times, hipsPos));
+  return new THREE.AnimationClip(name, clip.duration, tracks);
+}

@@ -8,7 +8,7 @@ import { motorbike } from './furniture';
 import { mulberry32, clamp } from './util';
 import { mat } from './materials';
 import { BikeRiderInstance, type BikeRiderTemplate } from './bikeRider';
-import type { HumanActor, HumanLibrary, HumanModelId } from './humans';
+import type { HumanActor, HumanLibrary, HumanModelId, OutfitPart } from './humans';
 
 export interface Life { update(dt: number, t: number): void }
 
@@ -245,6 +245,13 @@ class Static {
   update(t: number, hour: number) { const v = !this.hours || (hour >= this.hours[0] && hour < this.hours[1]); this.p.g.visible = v; if (v) pose(this.p, this.poseName, t, 0, 0); }
 }
 
+/** Clothing colors for street NPCs (each walker draws its own top, bottom and shoes). */
+const OUTFIT_TOP = ['#f2efe6', '#3f6fa8', '#b5473b', '#5f9a6a', '#2f2f35', '#d8d4c8', '#c4688a', '#e0c36a', '#6aa6b8', '#7a5a9a', '#d98a4a'];
+const OUTFIT_BOTTOM = ['#2d3445', '#4a4036', '#6b6f78', '#25292f', '#8a7a62', '#1f2a3a', '#5a4a3a', '#d8d0c0'];
+const OUTFIT_SHOES = ['#1b1b1b', '#3a2a20', '#e8e4dc', '#5a4a3a'];
+/** Model walkers farther than this (m) are not drawn. */
+const WALKER_HIDE_DISTANCE = 60;
+
 /** Slowest and fastest playback of a walk clip before its legs look wrong. */
 const WALK_CLIP_RANGE: [number, number] = [0.8, 1.45];
 
@@ -274,7 +281,9 @@ class ModelWalker {
       g.rotation.y += dy * Math.min(1, dt * 6); const st = this.sp * dt; g.position.x += (dx / d) * st; g.position.z += (dz / d) * st;
       const fy = this.ctx.phys.floorAt(g.position.x, g.position.z, 2, 0.6).y; g.position.y += (fy - g.position.y) * Math.min(1, dt * 8);
     }
-    this.a.update(dt, g.position.distanceTo(player));
+    const away = g.position.distanceTo(player);
+    g.visible = away < WALKER_HIDE_DISTANCE;
+    this.a.update(dt, away);
   }
 }
 
@@ -375,16 +384,25 @@ export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vect
   });
   residents.forEach((res) => { const act = pickSlot(res.sched, ctx.env.hour); res.cur = ''; res.begin(act, false); });
   const V = (x: number, z: number) => new THREE.Vector3(x, 0.15, z);
-  const sid = (zz: number, a: number, b: number, sp: number, o: ConstructorParameters<typeof Walker>[4] = {}, model?: HumanModelId) => {
-    // A sidewalk walker uses a character model when it loaded, otherwise a procedural person.
-    const actor = model ? humans?.spawn(model) : null;
-    if (actor && actor.can('walk')) modelWalkers.push(new ModelWalker(actor, [V(a, zz), V(b, zz)], sp, ctx));
-    else walkers.push(new Walker([V(a, zz), V(b, zz)], sp, ctx, r, o));
+  // Street NPCs get their own random stream for outfits, so adding one does not reshuffle the rest of the world.
+  const outfitRng = mulberry32(4242);
+  const outfit = (model: HumanModelId): Partial<Record<OutfitPart, string>> | undefined => model.startsWith('npc')
+    ? { top: pick(outfitRng, OUTFIT_TOP), bottom: pick(outfitRng, OUTFIT_BOTTOM), shoes: pick(outfitRng, OUTFIT_SHOES) }
+    : undefined;
+  /** A path walker using a character model when it loaded; otherwise a procedural person, or nobody when `fallback` is false. */
+  const walk = (pts: THREE.Vector3[], sp: number, o: ConstructorParameters<typeof Walker>[4], model?: HumanModelId, fallback = true) => {
+    const actor = model ? humans?.spawn(model, outfit(model)) : null;
+    if (actor && actor.can('walk')) modelWalkers.push(new ModelWalker(actor, pts, sp, ctx));
+    else if (fallback) walkers.push(new Walker(pts, sp, ctx, r, o));
   };
-  sid(4.7, -50, 50, 1.2, { hat: true }); sid(-4.6, 45, -50, 1.1, {}, 'juno3'); sid(4.3, 40, -30, 1.3, { kid: true }); sid(-4.3, -45, 40, 0.8, { pole: true, hat: true });
+  const sid = (zz: number, a: number, b: number, sp: number, o: ConstructorParameters<typeof Walker>[4] = {}, model?: HumanModelId, fallback = true) => walk([V(a, zz), V(b, zz)], sp, o, model, fallback);
+  sid(4.7, -50, 50, 1.2, { hat: true }, 'npcYoshida'); sid(-4.6, 45, -50, 1.1, {}, 'juno3'); sid(4.3, 40, -30, 1.3, { kid: true }); sid(-4.3, -45, 40, 0.8, { pole: true, hat: true });
   sid(4.9, -20, 30, 1.0, { elder: true }); sid(-5.0, 20, -40, 1.25, { hat: true }, 'manVN'); sid(4.5, 45, -45, 1.4, {}, 'rowan');
-  const alley = (a: number, b: number, sp: number, x: number, o: ConstructorParameters<typeof Walker>[4] = {}) => walkers.push(new Walker([new THREE.Vector3(x, 0.02, a), new THREE.Vector3(x, 0.02, b)], sp, ctx, r, o));
-  alley(8, 45, 1.0, 10.1, { hat: true }); alley(44, 8, 1.2, 9.3); alley(20, 46, 0.7, 10.7, { elder: true }); alley(12, 38, 1.5, 9.8, { kid: true });
+  const alley = (a: number, b: number, sp: number, x: number, o: ConstructorParameters<typeof Walker>[4] = {}, model?: HumanModelId) => walk([new THREE.Vector3(x, 0.02, a), new THREE.Vector3(x, 0.02, b)], sp, o, model);
+  alley(8, 45, 1.0, 10.1, { hat: true }, 'npcArthur'); alley(44, 8, 1.2, 9.3, {}, 'npcAlice'); alley(20, 46, 0.7, 10.7, { elder: true }); alley(12, 38, 1.5, 9.8, { kid: true });
+  // Extra sidewalk walkers from the street NPC set (only when their model loaded).
+  sid(-4.9, -30, 35, 1.15, {}, 'npcAlan', false); sid(4.6, 10, -45, 1.05, {}, 'npcLinMei', false);
+  sid(-4.4, 0, 55, 1.2, {}, 'npcNapole', false); sid(4.2, -40, 20, 1.3, {}, 'npcArchetype', false);
   const cafe = houses.filter((h) => !h.spec.lite)[3];
   if (cafe) { const cx = cafe.ox - cafe.W / 2; statics.push(new Static(ctx, r, cx - 1.5, 0.15, 4.5, Math.PI / 2, 'sip', { elder: true }, [6, 21])); statics.push(new Static(ctx, r, cx + 0.5, 0.15, 5.0, -Math.PI / 2, 'sip', {}, [7, 20])); }
   // Banh mi vendor beside the cart from streetProps.ts.

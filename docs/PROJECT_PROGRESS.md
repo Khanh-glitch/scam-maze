@@ -211,6 +211,20 @@ Resolved:
 
 ## Task History
 
+### 2026-11-14 — Khupho: street NPCs with separate meshes, outfit colors and retargeted walks
+
+- **Objective:** owner request: add the seven `Asset3D/human/streetNPC` people; drop the parts named in the file names (`*_removeHair`, `*_RemoveSunglasses`); vary clothing colors for more people; optimize.
+- **Completed:**
+  - `optimize-characters.cjs` street mode: removes the named parts (alan and lin_mei hair, arthur glasses) plus teeth, tongue, the transparent eye cornea and napole's two debug line/point meshes; strips clearcoat/sheen/ior; eyebrows and eyelashes alpha cutout; gray, normalized top/bottom/shoe textures so colors can be set directly; WebP. Each file ~2.5 MB → 0.35-0.46 MB, 20-30% fewer triangles (table in `assets-src/characters/SOURCE.md`).
+  - `retarget.ts`: the files have no clips, so juno3's Mixamo idle, walk and wave are retargeted at load onto the 53-bone rig (world-space rotation deltas with per-bone rest-direction alignment, hips offset scaled by leg length).
+  - `humans.ts`: street NPC specs (heights 1.5-1.72 m), `spawn(id, outfit)` recolors top/bottom/shoes per actor, meshes of one actor share one skeleton, eyes/brows/lashes hidden past 12 m, small parts cast no shadow.
+  - `people.ts`: 3 procedural walkers replaced (one sidewalk, two alley adults) and 4 sidewalk walkers added, each with a random outfit from its own seeded stream; model walkers are not drawn past 60 m.
+- **Files:** `apps/game/scripts/optimize-characters.cjs`, `apps/game/assets-src/characters/{street/*.glb,SOURCE.md}`, `apps/game/public/assets/3d/optimized/characters/npc-*.optimized.glb`, `apps/game/src/features/khupho/world/{retarget,humans,people}.ts`, this file.
+- **Validation:** `pnpm typecheck`, `pnpm build`, `vitest --run src/features/khupho src/features/prologue src/app` (33 passed). Headless `/khupho` screenshots: yoshida and alan walk with natural strides, arms down, facing their direction; outfit colors applied; alan bald as requested. Walk speeds measured from the retargeted clips: 1.24-1.49 m/s.
+- **Not verified:** frame rate on a real GPU (SwiftShader timings varied 224-420 ms between runs of the same view, so they are not a comparison); faces up close (eyebrows/lashes cutout); licenses (not provided).
+- **Deviations:** none. **Follow-up:** owner review of hair-less alan/lin_mei; optional body decimation if more NPCs are added.
+
+
 ### 2026-11-14 — Khupho: banh mi vendor model and a character model system
 
 - **Objective:** owner request: replace the procedural woman beside the banh mi cart with `banhmi_vendor_animated.glb`, and bring the other people in `Asset3D/human` (manVN, juno3, rowan) into the neighborhood through a system that more models can join later.
