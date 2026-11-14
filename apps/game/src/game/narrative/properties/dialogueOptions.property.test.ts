@@ -1,11 +1,12 @@
-// Re-enabled in task 7.4 and 7.6 to 7.17 once the scenario is assembled (all tests in this file are skipped until then).
-// Property 8 (design.md, "Correctness Properties"): dialogue options respect conditions and never
+// Feature: chapter-01-double-deception, carried-over property: Dialogue options respect conditions and never dead-end
+// (the Property 8 of chapter-01-the-urgent-call, rewritten for the Double Deception scenario; task 2.1 re-enable).
+// Dialogue options respect conditions and never
 // dead-end. In every state reached by a seeded random action sequence that has a current
 // conversation on a non-end node, `availableOptions` is non-empty, lists exactly the authored
 // options whose conditions hold (in authored order), shows the fallback only when no authored
 // option is available, and every listed option is accepted by SELECT_DIALOGUE_OPTION.
 
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   CORE_PROPERTY_RUNS,
@@ -27,6 +28,9 @@ import type { ChapterState } from "../types";
 /** Seed offset so this file's sequences differ from other core property files. */
 const SEED = (CORE_PROPERTY_SEED ^ 0x0008) >>> 0;
 
+/** A node offers at most this many options. */
+const MAX_OPTIONS = 4;
+
 /** Returns one message per violation of Property 8 in `state`; empty when it holds. */
 function optionProblems(state: ChapterState): string[] {
   const conversation = state.conversation;
@@ -40,6 +44,7 @@ function optionProblems(state: ChapterState): string[] {
   const problems: string[] = [];
   const listed = availableOptions(state, CHAPTER_1_SCENARIO);
   if (listed.length === 0) problems.push(`${where}: no options (dead end)`);
+  if (listed.length > MAX_OPTIONS) problems.push(`${where}: ${listed.length} options listed, at most ${MAX_OPTIONS}`);
 
   // Reference: the authored options whose conditions hold, in authored order.
   const expectedAuthored = node.options
@@ -87,9 +92,9 @@ function sequenceFails(actions: readonly unknown[]): boolean {
 /** Seeded property runs can exceed Vitest's 5 s default when the machine is loaded. */
 const PROPERTY_TIMEOUT_MS = 60_000;
 
-describe.skip("Property 8: Dialogue options respect conditions and never dead-end", () => {
+describe("Dialogue options respect conditions and never dead-end", () => {
   it("lists only available authored options, never dead-ends, and accepts every listed option", () => {
-    // Feature: chapter-01-the-urgent-call, Property 8: Dialogue options respect conditions and never dead-end
+    // Feature: chapter-01-double-deception, carried-over property: Dialogue options respect conditions and never dead-end
     let checkedStates = 0;
     for (let index = 0; index < CORE_PROPERTY_RUNS; index += 1) {
       const seed = caseSeed(SEED, index);
@@ -111,4 +116,46 @@ describe.skip("Property 8: Dialogue options respect conditions and never dead-en
     // Guard against a vacuous pass: the generator must reach conversations.
     if (checkedStates === 0) throw new Error("Property 8: no generated state had a conversation.");
   }, PROPERTY_TIMEOUT_MS);
+
+  it("every authored node offers at most four options and a way to leave the conversation", () => {
+    // Feature: chapter-01-double-deception, carried-over property: Dialogue options respect conditions and never dead-end
+    const problems: string[] = [];
+    let nodesChecked = 0;
+    for (const graph of Object.values(CHAPTER_1_SCENARIO.dialogues)) {
+      // Nodes that can end the conversation: end nodes, or nodes with an option that hangs up.
+      const canLeave = new Set<string>();
+      for (const node of Object.values(graph.nodes)) {
+        if (node.end || node.options.some((option) => typeof option.next !== "string")) canLeave.add(node.id);
+      }
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const node of Object.values(graph.nodes)) {
+          if (canLeave.has(node.id)) continue;
+          if (node.options.some((option) => typeof option.next === "string" && canLeave.has(option.next))) {
+            canLeave.add(node.id);
+            changed = true;
+          }
+        }
+      }
+      for (const node of Object.values(graph.nodes)) {
+        if (node.end) {
+          if (node.options.length > 0) problems.push(`${graph.id}/${node.id}: end node has options`);
+          continue;
+        }
+        nodesChecked += 1;
+        if (node.options.length > MAX_OPTIONS) {
+          problems.push(`${graph.id}/${node.id}: ${node.options.length} authored options, at most ${MAX_OPTIONS}`);
+        }
+        if (!canLeave.has(node.id)) problems.push(`${graph.id}/${node.id}: no way to leave the conversation`);
+        for (const option of node.options) {
+          if (typeof option.next === "string" && !Object.hasOwn(graph.nodes, option.next)) {
+            problems.push(`${graph.id}/${node.id}: option ${option.id} points at missing node ${option.next}`);
+          }
+        }
+      }
+    }
+    expect(nodesChecked, "no non-end node was checked").toBeGreaterThan(0);
+    expect(problems).toEqual([]);
+  });
 });

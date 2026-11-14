@@ -47,6 +47,7 @@ import {
 import { createLcg, pick, randomInt } from "../../../test/seededRandom";
 import { FIXTURE_SCENARIO } from "../../../test/fixtureScenario";
 import { OUTCOME_IDS } from "../chapter1/ids";
+import { CHAPTER_1_SCENARIO } from "../chapter1/scenario";
 import { MAX_PRESSURE, applyEffect } from "../conditions";
 import { analyzeReachability } from "../reachability";
 import { chapterReducer, createInitialState } from "../reducer";
@@ -490,6 +491,139 @@ describe("Scenario validation properties", () => {
           failures.push(`${label}: solver did not report orphan node "${orphanId}" as unreachable`);
         }
       }
+      expect(failures, failureReport(failures)).toEqual([]);
+    },
+    PROPERTY_TIMEOUT_MS,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Property 8: Deductions are grounded in provenance
+// ---------------------------------------------------------------------------
+
+// Feature: chapter-01-double-deception, Property 8: Deductions are grounded in provenance
+describe("Deduction provenance (chapter-01-double-deception, Property 8)", () => {
+  interface LooseSource {
+    identifiers: { key: string; value: string }[];
+  }
+  interface LooseEvidence {
+    sourceId: string;
+    discovery: unknown;
+  }
+  interface LooseDeduction {
+    id: string;
+    inputs: string[];
+    inputsAnyOf?: string[];
+    requires: unknown[];
+    basis: { kind: string; key: string };
+  }
+  const sourcesOf = (s: ScenarioDefinition) => s.sources as unknown as Record<string, LooseSource>;
+  const evidenceOf = (s: ScenarioDefinition) => s.evidence as unknown as Record<string, LooseEvidence>;
+  const deductionsOf = (s: ScenarioDefinition) => s.deductions as unknown as Record<string, LooseDeduction>;
+
+  const REAL_JSON = JSON.stringify(CHAPTER_1_SCENARIO);
+  const BASES = [
+    { name: "fixture", scenario: FIXTURE_SCENARIO },
+    { name: "chapter1", scenario: CHAPTER_1_SCENARIO },
+  ] as const;
+
+  it("accepts the unmodified scenarios and gives every evidence item an existing sourceId", () => {
+    for (const { name, scenario } of BASES) {
+      expect(validateScenarioIssues(scenario), `${name} scenario has issues`).toEqual([]);
+      const sources = sourcesOf(scenario);
+      for (const [id, item] of Object.entries(evidenceOf(scenario))) {
+        expect(typeof item.sourceId, `${name}: evidence "${id}" has no sourceId`).toBe("string");
+        expect(Object.hasOwn(sources, item.sourceId), `${name}: evidence "${id}" has unknown source "${item.sourceId}"`).toBe(true);
+      }
+    }
+  });
+
+  it(
+    "reports a basis issue when a source identifier is mutated and a circular gating issue when a discovery needs its own deduction",
+    () => {
+      const failures: string[] = [];
+      const caseSeeds = seeds(5);
+      console.info(`[P8] ${caseSeeds.length} cases, base seed ${PROPERTY_SEED}, SCAMMAZE_PBT_SEED reproduces one case`);
+      for (const [index, seed] of caseSeeds.entries()) {
+        const next = createLcg(seed);
+        const kind = index % 3;
+        const base = BASES[Math.floor(index / 3) % BASES.length];
+        const label = `SCAMMAZE_PBT_SEED=${seed} (case ${index}, ${base.name}, ${["shared basis loses value", "conflicting basis made equal", "circular discovery"][kind]})`;
+        const scenario = clone(base.scenario);
+        const sources = sourcesOf(scenario);
+        const evidence = evidenceOf(scenario);
+        const deductions = deductionsOf(scenario);
+        const sourceOf = (evidenceId: string): LooseSource => sources[evidence[evidenceId].sourceId];
+        let expectedCheck: ValidatorCheck = "V1";
+        let mentions = "";
+
+        if (kind === 0) {
+          // Shared basis: one source of a deduction input stops carrying the shared value.
+          const eligible = Object.values(deductions).filter(
+            (d) => d.basis.kind === "shared-identifier" && new Set(d.inputs.map((id) => evidence[id].sourceId)).size >= 2,
+          );
+          if (eligible.length === 0) {
+            failures.push(`${label}: no shared-identifier deduction with two distinct sources`);
+            continue;
+          }
+          const deduction = pick(next, eligible);
+          const source = sourceOf(pick(next, deduction.inputs));
+          const at = source.identifiers.findIndex((i) => i.key === deduction.basis.key);
+          if (at < 0) {
+            failures.push(`${label}: source of "${deduction.id}" has no "${deduction.basis.key}" identifier to mutate`);
+            continue;
+          }
+          if (next() < 0.5) source.identifiers[at].value = `${source.identifiers[at].value}-changed-${seed}`;
+          else source.identifiers.splice(at, 1);
+          mentions = `Deduction "${deduction.id}" claims a shared "${deduction.basis.key}"`;
+        } else if (kind === 1) {
+          // Conflicting basis: every source of one evidence set carries the same value.
+          const eligible = Object.values(deductions).filter((d) => d.basis.kind === "conflicting-identifier");
+          if (eligible.length === 0) {
+            failures.push(`${label}: no conflicting-identifier deduction`);
+            continue;
+          }
+          const deduction = pick(next, eligible);
+          const set = [...deduction.inputs, ...(deduction.inputsAnyOf && deduction.inputsAnyOf.length > 0 ? [pick(next, deduction.inputsAnyOf)] : [])];
+          const common = `shared-value-${seed}`;
+          for (const id of set) {
+            const source = sourceOf(id);
+            const found = source.identifiers.find((i) => i.key === deduction.basis.key);
+            if (found) found.value = common;
+            else source.identifiers.push({ key: deduction.basis.key, value: common });
+          }
+          mentions = `Deduction "${deduction.id}" claims conflicting "${deduction.basis.key}"`;
+        } else {
+          // Circular gating: a new evidence item is only discoverable after the new deduction
+          // that needs it as an input.
+          expectedCheck = "V4";
+          const original = pick(next, Object.values(deductions));
+          const newEvidenceId = `ev.circular.${seed}`;
+          const newDeductionId = `ded.circular.${seed}`;
+          evidence[newEvidenceId] = {
+            ...(JSON.parse(JSON.stringify(evidence[original.inputs[0]])) as LooseEvidence),
+            id: newEvidenceId,
+            discovery: { via: "inspect", requires: [{ kind: "deductionRecorded", deductionId: newDeductionId }] },
+          } as LooseEvidence;
+          deductions[newDeductionId] = {
+            ...JSON.parse(JSON.stringify(original)),
+            id: newDeductionId,
+            inputs: [newEvidenceId, ...original.inputs.slice(1)],
+            requires: [],
+          };
+          mentions = `Evidence "${newEvidenceId}" can only be discovered after deduction "${newDeductionId}"`;
+        }
+
+        const issues = validateScenarioIssues(scenario);
+        if (!issues.some((issue) => issue.check === expectedCheck && issue.message.includes(mentions))) {
+          failures.push(
+            `${label}: expected a ${expectedCheck} issue mentioning '${mentions}', got ${JSON.stringify(issues.map((i) => `${i.check}: ${i.message}`).slice(0, 4))}`,
+          );
+        }
+      }
+      // Mutations happen on clones only.
+      expect(JSON.stringify(FIXTURE_SCENARIO)).toBe(ORIGINAL_JSON);
+      expect(JSON.stringify(CHAPTER_1_SCENARIO)).toBe(REAL_JSON);
       expect(failures, failureReport(failures)).toEqual([]);
     },
     PROPERTY_TIMEOUT_MS,

@@ -1,28 +1,32 @@
-// @ts-nocheck -- uses the old street-chapter IDs; rewritten when the scenario is assembled (spec chapter-01-double-deception, task 2.1 placeholder).
-// Re-enabled in task 7.4 and 7.6 to 7.17 once the scenario is assembled (all tests in this file are skipped until then).
-// Property 5 (.kiro/specs/chapter-01-voice-narrative/design.md, "Correctness Properties"):
-// evidence-conditioned options are deterministic and local.
+// Feature: chapter-01-double-deception, Property: Condition-driven dialogue options are deterministic and local
+// (carried over from chapter-01-voice-narrative, Property 5; rewritten for the Double Deception scenario).
 //
-// For any two states that agree on `flags`, `discovered`, `claims`, the call log statuses and the
-// current node, `availableOptions` and the start node are equal (no dependence on `events`,
-// `pressure` or time). For every option whose only condition is `hasEvidence(e)`, the option is
-// available exactly when `e` is in `discovered`. For each link in the design.md table "Where
-// earlier choices change later dialogue", adding the named evidence or flag changes the
-// available options or the start node.
+// For any two states that agree on `flags`, `discovered`, `deductions`, `claims`, the call log
+// statuses and the current node, `availableOptions` and the start node are equal (no dependence on
+// `events`, `pressure`, the phone or time). For every option whose only condition is one
+// `hasEvidence`, `flag` or `deductionRecorded` condition, the option is available exactly when
+// that condition holds. Each authored link from an earlier choice to later dialogue (the recovery
+// call start node and its deduction-driven options) changes the options or the start node.
 //
-// Cases are seeded (fixed seed, CORE_PROPERTY_RUNS = 200 per property). A failure prints the
-// seed, the case index and the state that broke the property.
+// Cases are seeded (CORE_PROPERTY_RUNS = 200 per property). A failure prints the seed, the case
+// index and the state that broke the property.
 
 import { describe, expect, it } from "vitest";
 
 import { CORE_PROPERTY_RUNS, CORE_PROPERTY_SEED, caseSeed } from "../../../test/chapterRuns";
 import { createLcg, pick, randomInt } from "../../../test/seededRandom";
-import { EVIDENCE_IDS, FLAG_IDS, type EvidenceId, type FlagId } from "../chapter1/ids";
+import {
+  DEDUCTION_IDS,
+  EVIDENCE_IDS,
+  FLAG_IDS,
+  type DeductionId,
+  type EvidenceId,
+  type FlagId,
+} from "../chapter1/ids";
 import { CHAPTER_1_SCENARIO } from "../chapter1/scenario";
-import { canDiscover } from "../evidence";
 import { availableOptions, resolveStartNode } from "../dialogueEngine";
 import { createInitialState } from "../reducer";
-import type { ChapterState, DialogueGraph, DialogueNode } from "../types";
+import type { ChapterState, Condition, DialogueGraph, DialogueNode } from "../types";
 
 /** Seed offset so this file's cases differ from other core property files. */
 const SEED = (CORE_PROPERTY_SEED ^ 0x0105) >>> 0;
@@ -45,19 +49,22 @@ const NODE_REFS: NodeRef[] = GRAPHS.flatMap((graph) =>
     .map((node) => ({ graph, node })),
 );
 
-/** A playing state whose current conversation sits at `ref` with the given flags and evidence. */
-function stateAt(
-  ref: { graphId: DialogueGraph["id"]; nodeId: string },
-  discovered: readonly EvidenceId[],
-  flags: readonly FlagId[],
-): ChapterState {
+interface Context {
+  evidence: EvidenceId[];
+  flags: FlagId[];
+  deductions: DeductionId[];
+}
+
+/** A playing state whose current conversation sits at `ref` with the given context. */
+function stateAt(ref: { graphId: DialogueGraph["id"]; nodeId: string }, context: Context): ChapterState {
   const base = createInitialState();
   const flagMap = { ...base.flags };
-  for (const flag of flags) flagMap[flag] = true;
+  for (const flag of context.flags) flagMap[flag] = true;
   return {
     ...base,
     status: "playing",
-    discovered: [...discovered],
+    discovered: [...context.evidence],
+    deductions: [...context.deductions],
     flags: flagMap,
     conversation: { graphId: ref.graphId, nodeId: ref.nodeId, callId: null, history: [] },
   };
@@ -68,6 +75,14 @@ function subset<T>(next: () => number, items: readonly T[]): T[] {
   return items.filter(() => next() < 0.5);
 }
 
+function randomContext(next: () => number): Context {
+  return {
+    evidence: subset(next, EVIDENCE_IDS),
+    flags: subset(next, FLAG_IDS),
+    deductions: subset(next, DEDUCTION_IDS),
+  };
+}
+
 function optionIds(state: ChapterState): string[] {
   return availableOptions(state, SCENARIO).map((option) => option.id);
 }
@@ -76,13 +91,27 @@ function startNodes(state: ChapterState): string[] {
   return GRAPHS.map((graph) => resolveStartNode(state, graph, SCENARIO));
 }
 
-/** Options at `ref` whose only condition is `hasEvidence`. */
-function evidenceOnlyOptions(node: DialogueNode): Array<{ id: string; evidenceId: EvidenceId }> {
-  const found: Array<{ id: string; evidenceId: EvidenceId }> = [];
+/** True when the single condition holds in `context`, for the three kinds this file checks. */
+function holds(condition: Condition, context: Context): boolean | null {
+  switch (condition.kind) {
+    case "hasEvidence":
+      return context.evidence.includes(condition.evidenceId);
+    case "flag":
+      return context.flags.includes(condition.flag);
+    case "deductionRecorded":
+      return context.deductions.includes(condition.deductionId);
+    default:
+      return null;
+  }
+}
+
+/** Options at `node` whose only condition is one of the three checked kinds. */
+function singleConditionOptions(node: DialogueNode): Array<{ id: string; condition: Condition }> {
+  const found: Array<{ id: string; condition: Condition }> = [];
   for (const option of node.options) {
     const conditions = option.conditions ?? [];
-    if (conditions.length === 1 && conditions[0].kind === "hasEvidence") {
-      found.push({ id: option.id, evidenceId: conditions[0].evidenceId });
+    if (conditions.length === 1 && holds(conditions[0], { evidence: [], flags: [], deductions: [] }) !== null) {
+      found.push({ id: option.id, condition: conditions[0] });
     }
   }
   return found;
@@ -92,68 +121,67 @@ function fail(name: string, seed: number, index: number, detail: string): never 
   throw new Error(`${name} failed (seed ${seed}, case ${index}): ${detail}`);
 }
 
-describe.skip("Property 5: Evidence-conditioned options are deterministic and local", () => {
-  it("options and start nodes depend only on flags, evidence, claims, call log and node", () => {
-    // Feature: chapter-01-voice-narrative, Property 5: Evidence-conditioned options are deterministic and local
+describe("Condition-driven dialogue options are deterministic and local", () => {
+  it("options and start nodes depend only on flags, evidence, deductions, claims, call log and node", () => {
+    // Feature: chapter-01-double-deception, Property: Condition-driven dialogue options are deterministic and local
     for (let index = 0; index < CORE_PROPERTY_RUNS; index += 1) {
       const seed = caseSeed(SEED, index);
       const next = createLcg(seed);
       const { graph, node } = pick(next, NODE_REFS);
-      const discovered = subset(next, EVIDENCE_IDS);
-      const flags = subset(next, FLAG_IDS);
-      const where = `${graph.id}/${node.id} evidence=${JSON.stringify(discovered)} flags=${JSON.stringify(flags)}`;
+      const context = randomContext(next);
+      const where = `${graph.id}/${node.id} ${JSON.stringify(context)}`;
 
-      const a = stateAt({ graphId: graph.id, nodeId: node.id }, discovered, flags);
-      // Twin: same flags, evidence, claims, call log statuses and node; different pressure,
-      // event log, phone state and visited interactables.
+      const a = stateAt({ graphId: graph.id, nodeId: node.id }, context);
+      // Twin: same flags, evidence, deductions, claims, call log statuses and node; different
+      // pressure, event log, phone state and visited interactables.
       const b: ChapterState = {
         ...a,
         pressure: randomInt(next, 0, 3) as ChapterState["pressure"],
         events: [
           {
+            seq: 0,
             action: { type: "OPEN_PHONE" },
-            accepted: true,
-          } as unknown as ChapterState["events"][number],
+            derived: { evidence: [], flags: [], objectivesActivated: [], objectivesCompleted: [], debriefTags: [] },
+          },
         ],
         phone: { ...a.phone, open: !a.phone.open },
-        interacted: [...a.interacted, "obj.wallet"],
+        interacted: [...a.interacted, "obj.note"],
       };
 
       if (JSON.stringify(availableOptions(a, SCENARIO)) !== JSON.stringify(availableOptions(b, SCENARIO))) {
-        fail("Property 5", seed, index, `availableOptions differ between twins at ${where}`);
+        fail("conditionedOptions", seed, index, `availableOptions differ between twins at ${where}`);
       }
       if (JSON.stringify(startNodes(a)) !== JSON.stringify(startNodes(b))) {
-        fail("Property 5", seed, index, `start nodes differ between twins at ${where}`);
+        fail("conditionedOptions", seed, index, `start nodes differ between twins at ${where}`);
       }
       // Determinism: repeated calls agree.
       if (JSON.stringify(optionIds(a)) !== JSON.stringify(optionIds(a))) {
-        fail("Property 5", seed, index, `availableOptions is not repeatable at ${where}`);
+        fail("conditionedOptions", seed, index, `availableOptions is not repeatable at ${where}`);
       }
     }
   }, PROPERTY_TIMEOUT_MS);
 
-  it("an option whose only condition is hasEvidence(e) is available exactly when e is discovered", () => {
-    // Feature: chapter-01-voice-narrative, Property 5: Evidence-conditioned options are deterministic and local
-    const evidenceNodes = NODE_REFS.filter(({ node }) => evidenceOnlyOptions(node).length > 0);
+  it("an option with one evidence, flag or deduction condition is available exactly when it holds", () => {
+    // Feature: chapter-01-double-deception, Property: Condition-driven dialogue options are deterministic and local
+    const conditionedNodes = NODE_REFS.filter(({ node }) => singleConditionOptions(node).length > 0);
     // Guard against a vacuous pass: the scenario must author such options.
-    expect(evidenceNodes.length).toBeGreaterThanOrEqual(8);
+    expect(conditionedNodes.length).toBeGreaterThanOrEqual(3);
 
     for (let index = 0; index < CORE_PROPERTY_RUNS; index += 1) {
       const seed = caseSeed(SEED ^ 0x77, index);
       const next = createLcg(seed);
-      const { graph, node } = pick(next, evidenceNodes);
-      const discovered = subset(next, EVIDENCE_IDS);
-      const flags = subset(next, FLAG_IDS);
-      const state = stateAt({ graphId: graph.id, nodeId: node.id }, discovered, flags);
+      const { graph, node } = pick(next, conditionedNodes);
+      const context = randomContext(next);
+      const state = stateAt({ graphId: graph.id, nodeId: node.id }, context);
       const listed = new Set(optionIds(state));
-      for (const { id, evidenceId } of evidenceOnlyOptions(node)) {
-        const expected = discovered.includes(evidenceId);
+      for (const { id, condition } of singleConditionOptions(node)) {
+        const expected = holds(condition, context);
         if (listed.has(id) !== expected) {
           fail(
-            "Property 5",
+            "conditionedOptions",
             seed,
             index,
-            `${graph.id}/${node.id} option ${id}: listed=${listed.has(id)} but ${evidenceId} discovered=${expected}`,
+            `${graph.id}/${node.id} option ${id}: listed=${listed.has(id)} but ${JSON.stringify(condition)} holds=${String(expected)}`,
           );
         }
       }
@@ -162,171 +190,122 @@ describe.skip("Property 5: Evidence-conditioned options are deterministic and lo
 });
 
 // ---------------------------------------------------------------------------
-// Links from design.md "Where earlier choices change later dialogue"
+// Links from earlier choices to later dialogue (the recovery call)
 // ---------------------------------------------------------------------------
-
-type Added = { evidence: EvidenceId[]; flags: FlagId[] };
 
 interface Link {
   name: string;
-  /** What is added to the state. */
-  add: Added;
-  /** Returns a readable observation of what the link changes, from a state. */
-  observe: (discovered: EvidenceId[], flags: FlagId[]) => string;
-  /** Evidence and flags the random context must never contain (they would hide the change). */
-  exclude: Added;
+  /** What is added to the context. */
+  add: Partial<Context>;
+  /** A readable observation of what the link changes, from a context. */
+  observe: (context: Context) => string;
+  /** Evidence, flags and deductions the random context must never contain (they would hide the change). */
+  exclude: Partial<Context>;
 }
 
 function optionsAt(graphId: DialogueGraph["id"], nodeId: string) {
-  return (discovered: EvidenceId[], flags: FlagId[]): string =>
-    JSON.stringify(optionIds(stateAt({ graphId, nodeId }, discovered, flags)));
+  return (context: Context): string => JSON.stringify(optionIds(stateAt({ graphId, nodeId }, context)));
 }
 
 function startNodeOf(graphId: DialogueGraph["id"]) {
-  return (discovered: EvidenceId[], flags: FlagId[]): string =>
-    resolveStartNode(stateAt({ graphId, nodeId: SCENARIO.dialogues[graphId].startNodeId }, discovered, flags), SCENARIO.dialogues[graphId], SCENARIO);
-}
-
-/** True when the evidence item can be inspected: the condition under test for the last link. */
-function inspectable(evidenceId: EvidenceId) {
-  return (discovered: EvidenceId[], flags: FlagId[]): string =>
-    String(
-      canDiscover(
-        stateAt({ graphId: "dlg.scam-call", nodeId: "scam.open" }, discovered, flags),
-        evidenceId,
-        "inspect",
-        SCENARIO,
-      ),
+  return (context: Context): string =>
+    resolveStartNode(
+      stateAt({ graphId, nodeId: SCENARIO.dialogues[graphId].startNodeId }, context),
+      SCENARIO.dialogues[graphId],
+      SCENARIO,
     );
 }
 
+const VERIFIED: FlagId = "official_channel_verified";
+
 const LINKS: Link[] = [
   {
-    name: "ev.sms-alert shows the link option (scam.code-request)",
-    add: { evidence: ["ev.sms-alert"], flags: [] },
-    observe: optionsAt("dlg.scam-call", "scam.code-request"),
-    exclude: { evidence: ["ev.sms-alert"], flags: [] },
+    name: "ded.same-source shows the case challenge at rec.cites-case",
+    add: { deductions: ["ded.same-source"] },
+    observe: optionsAt("dlg.recovery", "rec.cites-case"),
+    exclude: { deductions: ["ded.same-source"] },
   },
   {
-    name: "ev.otp-sms shows the OTP warning option (scam.deflect)",
-    add: { evidence: ["ev.otp-sms"], flags: [] },
-    observe: optionsAt("dlg.scam-call", "scam.deflect"),
-    exclude: { evidence: ["ev.otp-sms"], flags: [] },
+    name: "ded.notification-mismatch shows the number challenge at rec.cites-case",
+    add: { deductions: ["ded.notification-mismatch"] },
+    observe: optionsAt("dlg.recovery", "rec.cites-case"),
+    exclude: { deductions: ["ded.notification-mismatch"] },
   },
   {
-    name: "ev.bank-app shows the app citation (scam.app-check)",
-    add: { evidence: ["ev.bank-app"], flags: [] },
-    observe: optionsAt("dlg.scam-call", "scam.app-check"),
-    exclude: { evidence: ["ev.bank-app"], flags: [] },
+    name: "ded.same-source shows the case challenge at rec.procedure",
+    add: { deductions: ["ded.same-source"] },
+    observe: optionsAt("dlg.recovery", "rec.procedure"),
+    exclude: { deductions: ["ded.same-source"] },
   },
   {
-    name: "ev.bank-card shows the number challenge (scam.knows-details)",
-    add: { evidence: ["ev.bank-card"], flags: [] },
-    observe: optionsAt("dlg.scam-call", "scam.knows-details"),
-    exclude: { evidence: ["ev.bank-card", "ev.bank-letter"], flags: [] },
+    name: "ded.notification-mismatch shows the number challenge at rec.pressure",
+    add: { deductions: ["ded.notification-mismatch"] },
+    observe: optionsAt("dlg.recovery", "rec.pressure"),
+    exclude: { deductions: ["ded.notification-mismatch"] },
   },
   {
-    name: "ev.bank-letter shows the number challenge (scam.identity)",
-    add: { evidence: ["ev.bank-letter"], flags: [] },
-    observe: optionsAt("dlg.scam-call", "scam.identity"),
-    exclude: { evidence: ["ev.bank-card", "ev.bank-letter"], flags: [] },
+    name: "official_channel_verified changes the recovery start node",
+    add: { flags: [VERIFIED] },
+    observe: startNodeOf("dlg.recovery"),
+    exclude: { flags: [VERIFIED] },
   },
   {
-    name: "asked_time changes the callback start node",
-    add: { evidence: [], flags: ["asked_time"] },
-    observe: startNodeOf("dlg.callback"),
-    exclude: { evidence: [], flags: ["asked_time"] },
+    name: "ded.same-source changes the recovery start node",
+    add: { deductions: ["ded.same-source"] },
+    observe: startNodeOf("dlg.recovery"),
+    exclude: { deductions: ["ded.same-source"], flags: [VERIFIED] },
   },
   {
-    name: "heard_deadline shows story-changed in the callback",
-    add: { evidence: [], flags: ["heard_deadline"] },
-    observe: optionsAt("dlg.callback", "callback.open"),
-    exclude: { evidence: [], flags: ["heard_deadline"] },
+    name: "notification_origin_inspected changes the recovery start node",
+    add: { flags: ["notification_origin_inspected"] },
+    observe: startNodeOf("dlg.recovery"),
+    exclude: { deductions: ["ded.same-source"], flags: [VERIFIED, "notification_origin_inspected"] },
   },
   {
-    name: "ev.official-confirmation shows i-called-bank in the callback",
-    add: { evidence: ["ev.official-confirmation"], flags: [] },
-    observe: optionsAt("dlg.callback", "callback.open"),
-    exclude: { evidence: ["ev.official-confirmation"], flags: [] },
-  },
-  {
-    name: "ev.official-confirmation shows bank-said-no in the follow-up",
-    add: { evidence: ["ev.official-confirmation"], flags: [] },
-    observe: optionsAt("dlg.followup", "followup.open"),
-    exclude: { evidence: ["ev.official-confirmation"], flags: [] },
-  },
-  {
-    name: "code_shared changes the follow-up start node",
-    add: { evidence: [], flags: ["code_shared"] },
-    observe: startNodeOf("dlg.followup"),
-    exclude: { evidence: [], flags: ["code_shared"] },
-  },
-  {
-    name: "code_shared changes the callback options",
-    add: { evidence: [], flags: ["code_shared"] },
-    observe: optionsAt("dlg.callback", "callback.open"),
-    exclude: { evidence: [], flags: ["code_shared"] },
-  },
-  {
-    name: "ev.caller-number shows read-number on the official line",
-    add: { evidence: ["ev.caller-number"], flags: [] },
-    observe: optionsAt("dlg.official-line", "official.numbers"),
-    exclude: { evidence: ["ev.caller-number"], flags: [] },
-  },
-  {
-    name: "ev.caller-number shows the first report option",
-    add: { evidence: ["ev.caller-number"], flags: [] },
-    observe: optionsAt("dlg.official-line", "official.report-intro"),
-    exclude: { evidence: ["ev.caller-number"], flags: [] },
-  },
-  {
-    name: "otp_sent shows the second report option",
-    add: { evidence: [], flags: ["otp_sent"] },
-    observe: optionsAt("dlg.official-line", "official.report-intro"),
-    exclude: { evidence: [], flags: ["otp_sent"] },
-  },
-  {
-    name: "followup_rang unlocks ev.second-number",
-    add: { evidence: [], flags: ["followup_rang"] },
-    observe: inspectable("ev.second-number"),
-    exclude: { evidence: ["ev.second-number"], flags: ["followup_rang"] },
-  },
-  {
-    name: "case_sms_sent unlocks ev.case-sms",
-    add: { evidence: [], flags: ["case_sms_sent"] },
-    observe: inspectable("ev.case-sms"),
-    exclude: { evidence: ["ev.case-sms"], flags: ["case_sms_sent"] },
+    name: "review_security_opened changes the recovery start node",
+    add: { flags: ["review_security_opened"] },
+    observe: startNodeOf("dlg.recovery"),
+    exclude: {
+      deductions: ["ded.same-source"],
+      flags: [VERIFIED, "notification_origin_inspected", "review_security_opened"],
+    },
   },
 ];
 
-describe.skip("Property 5: links in 'Where earlier choices change later dialogue'", () => {
-  it("lists at least eleven distinct links", () => {
-    expect(LINKS.length).toBeGreaterThanOrEqual(11);
-  });
-
-  it("adding the named evidence or flag changes the options, start node or unlock, in any context", () => {
-    // Feature: chapter-01-voice-narrative, Property 5: Evidence-conditioned options are deterministic and local
+describe("Condition-driven dialogue options: links from earlier choices to later dialogue", () => {
+  it("adding the named flag or deduction changes the options or the start node, in any context", () => {
+    // Feature: chapter-01-double-deception, Property: Condition-driven dialogue options are deterministic and local
+    expect(LINKS.length).toBeGreaterThanOrEqual(8);
     for (const [linkIndex, link] of LINKS.entries()) {
-      const contextEvidence = EVIDENCE_IDS.filter((id) => !link.exclude.evidence.includes(id));
-      const contextFlags = FLAG_IDS.filter((id) => !link.exclude.flags.includes(id));
+      const contextFlags = FLAG_IDS.filter((id) => !(link.exclude.flags ?? []).includes(id));
+      const contextDeductions = DEDUCTION_IDS.filter((id) => !(link.exclude.deductions ?? []).includes(id));
+      const contextEvidence = EVIDENCE_IDS.filter((id) => !(link.exclude.evidence ?? []).includes(id));
       for (let index = 0; index < CORE_PROPERTY_RUNS; index += 1) {
         const seed = caseSeed((SEED ^ Math.imul(linkIndex + 1, 0x1f1f)) >>> 0, index);
         const next = createLcg(seed);
-        const evidence = subset(next, contextEvidence);
-        const flags = subset(next, contextFlags);
-        const before = link.observe(evidence, flags);
-        const after = link.observe([...evidence, ...link.add.evidence], [...flags, ...link.add.flags]);
+        const context: Context = {
+          evidence: subset(next, contextEvidence),
+          flags: subset(next, contextFlags),
+          deductions: subset(next, contextDeductions),
+        };
+        const added: Context = {
+          evidence: [...context.evidence, ...(link.add.evidence ?? [])],
+          flags: [...context.flags, ...(link.add.flags ?? [])],
+          deductions: [...context.deductions, ...(link.add.deductions ?? [])],
+        };
+        const before = link.observe(context);
+        const after = link.observe(added);
         if (before === after) {
           fail(
-            "Property 5",
+            "conditionedOptions",
             seed,
             index,
-            `link "${link.name}" changed nothing (${before}); context evidence=${JSON.stringify(evidence)} flags=${JSON.stringify(flags)}`,
+            `link "${link.name}" changed nothing (${before}); context ${JSON.stringify(context)}`,
           );
         }
         // Determinism: the same inputs give the same observation.
-        if (link.observe(evidence, flags) !== before) {
-          fail("Property 5", seed, index, `link "${link.name}" is not deterministic`);
+        if (link.observe(context) !== before) {
+          fail("conditionedOptions", seed, index, `link "${link.name}" is not deterministic`);
         }
       }
     }

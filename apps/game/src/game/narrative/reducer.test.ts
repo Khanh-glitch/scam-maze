@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 
 import { FIXTURE_SCENARIO, fixtureState, withEvidence, withFlags } from "../../test/fixtureScenario";
+import { CHAPTER_1_SCENARIO } from "./chapter1/scenario";
 import { beatTag } from "./beats";
 import { OBJECTIVE_CONDITION_NOT_MET } from "./objectives";
 import { chapterReducer, createInitialState, isCoreAction, REASONS } from "./reducer";
@@ -204,7 +205,7 @@ describe("chapterReducer transitions", () => {
     expect(state.call.status).toBe("declined");
     expect(state.call.log[0].status).toBe("declined");
     expect(state.flags.first_call_rejected).toBe(true);
-    expectRejected(state, RING_ALEX, REASONS.callNotYet);
+    expectRejected(state, RING_ALEX, REASONS.callAlreadyRang);
   });
 
   it("END_CALL hangs up an active call, archives the conversation and records hung-up", () => {
@@ -470,5 +471,21 @@ describe("VERIFY_CLAIM", () => {
   it("bank-app keeps a contradicted status from the official line", () => {
     const verified = play(withNumber(afterAlex()), [OFFICIAL, option("off.ask"), { type: "OPEN_PHONE" }, BANK_APP]);
     expect(verified.claims["claim.recovery-needed"]).toBe("contradicted");
+  });
+});
+
+describe("RING_CALL rings at most once (regression)", () => {
+  it("rejects a re-ring of a declined call so the first call stays closed", () => {
+    const phoneOpen = play(createInitialState(CHAPTER_1_SCENARIO), [
+      START,
+      { type: "RING_CALL", callId: "call.alex", reason: "exploration-timer" },
+      { type: "OPEN_PHONE" },
+      END_CALL,
+    ], CHAPTER_1_SCENARIO);
+    const result = chapterReducer(phoneOpen, { type: "RING_CALL", callId: "call.alex", reason: "re-ring" }, CHAPTER_1_SCENARIO);
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toBe(REASONS.callAlreadyRang);
+    expect(result.state).toBe(phoneOpen);
+    expect(phoneOpen.call.log.find((r) => r.callId === "call.alex")?.status).toBe("declined");
   });
 });

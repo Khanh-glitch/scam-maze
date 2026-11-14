@@ -9,7 +9,7 @@ import { matchDeduction } from "./deductions";
 import { availableOptions } from "./dialogueEngine";
 import { chapterReducer, createInitialState } from "./reducer";
 import { enumerateCandidateActions } from "./selectors";
-import type { ChapterState, CoreAction, Effect, ScenarioDefinition } from "./types";
+import type { ChapterState, CoreAction, Effect, NpcDef, ScenarioDefinition } from "./types";
 
 /** Default state budget (design.md "Reachability solver"). */
 export const DEFAULT_MAX_STATES = 100_000;
@@ -57,6 +57,16 @@ function negatedFlags(scenario: ScenarioDefinition): Set<string> {
     if (value === null || typeof value !== "object") return;
     const record = value as Record<string, unknown>;
     if (record.kind === "notFlag" && typeof record.flag === "string") found.add(record.flag);
+    // A flag read by `startNodeWhen` picks the first matching start node, so setting it early can
+    // hide a later start node (for example a call that begins "blank" because nothing was opened).
+    if (Array.isArray(record.startNodeWhen)) {
+      for (const entry of record.startNodeWhen as Array<{ when?: unknown }>) {
+        if (!Array.isArray(entry.when)) continue;
+        for (const cond of entry.when as Array<Record<string, unknown>>) {
+          if (cond.kind === "flag" && typeof cond.flag === "string") found.add(cond.flag);
+        }
+      }
+    }
     for (const child of Object.values(record)) walk(child);
   };
   walk(scenario);
@@ -156,13 +166,17 @@ function stateKey(state: ChapterState, flags: readonly string[]): string {
     [...state.deductions].sort(),
     [...state.objectives.completed].sort(),
     // Beats that fired, and device actions that were done (a `once` action leaves the candidate list).
-    state.events
-      .flatMap((entry) =>
-        entry.derived.debriefTags.filter((tag) => tag.startsWith(BEAT_TAG_PREFIX)).concat(
-          entry.action.type === "DEVICE_ACTION" ? [`device:${entry.action.deviceActionId}`] : [],
+    // A set: repeating a device action that is not `once` (for example reopening the notification)
+    // must not create a new state, or the search never ends.
+    [
+      ...new Set(
+        state.events.flatMap((entry) =>
+          entry.derived.debriefTags.filter((tag) => tag.startsWith(BEAT_TAG_PREFIX)).concat(
+            entry.action.type === "DEVICE_ACTION" ? [`device:${entry.action.deviceActionId}`] : [],
+          ),
         ),
-      )
-      .sort(),
+      ),
+    ].sort(),
   ]);
 }
 
@@ -200,6 +214,26 @@ function branchingMoves(
     (action) =>
       !isFreeAction(action, scenario, negated) && action.type !== "CLOSE_PHONE" && action.type !== "FINISH_CHAPTER",
   );
+}
+
+/**
+ * Narration graphs (`dlg.intro`, `dlg.aftermath`): every node is a terminal node without options,
+ * and no call or NPC uses the graph. The presentation layer plays their nodes in a fixed order
+ * through the voice player (design Q6), so the dialogue engine never enters them. A graph with
+ * any option, or one that a call or an NPC starts, is real dialogue and is always checked.
+ */
+export function playbackOnlyGraphIds(scenario: ScenarioDefinition): string[] {
+  const used = new Set<string>([
+    ...Object.values(scenario.calls).map((call) => call.graphId),
+    ...(Object.values(scenario.npcs) as NpcDef[]).map((npc) => npc.graphId),
+  ]);
+  return Object.values(scenario.dialogues)
+    .filter(
+      (graph) =>
+        !used.has(graph.id) &&
+        Object.values(graph.nodes).every((node) => node.options.length === 0 && node.end !== undefined),
+    )
+    .map((graph) => graph.id);
 }
 
 /**
@@ -304,7 +338,10 @@ export function analyzeReachability(
 
   const allNodes: string[] = [];
   const allOptions: string[] = [];
+  const playbackOnly = new Set(playbackOnlyGraphIds(scenario));
   for (const graph of Object.values(scenario.dialogues)) {
+    // Narration is played by the presentation layer, never entered as a conversation.
+    if (playbackOnly.has(graph.id)) continue;
     for (const node of Object.values(graph.nodes)) {
       allNodes.push(node.id);
       for (const option of node.options) allOptions.push(option.id);

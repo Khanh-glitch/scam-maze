@@ -96,13 +96,6 @@ function memoByState<R>(
   };
 }
 
-/** True when the call was picked up before (answered, or answered and ended). */
-function wasAnswered(state: ChapterState, callId: CallId): boolean {
-  return state.call.log.some(
-    (record) => record.callId === callId && (record.status === "answered" || record.status === "ended"),
-  );
-}
-
 function hasRung(state: ChapterState, callId: CallId): boolean {
   return state.call.log.some((record) => record.callId === callId);
 }
@@ -787,12 +780,12 @@ export function enumerateCandidateActions(
       actions.push({ type: "TALK_TO_NPC", npcId: id });
     }
 
-    // Calls: mirror the reducer (not picked up before, `ringWhen` holds, no decision).
+    // Calls: mirror the reducer (never rang before, `ringWhen` holds, no decision).
     if (state.decision === null) {
       for (const id of incomingCallIds(scenario)) {
-        if (wasAnswered(state, id)) continue;
+        if (hasRung(state, id)) continue;
         if (!scenario.calls[id].ringWhen.some((all) => evaluateConditions(all, state, scenario))) continue;
-        const reason = hasRung(state, id) ? "re-ring" : state.interacted.length > 0 ? "first-interaction" : "callback";
+        const reason = state.interacted.length > 0 ? "first-interaction" : "callback";
         actions.push({ type: "RING_CALL", callId: id, reason });
       }
     }

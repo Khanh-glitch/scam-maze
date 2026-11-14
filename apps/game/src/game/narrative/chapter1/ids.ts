@@ -56,6 +56,7 @@ export const DIALOGUE_GRAPH_IDS = [
   "dlg.recovery",
   "dlg.official-line",
   "dlg.aftermath",
+  "dlg.intro",
 ] as const;
 export type DialogueGraphId = (typeof DIALOGUE_GRAPH_IDS)[number];
 
@@ -73,6 +74,10 @@ export const FLAG_IDS = [
   "alex_request_heard",
   /** Layer 1 harm, an explicit choice. */
   "code_shared",
+  /** The voicemail record exists (set by a beat). */
+  "voicemail_delivered",
+  /** The call summary record exists (set by a beat). */
+  "call_summary_delivered",
   /** The laptop notification exists (set by a beat). */
   "notification_delivered",
   "notification_opened",
