@@ -243,6 +243,12 @@ export class AudioEngine {
     this.tone(e.input, 1900, 0.03, 0.08);
     this.burst(e.input, { f: 1400, q: 3, dur: 0.02, vol: 0.25, delay: 0.045 });
   }
+  /** Short two-note notification sound at the laptop. */
+  chime() {
+    const e = this.emit.laptop; if (!e || !this.started || this.ctx.state === 'closed') return;
+    this.tone(e.input, 880, 0.35, 0.18);
+    this.tone(e.input, 1318, 0.5, 0.14, 0.12);
+  }
   doorClose() {
     const e = this.emit.door; if (!e) return;
     this.burst(e.input, { f: 90, type: 'lowpass', dur: 0.5, vol: 1.2, buf: this.brown });
@@ -289,5 +295,9 @@ export class AudioEngine {
   tick(..._args: unknown[]): void {}
   /** Silences (or restores) everything the room plays. */
   setMuted(muted: boolean) { this.listener.setMasterVolume(muted ? 0 : 1); }
-  dispose() { this.timers.forEach(clearTimeout); this.ctx.close(); }
+  dispose() {
+    this.timers.forEach(clearTimeout);
+    this.timers.length = 0;
+    if (this.ctx.state !== 'closed') void this.ctx.close().catch(() => {});
+  }
 }

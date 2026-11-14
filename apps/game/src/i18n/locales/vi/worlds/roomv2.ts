@@ -140,6 +140,7 @@ const roomv2: LocaleShape<typeof en> = {
         umbrella: "Cây dù",
         door: "Cửa ra vào",
         doorLeave: "Rời khỏi phòng",
+        doorLocked: "Cửa ra vào (đã khóa)",
         seatedHint: "Nhấn phím bất kỳ di chuyển / E để đứng dậy",
       },
       action: {
