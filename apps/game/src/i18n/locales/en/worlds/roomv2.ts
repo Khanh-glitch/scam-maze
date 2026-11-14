@@ -142,6 +142,9 @@ const roomv2 = {
         doorLeave: "Leave the room",
         doorLocked: "Front door (locked)",
         seatedHint: "Press any movement key / E to stand up",
+        phoneRecords: "Open the phone records",
+        laptopUse: "Use the laptop",
+        doorBusy: "Front door (finish what you are doing first)",
       },
       action: {
         back: "Back",

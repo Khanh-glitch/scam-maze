@@ -141,6 +141,10 @@ const roomv2: LocaleShape<typeof en> = {
         door: "Cửa ra vào",
         doorLeave: "Rời khỏi phòng",
         doorLocked: "Cửa ra vào (đã khóa)",
+        // Vietnamese text added in task 11.1 (English copy until then).
+        phoneRecords: "Open the phone records",
+        laptopUse: "Use the laptop",
+        doorBusy: "Front door (finish what you are doing first)",
         seatedHint: "Nhấn phím bất kỳ di chuyển / E để đứng dậy",
       },
       action: {

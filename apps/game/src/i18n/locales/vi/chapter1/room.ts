@@ -1,0 +1,98 @@
+// Vietnamese text added in task 11.1 (English copy until then).
+import type en from "../../en/chapter1/room";
+import type { LocaleShape } from "../../../types";
+const room: LocaleShape<typeof en> = {
+  room: {
+    laptop: {
+      badge: {
+        new: "New",
+        opened: "Opened",
+      },
+      headline: {
+        new: "Security alert: unusual account activity",
+        opened: "Security alert: opened",
+      },
+    },
+    prompt: {
+      phoneRinging: "Answer the call",
+      phoneDecline: "Decline the call",
+      phoneRecords: "Open the phone records",
+      laptopUse: "Use the laptop",
+      doorLocked: "The door is locked for now.",
+      doorBusy: "Finish what you are doing first.",
+    },
+    records: {
+      heading: "Phone records",
+      dialogLabel: "Phone records",
+      close: "Close the phone records",
+      tabs: {
+        calls: "Calls",
+        messages: "Messages",
+        voicemail: "Voicemail",
+      },
+      calls: {
+        heading: "Call history",
+        empty: "No calls yet.",
+        incoming: "Incoming",
+        outgoing: "Outgoing",
+        missed: "Missed",
+        declined: "Declined",
+        answered: "Answered",
+        row: "{{name}} · {{number}} · {{time}}",
+        detailsHeading: "Call details",
+        detailsOpen: "Open the call details",
+        callerIdLabel: "Number shown",
+        durationLabel: "Duration",
+        summaryLabel: "Call summary",
+      },
+      messages: {
+        heading: "Messages",
+        empty: "No messages.",
+        unread: "Unread",
+      },
+      voicemail: {
+        heading: "Voicemail",
+        empty: "No voicemail.",
+        summary: "Voicemail",
+        recordOpen: "Open the record of the first call",
+      },
+      back: "Back",
+      callSaved: {
+        called: "You called the saved contact.",
+        label: "Call the saved contact",
+        unavailable: "No saved contact is available yet.",
+        hint: "This calls the number you saved before tonight.",
+      },
+      numbersPlain: "Numbers are shown as plain text.",
+    },
+    objectiveToast: {
+      new: "New objective: {{objective}}",
+      done: "Objective complete: {{objective}}",
+      hintLabel: "Hint",
+    },
+    hints: {
+      heading: "Hint",
+      show: "Show a hint",
+      hide: "Hide the hint",
+      none: "No hint is available right now.",
+      answerOrDecline: "A call is coming in. You can answer it or decline it.",
+      checkLaptop: "Something new may have reached your laptop.",
+      investigate: "Look at the note, the receipts, the calendar, the phone records and the laptop.",
+      answerRecovery: "Another call may come in. You can answer or decline it.",
+      decide: "When you are ready, open the decision panel and choose what to do.",
+      review: "Read the debrief to see how the events connect.",
+    },
+    ending: {
+      transitionLabel: "Chapter ending",
+      transitionLine: "The room is quiet again.",
+      continue: "See what happened",
+      skip: "Skip",
+      simulation: "This was a simulation.",
+    },
+    status: {
+      overlayOpen: "An overlay is open. Press Escape to close it.",
+      callActive: "A call is in progress.",
+    },
+  },
+};
+export default room;
