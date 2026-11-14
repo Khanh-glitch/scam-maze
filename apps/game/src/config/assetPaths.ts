@@ -39,5 +39,10 @@ export const STREET_PROPS_GLB = "/assets/3d/optimized/street-props.optimized.glb
  * (Meshopt, produced by scripts/optimize-bike-rider.cjs).
  */
 export const BIKE_RIDER_GLB = "/assets/3d/optimized/bike-rider.optimized.glb";
+/**
+ * Folder of the animated character models (skinned, Meshopt + WebP, produced by
+ * scripts/optimize-characters.cjs). The files are listed in features/khupho/world/humans.ts.
+ */
+export const CHARACTERS_GLB_BASE = "/assets/3d/optimized/characters";
 /** Base URL of the prologue voice clips: `<base>/<locale>/prologue_home<n>_<locale>.mp3` (locale is `en` or `vi`). */
 export const PROLOGUE_VOICE_BASE = "/audio/prologue";
