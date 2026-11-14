@@ -30,6 +30,11 @@ export interface HumanModelSpec {
   clipsFrom?: 'juno3' | 'rowan';
   /** The model has separate clothing meshes (`Asset_top_`, `Asset_bottom_`, `Asset_shoes_`) that `spawn` can recolor. */
   outfit?: boolean;
+  /**
+   * Fit the black sunglasses accessory (scripts/optimize-characters.cjs) onto the eyes; skipped when
+   * the model already wears glasses. The street NPCs' eyes have no iris, so they all wear them (owner).
+   */
+  glasses?: boolean;
   /** Clip name for each role this model supports. */
   clips: Partial<Record<HumanRole, string>> & { idle: string };
   /**
@@ -57,19 +62,67 @@ export const HUMAN_MODELS = {
   npcLinMei: street('npc-linmei.optimized.glb'),
   npcNapole: street('npc-napole.optimized.glb'),
   npcYoshida: street('npc-yoshida.optimized.glb'),
+  // `_dontchangecolor` in the source name: keeps the authored clothing colors.
+  npcBlackGuy: { ...street('npc-blackguy.optimized.glb'), outfit: false },
+  npcFreya: street('npc-freya.optimized.glb'),
+  npcNguoiGia: street('npc-nguoigia.optimized.glb'),
+  npcSofia: street('npc-sofia.optimized.glb'),
 } satisfies Record<string, HumanModelSpec>;
 
 export type HumanModelId = keyof typeof HUMAN_MODELS;
 
 function street(file: string): HumanModelSpec {
-  return { file, clips: { idle: 'idle', walk: 'walk', wave: 'wave' }, clipsFrom: 'juno3', outfit: true };
+  return { file, clips: { idle: 'idle', walk: 'walk', wave: 'wave' }, clipsFrom: 'juno3', outfit: true, glasses: true };
 }
 
 /** Clothing parts `spawn` can recolor, by mesh name. */
 export type OutfitPart = 'top' | 'bottom' | 'shoes';
-const OUTFIT_PART: Record<OutfitPart, RegExp> = { top: /^Asset_top_/, bottom: /^Asset_bottom_/, shoes: /^Asset_shoes_/ };
+const OUTFIT_PART: Record<OutfitPart, RegExp> = { top: /^Asset_(top|fullbody)_/, bottom: /^Asset_bottom_/, shoes: /^Asset_shoes_/ };
 /** Small face parts hidden past DETAIL_DISTANCE (fewer draws for people walking far away). */
-const DETAIL_PART = /^Asset_(eyes|eyebrows|eyelashes)_/;
+const DETAIL_PART = /^Asset_(eyes|eyebrows|eyelashes|glasses)_/;
+/** Sunglasses fitted onto models with `glasses: true`. */
+const SUNGLASSES_FILE = 'accessory-sunglasses.optimized.glb';
+
+/** World-space box of a mesh at rest (skinned meshes include their bind pose). */
+function restBox(mesh: THREE.Mesh): THREE.Box3 {
+  mesh.geometry.computeBoundingBox();
+  if ((mesh as THREE.SkinnedMesh).isSkinnedMesh) (mesh as THREE.SkinnedMesh).computeBoundingBox();
+  const box = ((mesh as THREE.SkinnedMesh).isSkinnedMesh ? (mesh as THREE.SkinnedMesh).boundingBox : mesh.geometry.boundingBox)!.clone();
+  return box.applyMatrix4(mesh.matrixWorld);
+}
+
+/**
+ * Adds a copy of the sunglasses to `scene`, scaled by the eye width ratio and centered on the eyes,
+ * attached to the head bone so it follows every head turn. Returns false when it cannot be fitted.
+ */
+function fitGlasses(scene: THREE.Object3D, glasses: THREE.Mesh): boolean {
+  let eyes: THREE.Mesh | undefined, head: THREE.Object3D | undefined, worn = false;
+  scene.traverse((o) => {
+    if ((o as THREE.Mesh).isMesh && /^Asset_eyes_/.test(o.name)) eyes = o as THREE.Mesh;
+    if ((o as THREE.Mesh).isMesh && /^Asset_glasses_/.test(o.name)) worn = true;
+    if ((o as THREE.Bone).isBone && o.name === 'head') head = o;
+  });
+  if (worn) return true;
+  const ref = glasses.userData as { eyeCenter?: number[]; eyeWidth?: number };
+  if (!eyes || !head || !ref.eyeCenter || !ref.eyeWidth) return false;
+  scene.updateMatrixWorld(true);
+  const box = restBox(eyes), center = box.getCenter(new THREE.Vector3());
+  const k = (box.max.x - box.min.x) / ref.eyeWidth;
+  const src = new THREE.Vector3().fromArray(ref.eyeCenter);
+  // World transform: move the source eye center onto this model's, scaled about it.
+  const fit = new THREE.Matrix4().makeTranslation(center.x, center.y, center.z)
+    .multiply(new THREE.Matrix4().makeScale(k, k, k))
+    .multiply(new THREE.Matrix4().makeTranslation(-src.x, -src.y, -src.z))
+    .multiply(glasses.matrixWorld);
+  const copy = new THREE.Mesh(glasses.geometry, glasses.material);
+  copy.name = 'Asset_glasses_sunglasses';
+  copy.castShadow = false; copy.receiveShadow = true;
+  fit.decompose(copy.position, copy.quaternion, copy.scale);
+  scene.add(copy);
+  copy.updateMatrixWorld(true);
+  head.attach(copy);
+  return true;
+}
 /** Parts too small to matter in the shadow map. */
 const NO_SHADOW_PART = /^Asset_(eyes|eyebrows|eyelashes|shoes|glasses)_/;
 const DETAIL_DISTANCE = 12;
@@ -143,7 +196,21 @@ export class HumanLibrary {
     const wanted = new Set(ids);
     for (const id of ids) { const from = (HUMAN_MODELS[id] as HumanModelSpec).clipsFrom; if (from) wanted.add(from); }
     const loaded = new Map<HumanModelId, LoadedGltf>();
-    await Promise.all([...wanted].map(async (id) => {
+    let sunglasses: THREE.Mesh | null = null;
+    const needGlasses = ids.some((id) => (HUMAN_MODELS[id] as HumanModelSpec).glasses);
+    const glassesLoad = needGlasses
+      ? loader.loadAsync(`${CHARACTERS_GLB_BASE}/${SUNGLASSES_FILE}`).then((g) => {
+        g.scene.updateMatrixWorld(true);
+        g.scene.traverse((o) => { if (!sunglasses && (o as THREE.Mesh).isMesh) sunglasses = o as THREE.Mesh; });
+        // The fitting reference sits in the node's extras; GLTFLoader puts them on the node, the mesh may be a child.
+        if (sunglasses) {
+          let n: THREE.Object3D | null = sunglasses;
+          while (n && !(n.userData as { eyeWidth?: number }).eyeWidth) n = n.parent;
+          if (n && n !== sunglasses) Object.assign(sunglasses.userData, n.userData);
+        }
+      }).catch((err) => console.warn('[khupho] sunglasses failed to load', err))
+      : Promise.resolve();
+    await Promise.all([glassesLoad, ...[...wanted].map(async (id) => {
       const spec: HumanModelSpec = HUMAN_MODELS[id];
       try {
         const gltf = await loader.loadAsync(`${CHARACTERS_GLB_BASE}/${spec.file}`);
@@ -151,7 +218,7 @@ export class HumanLibrary {
       } catch (err) {
         console.warn(`[khupho] character "${id}" failed to load`, err);
       }
-    }));
+    })]);
     for (const id of ids) {
       const g = loaded.get(id);
       if (!g) continue;
@@ -164,6 +231,8 @@ export class HumanLibrary {
           mesh.receiveShadow = true;
         });
         scene.updateMatrixWorld(true);
+        const glassesMesh = sunglasses as THREE.Mesh | null;
+        if (spec.glasses && glassesMesh && !fitGlasses(scene, glassesMesh)) console.warn(`[khupho] ${id}: sunglasses could not be fitted`);
         let animations = g.animations;
         if (spec.clipsFrom) {
           const from = loaded.get(spec.clipsFrom);

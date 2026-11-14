@@ -41,6 +41,15 @@ with THREE.GLTFExporter r187): one 53-bone rig (`Root`, `pelvis`, `thigh_l`...),
 | `npc-napole` | `napole.glb` | 2 unnamed non-triangle meshes (debug lines and points) | 2.46 → 0.40 MB | 38,724 → 30,176 |
 | `npc-yoshida` | `yoshida.glb` | none | 2.46 → 0.42 MB | 42,163 → 33,615 |
 
+| `npc-blackguy` | `blackguy_dontchangecolor_new.glb` | none; keeps its authored clothing colors (`_dontchangecolor`) | 2.43 → 0.38 MB | 36,094 → 27,546 |
+| `npc-freya` | `freya_new.glb` | none (full-body tunic counts as the top) | 2.36 → 0.37 MB | 38,062 → 29,514 |
+| `npc-nguoigia` | `nguoigia_new.glb` | none (full-body kimono counts as the top) | 2.52 → 0.38 MB | 48,006 → 39,458 |
+| `npc-sofia` | `sofia_new.glb` | none | 3.14 → 0.52 MB | 60,806 → 52,258 |
+
+- Sunglasses: the eyes have no iris, so every street NPC wears black sunglasses (owner). The
+  `Asset_glasses_acc_round_sun` mesh of `lin_mei_removeHair.glb` is cut out into
+  `accessory-sunglasses.optimized.glb` (10 KB, 1,284 triangles) with the source eye center and width,
+  and fitted at load onto each NPC's eyes (scaled by eye width, attached to the `head` bone).
 - Materials: clearcoat, sheen and ior removed; eyebrows and eyelashes use alpha cutout; top,
   bottom and shoe textures made gray (mean 0.8 linear) with the factor rescaled, so the game can
   set clothing colors directly. Textures WebP, at most 512 px (the sources are 512 px or less).

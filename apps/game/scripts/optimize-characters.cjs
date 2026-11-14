@@ -48,8 +48,8 @@ const MAX_OUTPUT_BYTES = 5_242_880;
 const STREET_ALWAYS_REMOVE = [/^Asset_teeth_/, /^Asset_tongue_/];
 /** Street NPC parts whose blended alpha becomes a cutout. */
 const STREET_MASK = /^Asset_(eyebrows|eyelashes)_/;
-/** Street NPC parts the game recolors. */
-const STREET_TINT = /^Asset_(top|bottom|shoes)_/;
+/** Street NPC parts the game recolors (a full-body garment counts as the top). */
+const STREET_TINT = /^Asset_(top|fullbody|bottom|shoes)_/;
 /** Linear mean of a normalized tint texture (the factor carries the color). */
 const TINT_TEXTURE_MEAN = 0.8;
 const street = (id, file, remove = []) => ({ id, file: `street/${file}`, colorSize: 512, dataSize: 512, ratio: 1, street: true, remove });
@@ -66,6 +66,18 @@ const CHARACTERS = [
   street("npc-linmei", "lin_mei_removeHair.glb", [/^Asset_hair_/]),
   street("npc-napole", "napole.glb"),
   street("npc-yoshida", "yoshida.glb"),
+  street("npc-blackguy", "blackguy_dontchangecolor_new.glb"),
+  street("npc-freya", "freya_new.glb"),
+  street("npc-nguoigia", "nguoigia_new.glb"),
+  street("npc-sofia", "sofia_new.glb"),
+];
+
+/**
+ * Accessories cut out of a street NPC file and fitted onto the others at load (humans.ts). The
+ * node keeps the source's eye center and eye width (rest pose, meters) in its extras for fitting.
+ */
+const ACCESSORIES = [
+  { id: "accessory-sunglasses", file: "street/lin_mei_removeHair.glb", node: /^Asset_glasses_acc_round_sun$/, eyes: /^Asset_eyes_/ },
 ];
 
 const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
@@ -175,6 +187,37 @@ async function optimize(io, c) {
   if (bytes > MAX_OUTPUT_BYTES) throw new Error(`${c.id}: ${bytes} bytes is above the ${MAX_OUTPUT_BYTES} byte limit`);
 }
 
+/** Writes one accessory: only its node, unskinned, with the eye reference in its extras. */
+async function extractAccessory(io, a) {
+  const input = path.join(SRC, a.file);
+  const output = path.join(OUT, `${a.id}.optimized.glb`);
+  const doc = await io.read(input);
+  const root = doc.getRoot();
+  const eyesNode = root.listNodes().find((n) => n.getMesh() && a.eyes.test(n.getName()));
+  const keep = root.listNodes().find((n) => n.getMesh() && a.node.test(n.getName()));
+  if (!eyesNode || !keep) throw new Error(`${a.id}: accessory or eyes node not found in ${a.file}`);
+  const pos = eyesNode.getMesh().listPrimitives()[0].getAttribute("POSITION");
+  const min = pos.getMin([]), max = pos.getMax([]);
+  const eyeCenter = [0, 1, 2].map((k) => (min[k] + max[k]) / 2), eyeWidth = max[0] - min[0];
+  const scene = doc.createScene(a.id);
+  keep.setSkin(null);
+  for (const prim of keep.getMesh().listPrimitives()) { prim.setAttribute("JOINTS_0", null); prim.setAttribute("WEIGHTS_0", null); }
+  keep.setName(a.id).setExtras({ eyeCenter, eyeWidth });
+  for (const p of keep.listParents()) if (p.propertyType === "Node") p.removeChild(keep);
+  scene.addChild(keep);
+  for (const s of root.listScenes()) if (s !== scene) s.dispose();
+  for (const n of root.listNodes()) if (n !== keep) n.dispose();
+  for (const s of root.listSkins()) s.dispose();
+  for (const ext of root.listExtensionsUsed()) {
+    if (["KHR_materials_clearcoat", "KHR_materials_sheen", "KHR_materials_ior"].includes(ext.extensionName)) ext.dispose();
+  }
+  for (const m of root.listMaterials()) m.setExtras({});
+  root.setDefaultScene(scene);
+  await doc.transform(prune(), dedup(), weld({ tolerance: 0.0001 }), quantize(), reorder({ encoder: MeshoptEncoder }), meshopt({ encoder: MeshoptEncoder, level: "medium" }));
+  await io.write(output, doc);
+  console.log(`${a.id}: ${(fs.statSync(output).size / 1024).toFixed(1)} KB | triangles ${triangles(doc).toLocaleString("en-US")} | eye center [${eyeCenter.map((v) => v.toFixed(3)).join(", ")}], eye width ${eyeWidth.toFixed(3)}`);
+}
+
 async function main() {
   await Promise.all([MeshoptEncoder.ready, MeshoptSimplifier.ready]);
   fs.mkdirSync(OUT, { recursive: true });
@@ -184,9 +227,11 @@ async function main() {
   });
   const only = process.argv.slice(2);
   const list = only.length ? CHARACTERS.filter((c) => only.includes(c.id)) : CHARACTERS;
-  if (!list.length) throw new Error(`Unknown id. Known: ${CHARACTERS.map((c) => c.id).join(", ")}`);
+  const accessories = only.length ? ACCESSORIES.filter((a) => only.includes(a.id)) : ACCESSORIES;
+  if (!list.length && !accessories.length) throw new Error(`Unknown id. Known: ${[...CHARACTERS, ...ACCESSORIES].map((c) => c.id).join(", ")}`);
   console.log("=== SCAMMAZE CHARACTER OPTIMIZER ===");
   for (const c of list) await optimize(io, c);
+  for (const a of accessories) await extractAccessory(io, a);
 }
 
 main().catch((err) => {
