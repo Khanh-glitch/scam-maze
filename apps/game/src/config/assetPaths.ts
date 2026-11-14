@@ -44,5 +44,10 @@ export const BIKE_RIDER_GLB = "/assets/3d/optimized/bike-rider.optimized.glb";
  * scripts/optimize-characters.cjs). The files are listed in features/khupho/world/humans.ts.
  */
 export const CHARACTERS_GLB_BASE = "/assets/3d/optimized/characters";
+/**
+ * Folder of the street furniture and parked vehicle models (instanced in the neighborhood,
+ * produced by scripts/optimize-street-props.cjs). The files are listed in features/khupho/world/streetFurniture.ts.
+ */
+export const STREET_PROPS_MODELS_BASE = "/assets/3d/optimized/props";
 /** Base URL of the prologue voice clips: `<base>/<locale>/prologue_home<n>_<locale>.mp3` (locale is `en` or `vi`). */
 export const PROLOGUE_VOICE_BASE = "/audio/prologue";

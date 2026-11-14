@@ -50,6 +50,25 @@ const credits: LocaleShape<typeof en> = {
       notes:
         "Mô hình điện thoại cầm tay dùng cho các cuộc gọi. Bản đã tối ưu, đã bỏ hình nền và không có dấu hiệu thương hiệu nào.",
     },
+    plasticChairs: {
+      notes:
+        "Ghế đẩu thấp và ghế nhựa cao trên phố trong khu phố. Đã giảm lưới và chuyển sang Meshopt + WebP. Ghế cao: https://sketchfab.com/3d-models/vietnamese-plastic-chair-efa69b6b78cc48248f758aec21369447",
+    },
+    plasticTableSet: {
+      notes: "Bộ bàn ghế nhựa trước các quán cà phê và quán phở trong khu phố. Đã giảm lưới và chuyển sang Meshopt.",
+    },
+    superCub: {
+      notes: "Xe máy đậu trên phố trong khu phố. Đã giảm lưới và chuyển sang Meshopt + WebP.",
+    },
+    fatBoyCruiser: {
+      notes: "Xe máy đậu trên phố trong khu phố. Đã giảm lưới và chuyển sang Meshopt + WebP.",
+    },
+    hondaCg125: {
+      notes: "Xe máy đậu trên phố trong khu phố. Đã giảm lưới và chuyển sang Meshopt + WebP; tệp gốc không được phân phối lại.",
+    },
+    parkedBikesUnattributed: {
+      notes: "Hai mô hình xe máy đậu được cung cấp không kèm thông tin tác giả hay giấy phép. Logo thương hiệu và biển số của chiếc xe tay ga đã được gỡ bỏ.",
+    },
     chapter1Voices: {
       notes:
         "Giọng tổng hợp cho lời thoại Chương 1: Microsoft David, Mark và Zira (en-US) và Microsoft An (vi-VN). Không sao chép giọng của người thật nào. Điều khoản phân phối lại cho âm thanh được tạo ra chưa được xác minh.",

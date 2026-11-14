@@ -211,6 +211,24 @@ Resolved:
 
 ## Task History
 
+### 2026-11-15 — Khupho: model stools, table sets and parked bikes; horn; seated NPCs; walkers avoid solids
+
+- **Objective:** owner requests: walkers went through the banh mi cart; the first bike held up by the player honks `horn.mp3` with pauses; tall plastic chair by the vendor; low stools replace the stools at the shops; fewer people inside the shops, swapped for the street NPC models; table sets at the shops with single stools under seated people; the elderly NPC 1.5 m tall; every decorative bike replaced by the supplied models, fewer of them, optimized.
+- **Completed:**
+  - `scripts/optimize-street-props.cjs`: 8 props (low stool, tall chair, table set, Super Cub, CG 125, Fat Boy, bobber, PCX); drops physical extensions, animations and the PCX brand-logo and plate textures, per-primitive Meshopt simplification (sloppy pass for dense parts, off for the thin-shell chair), palette + join, WebP 512. Sizes: e.g. tall chair 67.45 → 0.42 MB, CG 125 19.16 → 0.61 MB, PCX 13.63 → 0.30 MB.
+  - `streetFurniture.ts`: loads the props before the world is built; `Builder.prop` records placements, the furniture helpers (`stool`, new `tableSet`, parked `motorbike`) use them when the model loaded (procedural fallback otherwise, colliders kept); all placements drawn as `InstancedMesh` per material and 24 m chunk. The distance culler skips instanced meshes.
+  - Parked bikes: at most one per house (same random draws, so the layout is unchanged), variants weighted toward scooters and step-throughs; 18 bikes in the street now (before up to 2 per house). Inside-room bikes (garage, repair shop) use models too.
+  - Cafe/pho fronts and the alley tea stall use table sets; shop counter stools keep a 0.42 m seat (procedural shopkeepers sit there).
+  - People: shops keep only the shopkeeper resident; the two cafe customers and the alley tea-stall sitter are street NPC models (nguoigia, archetype, freya) sitting on single low stools with a new generated sit pose (`retarget.ts` `sitClip`, leg IK from the rig); nguoigia scaled to 1.5 m; the tall chair stands next to the vendor with a collider.
+  - Walkers (`PathFollower`): probe 0.55 m and 1.2 m ahead for solids and take the nearest clear side offset (up to 1.4 m), wait and turn back if none, and are pushed out of solids every frame; standing and seated people count as people to side-step.
+  - Bikes: only the first bike held up by the player honks (`horn.mp3`, first after 0.6-1.2 s, then every 4-6.5 s); `AudioSys.horn` plays the recording positionally.
+  - Credits (`config/credits.ts`, en/vi) for the CC-BY props and the bikes; `SOURCE.md` for furniture and parked bikes; bike sources and the 67 MB chair are git-ignored local files.
+- **Files:** `.gitignore`, `apps/game/scripts/optimize-street-props.cjs`, `apps/game/assets-src/{README.md,props/furniture/{ghelun,set_table_chair}.glb,props/furniture/SOURCE.md,vehicles/parked/SOURCE.md}`, `apps/game/public/assets/3d/optimized/props/*.optimized.glb`, `apps/game/public/audio/horn.mp3`, `apps/game/src/config/{assetPaths,credits}.ts`, `apps/game/src/i18n/locales/{en,vi}/credits.ts`, `apps/game/src/features/khupho/world/{streetFurniture,builder,furniture,neighborhood,rooms,people,humans,retarget,audio,engine,distanceCull}.ts`, this file.
+- **Validation:** `pnpm typecheck`, `pnpm build`, `vitest --run src/features/khupho src/features/prologue src/app src/config` (40 passed). Headless `/khupho`: 900 simulated steps, 0 frames with a walker inside a solid; a lane held up 60 s: 6 bikes queued, only the first honked (11 honks, 4.5-6 s apart); screenshots: vendor with the tall chair and a walker passing in front of the cart; two seated customers on low stools facing each other. Props render as 8 instanced kinds (bikes 82 draws in total, stools 6).
+- **Not verified:** real-GPU frame rate (props add ~400k triangles when every chunk is in view; chunks out of view are culled); the sit pose up close for every NPC; licenses of the bobber and PCX models (not stated); possible small badge details left in the CG 125 / Super Cub textures.
+- **Deviations:** the CG 125 source (Sketchfab Standard) is not committed. **Follow-up:** owner review of bike mix and counts.
+
+
 ### 2026-11-14 — Khupho: sunglasses on every street NPC, four more street NPCs
 
 - **Objective:** owner request: the street NPCs (not the first models) all wear black sunglasses because their eyes have no iris; add the `_new` files; `_dontchangecolor` keeps its clothing colors but also wears sunglasses.

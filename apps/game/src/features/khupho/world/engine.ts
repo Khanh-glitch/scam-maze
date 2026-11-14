@@ -26,6 +26,7 @@ import { CharacterAssetCache } from '../../player/runtime/CharacterAssetCache';
 import { loadStreetProps, STORY_SPAWN, type PlacedProp } from './streetProps';
 import { loadBikeRider } from './bikeRider';
 import { HumanLibrary } from './humans';
+import { loadStreetFurniture, placeStreetFurniture } from './streetFurniture';
 import { findHome, inDoorway, HOME_FLOOR } from './home';
 
 export interface Hud { time: string; hour: number; loc: string; prompt: string | null; indoor: boolean; fps: number; rain: number; sitting: string | null; tour: boolean; started: boolean; timeScale: number; muted: boolean; quality: string; weather: string; cursorMode: boolean }
@@ -174,6 +175,9 @@ export class Engine {
       const bikeRider = loadBikeRider().catch((err) => { console.warn('[khupho] bike rider failed to load', err); return null; });
       // Character models (vendor, sidewalk walkers) load the same way; a model that fails falls back to a procedural person.
       const humans = HumanLibrary.load().catch((err) => { console.warn('[khupho] characters failed to load', err); return null; });
+      // Stools, tables and parked bikes must be known before building: the builders record them instead of procedural ones.
+      await loadStreetFurniture().catch((err) => console.warn('[khupho] street furniture failed to load', err));
+      if (isCancelled()) return e;
       buildNeighborhood(e.ctx);
       e.home = findHome(e.houses);
       if (opts.story) e.player.teleport(STORY_SPAWN.x, STORY_SPAWN.z, STORY_SPAWN.yaw);
@@ -181,6 +185,7 @@ export class Engine {
       e.life = buildLife(e.ctx, e.houses, e.vehicles, e.audio, await bikeRider, await humans);
       report('optimize'); await yieldFrame(); if (isCancelled()) return e;
       e.optimizeStatic();
+      placeStreetFurniture(e.ctx.root);
       e.initLightsAndPost();
       report('props'); await yieldFrame(); if (isCancelled()) return e;
       e.propsReady = loadStreetProps(e.ctx).catch((err) => { console.warn('[khupho] street props failed to load', err); return [] as PlacedProp[]; });
