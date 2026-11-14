@@ -1,236 +1,251 @@
-// @ts-nocheck -- uses the old street-chapter IDs; rewritten when the scenario is assembled (spec chapter-01-double-deception, task 2.1 placeholder).
-// Re-enabled in task 9.x (phone records UI) once the scenario is assembled (all tests in this file are skipped until then).
-// Phone overlay tests (task 9.4). Requirements 7.2, 7.3, 7.4, 7.6 and 18.6.
+// Phone records overlay tests (spec chapter-01-double-deception, task 9.4; Requirements 5.5, 13.6).
 //
-// The components are driven by a real Chapter_Store and the real selectors, so every assertion
-// checks the same data path the Chapter_Page uses. The harness below mirrors the page wiring for
-// the phone overlay (callbacks dispatch Core_Actions). Calls are no longer shown in this overlay
-// (game-3d-phone-call-ui task 10.5); the 3D call screens have their own tests.
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import React, { useSyncExternalStore } from "react";
+// Device-action tests drive the overlay with hand-built selector views and a spy, because the
+// fixture scenario defines no phone device actions. The saved-contact tests use a real chapter
+// store, the fixture scenario and the real `selectPhoneRecords`.
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import React, { useState, useSyncExternalStore } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { CHAPTER_1_SCENARIO } from "../../../game/narrative/chapter1/scenario";
+import type { DeviceActionId } from "../../../game/narrative/chapter1/ids";
 import { createInitialState } from "../../../game/narrative/reducer";
-import { selectCallLog, selectPhoneMessages } from "../../../game/narrative/selectors";
-import { createChapterStore, type ChapterStore } from "../../../game/narrative/store";
-import type { ScenarioDefinition } from "../../../game/narrative/types";
-import { applyLocale } from "../../../i18n";
-import viPhone from "../../../i18n/locales/vi/chapter1/phone";
-import { getDisplayScenario } from "../../../i18n/narrative";
+import {
+  selectPhoneMessages,
+  selectPhoneRecords,
+  type CallLogEntryView,
+  type DeviceActionView,
+  type PhoneMessageView,
+  type PhoneRecordsView,
+} from "../../../game/narrative/selectors";
+import { createChapterStore } from "../../../game/narrative/store";
+import { FIXTURE_SCENARIO, withEvidence } from "../../../test/fixtureScenario";
 import { PhoneOverlay } from "./PhoneOverlay";
 
-function startedStore(): ChapterStore {
-  const store = createChapterStore(createInitialState());
-  expect(store.dispatch({ type: "START_CHAPTER" }).accepted).toBe(true);
-  expect(store.dispatch({ type: "OPEN_PHONE" }).accepted).toBe(true);
-  return store;
+const dialog = () => screen.getByRole("dialog", { name: "Phone" });
+
+function callEntry(callId: "call.alex" | "call.recovery", name: string, number: string): CallLogEntryView {
+  return {
+    callId,
+    direction: "incoming",
+    displayName: name,
+    number,
+    status: "declined",
+    ringCount: 1,
+    evidenceId: null,
+    evidenceRecorded: false,
+    evidenceAvailable: false,
+  };
 }
 
-/**
- * Phone overlay bound to a real store, wired like the Chapter_Page. `scenario` is the display
- * scenario (`getDisplayScenario(locale)`); it defaults to the canonical English scenario.
- */
-const PhoneHarness: React.FC<{
-  store: ChapterStore;
-  onInspect?: (id: string) => void;
-  scenario?: ScenarioDefinition;
-}> = ({ store, onInspect, scenario = CHAPTER_1_SCENARIO }) => {
-  const state = useSyncExternalStore(store.subscribe, store.getState);
+const VOICEMAIL: PhoneMessageView = {
+  id: "msg.alex-voicemail",
+  from: "Unknown caller",
+  body: "Case NG-4471-X is open. Call back on +000 0100 2200.",
+  unread: true,
+  evidenceId: "ev.alex-statement",
+  evidenceRecorded: false,
+};
+
+function actionView(id: DeviceActionId, done: boolean): DeviceActionView {
+  return { id, label: id, once: true, done, available: !done };
+}
+
+interface Setup {
+  calls: CallLogEntryView[];
+  actions: DeviceActionId[];
+  voicemail?: PhoneMessageView | null;
+}
+
+/** Overlay with hand-built records. A dispatched action turns into a `done` view, like the core. */
+const Harness: React.FC<{ setup: Setup; spy: (id: DeviceActionId) => void }> = ({ setup, spy }) => {
+  const [done, setDone] = useState<DeviceActionId[]>([]);
+  const records: PhoneRecordsView = {
+    calls: setup.calls,
+    voicemail: setup.voicemail ?? null,
+    summaries: [],
+    savedContact: null,
+    deviceActions: setup.actions.map((id) => actionView(id, done.includes(id))),
+  };
   return (
     <PhoneOverlay
-      messages={selectPhoneMessages(state, scenario)}
-      callLog={selectCallLog(state, scenario)}
-      bankApp={scenario.phone.bankApp}
-      onInspectEvidence={(evidenceId) => {
-        onInspect?.(evidenceId);
-        store.dispatch({ type: "INSPECT_EVIDENCE", evidenceId });
+      records={records}
+      messages={setup.voicemail ? [setup.voicemail] : []}
+      onInspectEvidence={() => undefined}
+      onDeviceAction={(id) => {
+        spy(id);
+        setDone((previous) => (previous.includes(id) ? previous : [...previous, id]));
       }}
-      onVerifyBankApp={() => store.dispatch({ type: "VERIFY_CLAIM", claimId: "claim.account-suspended", method: "bank-app" })}
-      onClose={() => store.dispatch({ type: "CLOSE_PHONE" })}
+      onCallSavedContact={() => undefined}
+      onClose={() => undefined}
     />
   );
 };
 
-const phoneDialog = () => screen.getByRole("dialog", { name: "Phone" });
+describe("PhoneOverlay call details and records", () => {
+  it("dispatches the call details action once and shows the details", () => {
+    const spy = vi.fn();
+    const calls = [callEntry("call.alex", "Unknown caller", "+000 0100 2200")];
+    render(<Harness setup={{ calls, actions: ["dev.open-call-details"] }} spy={spy} />);
 
-describe.skip("PhoneOverlay with a real chapter store", () => {
-  it("shows the urgent message as unread at the start (Requirement 7.2)", () => {
-    const store = startedStore();
-    expect(selectPhoneMessages(store.getState()).filter((m) => m.unread)).toHaveLength(1);
-    render(<PhoneHarness store={store} />);
+    fireEvent.click(within(dialog()).getByRole("button", { name: /Calls/ }));
+    expect(within(dialog()).getByText("+000 0100 2200")).toBeTruthy();
+    expect(within(dialog()).queryByText("Call details")).toBeNull();
 
-    const messagesButton = within(phoneDialog()).getByRole("button", { name: /Messages/ });
-    expect((messagesButton).textContent).toContain("1 unread");
-
-    fireEvent.click(messagesButton);
-    expect(within(phoneDialog()).getByText("Unread")).toBeTruthy();
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Open the call details" }));
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith("dev.open-call-details");
+    expect(within(dialog()).getByRole("heading", { name: "Call details" })).toBeTruthy();
+    expect(within(dialog()).queryByRole("button", { name: "Open the call details" })).toBeNull();
   });
 
-  it("opening the message dispatches INSPECT_EVIDENCE and records the evidence (Requirements 7.3, 7.4)", () => {
-    const store = startedStore();
-    const onInspect = vi.fn();
-    render(<PhoneHarness store={store} onInspect={onInspect} />);
+  it("shows Alex's record only after it is opened, dispatching once", () => {
+    const spy = vi.fn();
+    render(<Harness setup={{ calls: [], actions: ["dev.open-alex-record"], voicemail: VOICEMAIL }} spy={spy} />);
 
-    fireEvent.click(within(phoneDialog()).getByRole("button", { name: /Messages/ }));
-    const [message] = selectPhoneMessages(store.getState());
-    fireEvent.click(within(phoneDialog()).getByRole("button", { name: new RegExp(message.from) }));
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Voicemail" }));
+    expect(within(dialog()).queryByText(/Case NG-4471-X is open/)).toBeNull();
 
-    expect(onInspect).toHaveBeenCalledTimes(1);
-    expect(onInspect).toHaveBeenCalledWith("ev.sms-alert");
-    const state = store.getState();
-    expect(state.discovered).toContain("ev.sms-alert");
-    expect(state.phone.unread).toHaveLength(0);
-    // The body, with its look-alike domain, is shown as plain text.
-    expect(within(phoneDialog()).getByText(/northgate-secure-verify\.invalid/)).toBeTruthy();
-    expect(within(phoneDialog()).getByText("Recorded in your journal")).toBeTruthy();
-
-    // Reopening does not dispatch again.
-    fireEvent.click(within(phoneDialog()).getByRole("button", { name: "Back to messages" }));
-    fireEvent.click(within(phoneDialog()).getByRole("button", { name: new RegExp(message.from) }));
-    expect(onInspect).toHaveBeenCalledTimes(1);
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Open the record of the first call" }));
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith("dev.open-alex-record");
+    expect(within(dialog()).getByText(/Case NG-4471-X is open/)).toBeTruthy();
+    expect(within(dialog()).queryByRole("button", { name: "Open the record of the first call" })).toBeNull();
   });
 
-  it("renders no anchor elements in any app (Requirement 7.6)", () => {
-    const store = startedStore();
-    // Put an entry in the call history too, so the Calls app has content.
-    store.dispatch({ type: "RING_CALL", callId: "call.scam-1", reason: "first-interaction" });
-    store.dispatch({ type: "END_CALL" });
-    const { container } = render(<PhoneHarness store={store} />);
-    const dialog = phoneDialog();
+  it("offers the recovery call details only after that call rang", () => {
+    const spy = vi.fn();
+    const alex = callEntry("call.alex", "Unknown caller", "+000 0100 2200");
+    const recovery = callEntry("call.recovery", "Follow-up team", "+000 0100 7771");
+
+    // Before the recovery call rang: no log entry and no available action for it.
+    const { unmount } = render(<Harness setup={{ calls: [alex], actions: ["dev.open-call-details"] }} spy={spy} />);
+    fireEvent.click(within(dialog()).getByRole("button", { name: /Calls/ }));
+    expect(within(dialog()).queryByText("Follow-up team")).toBeNull();
+    expect(within(dialog()).getAllByRole("button", { name: "Open the call details" })).toHaveLength(1);
+    unmount();
+
+    render(
+      <Harness
+        setup={{ calls: [alex, recovery], actions: ["dev.open-call-details", "dev.open-recovery-details"] }}
+        spy={spy}
+      />,
+    );
+    fireEvent.click(within(dialog()).getByRole("button", { name: /Calls/ }));
+    const buttons = within(dialog()).getAllByRole("button", { name: "Open the call details" });
+    expect(buttons).toHaveLength(2);
+    // Newest first: the recovery call is the first entry.
+    fireEvent.click(buttons[0]);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith("dev.open-recovery-details");
+  });
+
+  it("renders no anchor elements in any app", () => {
+    const calls = [callEntry("call.alex", "Unknown caller", "+000 0100 2200")];
+    const { container } = render(
+      <Harness
+        setup={{ calls, actions: ["dev.open-call-details", "dev.open-alex-record"], voicemail: VOICEMAIL }}
+        spy={() => undefined}
+      />,
+    );
     const noAnchors = () => expect(container.querySelectorAll("a")).toHaveLength(0);
-
     noAnchors();
-    for (const app of [/Messages/, /Calls/, new RegExp(CHAPTER_1_SCENARIO.phone.bankApp.title)]) {
-      fireEvent.click(within(dialog).getByRole("button", { name: app }));
-      noAnchors();
-      for (const button of within(dialog).queryAllByRole("button")) {
-        if (/Back|Close/.test(button.textContent ?? "") || button.getAttribute("aria-label") === "Close phone") continue;
+    for (const app of [/Messages/, /Calls/, "Voicemail"]) {
+      fireEvent.click(within(dialog()).getByRole("button", { name: app }));
+      for (const button of within(dialog()).queryAllByRole("button")) {
+        if (button.getAttribute("aria-label") === "Close phone" || /Back/.test(button.textContent ?? "")) continue;
         fireEvent.click(button);
-        noAnchors();
       }
-      // Return to the home screen (the detail view has its own back button first).
-      const backToList = within(dialog).queryByRole("button", { name: "Back to messages" });
-      if (backToList) fireEvent.click(backToList);
-      const back = within(dialog).queryByRole("button", { name: "Back" });
-      if (back) fireEvent.click(back);
+      noAnchors();
+      fireEvent.click(within(dialog()).getByRole("button", { name: /Back/ }));
     }
+    // The old street bank app is gone.
+    expect(within(dialog()).queryByRole("button", { name: /Bank/ })).toBeNull();
   });
 
-  it("supports keyboard navigation: focus moves into the phone and apps are buttons (Requirement 18.6)", () => {
-    const store = startedStore();
-    render(<PhoneHarness store={store} />);
-    const dialog = phoneDialog();
+  it("supports keyboard operation: focus moves into the phone and every control is a native button", () => {
+    const spy = vi.fn();
+    const calls = [callEntry("call.alex", "Unknown caller", "+000 0100 2200")];
+    render(<Harness setup={{ calls, actions: ["dev.open-call-details"] }} spy={spy} />);
 
-    // Focus is moved to the phone heading on open.
-    expect(document.activeElement).toBe(within(dialog).getByRole("heading", { name: "Home", level: 2 }));
-
-    // Every control is a native, focusable button (Enter and Space activate native buttons).
-    const buttons = within(dialog).getAllByRole("button");
-    expect(buttons.length).toBeGreaterThanOrEqual(4);
-    for (const button of buttons) {
+    expect(document.activeElement).toBe(within(dialog()).getByRole("heading", { name: "Home", level: 2 }));
+    for (const button of within(dialog()).getAllByRole("button")) {
       expect(button.tagName).toBe("BUTTON");
       expect(button.getAttribute("type")).toBe("button");
       expect(button.tabIndex).toBe(0);
     }
 
-    const messagesButton = within(dialog).getByRole("button", { name: /Messages/ });
-    messagesButton.focus();
-    expect(document.activeElement).toBe(messagesButton);
-    fireEvent.keyDown(messagesButton, { key: "Enter" });
-    fireEvent.click(messagesButton); // the browser's activation of a focused button
-    expect(within(dialog).getByRole("heading", { name: "Messages", level: 2 })).toBeTruthy();
-    expect(document.activeElement).toBe(within(dialog).getByRole("heading", { name: "Messages", level: 2 }));
+    const callsButton = within(dialog()).getByRole("button", { name: /Calls/ });
+    callsButton.focus();
+    fireEvent.click(callsButton); // the browser's activation of a focused button
+    expect(document.activeElement).toBe(within(dialog()).getByRole("heading", { name: "Calls", level: 2 }));
 
-    fireEvent.click(within(dialog).getByRole("button", { name: "Close phone" }));
-    expect(store.getState().phone.open).toBe(false);
+    const open = within(dialog()).getByRole("button", { name: "Open the call details" });
+    open.focus();
+    expect(document.activeElement).toBe(open);
+    fireEvent.click(open);
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 });
 
-// game-i18n-en-vi task 7.6 (Requirements 8.2, 8.4, 9.10). Chrome comes from the `chapter1`
-// phone dictionary; names, bodies and dialogue come from the Vietnamese display scenario.
-// Numbers, domains and IDs stay the same as in English.
-describe.skip("Phone in Vietnamese", () => {
-  const VI = viPhone.phone;
-  const viScenario = () => getDisplayScenario("vi");
+describe("PhoneOverlay saved contact", () => {
+  const S = FIXTURE_SCENARIO;
 
-  function viStore(): ChapterStore {
-    applyLocale("vi");
-    return startedStore();
+  /** Chapter store at the start, the first call declined, optionally holding saved-contact evidence. */
+  function storeWith(evidence: Parameters<typeof withEvidence>[1]) {
+    const store = createChapterStore(createInitialState(S), S);
+    for (const action of [
+      { type: "START_CHAPTER" },
+      { type: "RING_CALL", callId: "call.alex", reason: "exploration-timer" },
+      { type: "END_CALL" },
+    ] as const) {
+      expect(store.dispatch(action).accepted).toBe(true);
+    }
+    if (evidence.length === 0) return store;
+    // Same state shape the reducer would produce after the evidence was discovered.
+    const seeded = createChapterStore(withEvidence(store.getState(), evidence), S);
+    return seeded;
   }
 
-  const viDialog = () => screen.getByRole("dialog", { name: VI.overlay.name });
+  const StoreHarness: React.FC<{ store: ReturnType<typeof createChapterStore> }> = ({ store }) => {
+    const state = useSyncExternalStore(store.subscribe, store.getState);
+    return (
+      <PhoneOverlay
+        records={selectPhoneRecords(state, S)}
+        messages={selectPhoneMessages(state, S)}
+        onInspectEvidence={() => undefined}
+        onDeviceAction={(deviceActionId) => store.dispatch({ type: "DEVICE_ACTION", deviceActionId })}
+        onCallSavedContact={(claimId) =>
+          store.dispatch({ type: "VERIFY_CLAIM", claimId, method: "saved-official-contact" })
+        }
+        onClose={() => store.dispatch({ type: "CLOSE_PHONE" })}
+        initialRoute="calls"
+      />
+    );
+  };
 
-  it("shows Vietnamese chrome, app names and the unread count", () => {
-    const store = viStore();
-    render(<PhoneHarness store={store} scenario={viScenario()} />);
-    const dialog = viDialog();
-
-    expect(within(dialog).getByRole("heading", { name: VI.routes.home, level: 2 })).toBeTruthy();
-    expect(within(dialog).getByRole("button", { name: VI.overlay.close })).toBeTruthy();
-    const messagesButton = within(dialog).getByRole("button", { name: new RegExp(VI.home.messages) });
-    expect(messagesButton.textContent).toContain("1 chưa đọc");
-    expect(within(dialog).getByRole("button", { name: VI.home.calls })).toBeTruthy();
-    expect(within(dialog).getByRole("button", { name: viScenario().phone.bankApp.title })).toBeTruthy();
-    expect(within(dialog).queryByText("Messages")).toBeNull();
+  it("hides Call saved contact until an independent contact is found", () => {
+    render(<StoreHarness store={storeWith([])} />);
+    expect(within(dialog()).queryByRole("button", { name: "Call the saved contact" })).toBeNull();
+    expect(within(dialog()).queryByText("+000 0100 0800")).toBeNull();
   });
 
-  it("opens the message with the Vietnamese body; the domain stays plain text", () => {
-    const store = viStore();
-    const scenario = viScenario();
-    const { container } = render(<PhoneHarness store={store} scenario={scenario} />);
-    const dialog = viDialog();
+  for (const evidenceId of ["ev.official-contact-paper", "ev.official-contact-app"] as const) {
+    it(`shows Call saved contact once ${evidenceId} is found and dispatches VERIFY_CLAIM`, () => {
+      const store = storeWith([evidenceId]);
+      const { container } = render(<StoreHarness store={store} />);
+      // The number is plain text.
+      expect(within(dialog()).getByText("+000 0100 0800")).toBeTruthy();
+      expect(container.querySelectorAll("a")).toHaveLength(0);
 
-    fireEvent.click(within(dialog).getByRole("button", { name: new RegExp(VI.home.messages) }));
-    expect(within(dialog).getByRole("heading", { name: VI.routes.messages, level: 2 })).toBeTruthy();
-    expect(within(dialog).getByText(VI.messages.unread)).toBeTruthy();
-
-    const viBody = scenario.phone.messages["msg.sms-alert"].body;
-    expect(viBody).not.toBe(CHAPTER_1_SCENARIO.phone.messages["msg.sms-alert"].body);
-    const [message] = selectPhoneMessages(store.getState(), scenario);
-    fireEvent.click(within(dialog).getByRole("button", { name: new RegExp(message.from) }));
-
-    expect(store.getState().discovered).toContain("ev.sms-alert");
-    expect(within(dialog).getByText(viBody)).toBeTruthy();
-    expect(within(dialog).getByText(/northgate-secure-verify\.invalid/)).toBeTruthy();
-    expect(within(dialog).getByText(VI.messages.recorded)).toBeTruthy();
-    expect(within(dialog).getByRole("button", { name: VI.messages.backToList })).toBeTruthy();
-    expect(container.querySelectorAll("a")).toHaveLength(0);
-  });
-
-  it("shows Vietnamese caller names and statuses in the call history; numbers unchanged", () => {
-    const store = viStore();
-    store.dispatch({ type: "RING_CALL", callId: "call.scam-1", reason: "first-interaction" });
-    store.dispatch({ type: "END_CALL" });
-    const scenario = viScenario();
-    const { container } = render(<PhoneHarness store={store} scenario={scenario} />);
-    const dialog = viDialog();
-
-    fireEvent.click(within(dialog).getByRole("button", { name: VI.home.calls }));
-    const [entry] = selectCallLog(store.getState(), scenario);
-    expect(entry.displayName).toBe(scenario.calls["call.scam-1"].displayName);
-    expect(entry.displayName).not.toBe(CHAPTER_1_SCENARIO.calls["call.scam-1"].displayName);
-    expect(within(dialog).getByText(entry.displayName)).toBeTruthy();
-    expect(within(dialog).getByText(CHAPTER_1_SCENARIO.calls["call.scam-1"].number)).toBeTruthy();
-    expect(within(dialog).getByText(new RegExp(VI.calls.status[entry.status]))).toBeTruthy();
-    expect(within(dialog).getByText(new RegExp(VI.calls.incoming))).toBeTruthy();
-    expect(within(dialog).getByRole("button", { name: VI.calls.inspectNumber })).toBeTruthy();
-    expect(container.querySelectorAll("a")).toHaveLength(0);
-  });
-
-  it("shows the bank app in Vietnamese; number and domain stay plain text", () => {
-    const store = viStore();
-    const scenario = viScenario();
-    const { container } = render(<PhoneHarness store={store} scenario={scenario} />);
-    const dialog = viDialog();
-
-    fireEvent.click(within(dialog).getByRole("button", { name: scenario.phone.bankApp.title }));
-    expect(within(dialog).getByRole("button", { name: VI.bank.back })).toBeTruthy();
-    for (const bankScreen of scenario.phone.bankApp.screens) {
-      expect(within(dialog).getByRole("heading", { name: bankScreen.title })).toBeTruthy();
-      expect(within(dialog).getByText(bankScreen.body)).toBeTruthy();
-    }
-    expect(within(dialog).getByText(/\+000 555 0100/)).toBeTruthy();
-    expect(within(dialog).getByText(/northgate\.example/)).toBeTruthy();
-    expect(container.querySelectorAll("a")).toHaveLength(0);
-  });
+      act(() => {
+        fireEvent.click(within(dialog()).getByRole("button", { name: "Call the saved contact" }));
+      });
+      const verify = store.getState().events.filter((entry) => entry.action.type === "VERIFY_CLAIM");
+      expect(verify).toHaveLength(1);
+      expect(verify[0].action).toEqual({
+        type: "VERIFY_CLAIM",
+        claimId: "claim.recovery-needed",
+        method: "saved-official-contact",
+      });
+    });
+  }
 });
