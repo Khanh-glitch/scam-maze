@@ -269,6 +269,19 @@ Resolved:
 - **Validation:** `pnpm typecheck`, `pnpm build`, `vitest run` (170 files, 1518 tests) pass. Headless Chrome (SwiftShader, no real frame rates) through New Game with `?skip-prologue`: the hidden phone canvas is mounted at room entry, before any call; when the call rings the host goes `pending` -> `model` with no `fallback` step (before: `pending` -> `fallback` at +203 ms -> `model` at +549 ms); the Dynamic Island shows on the glass (screenshot checked). The remaining ~560 ms in that run is two software-rendered frames; a real GPU was not measured.
 - **Not verified:** pressing Accept or Decline on the 3D phone, the active-call screen, the prologue path, frame rate and the extra WebGL context on a real GPU (open question Q3 of the chapter spec), and the delay on a real device.
 
+### 2026-11-15 — Room intro text timed to the voice; ambience lowered under it; intro left out of the voice script
+
+- **Objective:** owner feedback on the room intro: the text ran ahead of the voice (wanted: en 8, 7, 8 s and vi 5, 6, 6 s for `intro.1` to `intro.3`); the voice was quieter than the background; the voice script must never touch the owner's intro files.
+- **Completed:**
+  - Cause of the fast text: in the room the intro voice plays through the narration player, and the overlay got lines without a clip (`src: null`), so it typed at the text-only speed (38 characters per second).
+  - `dialogues/intro.ts`: `INTRO_TYPING_MS` with the owner's timings per locale. `useIntroNarration.ts`: `NarrationLine` takes optional `durationMs` (text spread evenly over it) and `delayMs` (wait before typing). `RoomChapterLayer.tsx` passes the timing and the narration player's pause before the line (`effectivePauseMs`, 450 ms for `reassuring`).
+  - Room ambience: `AudioEngine.duckForVoice` lowers the rain, the city and the clock to 0.25 (about -12 dB) while the intro narration plays, combined with the story mood duck; exposed as the optional `RoomStoryCommands.duckForVoice`. The menu music is already faded out in the room, so the background heard there is this ambience.
+  - `generate-chapter1-voice.mjs`: `dlg.intro` is owner-supplied (`OWNER_GRAPHS`). The script no longer synthesizes, replaces or prunes those clips on any platform, even with `--force`; their manifest entries are copied unchanged; `--only intro.*` stops with an error. Replaces the earlier `voiceNote` check.
+  - Incident: the owner's intro MP3s were overwritten on disk when the working folder was switched to a branch made from `main` before PR #45 (the switch was not made by the agent and the script did not run). They were restored from `6f56dab`; `main` now has them (PR #45).
+- **Files modified:** `apps/game/scripts/generate-chapter1-voice.mjs`, `apps/game/src/game/narrative/chapter1/dialogues/intro.ts`, `apps/game/src/features/chapter1/intro/useIntroNarration{.ts,.test.ts}` (test new), `apps/game/src/features/chapter1/room/RoomChapterLayer.tsx`, `apps/game/src/features/roomv2/game/{audio,engine,outside}.ts`, `docs/PROJECT_PROGRESS.md`.
+- **Validation:** `voice:chapter1 --dry-run --force --prune` lists 82 jobs and no intro clip, `--only intro.1` is refused, the intro MP3 checksums did not change, `voice:report` 88 present. Typecheck, build and tests: see the commit report.
+- **Not verified:** the timing and the levels by ear in a browser.
+
 ### 2026-11-17 — Laptop and phone-records UI on the 3D device screens
 
 - Objective: owner request (approach A). The laptop and phone-records overlays should look like they are on the laptop display and phone display in the 3D view, not in a floating dialog.
@@ -345,6 +358,18 @@ This entry replaces the partial per-task entries (3.7, 10.3, 12.4) that were wri
    - Aftermath phone and laptop text is shown in the ending screen and is not pushed to the engine's laptop frame.
    - The Speaker toggle is a per-call override, as in the phone UI redesign.
 10. **Follow-ups:** human playtest and pacing tuning; native-speaker review of the Vietnamese text; consider more distinct voices; engine-level tests for the story port; open the pull request (the documentation is committed and the branch is pushed without force).
+
+### 2026-11-15 — New room intro narration; controls and Continue only on the last line
+
+- **Objective:** the owner rewrote the room intro narration (`intro.1` to `intro.3`) and supplied new voice clips; the on-screen text must match. The controls list and the Continue button of the intro overlay (street prologue and room) should appear only with the last line.
+- **Completed:**
+  - `dialogues/intro.ts` and `chapter1.vi/intro.ts`: the owner's en/vi text.
+  - `chapter1.manifest.ts`: the six `intro.*` entries take the owner's MP3s (hash, bytes, duration from the files; `voiceNote` and `credit` say "Supplied by the project owner"); `chapterContentVersion` 7d508ad7 (was b1b15925), so saves made before this change are reported as incompatible (design of save v3).
+  - `generate-chapter1-voice.mjs`: clips marked as owner-supplied are kept while their text is current, so a Windows run does not replace them with a local voice (`--dry-run`: 88 up to date, 0 to run).
+  - `ChapterIntroOverlay.tsx`: controls and Continue show (and are focusable) only on the last line; resume mode, with one line, shows them at once. This replaces the 2026-11-17 P2-8 behavior. Tests updated.
+- **Files modified:** `apps/game/src/game/narrative/chapter1/dialogues/intro.ts`, `apps/game/src/i18n/narrative/chapter1.vi/intro.ts`, `apps/game/src/game/voice/chapter1.manifest.ts`, `apps/game/scripts/generate-chapter1-voice.mjs`, `apps/game/src/features/chapter1/intro/ChapterIntroOverlay{,.test}.tsx`, the six `apps/game/public/audio/chapter01/{en,vi}/intro.*.mp3` (owner's files), `docs/PROJECT_PROGRESS.md`.
+- **Validation:** `pnpm typecheck`, `pnpm build`, `npx vitest --run` (168 files, 1511 tests), `voice:report` (88 present).
+- **Not verified:** that the owner's clips say exactly the new text; the overlay in a real browser. The owner's tone notes (gentle, relieved, calm, warm) are not scenario tones; the nodes keep `reassuring`. The manifest `origin` stays `tts-generated` (the schema has no "supplied" value; how the clips were made is not recorded).
 
 ### 2026-11-15 — Street bins use the owner's penguin bin model
 
