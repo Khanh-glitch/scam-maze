@@ -214,10 +214,13 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
 
   // The sound setting mutes both worlds' own audio (they do not read the settings themselves).
   const soundOn = settings.soundEnabled;
+  // The street stays silent while the player is in the room: the room is often built after the
+  // player went home (the room's `onReady` shows it at once), and this effect then runs again.
+  const inRoom = stage === "room";
   useEffect(() => {
-    streetRef.current?.audio.setMuted(!soundOn);
+    streetRef.current?.audio.setMuted(!soundOn || inRoom);
     roomRef.current?.audio.setMuted(!soundOn);
-  }, [soundOn, worldReady, roomBuilt]);
+  }, [soundOn, worldReady, roomBuilt, inRoom]);
   const toggleSound = useCallback(() => onUpdateSettings({ soundEnabled: !soundOn }), [onUpdateSettings, soundOn]);
 
   const beginWalk = useCallback(() => {
