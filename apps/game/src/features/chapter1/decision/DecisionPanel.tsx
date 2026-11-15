@@ -153,7 +153,7 @@ export const DecisionPanel: React.FC<DecisionPanelProps> = ({ panel, onStartPreS
         role="dialog"
         aria-modal="true"
         aria-labelledby={pending ? CONFIRM_HEADING_ID : HEADING_ID}
-        className={`${UI.panel} max-w-lg space-y-4`}
+        className={`${UI.panel} ${UI.panelFit} flex max-w-lg flex-col gap-4`}
       >
         {pending ? (
           <>
@@ -184,9 +184,10 @@ export const DecisionPanel: React.FC<DecisionPanelProps> = ({ panel, onStartPreS
           </>
         ) : (
           <>
-            <h2 id={HEADING_ID} ref={headingRef} tabIndex={-1} className={UI.heading}>
+            <h2 id={HEADING_ID} ref={headingRef} tabIndex={-1} className={`${UI.heading} shrink-0`}>
               {t("decision.heading")}
             </h2>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1" data-testid="decision-body">
             <p className={UI.body}>{panel.offered ? t("decision.intro") : t("decision.notOffered")}</p>
             <ul className="space-y-3">
               {panel.options.map((option) =>
@@ -202,7 +203,8 @@ export const DecisionPanel: React.FC<DecisionPanelProps> = ({ panel, onStartPreS
                 ),
               )}
             </ul>
-            <div className="flex justify-end">
+            </div>
+            <div className="flex shrink-0 justify-end">
               <button type="button" onClick={onClose} className={UI.buttonSecondary}>
                 <X className="h-4 w-4" aria-hidden="true" />
                 {t("decision.close")}

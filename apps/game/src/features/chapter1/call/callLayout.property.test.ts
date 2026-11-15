@@ -4,6 +4,7 @@ import { createLcg, pick, randomInt } from "../../../test/seededRandom";
 import {
   computeCallLayout,
   NARROW_BREAKPOINT,
+  NARROW_SUBTITLE_MAX_HEIGHT,
   rectsIntersectArea,
   SCREEN_ASPECT,
   SCREEN_HEIGHT_M,
@@ -199,6 +200,31 @@ describe("callLayout properties", () => {
       );
       // In front of the camera and beyond the near plane.
       expect(-pose.z, label).toBeGreaterThan(CAMERA_NEAR_M);
+    }
+  }, PROPERTY_TIMEOUT_MS);
+});
+
+describe("callLayout narrow viewports (P1-4)", () => {
+  it("390x844 leaves the reply region more than 280 px and a subtitle region that can hold 5 lines", () => {
+    const layout = computeCallLayout({ width: 390, height: 844 });
+    expect(layout.kind).toBe("narrow");
+    expect(layout.choice.height).toBeGreaterThanOrEqual(280);
+    expect(layout.subtitle.height).toBeGreaterThanOrEqual(120);
+    expect(layout.subtitle.height).toBeLessThanOrEqual(NARROW_SUBTITLE_MAX_HEIGHT);
+  });
+
+  it("gives the reply region at least 30 percent of the height on narrow viewports 640 px tall or more", () => {
+    const seed = 0x9a110e11;
+    const next = createLcg(seed);
+    for (let index = 0; index < RUNS; index += 1) {
+      const viewport: Viewport = {
+        width: randomInt(next, MIN_WIDTH, NARROW_BREAKPOINT - 1),
+        height: randomInt(next, 640, MAX_HEIGHT),
+      };
+      const layout = computeCallLayout(viewport);
+      const label = `seed ${seed.toString(16)} case ${index}, viewport ${JSON.stringify(viewport)}, layout ${JSON.stringify(layout)}`;
+      expect(layout.choice.height, label).toBeGreaterThanOrEqual(0.3 * viewport.height - 1);
+      expect(layout.subtitle.height, label).toBeLessThanOrEqual(NARROW_SUBTITLE_MAX_HEIGHT);
     }
   }, PROPERTY_TIMEOUT_MS);
 });

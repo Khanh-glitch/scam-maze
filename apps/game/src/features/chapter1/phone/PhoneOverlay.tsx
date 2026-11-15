@@ -10,6 +10,8 @@ import { useTranslation } from "react-i18next";
 import { Scale, X } from "lucide-react";
 import type { ClaimId, DeviceActionId, EvidenceId } from "../../../game/narrative/chapter1/ids";
 import type { PhoneMessageView, PhoneRecordsView } from "../../../game/narrative/selectors";
+import { ScreenSurface } from "../room/ScreenSurface";
+import { useScreenQuad } from "../room/useScreenQuad";
 import { UI } from "../theme";
 import { CallHistoryApp } from "./CallHistoryApp";
 import { MessagesApp } from "./MessagesApp";
@@ -53,6 +55,9 @@ export const PhoneOverlay: React.FC<PhoneOverlayProps> = ({
   const { t } = useTranslation("chapter1");
   const [route, setRoute] = useState<PhoneRoute>(initialRoute);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  // On the projected phone display when the 3D screen is visible; otherwise the flat phone frame.
+  const layout = useScreenQuad("phone");
+  const onScreen = layout.mode === "surface";
 
   // Move focus into the phone when it opens and when the screen changes, for keyboard users.
   useEffect(() => {
@@ -110,12 +115,16 @@ export const PhoneOverlay: React.FC<PhoneOverlayProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-[#171521]/70 sm:p-4">
+    <ScreenSurface layout={layout} device="phone" panelWrapperClassName="fixed inset-0 z-40 flex items-center justify-center bg-[#171521]/70 sm:p-4">
       <div
         role="dialog"
         aria-modal="true"
         aria-label={t("phone.overlay.name")}
-        className="flex h-full max-h-full w-full flex-col overflow-hidden bg-[#1d1b2b] text-[#f7f5ff] shadow-xl sm:h-[min(720px,100%)] sm:max-w-[380px] sm:rounded-[2rem] sm:border-4 sm:border-[#38344f]"
+        className={
+          onScreen
+            ? "flex h-full w-full flex-col overflow-hidden bg-[#1d1b2b] text-[#f7f5ff]"
+            : "flex h-full max-h-full w-full flex-col overflow-hidden bg-[#1d1b2b] text-[#f7f5ff] shadow-xl sm:h-[min(720px,100%)] sm:max-w-[380px] sm:rounded-[2rem] sm:border-4 sm:border-[#38344f]"
+        }
         data-phone-frame
       >
         <div className="flex items-center justify-between gap-2 border-b border-[#38344f] bg-[#171521] px-4 py-3">
@@ -134,6 +143,6 @@ export const PhoneOverlay: React.FC<PhoneOverlayProps> = ({
         </div>
         <div className="flex-1 overflow-y-auto p-4">{content}</div>
       </div>
-    </div>
+    </ScreenSurface>
   );
 };

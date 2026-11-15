@@ -81,6 +81,7 @@ export const PlayerChoiceOverlay: React.FC<PlayerChoiceOverlayProps> = ({
         maxHeight: region.height,
         overflowY: "auto",
         overflowX: "hidden",
+        overscrollBehavior: "contain",
       }}
     >
       {/* Persistent polite region, so a new narration line is announced once. */}
@@ -138,6 +139,7 @@ export const PlayerChoiceOverlay: React.FC<PlayerChoiceOverlayProps> = ({
                 disabled={disabled}
                 onClick={() => onSelectOption(option.id)}
                 onKeyDown={(event) => onOptionKeyDown(event, index)}
+                onFocus={(event) => event.currentTarget.scrollIntoView?.({ block: "nearest" })}
               >
                 {index < 9 ? (
                   <span

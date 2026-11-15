@@ -71,6 +71,7 @@ import { BankApp } from "./laptop/BankApp";
 import { CompareView } from "./laptop/CompareView";
 import { LaptopOverlay, type LaptopExtraTab } from "./laptop/LaptopOverlay";
 import { ReviewSecurityPage } from "./laptop/ReviewSecurityPage";
+import { ScreenQuadContext, type ScreenQuadSource } from "./useScreenQuad";
 import { buildBankAppView, buildCompareViewModel, buildReviewSecurityView } from "./laptop/laptopView";
 import {
   applyPresentation,
@@ -635,6 +636,31 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
     bridge.commands?.setCursorMode?.(anyOverlay);
   }, [anyOverlay, bridge, engineReady]);
 
+  // The engine can take the pointer again while a layer stays open (after a call ends, when the
+  // decision panel opens over it, or when Ctrl hides the cursor). The mouse is needed by every
+  // layer, so any lock that appears while one is open is released at once.
+  const [pointerLocked, setPointerLocked] = useState(() => typeof document !== "undefined" && document.pointerLockElement != null);
+  const anyOverlayRef = useRef(anyOverlay);
+  anyOverlayRef.current = anyOverlay;
+  useEffect(() => {
+    const sync = () => {
+      const locked = document.pointerLockElement != null;
+      setPointerLocked(locked);
+      if (locked && anyOverlayRef.current) {
+        bridge.commands?.setCursorMode?.(true);
+        document.exitPointerLock?.();
+      }
+    };
+    document.addEventListener("pointerlockchange", sync);
+    return () => document.removeEventListener("pointerlockchange", sync);
+  }, [bridge]);
+  useEffect(() => {
+    // A layer that opens or changes while the pointer is already locked frees it as well.
+    if (!anyOverlay || !engineReady || document.pointerLockElement == null) return;
+    bridge.commands?.setCursorMode?.(true);
+    document.exitPointerLock?.();
+  }, [anyOverlay, bridge, engineReady, overlays, blocking]);
+
   // --- Rings: only while the room is free ---------------------------------------------------
   const ringableSelector = useCallback((state: ChapterState) => selectRingableCall(state, scenario), [scenario]);
   const ringable = useChapterState(store, ringableSelector);
@@ -839,7 +865,19 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
     return text("room.announce.deduction", { statement });
   };
 
+  // Lets the laptop and phone-records overlays follow the projected 3D screen (see useScreenQuad).
+  const screenSource = useMemo<ScreenQuadSource>(
+    () => ({
+      watch: (device, listener) => {
+        bridge.commands?.watchScreen?.(device, listener);
+        return () => bridge.commands?.watchScreen?.(null);
+      },
+    }),
+    [bridge],
+  );
+
   return (
+    <ScreenQuadContext.Provider value={screenSource}>
     <ComfortProvider settings={settings}>
       <div data-testid="room-chapter-layer" className="contents">
         {/* Polite live region: new notification, new evidence, recorded deduction (Requirement 22.2). */}
@@ -905,6 +943,11 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
                   <span>{hintOn ? text("room.hints.hide") : text("room.hints.show")}</span>
                 </button>
               </div>
+              {pointerLocked && !anyOverlay && (
+                <p className={`${UI.hudPanel} max-w-xs`} role="note" data-testid="room-mouse-hint">
+                  {text("room.hud.mouseLockedHint")}
+                </p>
+              )}
               {hintOn && (
                 <p className={`${UI.hudPanel} max-w-xs`} role="note" aria-label={text("room.hud.hintPanelLabel")} data-testid="room-hint">
                   <span className={UI.label}>{text("room.hints.heading")}</span>
@@ -983,5 +1026,6 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
         )}
       </div>
     </ComfortProvider>
+    </ScreenQuadContext.Provider>
   );
 };

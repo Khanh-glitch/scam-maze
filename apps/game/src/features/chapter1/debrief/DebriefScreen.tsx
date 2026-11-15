@@ -11,7 +11,6 @@ import {
   BookOpen,
   Eye,
   Flag,
-  Footprints,
   Home,
   Info,
   FileText,
@@ -82,6 +81,7 @@ export const DebriefScreen: React.FC<DebriefScreenProps> = ({ view, caseReport, 
   const showCaseReport = outcomeHasCaseReport(view) && caseReport !== undefined && caseReport !== "";
   const headingRef = useRef<HTMLHeadingElement>(null);
   const { outcome } = view;
+  const outcomeText = outcome.summary !== "" ? outcome.summary : (outcome.consequence?.text ?? "");
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -114,25 +114,11 @@ export const DebriefScreen: React.FC<DebriefScreenProps> = ({ view, caseReport, 
         </header>
 
         <DebriefSection id="debrief-outcome" title={t("debrief.outcome")} icon={Flag}>
-          {outcome.summary && <p className={UI.body}>{outcome.summary}</p>}
-          {outcome.consequence && (
-            <p className={`${UI.card} text-sm leading-relaxed`} data-variant={outcome.consequence.id}>
-              {outcome.consequence.text}
+          {/* One paragraph. The consequence text was already shown on the ending screen and repeats the summary, so it is the fallback only. */}
+          {outcomeText !== "" && (
+            <p className={UI.body} data-testid="debrief-outcome-text" data-variant={outcome.consequence?.id}>
+              {outcomeText}
             </p>
-          )}
-        </DebriefSection>
-
-        <DebriefSection id="debrief-decisions" title={t("debrief.decisions")} icon={Footprints}>
-          {view.decisions.length === 0 ? (
-            <EmptyNote text={t("debrief.decisionsEmpty")} />
-          ) : (
-            <ol className="space-y-2">
-              {view.decisions.map((decision) => (
-                <li key={`${decision.seq}-${decision.tag}`} className={`${UI.card} text-sm leading-relaxed`}>
-                  {decision.text}
-                </li>
-              ))}
-            </ol>
           )}
         </DebriefSection>
 
@@ -184,11 +170,13 @@ export const DebriefScreen: React.FC<DebriefScreenProps> = ({ view, caseReport, 
                 </ul>
               </div>
             )}
-            <div className="space-y-1">
-              <h4 className="text-sm font-semibold">{text("debriefForensic.analysis.thirdCaller")}</h4>
-              <p className={UI.body}>{text("debriefForensic.analysis.thirdCallerNotIndependent")}</p>
-              <p className={UI.body}>{view.analysis.thirdCallerNote}</p>
-            </div>
+            {view.analysis.thirdCallerEncountered && view.analysis.thirdCallerNote !== null && (
+              <div className="space-y-1" data-testid="debrief-third-caller">
+                <h4 className="text-sm font-semibold">{text("debriefForensic.analysis.thirdCaller")}</h4>
+                <p className={UI.body}>{text("debriefForensic.analysis.thirdCallerNotIndependent")}</p>
+                <p className={UI.body}>{view.analysis.thirdCallerNote}</p>
+              </div>
+            )}
             <div className="space-y-1">
               <h4 className="text-sm font-semibold">{text("debriefForensic.analysis.trap")}</h4>
               <p className={UI.body}>{view.analysis.trapNote}</p>
@@ -237,19 +225,29 @@ export const DebriefScreen: React.FC<DebriefScreenProps> = ({ view, caseReport, 
           {view.cluesMissed.length === 0 ? (
             <EmptyNote text={t("debrief.cluesMissedEmpty")} />
           ) : (
-            <ul className="space-y-2">
-              {view.cluesMissed.map((clue) => (
-                <li key={clue.id} className={`${UI.card} space-y-1`}>
-                  <p className="text-sm font-semibold">
-                    <span className={`mr-2 ${UI.label}`} data-testid="clue-missed-label">
-                      {text("debriefForensic.cluesMissed.missedLabel")}
-                    </span>
-                    {clue.title}
-                  </p>
-                  <p className={UI.body}>{clue.hint}</p>
-                </li>
-              ))}
-            </ul>
+            <details className="group space-y-2" data-testid="debrief-clues-missed-details">
+              <summary
+                className={`${UI.buttonSecondary} w-full cursor-pointer justify-between text-left`}
+                data-testid="debrief-clues-missed-summary"
+              >
+                {text("debriefForensic.cluesMissed.summary", { count: view.cluesMissed.length, number: view.cluesMissed.length })}
+              </summary>
+              <ul className="mt-2 space-y-2">
+                {view.cluesMissed.map((clue) => (
+                  <li key={clue.id} className={`${UI.card} space-y-1`}>
+                    <p className="text-sm font-semibold">
+                      <span className={`mr-2 ${UI.label}`} data-testid="clue-missed-label">
+                        {text("debriefForensic.cluesMissed.missedLabel")}
+                      </span>
+                      {/* Reads as "Missed: <clue>" for screen readers. */}
+                      <span className="sr-only">: </span>
+                      {clue.title}
+                    </p>
+                    <p className={UI.body}>{clue.hint}</p>
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
         </DebriefSection>
 
