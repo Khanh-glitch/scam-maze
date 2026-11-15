@@ -4,7 +4,7 @@ import type { VoiceManifest } from "./manifestTypes";
 export const chapter1VoiceManifest: VoiceManifest = {
   "schemaVersion": 1,
   "chapterId": "chapter-1",
-  "chapterContentVersion": "b1b15925",
+  "chapterContentVersion": "7d508ad7",
   "clips": [
     {
       "clipId": "after.a.1",
@@ -985,13 +985,13 @@ export const chapter1VoiceManifest: VoiceManifest = {
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 5963,
-      "bytes": 35639,
+      "durationMs": 6348,
+      "bytes": 118501,
       "tone": "reassuring",
-      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
+      "voiceNote": "Supplied by the project owner",
       "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
-      "sourceTextHash": "953d86e7"
+      "credit": "Supplied by the project owner (generated outside this repository)",
+      "sourceTextHash": "d5b89530"
     },
     {
       "clipId": "intro.1",
@@ -1006,13 +1006,13 @@ export const chapter1VoiceManifest: VoiceManifest = {
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 6462,
-      "bytes": 38663,
+      "durationMs": 5799,
+      "bytes": 109723,
       "tone": "reassuring",
-      "voiceNote": "Microsoft An, rate 0.855, pitch 0.9, tone reassuring",
+      "voiceNote": "Supplied by the project owner",
       "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "5e91fbe4"
+      "credit": "Supplied by the project owner (generated outside this repository)",
+      "sourceTextHash": "1d63e331"
     },
     {
       "clipId": "intro.2",
@@ -1027,13 +1027,13 @@ export const chapter1VoiceManifest: VoiceManifest = {
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 5450,
-      "bytes": 32615,
+      "durationMs": 7079,
+      "bytes": 130203,
       "tone": "reassuring",
-      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
+      "voiceNote": "Supplied by the project owner",
       "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
-      "sourceTextHash": "7961f797"
+      "credit": "Supplied by the project owner (generated outside this repository)",
+      "sourceTextHash": "a3a30f6d"
     },
     {
       "clipId": "intro.2",
@@ -1048,13 +1048,13 @@ export const chapter1VoiceManifest: VoiceManifest = {
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 5834,
-      "bytes": 34991,
+      "durationMs": 6922,
+      "bytes": 127696,
       "tone": "reassuring",
-      "voiceNote": "Microsoft An, rate 0.855, pitch 0.9, tone reassuring",
+      "voiceNote": "Supplied by the project owner",
       "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "cac9b866"
+      "credit": "Supplied by the project owner (generated outside this repository)",
+      "sourceTextHash": "240b3d06"
     },
     {
       "clipId": "intro.3",
@@ -1069,13 +1069,13 @@ export const chapter1VoiceManifest: VoiceManifest = {
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 4617,
-      "bytes": 27647,
+      "durationMs": 8516,
+      "bytes": 153191,
       "tone": "reassuring",
-      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
+      "voiceNote": "Supplied by the project owner",
       "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
-      "sourceTextHash": "bb1f9cf4"
+      "credit": "Supplied by the project owner (generated outside this repository)",
+      "sourceTextHash": "1ef1f1fb"
     },
     {
       "clipId": "intro.3",
@@ -1090,13 +1090,13 @@ export const chapter1VoiceManifest: VoiceManifest = {
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 4474,
-      "bytes": 26783,
+      "durationMs": 6348,
+      "bytes": 118501,
       "tone": "reassuring",
-      "voiceNote": "Microsoft An, rate 0.855, pitch 0.9, tone reassuring",
+      "voiceNote": "Supplied by the project owner",
       "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "7b2fafba"
+      "credit": "Supplied by the project owner (generated outside this repository)",
+      "sourceTextHash": "ae9f49e6"
     },
     {
       "clipId": "off.advice",

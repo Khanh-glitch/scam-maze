@@ -11,6 +11,13 @@ export interface NarrationLine {
   text: string;
   /** Voice clip URL, or null for a line without a recording. */
   src: string | null;
+  /**
+   * Typing time (ms) for a line whose voice is played elsewhere (`src` null): the text is spread
+   * evenly over it instead of the text-only speed.
+   */
+  durationMs?: number;
+  /** Wait (ms) before typing starts, for the pause the other player makes before the voice. */
+  delayMs?: number;
 }
 
 export type AdvanceResult = "revealed" | "next" | "finished";
@@ -73,7 +80,7 @@ export function useIntroNarration({ lines, active, gain, createAudio }: IntroNar
   createAudioRef.current = createAudio ?? defaultCreateAudio;
 
   // A new script (for example after a language switch) starts again from the first line.
-  const scriptKey = lines.map((line) => `${line.src ?? ""}|${line.text}`).join("\n");
+  const scriptKey = lines.map((line) => `${line.src ?? ""}|${line.durationMs ?? ""}|${line.delayMs ?? ""}|${line.text}`).join("\n");
   const [lastScriptKey, setLastScriptKey] = useState(scriptKey);
   if (lastScriptKey !== scriptKey) {
     setLastScriptKey(scriptKey);
@@ -107,7 +114,7 @@ export function useIntroNarration({ lines, active, gain, createAudio }: IntroNar
     let revealed = 0;
     const startedAt = performance.now();
     // Where fixed-speed typing starts: the time and the characters already visible.
-    let fallbackFrom = startedAt;
+    let fallbackFrom = startedAt + (line.src === null ? Math.max(0, line.delayMs ?? 0) : 0);
     let fallbackBase = 0;
     const fail = () => {
       if (disposed || failed) return;
@@ -133,7 +140,8 @@ export function useIntroNarration({ lines, active, gain, createAudio }: IntroNar
       }
     }
 
-    const cps = line.src === null ? TEXT_ONLY_CPS : VOICE_FALLBACK_CPS;
+    const timed = line.src === null && line.durationMs !== undefined && line.durationMs > 0;
+    const cps = timed ? total / (line.durationMs! / 1000) : line.src === null ? TEXT_ONLY_CPS : VOICE_FALLBACK_CPS;
     // A slow clip only bridges the wait: typing starts at the fallback speed, and once the clip
     // reports its duration the text follows the voice again (it never moves backwards, so if the
     // fallback got ahead it holds until the voice catches up).
@@ -149,7 +157,7 @@ export function useIntroNarration({ lines, active, gain, createAudio }: IntroNar
         waitingSince = null;
         target = Math.floor((audio.currentTime / audio.duration) * total);
       } else if (failed) {
-        target = fallbackBase + Math.floor(((now - fallbackFrom) / 1000) * cps);
+        target = fallbackBase + Math.floor((Math.max(0, now - fallbackFrom) / 1000) * cps);
       } else if (now - startedAt > METADATA_TIMEOUT_MS) {
         if (waitingSince === null) {
           waitingSince = now;
@@ -170,7 +178,7 @@ export function useIntroNarration({ lines, active, gain, createAudio }: IntroNar
       window.clearInterval(timer);
       stopAudio();
     };
-    // The line is identified by its index and the script; `gain` is applied separately below.
+    // The line is identified by its index and the script (which includes its timing); `gain` is applied separately below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, safeIndex, scriptKey, total, stopAudio]);
 
