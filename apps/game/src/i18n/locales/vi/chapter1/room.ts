@@ -99,6 +99,8 @@ const room: LocaleShape<typeof en> = {
     },
     hud: {
       hintPanelLabel: "Gợi ý cho mục tiêu hiện tại",
+      mouseKeyHint: "Dùng chuột",
+      mouseLockedHint: "Nhấn Ctrl để dùng chuột.",
     },
     call: {
       toolsLabel: "Công cụ trong cuộc gọi",

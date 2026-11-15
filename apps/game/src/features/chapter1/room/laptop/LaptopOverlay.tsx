@@ -9,6 +9,8 @@ import type { LaptopView } from "../../../../game/narrative/selectors";
 import type { CoreAction } from "../../../../game/narrative/types";
 import { trapTabKey } from "../../focusTrap";
 import { UI } from "../../theme";
+import { ScreenSurface } from "../ScreenSurface";
+import { useScreenQuad } from "../useScreenQuad";
 import { NotificationApp } from "./NotificationApp";
 import { buildNotificationAppView } from "./laptopView";
 
@@ -38,6 +40,9 @@ export const LaptopOverlay: React.FC<LaptopOverlayProps> = ({ view, dispatch, on
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const [active, setActive] = useState<string>(NOTIFICATIONS_TAB);
+  // On the projected laptop display when the 3D screen is visible; otherwise the flat panel.
+  const layout = useScreenQuad("laptop");
+  const onScreen = layout.mode === "surface";
 
   useEffect(() => {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -67,28 +72,51 @@ export const LaptopOverlay: React.FC<LaptopOverlayProps> = ({ view, dispatch, on
   ];
   const current = tabs.find((tab) => tab.id === active) ?? tabs[0];
 
+  const tabClass = (selected: boolean) =>
+    onScreen
+      ? `flex items-center rounded-t-lg border border-b-0 px-4 py-2 text-sm font-medium cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#b9a5f5] ${
+          selected ? "border-[#7654d6]/60 bg-[#1d1b2b] text-white" : "border-transparent text-[#a9a4c4] hover:bg-[#1d1b2b]/60 hover:text-white"
+        }`
+      : selected
+        ? UI.buttonPrimary
+        : UI.buttonSecondary;
+
   return (
-    <div className={UI.backdrop}>
+    <ScreenSurface layout={layout} device="laptop" panelWrapperClassName={UI.backdrop}>
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={t("laptop.dialogLabel")}
-        className={`${UI.panel} flex max-h-[90vh] max-w-3xl flex-col gap-4`}
+        className={
+          onScreen
+            ? "flex h-full w-full flex-col bg-[#12101c] text-[#f7f5ff]"
+            : `${UI.panel} flex max-h-[calc(100dvh-2rem)] max-w-3xl flex-col gap-4`
+        }
       >
-        <div className="flex items-center justify-between gap-3">
+        <div
+          className={
+            onScreen
+              ? "flex items-center justify-between gap-3 border-b border-[#38344f] bg-[#171521] px-4 py-2"
+              : "flex items-center justify-between gap-3"
+          }
+        >
           <h2 ref={headingRef} tabIndex={-1} className={`${UI.heading} flex items-center gap-2`}>
             <Laptop className="h-5 w-5 text-[#b9a5f5]" aria-hidden="true" />
             {t("laptop.title")}
           </h2>
-          <span className={UI.textMuted}>{t("laptop.clock")}</span>
-          <button type="button" className={UI.buttonSecondary} onClick={onClose}>
+          <span className={`${UI.textMuted} ${onScreen ? "ml-auto" : ""}`}>{t("laptop.clock")}</span>
+          <button type="button" className={onScreen ? `${UI.buttonSecondary} !px-3 !py-1.5` : UI.buttonSecondary} onClick={onClose}>
             <X className="h-4 w-4" aria-hidden="true" />
             {t("laptop.close")}
           </button>
         </div>
 
-        <div role="tablist" aria-label={t("laptop.appsLabel")} className="flex flex-wrap gap-2">
+        <div
+          role="tablist"
+          aria-label={t("laptop.appsLabel")}
+          className={onScreen ? "flex flex-wrap gap-1 border-b border-[#38344f] bg-[#171521] px-4 pt-2" : "flex flex-wrap gap-2"}
+        >
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -97,7 +125,7 @@ export const LaptopOverlay: React.FC<LaptopOverlayProps> = ({ view, dispatch, on
               id={`${baseId}-tab-${tab.id}`}
               aria-selected={tab.id === current.id}
               aria-controls={`${baseId}-panel`}
-              className={tab.id === current.id ? UI.buttonPrimary : UI.buttonSecondary}
+              className={tabClass(tab.id === current.id)}
               onClick={() => setActive(tab.id)}
             >
               {tab.label}
@@ -109,11 +137,11 @@ export const LaptopOverlay: React.FC<LaptopOverlayProps> = ({ view, dispatch, on
           role="tabpanel"
           id={`${baseId}-panel`}
           aria-labelledby={`${baseId}-tab-${current.id}`}
-          className="min-h-0 flex-1 overflow-y-auto pr-1"
+          className={`min-h-0 flex-1 overflow-y-auto ${onScreen ? "bg-[#1d1b2b] p-4" : "pr-1"}`}
         >
           {current.content}
         </div>
       </div>
-    </div>
+    </ScreenSurface>
   );
 };

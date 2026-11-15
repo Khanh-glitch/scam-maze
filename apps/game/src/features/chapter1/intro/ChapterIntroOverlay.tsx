@@ -1,8 +1,8 @@
 // Opening screen of a chapter: the street is already visible behind it, and a friendly voice
 // greets the player one paragraph at a time. Each paragraph plays its voice clip and is typed in
 // step with it. A click shows the whole paragraph; the next click cuts the voice and moves on.
-// After the last paragraph the controls appear and a click starts the story (the page
-// dispatches START_CHAPTER in `onBegin`). It never shows the chapter number or title, so the
+// The Continue button is available as soon as the scene is ready (it skips the rest of the voice)
+// and starts the story (the page dispatches START_CHAPTER in `onBegin`). It never shows the chapter number or title, so the
 // player is not told in advance what is coming.
 
 import React, { useEffect, useMemo, useRef } from "react";
@@ -74,7 +74,9 @@ export const ChapterIntroOverlay: React.FC<ChapterIntroOverlayProps> = ({
   );
   const narration = useIntroNarration({ lines, active: ready, gain: voiceGain, createAudio });
   const { shown, text, lineDone, isLast } = narration;
-  const canContinue = ready && isLast && lineDone;
+  // The voice is skippable, so Continue is available as soon as the scene is ready. Clicking a
+  // paragraph still shows it whole and then moves on; Continue starts the story at once.
+  const canContinue = ready;
 
   const onLineChangeRef = useRef(onLineChange);
   onLineChangeRef.current = onLineChange;
@@ -211,7 +213,7 @@ export const ChapterIntroOverlay: React.FC<ChapterIntroOverlayProps> = ({
           </button>
         </div>
 
-        {ready && !canContinue && (
+        {ready && !(isLast && lineDone) && (
           <p className="mt-4 text-xs text-[#a9a4c4]" aria-hidden="true">
             {lineDone ? t("intro.next") : t("intro.skip")}
           </p>

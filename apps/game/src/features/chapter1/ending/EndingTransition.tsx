@@ -90,7 +90,7 @@ export const EndingTransition: React.FC<EndingTransitionProps> = ({ outcome, aft
       aria-labelledby="ending-transition-heading"
       data-testid="ending-transition"
       data-outcome={outcome.id}
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#171521]/95 p-4 sm:p-8"
+      className="fixed inset-0 z-50 flex overflow-y-auto bg-[#171521]/95 p-4 sm:p-8"
       style={{
         opacity: entered ? 1 : 0,
         transitionProperty: "opacity",
@@ -98,7 +98,7 @@ export const EndingTransition: React.FC<EndingTransitionProps> = ({ outcome, aft
         transitionTimingFunction: "ease-out",
       }}
     >
-      <div className={`${UI.panel} ${accent.border} max-w-xl space-y-5`}>
+      <div className={`${UI.panel} ${accent.border} m-auto max-w-xl space-y-5`}>
         <p className={`flex items-center gap-2 ${UI.label}`}>
           <Icon className={`h-4 w-4 ${accent.text}`} aria-hidden="true" />
           {t("ending.eyebrow")}
