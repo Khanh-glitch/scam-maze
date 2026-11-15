@@ -73,8 +73,9 @@ const AVATAR_CLASS =
 const ROUND_BASE_CLASS =
   "flex shrink-0 items-center justify-center rounded-full border text-[#f7f5ff] motion-safe:transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b9a5f5] disabled:cursor-not-allowed disabled:border-[#38344f] disabled:bg-[#38344f] disabled:text-[#a9a4c4] cursor-pointer";
 /** Big round accept, decline and end-call buttons: a colored disc with the label below it, inside one button. */
+// No focus ring: Accept takes focus when the call rings, and a ring around the label looked wrong on the phone glass.
 const CALL_BUTTON_CLASS =
-  "group flex shrink-0 cursor-pointer flex-col items-center gap-1.5 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b9a5f5] disabled:cursor-not-allowed";
+  "group flex shrink-0 cursor-pointer flex-col items-center gap-1.5 rounded-xl outline-none disabled:cursor-not-allowed";
 const CALL_DISC_CLASS =
   "flex h-16 w-16 items-center justify-center rounded-full motion-safe:transition-colors group-disabled:bg-[#38344f] group-disabled:text-[#a9a4c4]";
 const DECLINE_DISC_CLASS = "bg-[#c93c47] text-white group-hover:bg-[#b3343e]";

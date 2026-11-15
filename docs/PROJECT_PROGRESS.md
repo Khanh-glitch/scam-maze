@@ -224,6 +224,10 @@ Resolved:
   the reduced-stress hint) are listed in `ACCESSIBILITY.md`.
 
 ## Task History
+### 2026-11-15 — Call buttons: no focus ring; status bar uses the StatusBarLight icons only
+- **Objective:** Owner feedback: Accept takes focus when the call rings and showed a purple rectangle; use the `StatusBarLight` icons and delete the `statusBar` folder.
+- **Completed:** the call buttons no longer draw a focus outline (Accept still takes focus, so Enter or Space still answers). `PhoneStatusBar` uses `/assets/ui/StatusBarLight/*` and loses the `tone` prop; `public/assets/ui/statusBar` (with `Time.png`) is deleted.
+- **Validation:** `tsc` and `vitest run` (1521 tests) passed. Known limitation: with no ring, keyboard users get no visual cue of the focused call button.
 ### 2026-11-15 — Status bar uses the owner's icon art
 - **Objective:** Replace my drawn SVG icons with the owner's PNGs in `apps/game/public/assets/ui/statusBar` (white, for dark screens) and `StatusBarLight` (dark, for light screens).
 - **Completed:** `PhoneStatusBar.tsx` shows `Mobile Signal.png`, `Wifi.png` and `Battery.png` from the folder chosen by `tone` (`dark` is used by the call screen). `Time.png` is not used: the clock stays live text from `gameClock`. Test updated.

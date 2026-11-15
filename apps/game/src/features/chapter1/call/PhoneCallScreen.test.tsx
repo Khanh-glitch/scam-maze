@@ -110,9 +110,9 @@ describe("PhoneCallScreen", () => {
       expect(bar.className).toContain("pointer-events-none");
       expect(screen.getByTestId("phone-status-time").textContent).toMatch(/^\d{2}:\d{2}$/);
       expect(Array.from(bar.querySelectorAll("img")).map((i) => i.getAttribute("src"))).toEqual([
-        "/assets/ui/statusBar/Mobile%20Signal.png",
-        "/assets/ui/statusBar/Wifi.png",
-        "/assets/ui/statusBar/Battery.png",
+        "/assets/ui/StatusBarLight/Mobile%20Signal.png",
+        "/assets/ui/StatusBarLight/Wifi.png",
+        "/assets/ui/StatusBarLight/Battery.png",
       ]);
       unmount();
     }
