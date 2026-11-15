@@ -225,6 +225,19 @@ Resolved:
 
 ## Task History
 
+### 2026-11-15 — Room intro text timed to the voice; ambience lowered under it; intro left out of the voice script
+
+- **Objective:** owner feedback on the room intro: the text ran ahead of the voice (wanted: en 8, 7, 8 s and vi 5, 6, 6 s for `intro.1` to `intro.3`); the voice was quieter than the background; the voice script must never touch the owner's intro files.
+- **Completed:**
+  - Cause of the fast text: in the room the intro voice plays through the narration player, and the overlay got lines without a clip (`src: null`), so it typed at the text-only speed (38 characters per second).
+  - `dialogues/intro.ts`: `INTRO_TYPING_MS` with the owner's timings per locale. `useIntroNarration.ts`: `NarrationLine` takes optional `durationMs` (text spread evenly over it) and `delayMs` (wait before typing). `RoomChapterLayer.tsx` passes the timing and the narration player's pause before the line (`effectivePauseMs`, 450 ms for `reassuring`).
+  - Room ambience: `AudioEngine.duckForVoice` lowers the rain, the city and the clock to 0.25 (about -12 dB) while the intro narration plays, combined with the story mood duck; exposed as the optional `RoomStoryCommands.duckForVoice`. The menu music is already faded out in the room, so the background heard there is this ambience.
+  - `generate-chapter1-voice.mjs`: `dlg.intro` is owner-supplied (`OWNER_GRAPHS`). The script no longer synthesizes, replaces or prunes those clips on any platform, even with `--force`; their manifest entries are copied unchanged; `--only intro.*` stops with an error. Replaces the earlier `voiceNote` check.
+  - Incident: the owner's intro MP3s were overwritten on disk when the working folder was switched to a branch made from `main` before PR #45 (the switch was not made by the agent and the script did not run). They were restored from `6f56dab`; `main` now has them (PR #45).
+- **Files modified:** `apps/game/scripts/generate-chapter1-voice.mjs`, `apps/game/src/game/narrative/chapter1/dialogues/intro.ts`, `apps/game/src/features/chapter1/intro/useIntroNarration{.ts,.test.ts}` (test new), `apps/game/src/features/chapter1/room/RoomChapterLayer.tsx`, `apps/game/src/features/roomv2/game/{audio,engine,outside}.ts`, `docs/PROJECT_PROGRESS.md`.
+- **Validation:** `voice:chapter1 --dry-run --force --prune` lists 82 jobs and no intro clip, `--only intro.1` is refused, the intro MP3 checksums did not change, `voice:report` 88 present. Typecheck, build and tests: see the commit report.
+- **Not verified:** the timing and the levels by ear in a browser.
+
 ### 2026-11-17 — Laptop and phone-records UI on the 3D device screens
 
 - Objective: owner request (approach A). The laptop and phone-records overlays should look like they are on the laptop display and phone display in the 3D view, not in a floating dialog.
