@@ -10,11 +10,13 @@ import { buildApartment, ROOM, WIN, type Apartment } from './apartment';
 import { buildCity } from './city';
 import { createRainGlass } from './glass';
 import { AudioEngine } from './audio';
-import { clock, type PhoneMode } from './screens';
+import { clock, type LaptopFrame, type PhoneMode } from './screens';
 import { tr, trLines } from './strings';
 import { CharacterArmsViewmodel } from '../../player/runtime/CharacterArmsViewmodel';
 import { dropMaskCanvas, paintDropMask, canvas, toTex } from './textures';
-import type { RoomOptions } from './outside';
+import { projectCornersToViewport, cornersChanged, type ScreenCornersPx, type ScreenDeviceId } from './screenProjection';
+import { pickHoverId, laptopInteractRoute, inspectDurationSec } from './storyInteract';
+import { isRoomPropId, type RoomOptions, type RoomStoryCommands } from './outside';
 
 export type Caption = { text: string; voice?: boolean; id: number };
 export type UIAction = { key: string; label: string };
@@ -49,6 +51,23 @@ const POSES: Record<string, Pose> = {
   bed: { pos: V(1.55, 0.74, -1.66), look: V(0.7, 2.65, -1.0), fov: 70 },
 };
 
+/**
+ * Story mode only: closer poses so the device screen fills about 75 to 80 percent of the view width
+ * (laptop) or about 85 percent of the view height (phone) at 16:9, because the host maps its UI onto
+ * that screen. Standalone `/roomv2` keeps `POSES`. The phone camera sits on the phone's own "down"
+ * side so the portrait screen appears upright.
+ */
+const STORY_POSES: Record<string, Pose> = {
+  laptop: { pos: V(-1.63, 0.932, -1.56), look: V(-1.63, 0.862, -1.84), fov: 42 },
+  phone: { pos: V(0.936, 0.88, -1.745), look: V(0.93, 0.559, -1.78), fov: 29 },
+};
+
+/** Scratch objects for projecting a device screen to the viewport (story mode, no per-frame allocation). */
+const _scrViewProj = new THREE.Matrix4();
+const _scrPoint = new THREE.Vector3();
+const _scrWorld = new Array<number>(12).fill(0);
+const _scrOut = new Array<number>(8).fill(0);
+
 const CAPTION_COUNTS: Record<string, number> = {
   window: 2, laptop: 1, note: 1, receipts: 1, mug: 1, phone: 1, calendar: 1, photo: 1, fridge: 3, bed: 2, jacket: 1, umbrella: 1, door: 1,
 };
@@ -76,7 +95,7 @@ const easeIO = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2
 const TITLE_IDS = ['window', 'laptop', 'note', 'receipts', 'mug', 'phone', 'calendar', 'photo', 'fridge', 'bed'];
 const titleOf = (id: string): string => (TITLE_IDS.includes(id) ? tr(`title.${id}`) : '');
 
-export class Engine {
+export class Engine implements RoomStoryCommands {
   container: HTMLElement;
   renderer: THREE.WebGLRenderer;
   scene = new THREE.Scene();
@@ -138,7 +157,7 @@ export class Engine {
   lastInteract = 0;
   exposure = 1.55;
 
-  inspect: null | { id: string; from: { pos: THREE.Vector3; q: THREE.Quaternion; fov: number }; to: Pose; t: number; dir: 1 | -1; capIdx: number } = null;
+  inspect: null | { id: string; from: { pos: THREE.Vector3; q: THREE.Quaternion; fov: number }; to: Pose; t: number; dir: 1 | -1; capIdx: number; ready: boolean } = null;
   lookOffset = new THREE.Vector2();
 
   // fridge / seat / extras
@@ -151,8 +170,13 @@ export class Engine {
   dust!: THREE.Points;
   dustSeed: number[] = [];
 
-  story: 'calm' | 'presilence' | 'ringing' | 'call' | 'declined' | 'missed' | 'done' = 'calm';
+  /** `'external'`: a story host (`opts.story`) owns the story; the room's own phone-call timeline never runs. */
+  story: 'calm' | 'presilence' | 'ringing' | 'call' | 'declined' | 'missed' | 'done' | 'external' = 'calm';
   storyT = 0;
+  /** External story only: the host asked the phone to ring (vibration and ringtone). */
+  extRinging = false;
+  extMood: 'calm' | 'quiet' | 'tense' = 'calm';
+  laptopFrame: LaptopFrame | null = null;
   vibeOn = false;
   vibeClock = 0;
   callSec = 0;
@@ -182,6 +206,7 @@ export class Engine {
     this.container = container;
     this.opts = opts;
     this.live = !opts.standby;
+    if (opts.story) this.story = 'external';
     this.onUI = onUI;
     this.quality = quality;
     const r = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
@@ -274,7 +299,7 @@ export class Engine {
         p.material = m;
         this.glassMats.push(m);
       });
-    });
+    }, { wideLaptopHit: !!this.opts.story });
     const a = this.apt;
     this.phoneBase.copy(a.phone.position);
     this.phoneBaseRot = a.phone.rotation.y;
@@ -479,6 +504,7 @@ export class Engine {
     this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
     this.composer.setSize(w, h);
+    if (this.screenWatch) this.readScreenOffset();
     const pr = this.renderer.getPixelRatio();
     this.cityRT.setSize(Math.floor(w * pr * 0.5), Math.floor(h * pr * 0.5));
   };
@@ -537,14 +563,16 @@ export class Engine {
   }
 
   label(id: string): string | null {
-    const ring = this.story === 'ringing';
+    const hosted = this.opts.story?.label(id);
+    if (hosted != null) return hosted;
+    const ring = this.story === 'ringing' || (this.story === 'external' && this.phoneMode === 'ringing');
     switch (id) {
       case 'switch': return this.lights.ceiling ? tr('label.ceilingOff') : tr('label.ceilingOn');
       case 'desklamp': return this.lights.desk ? tr('label.deskOff') : tr('label.deskOn');
       case 'bedlamp': return this.lights.bed ? tr('label.bedOff') : tr('label.bedOn');
       case 'kitchenlight': return this.lights.kitchen ? tr('label.kitchenOff') : tr('label.kitchenOn');
       case 'window': return tr('label.window');
-      case 'laptop': return this.seat === 'seated' ? tr('label.laptopLook') : tr('label.laptopSit');
+      case 'laptop': return this.seat === 'seated' || this.opts.story ? tr('label.laptopLook') : tr('label.laptopSit');
       case 'chair': return this.seat === 'none' ? tr('label.sit') : null;
       case 'note': return tr('label.note');
       case 'receipts': return tr('label.receipts');
@@ -557,7 +585,9 @@ export class Engine {
       case 'bed': return tr('label.bed');
       case 'jacket': return tr('label.jacket');
       case 'umbrella': return tr('label.umbrella');
-      case 'door': return this.opts.onExit ? tr('label.doorLeave') : tr('label.door');
+      case 'door':
+        if (this.opts.story?.doorLocked?.()) return tr('label.doorLocked');
+        return this.opts.onExit ? tr('label.doorLeave') : tr('label.door');
     }
     return null;
   }
@@ -567,9 +597,12 @@ export class Engine {
     if (!id || this.inspect || this.seat === 'sitting' || this.seat === 'standing') return;
     this.markUsed(id);
     this.reachWithHand(id);
+    const port = this.opts.story;
+    if (port && isRoomPropId(id)) port.onProp(id, 'interact');
+    if (id === 'door' && port?.doorLocked?.()) { this.audio.switchClick('door'); this.say(captionLines('door')[0]); return; }
     if (id === 'door' && this.opts.onExit) { this.audio.switchClick('door'); this.requestExit(); return; }
     switch (id) {
-      case 'laptop': if (this.seat === 'seated') this.startInspect('laptop'); else this.startSit(); return;
+      case 'laptop': if (laptopInteractRoute(!!port, this.seat) === 'inspect') this.startInspect('laptop'); else this.startSit(); return;
       case 'chair': if (this.seat === 'none') this.startSit(); return;
       case 'fridge': if (this.fridgeOpen) this.setFridgeDoor(false); else { this.setFridgeDoor(true); this.startInspect('fridge'); } return;
       case 'switch': this.toggleLight('ceiling', 'switch'); return;
@@ -619,8 +652,8 @@ export class Engine {
   }
 
   startInspect(id: string) {
-    const to = POSES[id];
-    this.inspect = { id, from: { pos: this.camera.position.clone(), q: this.camera.quaternion.clone(), fov: this.camera.fov }, to, t: 0, dir: 1, capIdx: 0 };
+    const to = (this.opts.story ? STORY_POSES[id] : undefined) ?? POSES[id];
+    this.inspect = { id, from: { pos: this.camera.position.clone(), q: this.camera.quaternion.clone(), fov: this.camera.fov }, to, t: 0, dir: 1, capIdx: 0, ready: false };
     this.lookOffset.set(0, 0);
     // Picking it up is enough; the "look at your hand" inspect clip covered the phone (owner).
     if (HAND_INSPECT.has(id)) this.arms.triggerInteract();
@@ -635,6 +668,8 @@ export class Engine {
   }
 
   inspectLines(id: string): string[] {
+    const hosted = this.opts.story?.inspectLines(id);
+    if (hosted) return hosted;
     if (id === 'phone') {
       if (this.story === 'ringing') return [];
       if (this.story === 'declined' || this.story === 'missed' || this.story === 'done') return this.ui.ended === 'answered' ? trLines('inspect.phoneEndedAnswered', 1) : trLines('inspect.phoneEndedDeclined', 1);
@@ -644,10 +679,13 @@ export class Engine {
   }
 
   actionsFor(id: string): UIAction[] {
+    const hosted = this.opts.story?.actions(id);
+    if (hosted) return hosted;
     const back = { key: 'Q', label: tr('action.back') };
     if (id === 'window') return [{ key: 'F', label: this.windowOpen ? tr('action.windowClose') : tr('action.windowOpen') }, back];
     if (id === 'mug') return [{ key: 'F', label: tr('action.drink') }, back];
-    if (id === 'laptop') return [{ key: 'F', label: tr('action.type') }, { key: 'Q', label: tr('action.sitUp') }];
+    // Story mode: the chapter layer owns the laptop UI, so no typing demo hint and no "sit up" (the player never sat).
+    if (id === 'laptop') return this.opts.story ? [back] : [{ key: 'F', label: tr('action.type') }, { key: 'Q', label: tr('action.sitUp') }];
     if (id === 'fridge') return [{ key: 'F', label: this.fridgeOpen ? tr('action.fridgeShut') : tr('action.fridgeUnlatch') }, { key: 'Q', label: tr('action.back') }];
     if (id === 'phone' && this.story === 'ringing') return [{ key: 'F', label: tr('action.answer') }, { key: 'R', label: tr('action.decline') }];
     return [back];
@@ -656,6 +694,8 @@ export class Engine {
   inspectAction(key: string): boolean {
     if (!this.inspect || this.inspect.dir !== 1 || this.inspect.t < 0.6) return false;
     const id = this.inspect.id;
+    const port = this.opts.story;
+    if (port && isRoomPropId(id) && port.onInspectKey(id, key)) return true;
     if (id === 'window' && key === 'F') {
       this.windowOpen = !this.windowOpen;
       this.audio.windowSlide(this.windowOpen);
@@ -663,7 +703,7 @@ export class Engine {
       this.ui.inspecting = { title: titleOf(id), actions: this.actionsFor(id) }; this.emit();
       return true;
     }
-    if (id === 'laptop' && key === 'F') {
+    if (id === 'laptop' && key === 'F' && !port) {
       this.typed = Math.min(typedText().length, this.typed + 4 + Math.floor(Math.random() * 5));
       this.audio.typing();
       if (this.typed >= typedText().length && !this.used.has('typed')) { this.used.add('typed'); this.later(1.2, () => this.say(tr('say.typedSend'))); }
@@ -682,10 +722,12 @@ export class Engine {
     return false;
   }
 
-  endInspect() {
-    if (!this.inspect) return;
+  endInspect(force = false) {
+    if (!this.inspect || (force && this.inspect.dir !== 1)) return;
     const id = this.inspect.id;
     if (this.story === 'ringing' && id === 'phone') return; // must decide
+    if (!force && this.opts.story && !this.opts.story.canLeaveInspect(id)) return;
+    const wasReady = this.inspect.ready;
     this.inspect.dir = -1;
     this.inspect.from = { pos: this.camera.position.clone(), q: this.camera.quaternion.clone(), fov: this.camera.fov };
     this.inspect.t = 0;
@@ -693,10 +735,99 @@ export class Engine {
     if (id === 'bed') this.audio.bedRustle();
     this.ui.inspecting = null;
     this.emit();
+    if (wasReady && this.opts.story && isRoomPropId(id)) this.opts.story.onProp(id, 'inspect-end');
+  }
+
+  /* =================== STORY HOST COMMANDS =================== */
+  setPhoneMode(mode: PhoneMode) {
+    if (mode === 'call' && this.phoneMode !== 'call') this.callSec = 0;
+    this.phoneMode = mode;
+  }
+
+  ring(on: boolean) {
+    if (this.extRinging === on) return;
+    this.extRinging = on;
+    this.vibeClock = 0;
+    if (on) this.audio.ring(true); else this.stopVibe();
+  }
+
+  setLaptopFrame(frame: LaptopFrame | null) {
+    this.laptopFrame = frame;
+    // A new card wakes the screen (the existing fade-in and the small screen light) so the laptop
+    // shows it is waiting. No marker or highlight: only the screen light and the chime.
+    if (frame && this.opts.story) this.laptopWoken = true;
+    this.lastAwakeKey = -1; // redraw the screen on the next frame
+  }
+
+  chime() { this.audio.chime(); }
+
+  setMood(mood: 'calm' | 'quiet' | 'tense') {
+    if (this.extMood === mood) return;
+    this.extMood = mood;
+    this.audio.duckCity(mood === 'tense' ? 0.25 : mood === 'quiet' ? 0.55 : 1);
+  }
+
+  /** Leaves the inspect pose even when the host would keep the player there. */
+  closeInspect() { this.endInspect(true); }
+
+  /**
+   * Story host: follow the projected screen of a device. While the matching inspect pose is reached the
+   * listener gets the four viewport-pixel corners (top-left, top-right, bottom-right, bottom-left) when they
+   * change by more than a quarter pixel, and `null` when the screen is behind the camera. `null` as device
+   * stops watching. Nothing is reported while the camera is still moving into the pose.
+   */
+  watchScreen(device: ScreenDeviceId | null, listener?: (corners: ScreenCornersPx | null) => void) {
+    if (device === null || !listener) { this.screenWatch = null; return; }
+    this.readScreenOffset();
+    this.screenWatch = { device, listener, last: [0, 0, 0, 0, 0, 0, 0, 0], hasLast: false, visible: false };
+    this.updateScreenWatch();
+  }
+
+  private screenLeft = 0;
+  private screenTop = 0;
+  private readScreenOffset() { const r = this.container.getBoundingClientRect(); this.screenLeft = r.left; this.screenTop = r.top; }
+  private screenWatch: { device: ScreenDeviceId; listener: (corners: ScreenCornersPx | null) => void; last: number[]; hasLast: boolean; visible: boolean } | null = null;
+
+  private updateScreenWatch() {
+    const w = this.screenWatch;
+    if (!w || !this.opts.story) return;
+    const ins = this.inspect;
+    if (!ins || ins.id !== w.device || ins.dir !== 1 || !ins.ready) return;
+    const mesh = w.device === 'laptop' ? this.apt.laptopScreenMesh : this.apt.phoneScreenMesh;
+    const params = (mesh.geometry as THREE.PlaneGeometry).parameters;
+    const hw = params.width / 2, hh = params.height / 2;
+    mesh.updateWorldMatrix(true, false);
+    for (let i = 0; i < 4; i++) {
+      _scrPoint.set(i === 0 || i === 3 ? -hw : hw, i < 2 ? hh : -hh, 0).applyMatrix4(mesh.matrixWorld);
+      _scrWorld[i * 3] = _scrPoint.x; _scrWorld[i * 3 + 1] = _scrPoint.y; _scrWorld[i * 3 + 2] = _scrPoint.z;
+    }
+    const cam = this.camera;
+    cam.updateMatrixWorld();
+    cam.matrixWorldInverse.copy(cam.matrixWorld).invert();
+    _scrViewProj.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+    const ok = projectCornersToViewport(_scrViewProj.elements, _scrWorld, this.container.clientWidth, this.container.clientHeight, this.screenLeft, this.screenTop, _scrOut);
+    if (!ok) {
+      if (w.visible || !w.hasLast) { w.visible = false; w.hasLast = true; w.listener(null); }
+      return;
+    }
+    if (w.visible && w.hasLast && !cornersChanged(w.last, _scrOut, 0.25)) return;
+    for (let i = 0; i < 8; i++) w.last[i] = _scrOut[i];
+    w.visible = true; w.hasLast = true;
+    w.listener([_scrOut[0], _scrOut[1], _scrOut[2], _scrOut[3], _scrOut[4], _scrOut[5], _scrOut[6], _scrOut[7]]);
+  }
+
+  /** External story: vibration cycle and call timer, the part of `updateStory` the host does not own. */
+  private updateExternal(dt: number) {
+    if (this.phoneMode === 'call') this.callSec += dt;
+    if (!this.extRinging) return;
+    this.vibeClock += dt;
+    const on = this.vibeClock % 1.6 < 0.85;
+    if (on !== this.vibeOn) { this.vibeOn = on; this.audio.setVibe(on); if (on) this.phoneBaseRot += (Math.random() - 0.3) * 0.035; }
   }
 
   /* =================== STORY: the phone =================== */
   updateStory(dt: number) {
+    if (this.story === 'external') { this.updateExternal(dt); return; }
     const el = this.t - this.startT;
     if (this.story === 'calm' && this.ui.started) {
       const quiet = this.t - this.lastInteract;
@@ -896,7 +1027,7 @@ export class Engine {
     const walkQ = _walkQ.setFromEuler(_walkE.set(this.pitch + Math.sin(this.t * 0.7) * 0.003, this.yaw + sway * 0.5, Math.sin(this.bobPhase * 0.5) * 0.003, 'YXZ'));
     if (this.inspect) {
       const ins = this.inspect;
-      ins.t = Math.min(1, ins.t + dt / (ins.dir === 1 ? 1.15 : 0.9));
+      ins.t = Math.min(1, ins.t + dt / inspectDurationSec(!!this.opts.story, ins.id, ins.dir === 1 ? 1 : -1));
       const k = ins.t < 0.5 ? 4 * ins.t ** 3 : 1 - (-2 * ins.t + 2) ** 3 / 2;
       let toPos: THREE.Vector3, toQ: THREE.Quaternion, toFov: number;
       if (ins.dir === 1) {
@@ -915,6 +1046,11 @@ export class Engine {
       cam.fov = THREE.MathUtils.lerp(ins.from.fov, toFov, k);
       cam.updateProjectionMatrix();
       if (ins.dir === -1 && ins.t >= 1) { this.inspect = null; }
+      else if (ins.dir === 1 && ins.t >= 1 && !ins.ready) {
+        ins.ready = true;
+        const port = this.opts.story;
+        if (port && isRoomPropId(ins.id)) port.onProp(ins.id, 'inspect-ready');
+      }
     } else {
       cam.position.copy(walkPos);
       cam.quaternion.copy(walkQ);
@@ -929,8 +1065,10 @@ export class Engine {
     if ((this.hoverFrame++ & 1) === 1) return;
     this.raycaster.setFromCamera(_center, this.camera);
     this.raycaster.far = 2.3;
-    const hit = this.raycaster.intersectObjects(this.apt.hits, true)[0];
-    let id: string | null = (hit?.object.userData.id as string) ?? null;
+    const found = this.raycaster.intersectObjects(this.apt.hits, true);
+    let id: string | null = this.apt.laptopHitProxy
+      ? pickHoverId(found.map((h) => ({ id: h.object.userData.id as string, proxy: !!h.object.userData.hitProxy, distance: h.distance })))
+      : ((found[0]?.object.userData.id as string) ?? null);
     if (id === 'chair' && this.seat !== 'none') id = null;
     if (id !== this.hovered || (id && this.label(id) !== this.ui.prompt)) {
       this.hovered = id;
@@ -997,7 +1135,7 @@ export class Engine {
     a.emissives.powerLed.color.setScalar(this.laptopAwake > 0 ? 1.4 : 0.6 + Math.sin(this.t * 2) * 0.6);
     const awakeKey = this.laptopAwake > 0 ? 1 : 0;
     if ((this.laptopAwake > 0 && this.laptopAwake < 1) || time !== this.lastClock || this.typed !== this.lastTyped || awakeKey !== this.lastAwakeKey) {
-      a.laptopScreen.draw(this.laptopAwake, time, typedText().slice(0, this.typed)); this.lastTyped = this.typed; this.lastAwakeKey = awakeKey;
+      a.laptopScreen.draw(this.laptopAwake, time, typedText().slice(0, this.typed), this.opts.story ? this.laptopFrame : undefined); this.lastTyped = this.typed; this.lastAwakeKey = awakeKey;
     }
     // phone
     if (this.phoneMode === 'lock' && this.story === 'calm' && this.t > this.phoneLockUntil) this.phoneMode = 'aod';
@@ -1114,6 +1252,7 @@ export class Engine {
     if (this.ui.started) this.movePlayer(dt);
     this.updateSeat(rawDt > 0.05 ? 0.05 : dt);
     this.updateCamera(dt);
+    this.updateScreenWatch();
     this.updateArms(dt);
     this.updateHover();
     this.updateStory(rawDt);
@@ -1133,7 +1272,7 @@ export class Engine {
       if (this.exitT >= 1 && !this.exitSent) { this.exitSent = true; this.opts.onExit?.(); if (this.disposed) return; }
     }
     fu.uTime.value = this.t % 100;
-    const tension = this.story === 'ringing' || this.story === 'call' ? 1 : 0;
+    const tension = this.story === 'ringing' || this.story === 'call' || this.extMood === 'tense' ? 1 : 0;
     fu.uVig.value += ((0.85 + tension * 0.35) - fu.uVig.value) * dt * 0.8;
     fu.uDesat.value += ((tension * 0.18) - fu.uDesat.value) * dt * 0.6;
 
@@ -1157,6 +1296,7 @@ export class Engine {
   }
 
   dispose() {
+    if (this.disposed) return;
     this.disposed = true;
     cancelAnimationFrame(this.raf);
     this.timeouts.forEach(clearTimeout);
@@ -1167,6 +1307,8 @@ export class Engine {
     window.removeEventListener('resize', this.onResize);
     this.arms.dispose();
     this.audio.dispose();
+    const proxy = this.apt?.laptopHitProxy;
+    if (proxy) { proxy.removeFromParent(); proxy.geometry.dispose(); (proxy.material as THREE.Material).dispose(); }
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }

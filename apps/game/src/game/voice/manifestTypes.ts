@@ -36,6 +36,11 @@ export interface VoiceClipEntry {
 export interface VoiceManifest {
   schemaVersion: typeof VOICE_MANIFEST_SCHEMA_VERSION;
   chapterId: "chapter-1";
+  /**
+   * `computeChapterContentVersion` of the scenario the manifest was generated from. Absent in
+   * manifests written before the field existed.
+   */
+  chapterContentVersion?: string;
   /** Sorted by `clipId`, then `locale`. */
   clips: ReadonlyArray<VoiceClipEntry>;
 }

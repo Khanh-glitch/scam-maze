@@ -1,5 +1,6 @@
 // Example tests for buildVoiceJobs against the real Chapter 1 scenario and Vietnamese overlay.
-// Feature: chapter-01-voice-narrative, task 9.9. Validates: Requirements 4.7
+// Feature: chapter-01-voice-narrative, task 9.9; spec chapter-01-double-deception, task 11.6.
+// Validates: Requirements 14.1, 14.2, 14.3
 
 import { describe, expect, it } from "vitest";
 
@@ -9,7 +10,9 @@ import { CHAPTER_1_SCENARIO } from "../narrative/chapter1/scenario";
 import {
   buildVoiceJobs,
   CHAPTER1_VOICE_CAST,
+  computeChapterContentVersion,
   isSpokenNode,
+  listUntranslatedSpokenLines,
   overlayLineKey,
   TONE_RATE_MULTIPLIER,
 } from "./buildVoiceJobs";
@@ -24,20 +27,31 @@ const allNodes = graphs.flatMap((graph) =>
 const spoken = allNodes.filter(({ node }) => isSpokenNode(node));
 
 const jobs = buildVoiceJobs(CHAPTER_1_SCENARIO, OVERLAYS);
+const untranslated = listUntranslatedSpokenLines(CHAPTER_1_SCENARIO, OVERLAYS, "vi");
 
 describe("buildVoiceJobs with the real Chapter 1 data", () => {
   it("has spoken nodes to voice", () => {
     expect(spoken.length).toBeGreaterThan(0);
   });
 
-  it("makes one job per spoken node and locale", () => {
-    expect(jobs).toHaveLength(spoken.length * 2);
-    for (const locale of ["en", "vi"] as const) {
-      const ids = jobs.filter((job) => job.locale === locale).map((job) => job.clipId);
-      expect(ids).toHaveLength(spoken.length);
-      expect(new Set(ids).size).toBe(spoken.length);
-      expect([...ids].sort()).toEqual(spoken.map(({ node }) => node.id).sort());
-    }
+  it("covers the five Chapter 1 dialogue graphs", () => {
+    expect(graphs.map((graph) => graph.id).sort()).toEqual(
+      ["dlg.aftermath", "dlg.alex", "dlg.intro", "dlg.official-line", "dlg.recovery"],
+    );
+  });
+
+  it("makes one en job per spoken node", () => {
+    const ids = jobs.filter((job) => job.locale === "en").map((job) => job.clipId);
+    expect(ids).toHaveLength(spoken.length);
+    expect(new Set(ids).size).toBe(spoken.length);
+    expect([...ids].sort()).toEqual(spoken.map(({ node }) => node.id).sort());
+  });
+
+  it("makes a vi job for every spoken node that has overlay text and lists the rest as untranslated", () => {
+    const viIds = jobs.filter((job) => job.locale === "vi").map((job) => job.clipId);
+    expect(new Set(viIds).size).toBe(viIds.length);
+    expect(viIds.length + untranslated.length).toBe(spoken.length);
+    for (const line of untranslated) expect(viIds).not.toContain(line.clipId);
   });
 
   it("skips system nodes and every non-spoken node", () => {
@@ -73,7 +87,6 @@ describe("buildVoiceJobs with the real Chapter 1 data", () => {
       const overlayText = CHAPTER_1_NARRATIVE_VI[overlayLineKey(entry.graph.id, entry.node.lineId)];
       expect(overlayText).toBeTruthy();
       expect(job.text).toBe(overlayText);
-      expect(job.text).not.toBe(entry.graph.lines[entry.node.lineId]);
     }
   });
 
@@ -104,15 +117,49 @@ describe("buildVoiceJobs with the real Chapter 1 data", () => {
     });
   });
 
-  it("uses the design cast table", () => {
+  it("uses the Chapter 1 cast table", () => {
+    expect(Object.keys(CHAPTER1_VOICE_CAST).sort()).toEqual(
+      ["spk.alex", "spk.narrator", "spk.northgate-agent", "spk.recovery"],
+    );
     expect(CHAPTER1_VOICE_CAST["spk.alex"].locales.en.voice).toBe("Microsoft David");
-    expect(CHAPTER1_VOICE_CAST["spk.case-officer"].locales.en.voice).toBe("Microsoft Mark");
+    expect(CHAPTER1_VOICE_CAST["spk.recovery"].locales.en.voice).toBe("Microsoft Mark");
     expect(CHAPTER1_VOICE_CAST["spk.northgate-agent"].locales.en.voice).toBe("Microsoft Zira");
-    expect(CHAPTER1_VOICE_CAST["spk.sam"].locales.en.voice).toBe("Microsoft Mark");
+    expect(CHAPTER1_VOICE_CAST["spk.narrator"].locales.en.voice).toBe("Microsoft Mark");
     for (const entry of Object.values(CHAPTER1_VOICE_CAST)) {
       expect(entry.locales.vi.voice).toBe("Microsoft An");
     }
-    expect(CHAPTER1_VOICE_CAST["spk.sam"].phoneFilter).toBe(false);
+    expect(CHAPTER1_VOICE_CAST["spk.narrator"].phoneFilter).toBe(false);
+    expect(CHAPTER1_VOICE_CAST["spk.recovery"].phoneFilter).toBe(true);
+  });
+
+  it("gives speakers that share a voice a different rate or pitch", () => {
+    for (const locale of ["en", "vi"] as const) {
+      const entries = Object.entries(CHAPTER1_VOICE_CAST).map(([id, entry]) => ({ id, ...entry.locales[locale] }));
+      for (const a of entries) {
+        for (const b of entries) {
+          if (a.id >= b.id || a.voice !== b.voice) continue;
+          expect(a.rate !== b.rate || a.pitch !== b.pitch, `${locale}: ${a.id} vs ${b.id}`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("derives a stable content version that changes with a line", () => {
+    const version = computeChapterContentVersion(CHAPTER_1_SCENARIO);
+    expect(version).toMatch(/^[0-9a-f]{8}$/);
+    expect(computeChapterContentVersion(CHAPTER_1_SCENARIO)).toBe(version);
+    const first = spoken[0];
+    const changed = {
+      ...CHAPTER_1_SCENARIO,
+      dialogues: {
+        ...CHAPTER_1_SCENARIO.dialogues,
+        [first.graph.id]: {
+          ...first.graph,
+          lines: { ...first.graph.lines, [first.node.lineId]: `${first.graph.lines[first.node.lineId]} changed` },
+        },
+      },
+    };
+    expect(computeChapterContentVersion(changed)).not.toBe(version);
   });
 
   it("writes MP3 files under public/audio/chapter01 and WAV files outside public", () => {

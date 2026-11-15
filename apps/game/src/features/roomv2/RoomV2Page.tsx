@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { ArrowLeft } from "lucide-react";
 import type { GameSettings } from "@scammaze/shared-types";
 import { Engine, type UIState } from "./game/engine";
-import type { RoomOptions } from "./game/outside";
+import type { RoomOptions, RoomStoryPort } from "./game/outside";
 import { setTranslator } from "./game/strings";
 
 interface RoomV2PageProps {
@@ -20,6 +20,10 @@ interface RoomV2PageProps {
   onUI?: (ui: UIState) => void;
   /** Part of the neighborhood (house no. 59): built in standby, shown on `activate`, left through the door. */
   options?: RoomOptions;
+  /** Story host port. Same as `options.story`; when both are set, this one wins. */
+  story?: RoomStoryPort;
+  /** Rendered inside the root, above the engine canvas and the room's own HUD (story HUD, dialogue, phone). */
+  overlay?: React.ReactNode;
 }
 
 type RoomQuality = "high" | "low";
@@ -43,7 +47,7 @@ const SHADOW = { textShadow: "0 1px 6px rgba(0,0,0,.9)" } as const;
  * Prototype route `/roomv2`: the player's apartment, "After the Rain". It is a standalone engine
  * kept apart from the story chapters until it is integrated.
  */
-export const RoomV2Page: React.FC<RoomV2PageProps> = ({ settings, onBackToMenu, onReady, embedded = false, onUI, options }) => {
+export const RoomV2Page: React.FC<RoomV2PageProps> = ({ settings, onBackToMenu, onReady, embedded = false, onUI, options, story, overlay }) => {
   const { t } = useTranslation("worlds");
   const mountRef = useRef<HTMLDivElement | null>(null);
   const engineRef = useRef<Engine | null>(null);
@@ -55,8 +59,10 @@ export const RoomV2Page: React.FC<RoomV2PageProps> = ({ settings, onBackToMenu, 
   onReadyRef.current = onReady;
   const onUIRef = useRef(onUI);
   onUIRef.current = onUI;
-  const optionsRef = useRef(options);
-  optionsRef.current = options;
+  const mergedOptions = story ? { ...options, story } : options;
+  const hasStory = Boolean(mergedOptions?.story);
+  const optionsRef = useRef(mergedOptions);
+  optionsRef.current = mergedOptions;
   const embeddedRef = useRef(embedded);
   embeddedRef.current = embedded;
 
@@ -183,7 +189,7 @@ export const RoomV2Page: React.FC<RoomV2PageProps> = ({ settings, onBackToMenu, 
         </button>
       )}
 
-      {!embedded && !ui.started && (
+      {!embedded && !hasStory && !ui.started && (
         <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(ellipse_at_center,rgba(10,12,20,0.55),rgba(0,0,0,0.92))]">
           <div className="max-w-xl px-8 text-center">
             <p className="mb-6 text-[11px] uppercase tracking-[0.45em] text-amber-200/60">{t("roomv2.intro.kicker")}</p>
@@ -216,7 +222,7 @@ export const RoomV2Page: React.FC<RoomV2PageProps> = ({ settings, onBackToMenu, 
         </div>
       )}
 
-      {ui.ended && (
+      {ui.ended && !hasStory && (
         <div className="absolute inset-0 flex animate-[cap_2.5s_ease-out] items-center justify-center">
           <div className="max-w-lg px-8 text-center">
             <p className="mb-5 text-[11px] uppercase tracking-[0.45em] text-amber-200/55">
@@ -248,6 +254,8 @@ export const RoomV2Page: React.FC<RoomV2PageProps> = ({ settings, onBackToMenu, 
           </div>
         </div>
       )}
+
+      {overlay}
     </div>
   );
 };

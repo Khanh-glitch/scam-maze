@@ -1,7 +1,7 @@
-// Chapter progress encode and restore for save format version 2.
+// Chapter progress encode and restore for save format version 3.
 // Pure TypeScript: no React, Three.js, R3F, Drei, Rapier, Zustand or Dexie imports.
-// See .kiro/specs/chapter-01-the-urgent-call/design.md, "Saves" and "Error Handling", and
-// Requirements 15.3, 15.5, 15.6 and 15.7.
+// See .kiro/specs/chapter-01-double-deception/design.md, "Save format v3", and
+// Requirements 17.1 to 17.5. The Room chapter has no saved pose: new saves hold `null`.
 //
 // A save stores only the accepted Core_Actions. Restore replays them through the chapter core
 // from the initial Chapter_State, so a save is valid exactly when the core accepts every action.
@@ -9,8 +9,7 @@
 import { CHAPTER_1_SCENARIO } from "../narrative/chapter1/scenario";
 import { chapterReducer, createInitialState } from "../narrative/reducer";
 import type { ChapterState, ScenarioDefinition } from "../narrative/types";
-import { clampToPlayArea } from "../scenes/MainMenuScene/streetPlayArea";
-import { SAVE_MAX_ACTIONS, type ChapterProgressV2, type SavedPlayerPose } from "./saveGame";
+import { SAVE_MAX_ACTIONS, type ChapterProgressV3, type SavedPlayerPose } from "./saveGame";
 
 export type RestoreProgressResult =
   | { ok: true; state: ChapterState; pose: SavedPlayerPose | null }
@@ -36,10 +35,6 @@ function isFinitePose(pose: SavedPlayerPose): boolean {
   return pose.position.length === 3 && pose.position.every(Number.isFinite) && Number.isFinite(pose.yaw);
 }
 
-/** Returns a copy of the pose with the position clamped to the Play_Area bounds. */
-function clampPose(pose: SavedPlayerPose): SavedPlayerPose {
-  return { position: clampToPlayArea(pose.position), yaw: pose.yaw };
-}
 
 /**
  * Builds the progress part of a Checkpoint from the Event_Log (Requirement 15.3). Every Event_Log
@@ -50,18 +45,18 @@ function clampPose(pose: SavedPlayerPose): SavedPlayerPose {
  * action list would replay to a different state, so it is never written.
  *
  * A non-finite pose is stored as `null` (the chapter spawn point) so the encoder never writes a
- * save that restore would reject. A finite pose is clamped to the Play_Area bounds.
+ * save that restore would reject. The Room chapter passes `null`; a finite pose is stored unchanged.
  */
 export function encodeProgress(
   state: ChapterState,
   playerPose: SavedPlayerPose | null,
   checkpointId: string,
-): ChapterProgressV2 | null {
+): ChapterProgressV3 | null {
   if (state.events.length > SAVE_MAX_ACTIONS) return null;
   return {
     checkpointId,
     actions: state.events.map((entry) => entry.action),
-    playerPose: playerPose !== null && isFinitePose(playerPose) ? clampPose(playerPose) : null,
+    playerPose: playerPose !== null && isFinitePose(playerPose) ? playerPose : null,
   };
 }
 
@@ -71,20 +66,20 @@ export function encodeProgress(
  * With `{ lenient: true }` replay stops at the first rejected action and returns the state after
  * the last accepted action with `trimmed: true` and `acceptedActions`; a fully accepted log
  * returns `trimmed: false`. More than `SAVE_MAX_ACTIONS` actions or a non-finite pose stay hard
- * failures in both modes (Requirement 15.7); a finite pose is clamped to the Play_Area bounds.
+ * failures in both modes (Requirement 15.7); a finite pose is returned unchanged.
  */
 export function restoreProgress(
-  progress: ChapterProgressV2,
+  progress: ChapterProgressV3,
   scenario?: ScenarioDefinition,
   options?: { readonly lenient?: false },
 ): RestoreProgressResult;
 export function restoreProgress(
-  progress: ChapterProgressV2,
+  progress: ChapterProgressV3,
   scenario: ScenarioDefinition | undefined,
   options: { readonly lenient: true },
 ): LenientRestoreProgressResult;
 export function restoreProgress(
-  progress: ChapterProgressV2,
+  progress: ChapterProgressV3,
   scenario: ScenarioDefinition = CHAPTER_1_SCENARIO,
   options: RestoreProgressOptions = {},
 ): RestoreProgressResult | LenientRestoreProgressResult {
@@ -96,7 +91,7 @@ export function restoreProgress(
   if (pose !== null && !isFinitePose(pose)) {
     return { ok: false, reason: RESTORE_REASONS.invalidPose };
   }
-  const restoredPose = pose === null ? null : clampPose(pose);
+  const restoredPose = pose === null ? null : { position: [...pose.position] as SavedPlayerPose["position"], yaw: pose.yaw };
 
   let state = createInitialState(scenario);
   let accepted = 0;

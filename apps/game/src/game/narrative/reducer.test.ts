@@ -1,22 +1,26 @@
-// Unit tests for the chapter reducer: one transition test per Core_Action and every rejection
-// reason named in the requirements (Requirements 5.3, 5.4, 5.9, 6.8, 8.6, 8.8, 9.6, 11.4, 11.5,
-// 12.2, 12.3, 12.5, 13.4, 13.5, 13.8, 18.1).
+// Unit tests for the chapter reducer, run against the fixture scenario (spec
+// chapter-01-double-deception, task 3.3). One transition test per Core_Action kind and the
+// rejection reasons of the guard table.
 
 import { describe, expect, it } from "vitest";
 
-import { OPTION_NOT_AVAILABLE } from "./dialogueEngine";
+import { FIXTURE_SCENARIO, fixtureState, withEvidence, withFlags } from "../../test/fixtureScenario";
+import { CHAPTER_1_SCENARIO } from "./chapter1/scenario";
+import { beatTag } from "./beats";
 import { OBJECTIVE_CONDITION_NOT_MET } from "./objectives";
 import { chapterReducer, createInitialState, isCoreAction, REASONS } from "./reducer";
-import type { ChapterState, CoreAction } from "./types";
+import type { ChapterState, CoreAction, ScenarioDefinition } from "./types";
 
 /** Applies the actions in order and fails the test on the first rejection. */
-function play(state: ChapterState, actions: readonly CoreAction[]): ChapterState {
+function play(
+  state: ChapterState,
+  actions: readonly CoreAction[],
+  scenario: ScenarioDefinition = FIXTURE_SCENARIO,
+): ChapterState {
   let current = state;
   for (const action of actions) {
-    const result = chapterReducer(current, action);
-    if (!result.accepted) {
-      throw new Error(`Rejected ${JSON.stringify(action)}: ${result.reason}`);
-    }
+    const result = chapterReducer(current, action, scenario);
+    if (!result.accepted) throw new Error(`Rejected ${JSON.stringify(action)}: ${result.reason}`);
     current = result.state;
   }
   return current;
@@ -25,7 +29,7 @@ function play(state: ChapterState, actions: readonly CoreAction[]): ChapterState
 /** Dispatches one action and expects a rejection with `reason` that leaves the state unchanged. */
 function expectRejected(state: ChapterState, action: unknown, reason: string): void {
   const snapshot = JSON.stringify(state);
-  const result = chapterReducer(state, action);
+  const result = chapterReducer(state, action, FIXTURE_SCENARIO);
   expect(result.accepted).toBe(false);
   expect(result.reason).toBe(reason);
   expect(result.state).toBe(state);
@@ -33,39 +37,57 @@ function expectRejected(state: ChapterState, action: unknown, reason: string): v
 }
 
 const START: CoreAction = { type: "START_CHAPTER" };
-const RING_SCAM: CoreAction = { type: "RING_CALL", callId: "call.scam-1", reason: "first-interaction" };
-const RE_RING_SCAM: CoreAction = { type: "RING_CALL", callId: "call.scam-1", reason: "re-ring" };
-const RING_CALLBACK: CoreAction = { type: "RING_CALL", callId: "call.callback", reason: "callback" };
+const RING_ALEX: CoreAction = { type: "RING_CALL", callId: "call.alex", reason: "first-interaction" };
+const RING_RECOVERY: CoreAction = { type: "RING_CALL", callId: "call.recovery", reason: "callback" };
 const ANSWER: CoreAction = { type: "ANSWER_CALL" };
 const END_CALL: CoreAction = { type: "END_CALL" };
-const WALLET: CoreAction = { type: "INTERACT_OBJECT", objectId: "obj.wallet" };
-const OFFICIAL: CoreAction = { type: "VERIFY_CLAIM", claimId: "claim.caller-identity", method: "official-line" };
-const BANK_APP: CoreAction = { type: "VERIFY_CLAIM", claimId: "claim.account-suspended", method: "bank-app" };
+const RECEIPTS: CoreAction = { type: "INTERACT_OBJECT", objectId: "obj.receipts" };
+const INSPECT_ORIGIN: CoreAction = { type: "DEVICE_ACTION", deviceActionId: "dev.inspect-notification-origin" };
+const INSPECT_SHARED: CoreAction = { type: "INSPECT_EVIDENCE", evidenceId: "ev.shared-case-id" };
+const OFFICIAL: CoreAction = {
+  type: "VERIFY_CLAIM",
+  claimId: "claim.recovery-needed",
+  method: "saved-official-contact",
+};
+const BANK_APP: CoreAction = { type: "VERIFY_CLAIM", claimId: "claim.recovery-needed", method: "bank-app" };
 const option = (optionId: string): CoreAction => ({ type: "SELECT_DIALOGUE_OPTION", optionId });
+const decide = (decision: "follow-recovery" | "refuse-and-stop" | "verify-independently"): CoreAction => ({
+  type: "MAKE_DECISION",
+  decision,
+});
 
-const started = (): ChapterState => play(createInitialState(), [START]);
-/** Card found, scam call answered and ended right away to verify. */
-const afterScamCall = (): ChapterState =>
-  play(started(), [WALLET, RING_SCAM, ANSWER, option("opt.scam.open.verify")]);
-/** Official line completed after the scam call; no Decision yet. */
-const afterOfficialLine = (): ChapterState =>
-  play(afterScamCall(), [
-    OFFICIAL,
-    option("opt.official.greeting.wait"),
-    option("opt.official.agent.report"),
-    option("opt.official.confirm.block"),
-  ]);
-const ended = (): ChapterState => play(afterScamCall(), [{ type: "MAKE_DECISION", decision: "stop-and-wait" }]);
+const started = (): ChapterState => play(createInitialState(FIXTURE_SCENARIO), [START]);
+/** First call answered and refused: it ended, so the notification beat fired. */
+const afterAlex = (): ChapterState => play(started(), [RING_ALEX, ANSWER, option("alex.refuse")]);
+/** Notification origin inspected: the notification is handled and the second call may ring. */
+const afterOrigin = (): ChapterState => play(afterAlex(), [INSPECT_ORIGIN]);
+/** Second call answered and trusted: it ended. */
+const afterRecovery = (): ChapterState => play(afterOrigin(), [RING_RECOVERY, ANSWER, option("rec.trust")]);
 
 describe("isCoreAction", () => {
-  it("accepts every well-formed action with known IDs", () => {
-    expect(isCoreAction(START)).toBe(true);
-    expect(isCoreAction(WALLET)).toBe(true);
-    expect(isCoreAction(RING_CALLBACK)).toBe(true);
-    expect(isCoreAction(option("opt.scam.open.verify"))).toBe(true);
-    expect(isCoreAction(OFFICIAL)).toBe(true);
-    expect(isCoreAction({ type: "MAKE_DECISION", decision: "stop-and-wait" })).toBe(true);
-    expect(isCoreAction({ type: "COMPLETE_OBJECTIVE", objectiveId: "obj.decide" })).toBe(true);
+  it("accepts a well-formed action of each of the 16 kinds", () => {
+    const actions: unknown[] = [
+      START,
+      RECEIPTS,
+      INSPECT_SHARED,
+      { type: "OPEN_PHONE" },
+      { type: "CLOSE_PHONE" },
+      RING_ALEX,
+      RING_RECOVERY,
+      ANSWER,
+      END_CALL,
+      { type: "TALK_TO_NPC", npcId: "npc.anyone" },
+      option("alex.refuse"),
+      OFFICIAL,
+      decide("refuse-and-stop"),
+      { type: "COMPLETE_OBJECTIVE", objectiveId: "obj.decide" },
+      { type: "FINISH_CHAPTER" },
+      INSPECT_ORIGIN,
+      { type: "COMBINE_EVIDENCE", evidenceIds: ["ev.alex-statement", "ev.shared-case-id"] },
+    ];
+    const kinds = new Set(actions.map((a) => (a as { type: string }).type));
+    expect(kinds.size).toBe(16);
+    for (const action of actions) expect(isCoreAction(action)).toBe(true);
   });
 
   it("rejects unknown shapes and unknown IDs", () => {
@@ -80,12 +102,17 @@ describe("isCoreAction", () => {
       { type: "INTERACT_OBJECT", objectId: "obj.car" },
       { type: "INSPECT_EVIDENCE" },
       { type: "RING_CALL", callId: "call.official", reason: "callback" },
-      { type: "RING_CALL", callId: "call.scam-1", reason: "because" },
-      { type: "TALK_TO_NPC", npcId: "npc.nobody" },
+      { type: "RING_CALL", callId: "call.alex", reason: "because" },
+      { type: "TALK_TO_NPC" },
       { type: "SELECT_DIALOGUE_OPTION", optionId: "" },
-      { type: "VERIFY_CLAIM", claimId: "claim.caller-identity", method: "guess" },
+      { type: "VERIFY_CLAIM", claimId: "claim.recovery-needed", method: "guess" },
       { type: "MAKE_DECISION", decision: "panic" },
       { type: "COMPLETE_OBJECTIVE", objectiveId: "obj.nothing" },
+      { type: "DEVICE_ACTION", deviceActionId: "dev.nothing" },
+      { type: "COMBINE_EVIDENCE", evidenceIds: ["ev.alex-statement"] },
+      { type: "COMBINE_EVIDENCE", evidenceIds: ["ev.alex-statement", "ev.alex-statement"] },
+      { type: "COMBINE_EVIDENCE", evidenceIds: ["ev.alex-statement", "ev.nothing"] },
+      { type: "COMBINE_EVIDENCE", evidenceIds: Array(4).fill("ev.alex-statement") },
     ]) {
       expect(isCoreAction(value)).toBe(false);
     }
@@ -93,22 +120,20 @@ describe("isCoreAction", () => {
 });
 
 describe("chapterReducer transitions", () => {
-  it("creates an initial state with every claim unverified and every flag false", () => {
-    const state = createInitialState();
+  it("creates an initial state from the ID arrays", () => {
+    const state = createInitialState(FIXTURE_SCENARIO);
     expect(state.status).toBe("not-started");
     expect(Object.values(state.claims).every((status) => status === "unverified")).toBe(true);
     expect(Object.values(state.flags).every((flag) => flag === false)).toBe(true);
+    expect(state.deductions).toEqual([]);
     expect(state.pressure).toBe(0);
     expect(state.events).toEqual([]);
   });
 
-  it("START_CHAPTER starts play, delivers the urgent text and logs one event", () => {
+  it("START_CHAPTER starts play, activates objectives and logs one event", () => {
     const state = started();
     expect(state.status).toBe("playing");
-    expect(state.phone.messages).toEqual(["msg.sms-alert"]);
-    expect(state.phone.unread).toEqual(["msg.sms-alert"]);
-    expect(state.objectives.active).toEqual(["obj.look-around"]);
-    expect(Object.values(state.claims).every((status) => status === "unverified")).toBe(true);
+    expect(state.objectives.active).toEqual(["obj.answer-or-decline"]);
     expect(state.events).toHaveLength(1);
     expect(state.events[0]).toMatchObject({ seq: 0, action: START });
   });
@@ -116,327 +141,351 @@ describe("chapterReducer transitions", () => {
   it("does not mutate the input state", () => {
     const before = started();
     const snapshot = JSON.stringify(before);
-    const result = chapterReducer(before, WALLET);
+    const result = chapterReducer(before, RECEIPTS, FIXTURE_SCENARIO);
     expect(result.accepted).toBe(true);
     expect(result.state).not.toBe(before);
     expect(JSON.stringify(before)).toBe(snapshot);
   });
 
   it("INTERACT_OBJECT records the object and its evidence once", () => {
-    const once = play(started(), [WALLET]);
-    expect(once.interacted).toEqual(["obj.wallet"]);
-    expect(once.discovered).toEqual(["ev.bank-card"]);
-    expect(once.events[1].derived.evidence).toEqual(["ev.bank-card"]);
-    const twice = play(once, [WALLET]);
-    expect(twice.interacted).toEqual(["obj.wallet"]);
-    expect(twice.discovered).toEqual(["ev.bank-card"]);
+    const once = play(started(), [RECEIPTS]);
+    expect(once.interacted).toEqual(["obj.receipts"]);
+    expect(once.discovered).toEqual(["ev.account-activity"]);
+    expect(once.events[1].derived.evidence).toEqual(["ev.account-activity"]);
+    const twice = play(once, [RECEIPTS]);
+    expect(twice.discovered).toEqual(["ev.account-activity"]);
     expect(twice.events).toHaveLength(3);
     expect(twice.events[2].derived.evidence).toEqual([]);
   });
 
-  it("INSPECT_EVIDENCE discovers the message evidence and marks the message read", () => {
-    const state = play(started(), [{ type: "INSPECT_EVIDENCE", evidenceId: "ev.sms-alert" }]);
-    expect(state.discovered).toEqual(["ev.sms-alert"]);
-    expect(state.phone.unread).toEqual([]);
-    expect(state.phone.messages).toEqual(["msg.sms-alert"]);
+  it("INSPECT_EVIDENCE rejects unavailable and already recorded evidence, and discovers when available", () => {
+    expectRejected(started(), INSPECT_SHARED, REASONS.evidenceNotAvailable);
+    const state = play(afterAlex(), [INSPECT_ORIGIN, INSPECT_SHARED]);
+    expect(state.discovered).toContain("ev.shared-case-id");
+    expectRejected(state, INSPECT_SHARED, REASONS.evidenceAlreadyRecorded);
   });
 
   it("OPEN_PHONE and CLOSE_PHONE toggle the phone", () => {
     const open = play(started(), [{ type: "OPEN_PHONE" }]);
     expect(open.phone.open).toBe(true);
+    expectRejected(open, { type: "OPEN_PHONE" }, REASONS.phoneAlreadyOpen);
     const closed = play(open, [{ type: "CLOSE_PHONE" }]);
     expect(closed.phone.open).toBe(false);
+    expectRejected(closed, { type: "CLOSE_PHONE" }, REASONS.phoneAlreadyClosed);
   });
 
-  it("RING_CALL rings the scam call and records it in the call log", () => {
-    const state = play(started(), [RING_SCAM]);
-    expect(state.call.current).toBe("call.scam-1");
+  it("RING_CALL rings a call whose ringWhen holds and logs it", () => {
+    const state = play(started(), [RING_ALEX]);
+    expect(state.call.current).toBe("call.alex");
     expect(state.call.status).toBe("ringing");
-    expect(state.flags.scam1_rang).toBe(true);
     expect(state.call.log).toEqual([
       {
-        callId: "call.scam-1",
+        callId: "call.alex",
         direction: "incoming",
-        displayName: "Northgate Bank Security",
-        number: "+000 555 0142",
+        displayName: "Unknown caller",
+        number: "+000 0100 2200",
         status: "ringing",
         ringCount: 1,
       },
     ]);
+    expectRejected(state, RING_ALEX, REASONS.callAlreadyRinging);
   });
 
-  it("END_CALL declines a ringing call, and the scam call can ring again", () => {
-    const declined = play(started(), [RING_SCAM, END_CALL]);
-    expect(declined.call.current).toBeNull();
-    expect(declined.call.status).toBe("declined");
-    expect(declined.call.log[0].status).toBe("declined");
-    expect(declined.conversation).toBeNull();
-
-    const reRung = play(declined, [RE_RING_SCAM, END_CALL, RE_RING_SCAM]);
-    expect(reRung.call.log).toHaveLength(1);
-    expect(reRung.call.log[0]).toMatchObject({ status: "ringing", ringCount: 3 });
-  });
-
-  it("ANSWER_CALL starts the scam conversation linked to the call", () => {
-    const state = play(started(), [RING_SCAM, ANSWER]);
+  it("ANSWER_CALL starts the conversation and discovers dialogue evidence", () => {
+    const state = play(started(), [RING_ALEX, ANSWER]);
     expect(state.call.status).toBe("active");
-    expect(state.call.log[0].status).toBe("answered");
-    expect(state.conversation).toEqual({
-      graphId: "dlg.scam-call",
-      nodeId: "scam.open",
-      callId: "call.scam-1",
-      history: [],
-    });
+    expect(state.conversation?.nodeId).toBe("alex.open");
+    expect(state.discovered).toEqual(["ev.alex-statement"]);
+    expectRejected(started(), ANSWER, REASONS.noCallRinging);
+  });
+
+  it("END_CALL declines a ringing call and records first_call_rejected", () => {
+    const state = play(started(), [RING_ALEX, END_CALL]);
+    expect(state.call.current).toBeNull();
+    expect(state.call.status).toBe("declined");
+    expect(state.call.log[0].status).toBe("declined");
+    expect(state.flags.first_call_rejected).toBe(true);
+    expectRejected(state, RING_ALEX, REASONS.callAlreadyRang);
   });
 
   it("END_CALL hangs up an active call, archives the conversation and records hung-up", () => {
-    const state = play(started(), [RING_SCAM, ANSWER, END_CALL]);
+    const state = play(started(), [RING_ALEX, ANSWER, END_CALL]);
     expect(state.call.current).toBeNull();
     expect(state.call.status).toBe("ended");
-    expect(state.call.log[0].status).toBe("ended");
     expect(state.conversation).toBeNull();
-    expect(state.conversationHistory).toEqual([{ graphId: "dlg.scam-call", history: [], endNodeId: null }]);
-    expect(state.events.at(-1)?.derived.debriefTags).toEqual(["hung-up"]);
-  });
-
-  it("TALK_TO_NPC starts Sam's conversation and counts the talk", () => {
-    const state = play(started(), [{ type: "TALK_TO_NPC", npcId: "npc.sam" }]);
-    expect(state.npc["npc.sam"].timesTalked).toBe(1);
-    expect(state.conversation).toMatchObject({ graphId: "dlg.shopkeeper", callId: null });
-  });
-
-  it("SELECT_DIALOGUE_OPTION applies effects, ends the call at an end node and records tags", () => {
-    const state = afterScamCall();
-    expect(state.flags.scam1_hung_up_to_verify).toBe(true);
-    expect(state.conversation).toBeNull();
-    expect(state.call.status).toBe("ended");
-    expect(state.conversationHistory[0]).toEqual({
-      graphId: "dlg.scam-call",
-      history: [{ nodeId: "scam.open", optionId: "opt.scam.open.verify" }],
-      endNodeId: "scam.end.verify",
-    });
-    expect(state.events.at(-1)?.derived.debriefTags).toEqual(["hung-up-to-verify"]);
-  });
-
-  it("VERIFY_CLAIM official-line starts the official line as an outgoing call", () => {
-    const state = play(afterScamCall(), [OFFICIAL]);
-    expect(state.call.current).toBe("call.official");
-    expect(state.call.status).toBe("active");
-    expect(state.call.log.at(-1)).toMatchObject({
-      callId: "call.official",
-      direction: "outgoing",
-      number: "+000 555 0100",
-      status: "answered",
-    });
-    expect(state.conversation).toMatchObject({
-      graphId: "dlg.official-line",
-      nodeId: "official.greeting",
-      callId: "call.official",
-    });
-  });
-
-  it("the official line confirmation contradicts the caller identity claim", () => {
-    const state = afterOfficialLine();
-    expect(state.discovered).toContain("ev.official-confirmation");
-    expect(state.claims["claim.caller-identity"]).toBe("contradicted");
-    expect(state.call.current).toBeNull();
-  });
-
-  it("VERIFY_CLAIM bank-app discovers the app evidence and sets the claim to inconclusive", () => {
-    const state = play(started(), [{ type: "OPEN_PHONE" }, BANK_APP]);
-    expect(state.discovered).toEqual(["ev.bank-app"]);
-    expect(state.claims["claim.account-suspended"]).toBe("inconclusive");
-  });
-
-  it("VERIFY_CLAIM bank-app keeps a contradicted status from the official line", () => {
-    const state = play(afterOfficialLine(), [{ type: "OPEN_PHONE" }, BANK_APP]);
-    expect(state.claims["claim.account-suspended"]).toBe("contradicted");
-  });
-
-  it("MAKE_DECISION records the decision and sets the outcome", () => {
-    const state = play(afterOfficialLine(), [{ type: "MAKE_DECISION", decision: "verify-independently" }]);
-    expect(state.decision).toBe("verify-independently");
-    expect(state.outcome).toBe("verified");
-    expect(state.status).toBe("ended");
-    expect(state.events.at(-1)?.derived.debriefTags).toEqual(["chose-verify-independently"]);
-  });
-
-  it("MAKE_DECISION follow-request from the panel sets money_moved", () => {
-    const state = play(afterScamCall(), [{ type: "MAKE_DECISION", decision: "follow-request" }]);
-    expect(state.flags.money_moved).toBe(true);
-    expect(state.outcome).toBe("risky");
-  });
-
-  it("FINISH_CHAPTER finishes an ended chapter and completes the review objective", () => {
-    const state = play(ended(), [{ type: "FINISH_CHAPTER" }]);
-    expect(state.status).toBe("finished");
-    expect(state.objectives.completed).toContain("obj.review");
-  });
-
-  it("appends one contiguous Event_Log entry per accepted action", () => {
-    const state = afterOfficialLine();
-    expect(state.events.map((entry) => entry.seq)).toEqual(state.events.map((_, i) => i));
-  });
-});
-
-describe("chapterReducer rejection reasons", () => {
-  it('rejects malformed values with "Unknown action."', () => {
-    expect(REASONS.unknownAction).toBe("Unknown action.");
-    for (const value of [null, {}, { type: "JUMP" }, { type: "INTERACT_OBJECT", objectId: "obj.car" }]) {
-      expectRejected(started(), value, "Unknown action.");
-    }
-  });
-
-  it("rejects gameplay actions before START_CHAPTER, and a second START_CHAPTER", () => {
-    const initial = createInitialState();
-    expectRejected(initial, WALLET, REASONS.notStarted);
-    expectRejected(initial, { type: "OPEN_PHONE" }, REASONS.notStarted);
-    expectRejected(initial, RING_SCAM, REASONS.notStarted);
-    expectRejected(initial, { type: "FINISH_CHAPTER" }, REASONS.chapterNotEnded);
-    expectRejected(started(), START, REASONS.alreadyStarted);
-  });
-
-  it("rejects INTERACT_OBJECT on an NPC object", () => {
-    expectRejected(started(), { type: "INTERACT_OBJECT", objectId: "obj.shopkeeper" }, REASONS.wrongObjectAction);
-  });
-
-  it("rejects world actions while a call rings or a conversation runs", () => {
-    const ringing = play(started(), [{ type: "OPEN_PHONE" }, RING_SCAM]);
-    expectRejected(ringing, WALLET, REASONS.callInProgress);
-    expectRejected(ringing, { type: "TALK_TO_NPC", npcId: "npc.sam" }, REASONS.callInProgress);
-    expectRejected(ringing, { type: "CLOSE_PHONE" }, REASONS.callInProgress);
-    expectRejected(ringing, BANK_APP, REASONS.callInProgress);
-
-    const talking = play(started(), [{ type: "TALK_TO_NPC", npcId: "npc.sam" }]);
-    expectRejected(talking, WALLET, REASONS.conversationInProgress);
-    expectRejected(talking, { type: "TALK_TO_NPC", npcId: "npc.sam" }, REASONS.conversationInProgress);
-    expectRejected(talking, RING_SCAM, REASONS.conversationInProgress);
-  });
-
-  it("rejects INSPECT_EVIDENCE for unavailable and already recorded evidence", () => {
-    expectRejected(started(), { type: "INSPECT_EVIDENCE", evidenceId: "ev.otp-sms" }, "Evidence not available yet.");
-    const read = play(started(), [{ type: "INSPECT_EVIDENCE", evidenceId: "ev.sms-alert" }]);
-    expectRejected(read, { type: "INSPECT_EVIDENCE", evidenceId: "ev.sms-alert" }, "Evidence already recorded.");
-  });
-
-  it("rejects opening an open phone and closing a closed phone", () => {
-    expectRejected(play(started(), [{ type: "OPEN_PHONE" }]), { type: "OPEN_PHONE" }, REASONS.phoneAlreadyOpen);
-    expectRejected(started(), { type: "CLOSE_PHONE" }, REASONS.phoneAlreadyClosed);
-  });
-
-  it("rejects RING_CALL while ringing, during a call, and after the scam call was answered", () => {
-    const ringing = play(started(), [RING_SCAM]);
-    expectRejected(ringing, RE_RING_SCAM, REASONS.callAlreadyRinging);
-    const active = play(ringing, [ANSWER]);
-    expectRejected(active, RE_RING_SCAM, REASONS.callInProgress);
-    expectRejected(afterScamCall(), RE_RING_SCAM, REASONS.scamCallAlreadyAnswered);
-  });
-
-  it("rejects the callback before the scam call ended after being answered", () => {
-    expectRejected(started(), RING_CALLBACK, REASONS.callbackNotYet);
-    expectRejected(play(started(), [RING_SCAM, END_CALL]), RING_CALLBACK, REASONS.callbackNotYet);
-  });
-
-  it("rejects the callback once it has rung (Requirement 8.6)", () => {
-    const rang = play(afterScamCall(), [RING_CALLBACK]);
-    expect(rang.call.current).toBe("call.callback");
-    const declined = play(rang, [END_CALL]);
-    expectRejected(declined, RING_CALLBACK, REASONS.callbackAlreadyRang);
-    const answered = play(afterScamCall(), [RING_CALLBACK, ANSWER, option("opt.callback.open.hang-up")]);
-    expectRejected(answered, RING_CALLBACK, REASONS.callbackAlreadyRang);
-  });
-
-  it('rejects ANSWER_CALL with "No call is ringing." and END_CALL with no call', () => {
-    expectRejected(started(), ANSWER, "No call is ringing.");
-    expectRejected(play(started(), [RING_SCAM, ANSWER]), ANSWER, "No call is ringing.");
+    expect(state.conversationHistory).toEqual([{ graphId: "dlg.alex", history: [], endNodeId: null }]);
+    expect(state.events.at(-1)?.derived.debriefTags).toContain("hung-up");
+    expect(state.flags.first_call_rejected).toBe(true);
     expectRejected(started(), END_CALL, REASONS.noCallToEnd);
   });
 
-  it('rejects an unavailable dialogue option with "Option not available."', () => {
-    expect(OPTION_NOT_AVAILABLE).toBe("Option not available.");
-    expectRejected(started(), option("opt.scam.open.verify"), "Option not available.");
-    const inCall = play(started(), [RING_SCAM, ANSWER]);
-    expectRejected(inCall, option("opt.official.agent.report"), "Option not available.");
+  it("TALK_TO_NPC is a valid action that is rejected when no NPC exists", () => {
+    const action = { type: "TALK_TO_NPC", npcId: "npc.nobody" };
+    expect(isCoreAction(action)).toBe(true);
+    expectRejected(started(), action, REASONS.unknownNpc);
   });
 
-  it("rejects VERIFY_CLAIM official-line without the official number, before the call, and during a call", () => {
-    expectRejected(play(started(), [RING_SCAM, END_CALL]), OFFICIAL, "You need the bank's official number first.");
-    expectRejected(play(started(), [WALLET]), OFFICIAL, REASONS.noCallToVerify);
-    expectRejected(play(started(), [WALLET, RING_SCAM]), OFFICIAL, REASONS.callInProgress);
-    const talking = play(started(), [WALLET, RING_SCAM, END_CALL, { type: "TALK_TO_NPC", npcId: "npc.sam" }]);
-    expectRejected(talking, OFFICIAL, REASONS.conversationInProgress);
+  it("SELECT_DIALOGUE_OPTION applies option effects and debrief tags", () => {
+    const state = play(started(), [RING_ALEX, ANSWER, option("alex.share-code")]);
+    expect(state.flags.code_shared).toBe(true);
+    expect(state.events.at(-1)?.derived.debriefTags).toContain("shared-code");
   });
 
-  it("rejects VERIFY_CLAIM bank-app with the phone closed, and a repeat", () => {
-    expectRejected(started(), BANK_APP, REASONS.phoneClosed);
-    const checked = play(started(), [{ type: "OPEN_PHONE" }, BANK_APP]);
-    expectRejected(checked, BANK_APP, REASONS.evidenceAlreadyRecorded);
+  it("MAKE_DECISION applies the decision effects and selects the ending", () => {
+    const state = play(afterRecovery(), [decide("follow-recovery")]);
+    expect(state.decision).toBe("follow-recovery");
+    expect(state.flags.money_moved).toBe(true);
+    expect(state.outcome).toBe("false-victory");
+    expect(state.status).toBe("ended");
+    expect(state.events.at(-1)?.derived.debriefTags).toContain("followed-recovery");
+
+    const refused = play(afterAlex(), [decide("refuse-and-stop")]);
+    expect(refused.flags.money_moved).toBe(false);
+    expect(refused.outcome).toBe("break-the-chain");
   });
 
-  it("rejects verify-independently before the official confirmation (Requirement 13.4)", () => {
-    const result = chapterReducer(afterScamCall(), { type: "MAKE_DECISION", decision: "verify-independently" });
-    expect(result.accepted).toBe(false);
-    expect(result.reason).toBe("Call Northgate on the official number first.");
+  it("MAKE_DECISION rejects unavailable decisions, busy states and a second decision", () => {
+    expectRejected(started(), decide("follow-recovery"), "The second caller has not called yet.");
+    expectRejected(started(), decide("verify-independently"), "Finish the first call first.");
+    expectRejected(play(started(), [RING_ALEX, ANSWER]), decide("refuse-and-stop"), REASONS.conversationInProgress);
+    expectRejected(play(started(), [RING_ALEX]), decide("refuse-and-stop"), REASONS.callInProgress);
+    const decided: ChapterState = { ...afterAlex(), decision: "refuse-and-stop" };
+    expectRejected(decided, decide("refuse-and-stop"), REASONS.decisionAlreadyMade);
   });
 
-  it('rejects MAKE_DECISION when a Decision exists with "A decision has already been made."', () => {
-    // A reachable Decision always sets the Outcome, so the outcome lock answers first in play.
-    // This crafted state checks the guard itself.
-    const decided: ChapterState = { ...afterOfficialLine(), decision: "stop-and-wait" };
-    expectRejected(decided, { type: "MAKE_DECISION", decision: "verify-independently" }, "A decision has already been made.");
-    expectRejected(decided, OFFICIAL, REASONS.decisionAlreadyMade);
-    expectRejected(decided, RING_CALLBACK, REASONS.decisionAlreadyMade);
+  it("COMPLETE_OBJECTIVE is rejected unless the objective is active and its condition holds", () => {
+    expectRejected(
+      started(),
+      { type: "COMPLETE_OBJECTIVE", objectiveId: "obj.decide" },
+      OBJECTIVE_CONDITION_NOT_MET,
+    );
   });
 
-  it("rejects MAKE_DECISION during a conversation or a ringing call", () => {
-    const inCall = play(afterScamCall(), [OFFICIAL]);
-    expectRejected(inCall, { type: "MAKE_DECISION", decision: "stop-and-wait" }, REASONS.conversationInProgress);
-    const ringing = play(afterScamCall(), [RING_CALLBACK]);
-    expectRejected(ringing, { type: "MAKE_DECISION", decision: "stop-and-wait" }, REASONS.callInProgress);
-  });
-
-  it('rejects COMPLETE_OBJECTIVE with "Objective condition not met."', () => {
-    expect(OBJECTIVE_CONDITION_NOT_MET).toBe("Objective condition not met.");
-    expectRejected(started(), { type: "COMPLETE_OBJECTIVE", objectiveId: "obj.look-around" }, "Objective condition not met.");
-    expectRejected(started(), { type: "COMPLETE_OBJECTIVE", objectiveId: "obj.decide" }, "Objective condition not met.");
-    expectRejected(afterScamCall(), { type: "COMPLETE_OBJECTIVE", objectiveId: "obj.check-claims" }, "Objective condition not met.");
-  });
-
-  it("accepts COMPLETE_OBJECTIVE when the objective is active and its condition holds", () => {
-    // Crafted: the claim-related evidence is present but the manager has not run since.
-    const base = afterScamCall();
-    const crafted: ChapterState = { ...base, discovered: [...base.discovered, "ev.shop-poster"] };
-    const result = chapterReducer(crafted, { type: "COMPLETE_OBJECTIVE", objectiveId: "obj.check-claims" });
-    expect(result.accepted).toBe(true);
-    expect(result.state.objectives.completed).toContain("obj.check-claims");
-    expect(result.state.objectives.active).not.toContain("obj.check-claims");
-    expect(result.state.events.at(-1)?.derived.objectivesCompleted).toEqual(["obj.check-claims"]);
-  });
-
-  it("rejects FINISH_CHAPTER before the Outcome and after finishing", () => {
-    expectRejected(afterScamCall(), { type: "FINISH_CHAPTER" }, REASONS.chapterNotEnded);
-    const finished = play(ended(), [{ type: "FINISH_CHAPTER" }]);
+  it("FINISH_CHAPTER needs an outcome and then finishes once", () => {
+    expectRejected(started(), { type: "FINISH_CHAPTER" }, REASONS.chapterNotEnded);
+    const ended = play(afterAlex(), [decide("refuse-and-stop")]);
+    const finished = play(ended, [{ type: "FINISH_CHAPTER" }]);
+    expect(finished.status).toBe("finished");
     expectRejected(finished, { type: "FINISH_CHAPTER" }, REASONS.chapterAlreadyFinished);
   });
 
-  it("rejects every action except FINISH_CHAPTER once the Outcome is set (Requirement 5.9)", () => {
-    const state = ended();
-    expect(state.outcome).toBe("uncertain");
-    const actions: CoreAction[] = [
+  it("locks every action but FINISH_CHAPTER once an outcome is set", () => {
+    const ended = play(afterAlex(), [decide("refuse-and-stop")]);
+    expectRejected(ended, { type: "OPEN_PHONE" }, REASONS.chapterEnded);
+    expectRejected(ended, RECEIPTS, REASONS.chapterEnded);
+  });
+
+  it("rejects unknown actions and actions before START_CHAPTER", () => {
+    expectRejected(started(), { type: "JUMP" }, REASONS.unknownAction);
+    expectRejected(createInitialState(FIXTURE_SCENARIO), RECEIPTS, REASONS.notStarted);
+    expectRejected(started(), START, REASONS.alreadyStarted);
+  });
+
+  it("appends exactly one event per accepted action and none for a rejection", () => {
+    const state = afterRecovery();
+    expect(state.events.map((e) => e.seq)).toEqual(state.events.map((_, i) => i));
+    const rejected = chapterReducer(state, { type: "OPEN_PHONE" }, FIXTURE_SCENARIO);
+    expect(rejected.accepted).toBe(true);
+    const again = chapterReducer(rejected.state, { type: "OPEN_PHONE" }, FIXTURE_SCENARIO);
+    expect(again.accepted).toBe(false);
+    expect(again.state.events).toHaveLength(rejected.state.events.length);
+  });
+});
+
+describe("beats", () => {
+  it("fires the notification beat on the action that ends the first call and tags the event", () => {
+    const state = afterAlex();
+    expect(state.flags.notification_delivered).toBe(true);
+    const last = state.events.at(-1);
+    expect(last?.derived.debriefTags).toContain(beatTag("beat.notification"));
+    expect(last?.derived.flags).toContain("notification_delivered");
+  });
+
+  it("fires a beat without its own guard only once", () => {
+    const scenario: ScenarioDefinition = {
+      ...FIXTURE_SCENARIO,
+      beats: [{ id: "beat.always", when: [], effects: [{ kind: "addPressure" }] }],
+    };
+    const state = play(
+      createInitialState(scenario),
+      [START, { type: "OPEN_PHONE" }, { type: "CLOSE_PHONE" }, { type: "OPEN_PHONE" }],
+      scenario,
+    );
+    expect(state.pressure).toBe(1);
+    const tagged = state.events.filter((e) => e.derived.debriefTags.includes(beatTag("beat.always")));
+    expect(tagged).toHaveLength(1);
+    expect(tagged[0].seq).toBe(0);
+  });
+});
+
+describe("DEVICE_ACTION", () => {
+  it("is rejected when unknown to the scenario, unavailable, or already done", () => {
+    expectRejected(started(), { type: "DEVICE_ACTION", deviceActionId: "dev.open-bank-app" }, REASONS.unknownDeviceAction);
+    expectRejected(started(), INSPECT_ORIGIN, REASONS.deviceActionUnavailable);
+    expectRejected(afterOrigin(), INSPECT_ORIGIN, REASONS.deviceActionAlreadyDone);
+  });
+
+  it("applies effects, reveals evidence and records the debrief tag", () => {
+    const state = afterOrigin();
+    expect(state.flags.notification_origin_inspected).toBe(true);
+    expect(state.flags.notification_handled).toBe(true);
+    expect(state.discovered).toContain("ev.notification-metadata");
+    const last = state.events.at(-1);
+    expect(last?.derived.evidence).toEqual(["ev.notification-metadata"]);
+    expect(last?.derived.debriefTags).toContain("inspected-origin");
+  });
+
+  it("can repeat an action that is not marked once", () => {
+    const scenario: ScenarioDefinition = {
+      ...FIXTURE_SCENARIO,
+      deviceActions: {
+        ...FIXTURE_SCENARIO.deviceActions,
+        "dev.inspect-notification-origin": {
+          ...FIXTURE_SCENARIO.deviceActions["dev.inspect-notification-origin"],
+          requires: [],
+          once: false,
+        },
+      },
+    };
+    const state = play(createInitialState(scenario), [START, INSPECT_ORIGIN, INSPECT_ORIGIN], scenario);
+    expect(state.events).toHaveLength(3);
+  });
+});
+
+describe("COMBINE_EVIDENCE", () => {
+  const sameSource: CoreAction = { type: "COMBINE_EVIDENCE", evidenceIds: ["ev.alex-statement", "ev.shared-case-id"] };
+  const sameSourceReversed: CoreAction = {
+    type: "COMBINE_EVIDENCE",
+    evidenceIds: ["ev.shared-case-id", "ev.alex-statement"],
+  };
+  const mismatch: CoreAction = {
+    type: "COMBINE_EVIDENCE",
+    evidenceIds: ["ev.notification-metadata", "ev.account-activity"],
+  };
+  const ready = (): ChapterState => play(afterAlex(), [INSPECT_ORIGIN, INSPECT_SHARED, RECEIPTS]);
+
+  it("records the deduction, applies its effects and tags the event", () => {
+    const state = play(ready(), [sameSource]);
+    expect(state.deductions).toEqual(["ded.same-source"]);
+    expect(state.flags.shared_origin_established).toBe(true);
+    expect(state.events.at(-1)?.derived.debriefTags).toContain("same-source");
+    expect(state.events.at(-1)?.derived.flags).toContain("shared_origin_established");
+  });
+
+  it("sets a claim to inconclusive through a deduction effect", () => {
+    const state = play(ready(), [mismatch]);
+    expect(state.deductions).toEqual(["ded.notification-mismatch"]);
+    expect(state.claims["claim.notification-genuine"]).toBe("inconclusive");
+  });
+
+  it("rejects a combination that matches no deduction", () => {
+    expectRejected(
+      ready(),
+      { type: "COMBINE_EVIDENCE", evidenceIds: ["ev.alex-statement", "ev.account-activity"] },
+      REASONS.combinationInvalid,
+    );
+    expectRejected(
+      ready(),
+      { type: "COMBINE_EVIDENCE", evidenceIds: ["ev.alex-statement", "ev.shared-case-id", "ev.account-activity"] },
+      REASONS.combinationInvalid,
+    );
+  });
+
+  it("rejects evidence that is not discovered", () => {
+    expectRejected(afterAlex(), sameSource, REASONS.evidenceNotAvailable);
+  });
+
+  it("rejects a duplicate submission and leaves the state untouched", () => {
+    const once = play(ready(), [sameSource]);
+    expectRejected(once, sameSource, REASONS.deductionAlreadyRecorded);
+    expectRejected(once, sameSourceReversed, REASONS.deductionAlreadyRecorded);
+  });
+
+  it("gives the same result for any order of the evidence", () => {
+    const a = play(ready(), [sameSource]);
+    const b = play(ready(), [sameSourceReversed]);
+    expect(b.deductions).toEqual(a.deductions);
+    expect(b.flags).toEqual(a.flags);
+    expect(b.claims).toEqual(a.claims);
+    expect(b.discovered).toEqual(a.discovered);
+  });
+
+  it("rejects a matching deduction whose requires do not hold", () => {
+    const scenario: ScenarioDefinition = {
+      ...FIXTURE_SCENARIO,
+      deductions: {
+        ...FIXTURE_SCENARIO.deductions,
+        "ded.same-source": {
+          ...FIXTURE_SCENARIO.deductions["ded.same-source"],
+          requires: [{ kind: "flag", flag: "chain_identified" }],
+        },
+      },
+    };
+    const state = withEvidence(fixtureState(), ["ev.alex-statement", "ev.shared-case-id"]);
+    const result = chapterReducer(state, sameSource, scenario);
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toBe(REASONS.combinationInvalid);
+    const unlocked = chapterReducer(withFlags(state, ["chain_identified"]), sameSource, scenario);
+    expect(unlocked.accepted).toBe(true);
+  });
+});
+
+describe("VERIFY_CLAIM", () => {
+  const withNumber = (state: ChapterState): ChapterState => withEvidence(state, ["ev.official-contact-paper"]);
+
+  it("saved-official-contact needs the saved contact evidence and no call in progress", () => {
+    expectRejected(afterAlex(), OFFICIAL, REASONS.needOfficialNumber);
+    const talking = withNumber(play(started(), [RING_ALEX]));
+    expectRejected(talking, OFFICIAL, REASONS.callInProgress);
+    const decided: ChapterState = { ...withNumber(afterAlex()), decision: "refuse-and-stop" };
+    expectRejected(decided, OFFICIAL, REASONS.decisionAlreadyMade);
+  });
+
+  it("saved-official-contact accepts either E03 or E03b", () => {
+    for (const id of ["ev.official-contact-paper", "ev.official-contact-app"] as const) {
+      const result = chapterReducer(withEvidence(afterAlex(), [id]), OFFICIAL, FIXTURE_SCENARIO);
+      expect(result.accepted).toBe(true);
+    }
+  });
+
+  it("saved-official-contact starts an outgoing call to call.official and can contradict a claim", () => {
+    const calling = play(withNumber(afterAlex()), [OFFICIAL]);
+    expect(calling.call.current).toBe("call.official");
+    expect(calling.call.status).toBe("active");
+    expect(calling.call.log.at(-1)).toMatchObject({ callId: "call.official", direction: "outgoing", status: "answered" });
+    expect(calling.conversation?.graphId).toBe("dlg.official-line");
+
+    const done = play(calling, [option("off.ask")]);
+    expect(done.call.current).toBeNull();
+    expect(done.claims["claim.recovery-needed"]).toBe("contradicted");
+    expect(done.flags.official_channel_verified).toBe(true);
+  });
+
+  it("bank-app needs the phone open and sets the claim to inconclusive, not contradicted", () => {
+    expectRejected(started(), BANK_APP, REASONS.phoneClosed);
+    const state = play(started(), [{ type: "OPEN_PHONE" }, BANK_APP]);
+    expect(state.claims["claim.recovery-needed"]).toBe("inconclusive");
+    expectRejected(state, BANK_APP, REASONS.evidenceAlreadyRecorded);
+  });
+
+  it("bank-app keeps a contradicted status from the official line", () => {
+    const verified = play(withNumber(afterAlex()), [OFFICIAL, option("off.ask"), { type: "OPEN_PHONE" }, BANK_APP]);
+    expect(verified.claims["claim.recovery-needed"]).toBe("contradicted");
+  });
+});
+
+describe("RING_CALL rings at most once (regression)", () => {
+  it("rejects a re-ring of a declined call so the first call stays closed", () => {
+    const phoneOpen = play(createInitialState(CHAPTER_1_SCENARIO), [
       START,
-      WALLET,
-      { type: "INSPECT_EVIDENCE", evidenceId: "ev.caller-number" },
+      { type: "RING_CALL", callId: "call.alex", reason: "exploration-timer" },
       { type: "OPEN_PHONE" },
-      RING_CALLBACK,
-      ANSWER,
       END_CALL,
-      { type: "TALK_TO_NPC", npcId: "npc.sam" },
-      option("opt.sam.ask.bye"),
-      OFFICIAL,
-      { type: "MAKE_DECISION", decision: "verify-independently" },
-      { type: "COMPLETE_OBJECTIVE", objectiveId: "obj.review" },
-    ];
-    for (const action of actions) expectRejected(state, action, REASONS.chapterEnded);
-    expect(chapterReducer(state, { type: "FINISH_CHAPTER" }).accepted).toBe(true);
+    ], CHAPTER_1_SCENARIO);
+    const result = chapterReducer(phoneOpen, { type: "RING_CALL", callId: "call.alex", reason: "re-ring" }, CHAPTER_1_SCENARIO);
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toBe(REASONS.callAlreadyRang);
+    expect(result.state).toBe(phoneOpen);
+    expect(phoneOpen.call.log.find((r) => r.callId === "call.alex")?.status).toBe("declined");
   });
 });

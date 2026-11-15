@@ -16,7 +16,7 @@ import type { PhoneCallView } from "./callDialogueView";
 
 const LOCALES: readonly GameLocale[] = ["en", "vi"];
 const PHONE_TEXT = { en: enPhone.phone, vi: viPhone.phone } as const;
-const CALL_ID: CallId = "call.scam-1";
+const CALL_ID: CallId = "call.alex";
 const FORBIDDEN_WORDS = ["safe", "verified", "trusted", "an toàn"];
 const EMOJI = /\p{Extended_Pictographic}/u;
 

@@ -7,6 +7,8 @@ import type { InteractableId } from "../../game/narrative/chapter1/ids";
 export type Overlay =
   | { kind: "phone" }
   | { kind: "journal" }
+  /** Laptop apps in the room chapter (notification, bank app, compare, Review Security). */
+  | { kind: "laptop" }
   | { kind: "inspection"; objectId: InteractableId }
   /** Face-to-face dialogue panel (Sam). Phone calls render inside the phone overlay. */
   | { kind: "dialogue" }

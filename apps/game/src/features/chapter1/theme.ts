@@ -25,6 +25,8 @@ export const UI = {
   /** Main panel surface (dialogs, journal, decision, pause). */
   panel:
     "w-full rounded-xl border border-[#7654d6]/35 bg-[#1d1b2b]/92 p-5 text-[#f7f5ff] shadow-xl sm:p-6",
+  /** Caps a panel to the viewport (the backdrop adds 1 rem of padding on each side). Use with `flex flex-col` and a scrolling body. */
+  panelFit: "max-h-[calc(100dvh-2rem)]",
   /** Smaller surface for HUD elements (tracker, prompts, notices). */
   hudPanel:
     "rounded-lg border border-[#38344f] bg-[#171521]/85 px-3 py-2 text-sm text-[#f7f5ff]",

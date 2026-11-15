@@ -1,8 +1,8 @@
 // Opening screen of a chapter: the street is already visible behind it, and a friendly voice
 // greets the player one paragraph at a time. Each paragraph plays its voice clip and is typed in
 // step with it. A click shows the whole paragraph; the next click cuts the voice and moves on.
-// After the last paragraph the controls appear and a click starts the story (the page
-// dispatches START_CHAPTER in `onBegin`). It never shows the chapter number or title, so the
+// The Continue button is available as soon as the scene is ready (it skips the rest of the voice)
+// and starts the story (the page dispatches START_CHAPTER in `onBegin`). It never shows the chapter number or title, so the
 // player is not told in advance what is coming.
 
 import React, { useEffect, useMemo, useRef } from "react";
@@ -26,6 +26,13 @@ export interface ChapterIntroOverlayProps {
   createAudio?: (src: string) => HTMLAudioElement;
   /** Controls listed after the last paragraph; defaults to all of them (the street chapter). */
   controlIds?: readonly IntroControlId[];
+  /**
+   * Narration lines that replace the built-in script (the room chapter passes the `dlg.intro`
+   * lines). Already translated. Ignored in "continue" mode, which keeps the short resume line.
+   */
+  lines?: readonly NarrationLine[];
+  /** Called with the index of the line on screen, once the scene is ready and whenever it changes. */
+  onLineChange?: (index: number) => void;
 }
 
 /** Key caps are physical labels and stay the same in every language ("mouse" is translated). */
@@ -47,23 +54,36 @@ export const ChapterIntroOverlay: React.FC<ChapterIntroOverlayProps> = ({
   onBegin,
   createAudio,
   controlIds,
+  lines: customLines,
+  onLineChange,
 }) => {
   const { t } = useTranslation("chapter1");
   const locale = useGameLocale();
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   const script = mode === "continue" ? RESUME_SCRIPT : welcomeScript(locale);
-  const lineTexts = script.map((line) => t(line.textKey));
-  const linesKey = `${script.map((line) => line.src ?? "").join("|")}\n${lineTexts.join("\n")}`;
+  const custom = mode === "begin" && customLines !== undefined && customLines.length > 0 ? customLines : null;
+  const lineTexts = custom ? custom.map((line) => line.text) : script.map((line) => t(line.textKey));
+  const lineSrcs = custom ? custom.map((line) => line.src) : script.map((line) => line.src);
+  const linesKey = `${lineSrcs.map((src) => src ?? "").join("|")}\n${lineTexts.join("\n")}`;
   const lines: NarrationLine[] = useMemo(
-    () => script.map((line, i) => ({ text: lineTexts[i], src: line.src })),
+    () => lineTexts.map((text, i) => ({ text, src: lineSrcs[i] })),
     // Rebuilt only when the clips or the translated text change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [linesKey],
   );
   const narration = useIntroNarration({ lines, active: ready, gain: voiceGain, createAudio });
   const { shown, text, lineDone, isLast } = narration;
-  const canContinue = ready && isLast && lineDone;
+  // The voice is skippable, so Continue is available as soon as the scene is ready. Clicking a
+  // paragraph still shows it whole and then moves on; Continue starts the story at once.
+  const canContinue = ready;
+
+  const onLineChangeRef = useRef(onLineChange);
+  onLineChangeRef.current = onLineChange;
+  const lineIndex = narration.index;
+  useEffect(() => {
+    if (ready) onLineChangeRef.current?.(lineIndex);
+  }, [ready, lineIndex]);
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -193,7 +213,7 @@ export const ChapterIntroOverlay: React.FC<ChapterIntroOverlayProps> = ({
           </button>
         </div>
 
-        {ready && !canContinue && (
+        {ready && !(isLast && lineDone) && (
           <p className="mt-4 text-xs text-[#a9a4c4]" aria-hidden="true">
             {lineDone ? t("intro.next") : t("intro.skip")}
           </p>

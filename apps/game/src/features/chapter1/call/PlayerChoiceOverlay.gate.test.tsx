@@ -22,7 +22,7 @@ const REGION = { left: 16, top: 400, width: 360, height: 300 };
 
 const SCAM_OPEN: readonly CoreAction[] = [
   { type: "START_CHAPTER" },
-  { type: "RING_CALL", callId: "call.scam-1", reason: "exploration-timer" },
+  { type: "RING_CALL", callId: "call.alex", reason: "exploration-timer" },
   { type: "ANSWER_CALL" },
 ];
 

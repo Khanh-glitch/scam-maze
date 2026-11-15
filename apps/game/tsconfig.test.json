@@ -19,5 +19,6 @@
     "noFallthroughCasesInSwitch": true,
     "erasableSyntaxOnly": true
   },
-  "include": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/test"]
+  "include": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/test"],
+  "exclude": ["src/legacy"]
 }

@@ -6,8 +6,8 @@
 // For any generated call state (src/test/callStates.ts) and any number k from 1 to 5 of
 // activations of the same call button, `CallPresentation` dispatches at most one ANSWER_CALL or
 // END_CALL for that call status, and the resulting state equals the state after one direct
-// dispatch. Activating Hang up from any active state (any node, with or without options, or no
-// linked node) leaves the call status outside `ringing` and `active` or sets an Outcome. While
+// dispatch. Activating Hang up from any active state (any node, with or without options)
+// leaves the call status outside `ringing` and `active` or sets an Outcome. While
 // the page is paused, no activation dispatches anything and the state does not change (Req 5.6).
 //
 // The activations are sent either inside one React batch (one `act`) or as separate events. The
@@ -76,17 +76,12 @@ describe("CallPresentation call buttons (Property 9)", () => {
     () => {
       const generated = generateCallStates(CASES, SEED);
       const next = createLcg(SEED);
-      const coverage = { ringing: 0, activeWithOptions: 0, activeWithoutOptions: 0, paused: 0, repeated: 0 };
+      const coverage = { ringing: 0, activeWithOptions: 0, paused: 0, repeated: 0 };
 
       generated.forEach((callState, caseIndex) => {
-        // The generator always ends on a linked node with options. Half of the active official
-        // line cases drop the conversation, which is the "no linked node" state the official
-        // line can be in (the only call allowed to be active without one, see assertInvariants).
-        const unlinked =
-          callState.callId === "call.official" &&
-          callState.state.call.status === "active" &&
-          next() < 0.5;
-        const start: ChapterState = unlinked ? { ...callState.state, conversation: null } : callState.state;
+        // The generator always ends on a linked node with options, and every active call (the
+        // official line included) keeps its conversation, as assertInvariants requires.
+        const start: ChapterState = callState.state;
         expect(assertInvariants(start)).toEqual([]);
         const c = generateButtonCase(next, start);
         applyLocale(callState.locale);
@@ -166,18 +161,13 @@ describe("CallPresentation call buttons (Property 9)", () => {
             const { status } = store.getState().call;
             const ended = status !== "ringing" && status !== "active";
             expect(ended || store.getState().outcome !== null).toBe(true);
-            const linked = start.conversation !== null && start.conversation.callId === start.call.current;
-            if (linked && availableOptions(start, CHAPTER_1_SCENARIO).length > 0) {
-              coverage.activeWithOptions += 1;
-            } else {
-              coverage.activeWithoutOptions += 1;
-            }
+            if (availableOptions(start, CHAPTER_1_SCENARIO).length > 0) coverage.activeWithOptions += 1;
           } else {
             coverage.ringing += 1;
           }
         } catch (error) {
           throw new Error(
-            `Property 9 failed (seed ${SEED}, case ${caseIndex}): ${JSON.stringify({ ...c, unlinked })} from ${describeCallState(callState)}\n${String(error)}`,
+            `Property 9 failed (seed ${SEED}, case ${caseIndex}): ${JSON.stringify(c)} from ${describeCallState(callState)}\n${String(error)}`,
           );
         } finally {
           view.unmount();
@@ -187,7 +177,6 @@ describe("CallPresentation call buttons (Property 9)", () => {
       // The generated cases reach every branch the property names.
       expect(coverage.ringing).toBeGreaterThan(0);
       expect(coverage.activeWithOptions).toBeGreaterThan(0);
-      expect(coverage.activeWithoutOptions).toBeGreaterThan(0);
       expect(coverage.paused).toBeGreaterThan(0);
       expect(coverage.repeated).toBeGreaterThan(0);
     },

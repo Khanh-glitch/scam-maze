@@ -1,5 +1,8 @@
+// Feature: chapter-01-double-deception, Property 2: Save v3 round trip and tamper handling
+// **Validates: Requirements 17.4, 17.5**
 import { describe, expect, it } from "vitest";
 
+import { applyRestoredProgress, type ChapterSession } from "../chapters/chapterSession";
 import { CHAPTER_1_SCENARIO } from "../narrative/chapter1/scenario";
 import type { CoreAction } from "../narrative/types";
 import {
@@ -14,21 +17,20 @@ import {
 } from "../../test/chapterRuns";
 import { createLcg, randomInt } from "../../test/seededRandom";
 import { encodeProgress, restoreProgress } from "./chapterProgress";
-import type { ChapterProgressV2 } from "./saveGame";
+import type { ChapterProgressV3 } from "./saveGame";
 
 /** Seeded property runs can exceed Vitest's 5 s default when the machine is loaded. */
-const PROPERTY_TIMEOUT_MS = 60_000;
+const PROPERTY_TIMEOUT_MS = 120_000;
 
 /** Base seed for this file, derived from the shared core seed. */
 const FILE_SEED = (CORE_PROPERTY_SEED ^ 0x1e41e47) >>> 0;
 const RUNS = Math.max(100, CORE_PROPERTY_RUNS);
 
-function makeProgress(actions: readonly unknown[], checkpointId = "cp.test"): ChapterProgressV2 {
+function makeProgress(actions: readonly unknown[], checkpointId = "cp.test"): ChapterProgressV3 {
   return { checkpointId, actions: actions as CoreAction[], playerPose: null };
 }
 
 describe("chapterProgress lenient restore property", () => {
-  // Feature: chapter-01-voice-narrative, Property 16: Lenient restore returns the longest accepted prefix
   it(
     "returns the state of the longest accepted prefix, trimmed iff an action was rejected, and equals strict restore for valid logs",
     () => {
@@ -65,6 +67,21 @@ describe("chapterProgress lenient restore property", () => {
         expect(lenient.state, label("state equals replay of the first k actions")).toEqual(expectedPrefix.final);
         if (lenient.trimmed) trimmedCases += 1;
 
+        // The loader path reports `saveTrimmed` exactly when the restore stopped early.
+        const session: ChapterSession = {
+          chapterId: "chapter-1",
+          chapterNumber: 1,
+          sceneId: "street",
+          origin: "saved-game",
+          progress: drifted,
+        };
+        const applied = applyRestoredProgress(session, CHAPTER_1_SCENARIO);
+        expect(applied.ok, label("applyRestoredProgress ok")).toBe(true);
+        if (applied.ok) {
+          expect(applied.session.saveTrimmed === true, label("saveTrimmed")).toBe(rejectedAt !== -1);
+          expect(applied.session.restored?.state, label("session state")).toEqual(expectedPrefix.final);
+        }
+
         // Valid log: only accepted actions. Lenient equals strict and is not trimmed.
         const validActions = generated.filter((_, index) => generatedRun.results[index].accepted);
         const validRun = runSequence(validActions);
@@ -94,7 +111,7 @@ describe("chapterProgress lenient restore property", () => {
             "playerPose",
           ]);
           if (encoded !== null) {
-            const again = restoreProgress(JSON.parse(JSON.stringify(encoded)) as ChapterProgressV2, CHAPTER_1_SCENARIO, {
+            const again = restoreProgress(JSON.parse(JSON.stringify(encoded)) as ChapterProgressV3, CHAPTER_1_SCENARIO, {
               lenient: true,
             });
             expect(again.ok && again.trimmed, label("round trip not trimmed")).toBe(false);

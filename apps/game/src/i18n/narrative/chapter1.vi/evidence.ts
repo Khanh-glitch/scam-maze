@@ -1,195 +1,154 @@
-// Vietnamese Chapter 1 narrative overlay, evidence part (game-i18n-en-vi, task 6.3).
-// Keys: `evidence/<id>/<field>` and `evidence/<id>/relations/<claimId>/note`.
-// Missing keys fall back to English.
+// Vietnamese Chapter 1 narrative overlay, evidence part (spec chapter-01-double-deception, task 11.4).
+// Keys: `evidence/<id>/{title,description,location,relevance,debriefHint}` and
+// `evidence/<id>/relations/<claimId>/note`. Case ID, phone numbers and domains stay unchanged.
+// Clues that the player can read before the debrief avoid the words "lừa đảo" and "giả".
 
 import type { NarrativeOverlay } from "../../../game/narrative/localize";
 
 export const EVIDENCE_VI: NarrativeOverlay = {
-  // ev.sms-alert
-  "evidence/ev.sms-alert/title": "Tin nhắn khẩn cấp",
-  "evidence/ev.sms-alert/description":
-    "Một tin nhắn báo rằng tài khoản Northgate Bank của bạn đã bị tạm khóa và yêu cầu bạn xác minh danh tính trong vòng 15 phút tại northgate-secure-verify.invalid.",
-  "evidence/ev.sms-alert/location": "Điện thoại · Tin nhắn",
-  "evidence/ev.sms-alert/relations/claim.account-suspended/note":
-    "Tin nhắn nói tài khoản đã bị tạm khóa, nhưng chỉ một tin nhắn thì không chứng minh được điều đó là thật.",
-  "evidence/ev.sms-alert/relevance":
-    "Tin nhắn lừa đảo thường đặt ra thời hạn rất ngắn và kèm một đường link trông giống trang web của ngân hàng.",
-  "evidence/ev.sms-alert/debriefHint":
-    "Tin nhắn khẩn cấp đặt thời hạn 15 phút và dùng một địa chỉ web không phải là trang web chính thức của ngân hàng.",
+  // ev.caller-id-anomaly
+  "evidence/ev.caller-id-anomaly/title": "Số hiển thị là số của chính bạn",
+  "evidence/ev.caller-id-anomaly/description":
+    "Chi tiết cuộc gọi đầu tiên cho thấy số hiển thị là +000 0100 3300. Đó là số của chính bạn. Người gọi có thể tự đặt số hiện lên màn hình, nên chi tiết này cần được cân nhắc. Nó lạ, nhưng tự nó không cho biết ai đã gọi.",
+  "evidence/ev.caller-id-anomaly/location": "Điện thoại, chi tiết cuộc gọi đầu tiên",
+  "evidence/ev.caller-id-anomaly/relations/claim.alex-identity/note":
+    "Một số hiển thị lạ là lý do để kiểm tra. Nó không chứng minh người gọi không phải của ngân hàng.",
+  "evidence/ev.caller-id-anomaly/relevance":
+    "Cho thấy số trên màn hình có thể do người gọi đặt, và một chi tiết lạ là lý do để kiểm tra, không phải kết luận.",
+  "evidence/ev.caller-id-anomaly/debriefHint": "Chi tiết cuộc gọi đầu tiên cho thấy số hiển thị là số của chính bạn.",
 
-  // ev.otp-sms
-  "evidence/ev.otp-sms/title": "Tin nhắn mã xác thực một lần",
-  "evidence/ev.otp-sms/description":
-    "Một tin nhắn từ Northgate Bank chứa mã xác thực một lần. Tin nhắn ghi: \"Tuyệt đối không chia sẻ mã này với bất kỳ ai, kể cả nhân viên ngân hàng.\"",
-  "evidence/ev.otp-sms/location": "Điện thoại · Tin nhắn",
-  "evidence/ev.otp-sms/relations/claim.code-needed/note":
-    "Chính tin nhắn của ngân hàng dặn không bao giờ chia sẻ mã, kể cả với nhân viên ngân hàng.",
-  "evidence/ev.otp-sms/relevance":
-    "Mã xác thực một lần chỉ dành riêng cho bạn. Khi có người hỏi mã này, có thể họ đang tìm cách đăng nhập dưới tên bạn.",
-  "evidence/ev.otp-sms/debriefHint":
-    "Tin nhắn mã xác thực một lần đã dặn không bao giờ chia sẻ mã với bất kỳ ai, kể cả nhân viên ngân hàng.",
+  // ev.notification-metadata
+  "evidence/ev.notification-metadata/title": "Thông báo đến từ đâu",
+  "evidence/ev.notification-metadata/description":
+    "Chi tiết cho thấy tên miền người gửi là northgate-alerts.invalid, một ứng dụng tên NG Secure Helper, mã hồ sơ NG-4471-X và số liên hệ +000 0100 7771 do chính thông báo đưa ra. Không thứ nào khớp với hồ sơ ngân hàng bạn đã lưu, nhưng bạn cần đối chiếu các chi tiết này với hồ sơ đó trước khi quyết định.",
+  "evidence/ev.notification-metadata/location": "Máy tính xách tay, chi tiết thông báo",
+  "evidence/ev.notification-metadata/relations/claim.notification-genuine/note":
+    "Nguồn gốc trông lạ. Hãy so với những hồ sơ bạn đã lưu từ trước hôm nay.",
+  "evidence/ev.notification-metadata/relevance":
+    "Cho thấy cách đọc thông tin người gửi, và một số nằm trong tin nhắn không phải cách đáng tin để liên hệ với ngân hàng.",
+  "evidence/ev.notification-metadata/debriefHint":
+    "Chi tiết thông báo cho thấy một người gửi, một ứng dụng và một số mà bạn chưa từng lưu.",
 
-  // ev.caller-number
-  "evidence/ev.caller-number/title": "Số điện thoại người gọi",
-  "evidence/ev.caller-number/description":
-    "Lịch sử cuộc gọi cho thấy \"Northgate Bank Security\" đã gọi từ số +000 555 0142.",
-  "evidence/ev.caller-number/location": "Điện thoại · Cuộc gọi",
-  "evidence/ev.caller-number/relations/claim.caller-identity/note":
-    "Tên hiện trên màn hình là do người gọi đặt. Hãy so số này với một số bạn đã tin cậy từ trước.",
-  "evidence/ev.caller-number/relevance":
-    "Tên và số hiện khi có cuộc gọi đến có thể bị giả mạo. Hãy đối chiếu với số in trên thẻ hoặc trong thư của ngân hàng.",
-  "evidence/ev.caller-number/debriefHint":
-    "Lịch sử cuộc gọi đã cho thấy số mà người gọi dùng: +000 555 0142.",
+  // ev.official-contact-paper
+  "evidence/ev.official-contact-paper/title": "Số liên hệ in trên sao kê của bạn",
+  "evidence/ev.official-contact-paper/description":
+    "Sao kê giấy của bạn in số liên hệ của ngân hàng là +000 0100 0800 và địa chỉ northgate-bank.example. Tờ giấy được in từ trước hôm nay, nên đây là một hồ sơ mà cả hai người gọi đều không viết ra.",
+  "evidence/ev.official-contact-paper/location": "Tờ sao kê ngân hàng gấp lẫn trong đống hóa đơn",
+  "evidence/ev.official-contact-paper/relations/claim.notification-genuine/note":
+    "Nó cho thấy một kênh đã có từ trước hôm nay. Nó chưa nói gì về thông báo cho đến khi bạn so các số với nhau.",
+  "evidence/ev.official-contact-paper/relevance":
+    "Cho thấy thói quen giữ sẵn một liên hệ đáng tin từ trước khi có bất kỳ tin nhắn nào đến.",
+  "evidence/ev.official-contact-paper/debriefHint":
+    "Tờ sao kê giấy trong đống hóa đơn in sẵn số ngân hàng mà bạn có thể dùng để kiểm tra.",
 
-  // ev.bank-card
-  "evidence/ev.bank-card/title": "Số điện thoại trên thẻ ngân hàng",
-  "evidence/ev.bank-card/description":
-    "Mặt sau thẻ Northgate Bank của bạn in số điện thoại chính thức +000 555 0100.",
-  "evidence/ev.bank-card/location": "Bàn quán cà phê · ví",
-  "evidence/ev.bank-card/relations/claim.caller-identity/note":
-    "Đây là số chính thức của ngân hàng. Hãy dùng số này để kiểm tra ai thật sự đã gọi cho bạn.",
-  "evidence/ev.bank-card/relevance":
-    "Số trên thẻ là số bạn có thể tin cậy, vì bạn không nhận nó từ người gọi.",
-  "evidence/ev.bank-card/debriefHint":
-    "Chiếc ví trên bàn quán cà phê có thẻ ngân hàng của bạn, in số chính thức +000 555 0100.",
+  // ev.official-contact-app
+  "evidence/ev.official-contact-app/title": "Liên hệ đã lưu trong ứng dụng ngân hàng",
+  "evidence/ev.official-contact-app/description":
+    "Trang Liên hệ của Northgate Mobile, ứng dụng bạn đã cài từ trước hôm nay, ghi số ngân hàng +000 0100 0800 và địa chỉ northgate-bank.example. Đó là cùng số với sao kê giấy của bạn.",
+  "evidence/ev.official-contact-app/location": "Máy tính xách tay, ứng dụng ngân hàng, mục Liên hệ",
+  "evidence/ev.official-contact-app/relations/claim.notification-genuine/note":
+    "Nó cho thấy liên hệ bạn đã lưu. Tự nó không xác nhận hay phủ nhận thông báo.",
+  "evidence/ev.official-contact-app/relevance": "Cho một cách số hóa để đi đến cùng kết luận như sao kê giấy.",
+  "evidence/ev.official-contact-app/debriefHint":
+    "Ứng dụng ngân hàng do chính bạn cài ghi cùng một số ngân hàng với sao kê của bạn.",
 
-  // ev.bank-letter
-  "evidence/ev.bank-letter/title": "Thư từ Northgate Bank",
-  "evidence/ev.bank-letter/description":
-    "Một lá thư sao kê hằng năm ghi số hỗ trợ +000 555 0100 và trang web northgate.example. Thư không nhắc đến vấn đề nào với tài khoản của bạn.",
-  "evidence/ev.bank-letter/location": "Hộp thư",
-  "evidence/ev.bank-letter/relations/claim.caller-identity/note":
-    "Lá thư ghi số chính thức của ngân hàng. Hãy dùng số này để kiểm tra ai thật sự đã gọi cho bạn.",
-  "evidence/ev.bank-letter/relations/claim.account-suspended/note":
-    "Lá thư không nhắc đến việc tạm khóa, nhưng thư được gửi trước tin nhắn, nên hãy hỏi lại ngân hàng.",
-  "evidence/ev.bank-letter/relevance":
-    "Thư bạn đã có sẵn cho biết thông tin liên hệ thật của ngân hàng. Hãy so sánh với thông tin trong tin nhắn hoặc cuộc gọi.",
-  "evidence/ev.bank-letter/debriefHint":
-    "Lá thư trong hộp thư ghi số chính thức và trang web chính thức northgate.example.",
+  // ev.account-activity
+  "evidence/ev.account-activity/title": "Không có khoản thanh toán nào bị đánh dấu trong hoạt động tài khoản",
+  "evidence/ev.account-activity/description":
+    "Trang hoạt động trong ứng dụng ngân hàng cho thấy các khoản thanh toán quen thuộc của bạn và không có khoản nào bị đánh dấu hay chặn. Đây là một kết quả yên ắng, không phải bằng chứng. Ứng dụng không phải là cuộc trò chuyện trực tiếp với ngân hàng, nên nó không trả lời được hồ sơ có tồn tại hay không.",
+  "evidence/ev.account-activity/location": "Máy tính xách tay, ứng dụng ngân hàng, mục Hoạt động",
+  "evidence/ev.account-activity/relations/claim.recovery-needed/note":
+    "Một trang hoạt động yên ắng không cho biết có vấn đề hay không. Hãy hỏi ngân hàng qua một kênh bạn tin tưởng.",
+  "evidence/ev.account-activity/relevance":
+    "Cho thấy một nguồn yên ắng chưa phải câu trả lời, và kiểm tra khác với xác nhận.",
+  "evidence/ev.account-activity/debriefHint":
+    "Trang hoạt động tài khoản không có khoản thanh toán nào bị đánh dấu, điều đáng để kiểm tra thêm một lần nữa.",
 
-  // ev.bank-app
-  "evidence/ev.bank-app/title": "Ứng dụng Northgate Bank",
-  "evidence/ev.bank-app/description":
-    "Ứng dụng Northgate Bank trên điện thoại cho thấy tài khoản của bạn vẫn đang hoạt động, không có cảnh báo và không có giao dịch chuyển tiền nào đang chờ.",
-  "evidence/ev.bank-app/location": "Điện thoại · Northgate Bank",
-  "evidence/ev.bank-app/relations/claim.account-suspended/note":
-    "Ứng dụng do chính bạn cài đặt không hiển thị việc tạm khóa nào.",
-  "evidence/ev.bank-app/relevance":
-    "Tự mở ứng dụng ngân hàng, không bấm vào link trong tin nhắn, là một cách để kiểm tra một cảnh báo.",
-  "evidence/ev.bank-app/debriefHint":
-    "Ứng dụng Northgate Bank trên điện thoại đã cho thấy tài khoản của bạn vẫn hoạt động và không có cảnh báo.",
+  // ev.shared-case-id
+  "evidence/ev.shared-case-id/title": "Cùng một mã hồ sơ ở hai nơi",
+  "evidence/ev.shared-case-id/description":
+    "Alex đưa mã hồ sơ NG-4471-X trong cuộc gọi đầu tiên. Thông báo cũng dùng NG-4471-X. Hai liên hệ riêng biệt đồng ý về một mã, nhưng chúng có thể có chung một nguồn. Sự trùng khớp giữa chúng không phải là xác nhận độc lập.",
+  "evidence/ev.shared-case-id/location": "Máy tính xách tay, màn hình so sánh",
+  "evidence/ev.shared-case-id/relations/claim.claims-independent/note":
+    "Một mã dùng chung có thể có nghĩa là chỉ có một nguồn đứng sau cả hai. Hãy kiểm tra với người không phụ thuộc vào cả hai.",
+  "evidence/ev.shared-case-id/relevance":
+    "Cho thấy hai tin nhắn lặp lại cùng một chi tiết có thể chỉ là một nguồn, không phải hai người làm chứng.",
+  "evidence/ev.shared-case-id/debriefHint":
+    "Alex và thông báo dùng cùng một mã hồ sơ. Hai liên hệ khớp nhau vẫn có thể đến từ một nguồn.",
 
-  // ev.shop-poster
-  "evidence/ev.shop-poster/title": "Thông báo của Northgate trên cửa kính cửa hàng",
-  "evidence/ev.shop-poster/description":
-    "Thông báo của Northgate Bank ghi rằng ngân hàng sẽ không bao giờ hỏi mã xác thực một lần của bạn và không bao giờ yêu cầu bạn chuyển tiền sang tài khoản khác để bảo vệ số tiền đó.",
-  "evidence/ev.shop-poster/location": "Cửa kính cửa hàng ở góc phố",
-  "evidence/ev.shop-poster/relations/claim.code-needed/note":
-    "Ngân hàng cho biết họ không bao giờ hỏi mã xác thực một lần.",
-  "evidence/ev.shop-poster/relations/claim.protected-account/note":
-    "Ngân hàng cho biết họ không bao giờ yêu cầu bạn chuyển tiền để bảo vệ số tiền đó.",
-  "evidence/ev.shop-poster/relevance":
-    "Ngân hàng công bố những việc họ sẽ không bao giờ yêu cầu bạn làm. Một yêu cầu đi ngược lại điều này là dấu hiệu cảnh báo rõ ràng.",
-  "evidence/ev.shop-poster/debriefHint":
-    "Thông báo trên cửa kính cửa hàng ghi rằng Northgate không bao giờ hỏi mã hay yêu cầu bạn chuyển tiền.",
+  // ev.note-app-origin
+  "evidence/ev.note-app-origin/title": "Ghi chú của chính bạn về cách ngân hàng liên lạc",
+  "evidence/ev.note-app-origin/description":
+    "Mẩu ghi chú tự viết của bạn nói rằng ngân hàng liên lạc với bạn qua ứng dụng Northgate Mobile và số +000 0100 0800 in trên sao kê. Thông báo lại dùng một ứng dụng khác, NG Secure Helper. Đây là một manh mối yếu. Ghi chú chỉ ghi lại thói quen của bạn và không chứng minh thông báo là sai.",
+  "evidence/ev.note-app-origin/location": "Mẩu ghi chú tự viết gần bàn",
+  "evidence/ev.note-app-origin/relations/claim.notification-genuine/note":
+    "Yếu. Thông báo không theo kênh thường lệ của bạn, nhưng chỉ có việc kiểm tra với ngân hàng mới giải quyết được.",
+  "evidence/ev.note-app-origin/relevance":
+    "Cho thấy một quy tắc cá nhân bạn đặt ra từ trước có thể giúp bạn nhận ra tin nhắn không khớp.",
+  "evidence/ev.note-app-origin/debriefHint":
+    "Ghi chú của chính bạn nói ngân hàng liên lạc với bạn thế nào, và thông báo không theo cách đó.",
 
-  // ev.community-alert
-  "evidence/ev.community-alert/title": "Cảnh báo của khu phố",
-  "evidence/ev.community-alert/description":
-    "Một cảnh báo trên bảng tin cho biết nhiều người hàng xóm đã nhận cuộc gọi từ những người tự xưng là nhân viên ngân hàng, yêu cầu họ chuyển tiền tiết kiệm sang một \"tài khoản được bảo vệ\".",
-  "evidence/ev.community-alert/location": "Bảng tin",
-  "evidence/ev.community-alert/relations/claim.protected-account/note":
-    "Hàng xóm đã nhận cùng một yêu cầu từ những người gọi không phải là nhân viên ngân hàng.",
-  "evidence/ev.community-alert/relevance":
-    "Cùng một câu chuyện thường đến với nhiều người. Nghe người khác kể giúp bạn nhận ra kiểu lừa này.",
-  "evidence/ev.community-alert/debriefHint":
-    "Bảng tin khu phố mô tả những cuộc gọi yêu cầu hàng xóm chuyển tiền tiết kiệm sang một \"tài khoản được bảo vệ\".",
+  // ev.alex-statement
+  "evidence/ev.alex-statement/title": "Những gì Alex đã nói, bằng văn bản",
+  "evidence/ev.alex-statement/description":
+    "Bản ghi cuộc gọi đầu tiên cho biết Alex đã đưa mã hồ sơ NG-4471-X, yêu cầu một mã gửi đến điện thoại của bạn, và đưa số gọi lại +000 0100 2200. Bản ghi cũng cho biết sẽ có một thông báo và một nhóm theo dõi liên lạc sau đó. Đây là lời khẳng định của người gọi, không phải điều bạn đã kiểm chứng.",
+  "evidence/ev.alex-statement/location": "Điện thoại, bản ghi cuộc gọi đầu tiên",
+  "evidence/ev.alex-statement/relations/claim.alex-identity/note":
+    "Bản ghi cho thấy điều đã được khẳng định. Nó không cho biết lời khẳng định đó có đúng không.",
+  "evidence/ev.alex-statement/relevance":
+    "Một bản ghi bằng văn bản giúp dễ so sánh các lời khẳng định về sau, và nó báo trước thông báo cùng nhóm theo dõi.",
+  "evidence/ev.alex-statement/debriefHint":
+    "Bản ghi cuộc gọi đầu tiên nói rằng sẽ có một thông báo và một nhóm theo dõi. Cả hai đều đã đến.",
 
-  // ev.partial-info
-  "evidence/ev.partial-info/title": "Những gì người gọi biết",
-  "evidence/ev.partial-info/description":
-    "Người gọi biết tên bạn và bốn số cuối của số tài khoản.",
-  "evidence/ev.partial-info/location": "Cuộc gọi lừa đảo",
-  "evidence/ev.partial-info/relations/claim.caller-identity/note":
-    "Những thông tin này có thể đến từ dữ liệu bị rò rỉ, nên chúng không cho biết người gọi là ai.",
-  "evidence/ev.partial-info/relevance":
-    "Biết một vài thông tin cá nhân khiến người gọi nghe có vẻ thật, nhưng điều đó không chứng minh họ làm việc cho ngân hàng của bạn.",
-  "evidence/ev.partial-info/debriefHint":
-    "Nếu hỏi người gọi làm sao bạn biết họ là nhân viên ngân hàng, bạn sẽ thấy họ chỉ biết vài thông tin nhỏ.",
-
-  // ev.sam-testimony
-  "evidence/ev.sam-testimony/title": "Câu chuyện của Sam",
-  "evidence/ev.sam-testimony/description":
-    "Sam kể rằng có lần một người gọi nói với bạn của Sam rằng tài khoản đang gặp nguy hiểm, hỏi mã rồi yêu cầu chuyển tiền. Sam khuyên hãy gọi vào số trên thẻ của bạn, không gọi lại số vừa gọi cho bạn.",
-  "evidence/ev.sam-testimony/location": "Cửa hàng ở góc phố",
-  "evidence/ev.sam-testimony/relations/claim.caller-identity/note":
-    "Câu chuyện của Sam giống cuộc gọi này, nhưng nó không cho biết ai đã gọi cho bạn.",
-  "evidence/ev.sam-testimony/relevance":
-    "Nói chuyện với người bạn tin tưởng giúp bạn có thời gian suy nghĩ, và thường cho thấy câu chuyện này là một kiểu lừa quen thuộc.",
-  "evidence/ev.sam-testimony/debriefHint":
-    "Sam ở cửa hàng góc phố đã từng nghe về kiểu cuộc gọi tương tự.",
+  // ev.recovery-statement
+  "evidence/ev.recovery-statement/title": "Người gọi thứ ba lặp lại mã hồ sơ",
+  "evidence/ev.recovery-statement/description":
+    "Người gọi thứ ba lặp lại mã hồ sơ NG-4471-X và nói rằng tiền của bạn phải được chuyển sang một tài khoản tạm giữ để bảo vệ. Người gọi cũng đồng tình với những nghi ngờ của bạn. Cùng một mã bạn đã thấy hai lần là một lời khẳng định lặp lại, không phải một người làm chứng mới.",
+  "evidence/ev.recovery-statement/location": "Cuộc gọi thứ ba, người gọi khôi phục",
+  "evidence/ev.recovery-statement/relations/claim.recovery-needed/note":
+    "Người gọi yêu cầu hành động gấp. Có cần hành động hay không là điều chỉ ngân hàng mới xác nhận được.",
+  "evidence/ev.recovery-statement/relevance":
+    "Cho thấy một giọng nói thứ ba có thể mượn chi tiết từ hai giọng đầu để trông như độc lập.",
+  "evidence/ev.recovery-statement/debriefHint":
+    "Người gọi thứ ba lặp lại cùng mã hồ sơ và yêu cầu bạn chuyển tiền.",
 
   // ev.official-confirmation
-  "evidence/ev.official-confirmation/title": "Đường dây chính thức của Northgate",
+  "evidence/ev.official-confirmation/title": "Đường dây ngân hàng xác nhận không có hồ sơ nào như vậy",
   "evidence/ev.official-confirmation/description":
-    "Bạn đã gọi cho Northgate theo số +000 555 0100. Ngân hàng không có ghi nhận nào về cuộc gọi cho bạn hôm nay, tài khoản của bạn vẫn hoạt động, và họ không bao giờ hỏi mã xác thực một lần hay yêu cầu bạn chuyển tiền.",
-  "evidence/ev.official-confirmation/location": "Điện thoại · cuộc gọi chính thức",
-  "evidence/ev.official-confirmation/relations/claim.caller-identity/note":
-    "Khi bạn liên hệ qua số chính thức, ngân hàng cho biết không có ghi nhận nào về việc đã gọi cho bạn.",
-  "evidence/ev.official-confirmation/relations/claim.account-suspended/note":
-    "Ngân hàng cho biết tài khoản của bạn vẫn đang hoạt động.",
-  "evidence/ev.official-confirmation/relations/claim.code-needed/note":
-    "Ngân hàng cho biết họ không bao giờ hỏi mã xác thực một lần.",
+    "Bạn đã gọi +000 0100 0800, số đã lưu từ trước hôm nay. Nhân viên ngân hàng không thấy hồ sơ NG-4471-X, không thấy thông báo bảo mật nào được gửi cho bạn, và không có quy trình khôi phục nào yêu cầu bạn chuyển tiền.",
+  "evidence/ev.official-confirmation/location": "Cuộc gọi đến số ngân hàng đã lưu",
+  "evidence/ev.official-confirmation/relations/claim.alex-identity/note":
+    "Ngân hàng không có hồ sơ nào về người gọi này hay hồ sơ này.",
+  "evidence/ev.official-confirmation/relations/claim.notification-genuine/note": "Ngân hàng không gửi thông báo này.",
+  "evidence/ev.official-confirmation/relations/claim.recovery-needed/note": "Không có quy trình khôi phục nào cả.",
+  "evidence/ev.official-confirmation/relations/claim.claims-independent/note":
+    "Các người gọi và thông báo có chung một nguồn.",
   "evidence/ev.official-confirmation/relevance":
-    "Tự gọi cho ngân hàng theo số bạn đã tin cậy từ trước là cách đáng tin nhất để kiểm tra một cuộc gọi hoặc tin nhắn.",
+    "Cho thấy cách xử lý đúng: dừng lại, rồi hỏi qua một kênh bạn đã tin từ trước, không phải kênh do người gửi đưa.",
   "evidence/ev.official-confirmation/debriefHint":
-    "Nếu gọi cho Northgate theo số trên thẻ hoặc trong thư, bạn sẽ biết chắc rằng ngân hàng không hề gọi cho bạn.",
+    "Gọi vào số bạn đã lưu từ trước hôm nay sẽ giải quyết được câu hỏi.",
 
-  // ev.transfer-check
-  "evidence/ev.transfer-check/title": "Không có giao dịch chuyển tiền nào đang chờ",
-  "evidence/ev.transfer-check/description":
-    "Bạn đã hỏi đường dây chính thức về khoản chuyển tiền lớn mà người gọi nhắc đến. Northgate cho biết không có giao dịch nào đang chờ và không có khoản nào bị giữ trong tài khoản của bạn. Điều này không khớp với câu chuyện của người gọi.",
-  "evidence/ev.transfer-check/location": "Điện thoại · cuộc gọi chính thức",
-  "evidence/ev.transfer-check/relations/claim.account-suspended/note":
-    "Ghi nhận của chính ngân hàng cho thấy không có giao dịch và không có khoản bị giữ, điều này không khớp với lời người gọi nói.",
-  "evidence/ev.transfer-check/relevance":
-    "Hỏi thêm một câu trên kênh bạn tin cậy có thể cho thấy chi tiết của người gọi có khớp với ghi nhận chính thức hay không.",
-  "evidence/ev.transfer-check/debriefHint":
-    "Khi hỏi Northgate về khoản chuyển tiền, bạn biết rằng ngân hàng không có ghi nhận nào về nó, nên câu chuyện của người gọi không khớp.",
+  // ev.calendar-routine
+  "evidence/ev.calendar-routine/title": "Không có cuộc hẹn bảo mật nào trên lịch của bạn",
+  "evidence/ev.calendar-routine/description":
+    "Cuốn lịch của bạn chỉ có ngày sao kê quen thuộc và không có cuộc hẹn bảo mật nào với ngân hàng. Chi tiết này không bắt buộc và yếu. Một ô trống khớp với những gì bạn nhớ, nhưng không chứng minh điều gì về các cuộc gọi.",
+  "evidence/ev.calendar-routine/location": "Cuốn lịch treo tường",
+  "evidence/ev.calendar-routine/relations/claim.recovery-needed/note":
+    "Lịch sinh hoạt của bạn không có dấu hiệu nào về chuyện bảo mật, nhưng lịch sinh hoạt không thể loại trừ chuyện đó.",
+  "evidence/ev.calendar-routine/relevance":
+    "Một chi tiết không bắt buộc, cho thấy nhiều dấu hiệu yếu khác với một sự thật đã được xác nhận như thế nào.",
+  "evidence/ev.calendar-routine/debriefHint":
+    "Lịch của bạn không có cuộc hẹn bảo mật nào. Đó là một dấu hiệu yếu, không phải bằng chứng.",
 
-  // ev.second-number
-  "evidence/ev.second-number/title": "Số thứ ba mang tên \"Northgate\"",
-  "evidence/ev.second-number/description":
-    "Lịch sử cuộc gọi cho thấy \"Northgate Case Desk\" gọi từ số +000 555 0177. Đây là một số khác với người gọi đầu tiên (+000 555 0142) và với số chính thức (+000 555 0100).",
-  "evidence/ev.second-number/location": "Điện thoại · Cuộc gọi",
-  "evidence/ev.second-number/relations/claim.caller-identity/note":
-    "Số này không trùng với số chính thức trên thẻ hoặc trong thư của bạn.",
-  "evidence/ev.second-number/relevance":
-    "Khi một số mới dùng tên ngân hàng, hãy so nó với một số bạn đã tin cậy từ trước. Bạn không cần nghe máy để làm việc này.",
-  "evidence/ev.second-number/debriefHint":
-    "Cuộc gọi tiếp theo đến từ +000 555 0177, một số thứ ba không trùng với số chính thức +000 555 0100.",
-
-  // ev.case-sms
-  "evidence/ev.case-sms/title": "Tin nhắn hồ sơ có địa chỉ giống thật",
-  "evidence/ev.case-sms/description":
-    "Một tin nhắn từ \"Northgate Bank\" nêu mã hồ sơ và yêu cầu bạn xem lại hồ sơ tại northgate-case-review.invalid. Địa chỉ này không trùng với trang web chính thức northgate.example.",
-  "evidence/ev.case-sms/location": "Điện thoại · Tin nhắn",
-  "evidence/ev.case-sms/relations/claim.caller-identity/note":
-    "Đường link không trùng với trang web chính thức của ngân hàng.",
-  "evidence/ev.case-sms/relevance":
-    "Mã hồ sơ khiến tin nhắn trông có vẻ chính thức, nhưng địa chỉ web vẫn phải trùng với trang web thật của ngân hàng. Đừng mở link do người gọi gửi.",
-  "evidence/ev.case-sms/debriefHint":
-    "Tin nhắn hồ sơ dẫn đến northgate-case-review.invalid, địa chỉ không trùng với trang web chính thức northgate.example.",
-
-  // ev.shifting-story
-  "evidence/ev.shifting-story/title": "Thời hạn đã thay đổi",
-  "evidence/ev.shifting-story/description":
-    "Trong cuộc gọi đầu, người gọi nói bạn chỉ có vài phút. Khi gọi lại, người gọi kể về thời hạn theo cách khác. Hai lời kể này không khớp nhau.",
-  "evidence/ev.shifting-story/location": "Cuộc gọi lại",
-  "evidence/ev.shifting-story/relations/claim.caller-identity/note":
-    "Một vấn đề thật với tài khoản chỉ có một ghi nhận rõ ràng. Câu chuyện thay đổi giữa các cuộc gọi là một dấu hiệu cảnh báo.",
-  "evidence/ev.shifting-story/relevance":
-    "Hãy nhớ những gì người gọi đã nói trước đó. Khi chi tiết thay đổi, hãy hỏi về điểm khác biệt hoặc kết thúc cuộc gọi và tự kiểm tra.",
-  "evidence/ev.shifting-story/debriefHint":
-    "Việc nhắc lại câu \"vài phút\" lúc trước cho thấy câu chuyện về thời hạn của người gọi đã thay đổi.",
+  // ev.recovery-number-match
+  "evidence/ev.recovery-number-match/title": "Người gọi thứ ba dùng số trong thông báo",
+  "evidence/ev.recovery-number-match/description":
+    "Chi tiết cuộc gọi thứ ba cho thấy số hiển thị là +000 0100 7771. Đó là số liên hệ mà chính thông báo đã đưa ra. Thông báo và người gọi thứ ba có thể có chung một nguồn, dù chỉ một số thì vẫn cần được kiểm tra.",
+  "evidence/ev.recovery-number-match/location": "Điện thoại, chi tiết cuộc gọi thứ ba",
+  "evidence/ev.recovery-number-match/relations/claim.claims-independent/note":
+    "Một số dùng chung cho thấy chỉ có một nguồn. Hãy xác nhận với ngân hàng trước khi quyết định.",
+  "evidence/ev.recovery-number-match/relevance":
+    "Nối cuộc gọi thứ ba với thông báo, điều đã được báo trước từ trước đó.",
+  "evidence/ev.recovery-number-match/debriefHint":
+    "Cuộc gọi thứ ba đến từ chính số mà thông báo đã đưa ra.",
 };

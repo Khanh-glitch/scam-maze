@@ -22,10 +22,11 @@ import type { ChapterStore } from "../../game/narrative/store";
 import type { ChapterState } from "../../game/narrative/types";
 import { encodeProgress } from "../../game/saves/chapterProgress";
 import {
-  SAVE_FORMAT_VERSION_V2,
+  SAVE_CONTENT_VERSION,
+  SAVE_FORMAT_VERSION_V3,
   START_CHECKPOINT_ID,
   type SaveGameSource,
-  type SavedGameV2,
+  type SavedGameV3,
   type SavedPlayerPose,
 } from "../../game/saves/saveGame";
 
@@ -102,8 +103,9 @@ export function useCheckpointSaver({
 
       const { saveSource: source, chapterId: id, sceneId: scene, onWriteFailure: onFailure } =
         latest.current;
-      const save: SavedGameV2 = {
-        formatVersion: SAVE_FORMAT_VERSION_V2,
+      const save: SavedGameV3 = {
+        formatVersion: SAVE_FORMAT_VERSION_V3,
+        contentVersion: SAVE_CONTENT_VERSION,
         chapterId: id,
         sceneId: scene,
         savedAt: new Date().toISOString(),

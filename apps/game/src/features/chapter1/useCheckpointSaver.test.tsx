@@ -1,5 +1,5 @@
-// Integration tests for the Checkpoint_Saver hook (task 12.4). Requirements 15.1, 15.2, 15.14
-// and 18.6.
+// Integration tests for the Checkpoint_Saver hook (re-enabled in task 12.4 with the rebuilt scenario).
+// Requirements 17.6 and 17.7 of chapter-01-double-deception (checkpoints and restore).
 //
 // The hook runs against a real Chapter_Store and an in-memory SaveGameSource, so every write
 // goes through `encodeProgress` and can be replayed with `restoreProgress`.
@@ -8,33 +8,30 @@ import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { createInitialState } from "../../game/narrative/reducer";
 import { createChapterStore, type ChapterStore } from "../../game/narrative/store";
+import { reachEndingA } from "../../test/chapterRuns";
 import type { CoreAction } from "../../game/narrative/types";
 import { restoreProgress } from "../../game/saves/chapterProgress";
 import {
-  SAVE_FORMAT_VERSION_V2,
+  SAVE_FORMAT_VERSION_V3,
   type SaveGameSource,
   type SaveReadResult,
-  type SavedGameV2,
+  type SavedGameV3,
   type SavedPlayerPose,
 } from "../../game/saves/saveGame";
-import { DEBRIEF_CHECKPOINT_ID, useCheckpointSaver } from "./useCheckpointSaver";
+import { DEBRIEF_CHECKPOINT_ID, objectiveCheckpointId, useCheckpointSaver } from "./useCheckpointSaver";
 
+/** A complete accepted run of the rebuilt chapter: START_CHAPTER ... FINISH_CHAPTER. */
+const RUN: readonly CoreAction[] = reachEndingA().actions;
 const START: CoreAction = { type: "START_CHAPTER" };
-const WALLET: CoreAction = { type: "INTERACT_OBJECT", objectId: "obj.wallet" };
-const RING_SCAM: CoreAction = { type: "RING_CALL", callId: "call.scam-1", reason: "first-interaction" };
-const ANSWER: CoreAction = { type: "ANSWER_CALL" };
-const END_CALL: CoreAction = { type: "END_CALL" };
-const VERIFY_OPTION: CoreAction = { type: "SELECT_DIALOGUE_OPTION", optionId: "opt.scam.open.verify" };
-const STOP_AND_WAIT: CoreAction = { type: "MAKE_DECISION", decision: "stop-and-wait" };
-const FINISH: CoreAction = { type: "FINISH_CHAPTER" };
+const RING_ALEX: CoreAction = { type: "RING_CALL", callId: "call.alex", reason: "first-interaction" };
 
 /** In-memory save source. `setWritable(false)` makes writes fail like blocked storage. */
 function createMemorySaveSource() {
-  let saved: SavedGameV2 | null = null;
+  let saved: SavedGameV3 | null = null;
   let writable = true;
   const source = {
     read: vi.fn((): SaveReadResult => (saved ? { status: "valid", save: saved } : { status: "none" })),
-    write: vi.fn((save: SavedGameV2) => {
+    write: vi.fn((save: SavedGameV3) => {
       if (!writable) return false;
       saved = save;
       return true;
@@ -64,7 +61,7 @@ function setup(pose: SavedPlayerPose | null = null) {
       saveSource: memory.source,
       poseGetterRef,
       chapterId: "chapter-1",
-      sceneId: "street",
+      sceneId: "apartment",
       onWriteFailure,
     }),
   );
@@ -86,75 +83,64 @@ const lastWrite = (memory: ReturnType<typeof createMemorySaveSource>) => {
   if (!call) throw new Error("Nothing was written");
   return call[0];
 };
+const callInProgress = (store: ChapterStore) => {
+  const status = store.getState().call.status;
+  return status === "ringing" || status === "active";
+};
 
 describe("useCheckpointSaver", () => {
+  it("starts from a run that begins with START_CHAPTER and ends with FINISH_CHAPTER", () => {
+    expect(RUN[0]).toEqual(START);
+    expect(RUN.at(-1)).toEqual({ type: "FINISH_CHAPTER" });
+  });
+
   it("writes nothing before START_CHAPTER", () => {
     const { store, memory } = setup();
     // A rejected action does not notify; a replace to the initial state does.
     act(() => {
-      store.dispatch(WALLET);
+      store.dispatch({ type: "END_CALL" });
       store.replace(createInitialState());
     });
     expect(writeCount(memory)).toBe(0);
   });
 
-  it("writes a Checkpoint on START_CHAPTER and on each later objective change", () => {
+  it("writes a replayable Checkpoint on START_CHAPTER", () => {
     const { store, memory } = setup();
     dispatchAll(store, [START]);
     expect(writeCount(memory)).toBe(1);
     const first = lastWrite(memory);
-    expect(first).toMatchObject({ formatVersion: SAVE_FORMAT_VERSION_V2, chapterId: "chapter-1", sceneId: "street" });
-    expect(first.progress.checkpointId).toBe("obj.look-around");
-
-    // OPEN_PHONE changes no objective, so nothing is written.
-    dispatchAll(store, [{ type: "OPEN_PHONE" }, { type: "CLOSE_PHONE" }]);
-    expect(writeCount(memory)).toBe(1);
-
-    // The wallet completes "look around": a new Checkpoint that replays to the same state.
-    dispatchAll(store, [WALLET]);
-    expect(writeCount(memory)).toBe(2);
-    const restored = restoreProgress(lastWrite(memory).progress);
+    expect(first).toMatchObject({ formatVersion: SAVE_FORMAT_VERSION_V3, chapterId: "chapter-1", sceneId: "apartment" });
+    expect(first.progress.checkpointId).toBe(objectiveCheckpointId(store.getState()));
+    const restored = restoreProgress(first.progress);
     if (!restored.ok) throw new Error(restored.reason);
     expect(restored.state.objectives).toEqual(store.getState().objectives);
-    expect(restored.state.discovered).toEqual(store.getState().discovered);
   });
 
-  it("defers a change made while a call rings and writes it when the call ends", () => {
+  it("never writes during a call, and the last Checkpoint matches the objectives once the call is over", () => {
     const { store, memory } = setup();
-    dispatchAll(store, [START, WALLET]);
-    const before = writeCount(memory);
-
-    // Ringing activates "answer the call", but a Checkpoint must wait.
-    dispatchAll(store, [RING_SCAM]);
-    expect(store.getState().objectives.active).toContain("obj.answer-call");
-    expect(writeCount(memory)).toBe(before);
-
-    // Declining changes no objective; the pending difference is written now.
-    dispatchAll(store, [END_CALL]);
-    expect(writeCount(memory)).toBe(before + 1);
-    expect(lastWrite(memory).progress.checkpointId).toBe("obj.answer-call");
-    expect(lastWrite(memory).progress.actions).toEqual([START, WALLET, RING_SCAM, END_CALL]);
-  });
-
-  it("writes nothing during an active call and once after it ends", () => {
-    const { store, memory } = setup();
-    dispatchAll(store, [START, WALLET]);
-    const before = writeCount(memory);
-
-    dispatchAll(store, [RING_SCAM, ANSWER]);
-    expect(store.getState().call.status).toBe("active");
-    expect(writeCount(memory)).toBe(before);
-
-    dispatchAll(store, [VERIFY_OPTION]);
-    expect(writeCount(memory)).toBe(before + 1);
+    let writesDuringCalls = 0;
+    for (const action of RUN.slice(0, -1)) {
+      const before = writeCount(memory);
+      dispatchAll(store, [action]);
+      if (callInProgress(store)) {
+        writesDuringCalls += writeCount(memory) - before;
+        continue;
+      }
+      const restored = restoreProgress(lastWrite(memory).progress);
+      if (!restored.ok) throw new Error(restored.reason);
+      // The deferred difference of a call is written as soon as the call is over.
+      expect(restored.state.objectives).toEqual(store.getState().objectives);
+    }
+    expect(writesDuringCalls).toBe(0);
+    expect(writeCount(memory)).toBeGreaterThan(1);
   });
 
   it('writes checkpoint "debrief" once after FINISH_CHAPTER', () => {
     const { store, memory } = setup();
-    dispatchAll(store, [START, WALLET, RING_SCAM, ANSWER, VERIFY_OPTION, STOP_AND_WAIT]);
+    dispatchAll(store, RUN.slice(0, -1));
     const before = writeCount(memory);
 
-    dispatchAll(store, [FINISH]);
+    dispatchAll(store, RUN.slice(-1));
     expect(writeCount(memory)).toBe(before + 1);
     expect(lastWrite(memory).progress.checkpointId).toBe(DEBRIEF_CHECKPOINT_ID);
     const restored = restoreProgress(lastWrite(memory).progress);
@@ -168,19 +154,19 @@ describe("useCheckpointSaver", () => {
   it("reports a write failure once per failure streak and keeps going", () => {
     const { store, memory, onWriteFailure } = setup();
     memory.setWritable(false);
-    dispatchAll(store, [START, WALLET]);
-    expect(writeCount(memory)).toBe(2);
+    dispatchAll(store, [START]);
+    expect(writeCount(memory)).toBe(1);
     expect(onWriteFailure).toHaveBeenCalledTimes(1);
     expect(store.getState().status).toBe("playing");
 
     // A success ends the streak; the next failure is reported again.
     memory.setWritable(true);
-    dispatchAll(store, [RING_SCAM, ANSWER, VERIFY_OPTION]);
+    dispatchAll(store, RUN.slice(1, -1));
     expect(memory.saved()).not.toBeNull();
     expect(onWriteFailure).toHaveBeenCalledTimes(1);
 
     memory.setWritable(false);
-    dispatchAll(store, [STOP_AND_WAIT, FINISH]);
+    dispatchAll(store, RUN.slice(-1));
     expect(onWriteFailure).toHaveBeenCalledTimes(2);
   });
 
@@ -191,7 +177,7 @@ describe("useCheckpointSaver", () => {
     expect(hook.result.current.saveNow()).toBe(false);
     expect(writeCount(memory)).toBe(0);
 
-    dispatchAll(store, [START, WALLET]);
+    dispatchAll(store, [START]);
     const before = writeCount(memory);
     let ok = false;
     act(() => {
@@ -199,10 +185,10 @@ describe("useCheckpointSaver", () => {
     });
     expect(ok).toBe(true);
     expect(writeCount(memory)).toBe(before + 1);
-    expect(lastWrite(memory).progress.checkpointId).toBe("obj.look-around");
+    expect(lastWrite(memory).progress.checkpointId).toBe(objectiveCheckpointId(store.getState()));
     expect(lastWrite(memory).progress.playerPose?.yaw).toBe(0.5);
 
-    dispatchAll(store, [RING_SCAM]);
+    dispatchAll(store, [RING_ALEX]);
     expect(hook.result.current.saveNow()).toBe(false);
     expect(writeCount(memory)).toBe(before + 1);
   });

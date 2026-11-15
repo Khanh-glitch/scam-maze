@@ -18,6 +18,9 @@ export function clock(base = { h: 23, m: 8 }, elapsedSec = 0) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
+/** Small status card on the laptop screen. Text is drawn as given (the caller translates it). */
+export interface LaptopFrame { badge: string; headline: string }
+
 /* ================= LAPTOP ================= */
 export class LaptopScreen {
   c = canvas(1280, 800);
@@ -39,7 +42,11 @@ export class LaptopScreen {
     this.draw(0, '23:08');
   }
 
-  draw(awake: number, time: string, typed = '') {
+  /**
+   * `frame`: undefined draws the original corner card, `null` draws no card, an object draws the
+   * badge and headline in its place.
+   */
+  draw(awake: number, time: string, typed = '', frame?: LaptopFrame | null) {
     const ctx = this.ctx;
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 1280, 800);
     if (awake <= 0.01) { this.tex.needsUpdate = true; return; }
@@ -95,18 +102,37 @@ export class LaptopScreen {
 
     // --- old notification still sitting in the corner ---
     const nx = 900, ny = 520, nw = 350, nh = 150;
-    ctx.fillStyle = 'rgba(38,40,48,0.92)'; rr(ctx, nx, ny, nw, nh, 12); ctx.fill();
-    ctx.fillStyle = '#0f5c4c'; rr(ctx, nx + 14, ny + 14, 22, 22, 5); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = `bold 12px ${UI}`; ctx.fillText('N', nx + 21, ny + 30);
-    ctx.fillStyle = '#ccc'; ctx.font = `12px ${UI}`; ctx.fillText('Northgate Bank  ·  18/10', nx + 46, ny + 30);
-    ctx.fillStyle = '#888'; ctx.fillText('✕', nx + nw - 24, ny + 30);
-    ctx.fillStyle = '#fff'; ctx.font = `bold 14px ${UI}`; ctx.fillText(st('notifTitle'), nx + 16, ny + 60);
-    ctx.fillStyle = '#d8d8de'; ctx.font = `13px ${UI}`;
-    ctx.fillText(st('notifL1'), nx + 16, ny + 82);
-    ctx.fillText(st('notifL2'), nx + 16, ny + 100);
-    ctx.fillStyle = '#9a9aa4'; ctx.font = `11px ${UI}`;
-    ctx.fillText(st('notifL3'), nx + 16, ny + 124);
-    ctx.fillText(st('notifL4'), nx + 16, ny + 139);
+    if (frame) {
+      ctx.fillStyle = 'rgba(38,40,48,0.92)'; rr(ctx, nx, ny, nw, nh, 12); ctx.fill();
+      ctx.font = `bold 12px ${UI}`;
+      const bw2 = Math.min(nw - 28, Math.ceil(ctx.measureText(frame.badge).width) + 24);
+      ctx.fillStyle = '#0f5c4c'; rr(ctx, nx + 14, ny + 14, bw2, 24, 12); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillText(frame.badge, nx + 26, ny + 31);
+      ctx.fillStyle = '#fff'; ctx.font = `bold 16px ${UI}`;
+      let ly = ny + 68, line = '';
+      const maxW = nw - 32;
+      for (const wd of frame.headline.split(' ')) {
+        const next = line ? `${line} ${wd}` : wd;
+        if (line && ctx.measureText(next).width > maxW) {
+          ctx.fillText(line, nx + 16, ly); ly += 22; line = wd;
+          if (ly > ny + nh - 12) break;
+        } else line = next;
+      }
+      if (ly <= ny + nh - 12) ctx.fillText(line, nx + 16, ly);
+    } else if (frame === undefined) {
+      ctx.fillStyle = 'rgba(38,40,48,0.92)'; rr(ctx, nx, ny, nw, nh, 12); ctx.fill();
+      ctx.fillStyle = '#0f5c4c'; rr(ctx, nx + 14, ny + 14, 22, 22, 5); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = `bold 12px ${UI}`; ctx.fillText('N', nx + 21, ny + 30);
+      ctx.fillStyle = '#ccc'; ctx.font = `12px ${UI}`; ctx.fillText('Northgate Bank  ·  18/10', nx + 46, ny + 30);
+      ctx.fillStyle = '#888'; ctx.fillText('✕', nx + nw - 24, ny + 30);
+      ctx.fillStyle = '#fff'; ctx.font = `bold 14px ${UI}`; ctx.fillText(st('notifTitle'), nx + 16, ny + 60);
+      ctx.fillStyle = '#d8d8de'; ctx.font = `13px ${UI}`;
+      ctx.fillText(st('notifL1'), nx + 16, ny + 82);
+      ctx.fillText(st('notifL2'), nx + 16, ny + 100);
+      ctx.fillStyle = '#9a9aa4'; ctx.font = `11px ${UI}`;
+      ctx.fillText(st('notifL3'), nx + 16, ny + 124);
+      ctx.fillText(st('notifL4'), nx + 16, ny + 139);
+    }
 
     // --- reply draft being typed ---
     if (typed) {

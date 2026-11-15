@@ -49,7 +49,7 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({ chapterNumber, onResume, o
         aria-modal="true"
         aria-labelledby="pause-menu-heading"
         aria-describedby={confirming ? "pause-menu-confirm-text" : undefined}
-        className={`${UI.panel} max-w-md space-y-4`}
+        className={`${UI.panel} ${UI.panelFit} max-w-md space-y-4 overflow-y-auto`}
       >
         <h2 id="pause-menu-heading" ref={headingRef} tabIndex={-1} className={UI.heading}>
           {confirming ? t("pause.confirmHeading") : t("pause.heading")}

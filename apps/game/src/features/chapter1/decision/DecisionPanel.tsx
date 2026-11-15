@@ -1,7 +1,7 @@
-// Decision panel: the three ways to respond after the first call (Requirements 13.1-13.4).
+// Decision panel: the five final decisions of Act V (Requirements 10.1, 10.2).
 // Props only: the page passes the `selectDecisionPanel` view and dispatches the actions.
-// The official route has two steps: VERIFY_CLAIM `official-line` (the pre-step), then
-// MAKE_DECISION `verify-independently`. Every MAKE_DECISION goes through a confirmation step.
+// The verify route has two steps: VERIFY_CLAIM with the pre-step method ("Call the number on your
+// statement"), then MAKE_DECISION `verify-independently`. Every MAKE_DECISION goes through a confirmation step.
 // Escape is handled by the page through the overlay stack; this panel only offers Close.
 
 import React, { useEffect, useRef, useState } from "react";
@@ -9,13 +9,13 @@ import { useTranslation } from "react-i18next";
 import { ArrowLeft, Check, Info, PhoneCall, X } from "lucide-react";
 import type { DecisionId } from "../../../game/narrative/chapter1/ids";
 import type { ReasonCode } from "../../../game/narrative/reducer";
-import type { DecisionOptionView, DecisionPanelView } from "../../../game/narrative/selectors";
+import type { DecisionOptionView, DecisionPanelView, DecisionPreStepView } from "../../../game/narrative/selectors";
 import { UI } from "../theme";
 
 export interface DecisionPanelProps {
   panel: DecisionPanelView;
-  /** Dispatches VERIFY_CLAIM with the `official-line` method. */
-  onStartOfficialCall: () => void;
+  /** Dispatches VERIFY_CLAIM with the pre-step claim and method. */
+  onStartPreStep: (preStep: DecisionPreStepView) => void;
   /** Dispatches MAKE_DECISION. Called only after the player confirms. */
   onDecide: (decisionId: DecisionId) => void;
   onClose: () => void;
@@ -79,9 +79,9 @@ const SimpleOption: React.FC<{ option: DecisionOptionView; onChoose: (id: Decisi
 
 const TwoStepOption: React.FC<{
   option: DecisionOptionView;
-  onStartOfficialCall: () => void;
+  onStartPreStep: (preStep: DecisionPreStepView) => void;
   onChoose: (id: DecisionId) => void;
-}> = ({ option, onStartOfficialCall, onChoose }) => {
+}> = ({ option, onStartPreStep, onChoose }) => {
   const { t } = useTranslation("chapter1");
   const hintText = useHintText();
   const preStep = option.preStep!;
@@ -106,7 +106,7 @@ const TwoStepOption: React.FC<{
             type="button"
             disabled={!preStep.available}
             aria-describedby={preStepHint ? preStepHintId : undefined}
-            onClick={onStartOfficialCall}
+            onClick={() => onStartPreStep(preStep)}
             className={`${UI.buttonSecondary} w-full justify-start text-left`}
           >
             <PhoneCall className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -133,7 +133,7 @@ const TwoStepOption: React.FC<{
   );
 };
 
-export const DecisionPanel: React.FC<DecisionPanelProps> = ({ panel, onStartOfficialCall, onDecide, onClose }) => {
+export const DecisionPanel: React.FC<DecisionPanelProps> = ({ panel, onStartPreStep, onDecide, onClose }) => {
   const { t } = useTranslation("chapter1");
   const headingRef = useRef<HTMLHeadingElement>(null);
   const confirmHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -153,7 +153,7 @@ export const DecisionPanel: React.FC<DecisionPanelProps> = ({ panel, onStartOffi
         role="dialog"
         aria-modal="true"
         aria-labelledby={pending ? CONFIRM_HEADING_ID : HEADING_ID}
-        className={`${UI.panel} max-w-lg space-y-4`}
+        className={`${UI.panel} ${UI.panelFit} flex max-w-lg flex-col gap-4`}
       >
         {pending ? (
           <>
@@ -184,9 +184,10 @@ export const DecisionPanel: React.FC<DecisionPanelProps> = ({ panel, onStartOffi
           </>
         ) : (
           <>
-            <h2 id={HEADING_ID} ref={headingRef} tabIndex={-1} className={UI.heading}>
+            <h2 id={HEADING_ID} ref={headingRef} tabIndex={-1} className={`${UI.heading} shrink-0`}>
               {t("decision.heading")}
             </h2>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1" data-testid="decision-body">
             <p className={UI.body}>{panel.offered ? t("decision.intro") : t("decision.notOffered")}</p>
             <ul className="space-y-3">
               {panel.options.map((option) =>
@@ -194,7 +195,7 @@ export const DecisionPanel: React.FC<DecisionPanelProps> = ({ panel, onStartOffi
                   <TwoStepOption
                     key={option.id}
                     option={option}
-                    onStartOfficialCall={onStartOfficialCall}
+                    onStartPreStep={onStartPreStep}
                     onChoose={setPendingId}
                   />
                 ) : (
@@ -202,7 +203,8 @@ export const DecisionPanel: React.FC<DecisionPanelProps> = ({ panel, onStartOffi
                 ),
               )}
             </ul>
-            <div className="flex justify-end">
+            </div>
+            <div className="flex shrink-0 justify-end">
               <button type="button" onClick={onClose} className={UI.buttonSecondary}>
                 <X className="h-4 w-4" aria-hidden="true" />
                 {t("decision.close")}
