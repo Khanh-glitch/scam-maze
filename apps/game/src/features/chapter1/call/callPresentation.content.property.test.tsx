@@ -1,4 +1,3 @@
-// Re-enabled in task 10.5 once the scenario is assembled (all tests in this file are skipped until then).
 // Feature: game-phone-call-ui-redesign, Property 1: The phone screen holds only call content
 // Feature: game-3d-phone-call-ui, Property 3: The choice overlay mirrors the dialogue options
 //
@@ -296,7 +295,7 @@ function propertyCase(baseSeed: number, index: number): { generated: GeneratedCa
   return { generated, mode };
 }
 
-describe.skip("call presentation content properties", () => {
+describe("call presentation content properties", () => {
   afterEach(() => {
     applyLocale("en");
   });

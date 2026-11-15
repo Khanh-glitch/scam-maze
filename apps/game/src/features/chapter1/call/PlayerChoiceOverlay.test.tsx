@@ -1,5 +1,3 @@
-// @ts-nocheck -- uses the old street-chapter IDs; rewritten when the scenario is assembled (spec chapter-01-double-deception, task 2.1 placeholder).
-// Re-enabled in task 10.5 once the scenario is assembled (all tests in this file are skipped until then).
 // PlayerChoiceOverlay unit tests (task 7.4). Requirements 3.5, 3.7, 3.8, 3.9, 4.1, 4.7 and 7.10.
 //
 // The dialogue views come from the real Chapter 1 core (`chapterReducer` and
@@ -26,25 +24,10 @@ const REGION = { left: 16, top: 400, width: 360, height: 300 };
 /** Scam call answered: the caller's opening node, with its reply options. */
 const SCAM_OPEN: readonly CoreAction[] = [
   { type: "START_CHAPTER" },
-  { type: "RING_CALL", callId: "call.scam-1", reason: "exploration-timer" },
+  { type: "RING_CALL", callId: "call.alex", reason: "exploration-timer" },
   { type: "ANSWER_CALL" },
 ];
 
-/** Official line reached: its first node is a `system` narration line (`official.greeting`). */
-const OFFICIAL_GREETING: readonly CoreAction[] = [
-  { type: "START_CHAPTER" },
-  { type: "INTERACT_OBJECT", objectId: "obj.wallet" },
-  { type: "RING_CALL", callId: "call.scam-1", reason: "first-interaction" },
-  { type: "ANSWER_CALL" },
-  { type: "SELECT_DIALOGUE_OPTION", optionId: "opt.scam.open.ask-proof" },
-  { type: "SELECT_DIALOGUE_OPTION", optionId: "opt.scam.knows.challenge" },
-  { type: "SELECT_DIALOGUE_OPTION", optionId: "opt.scam.challenged.call-card" },
-  { type: "OPEN_PHONE" },
-  { type: "INSPECT_EVIDENCE", evidenceId: "ev.caller-number" },
-  { type: "VERIFY_CLAIM", claimId: "claim.account-suspended", method: "bank-app" },
-  { type: "CLOSE_PHONE" },
-  { type: "VERIFY_CLAIM", claimId: "claim.caller-identity", method: "official-line" },
-];
 
 function run(actions: readonly CoreAction[]): ChapterState {
   let state = createInitialState(CHAPTER_1_SCENARIO);
@@ -85,7 +68,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe.skip.each(LOCALES)("PlayerChoiceOverlay (%s)", (locale) => {
+describe.each(LOCALES)("PlayerChoiceOverlay (%s)", (locale) => {
   const story = STORY[locale];
   const scenario = getDisplayScenario(locale);
 
@@ -133,8 +116,10 @@ describe.skip.each(LOCALES)("PlayerChoiceOverlay (%s)", (locale) => {
 
   it("shows a system line as a labeled narration paragraph in a polite live region", () => {
     setLocale();
-    const view = viewFor(OFFICIAL_GREETING, scenario);
-    expect(view.speaker).toBe("system");
+    // A system node (for example the end line of a call) has no persona and no speaker name.
+    const base = viewFor(SCAM_OPEN, scenario);
+    const view: DialogueView = { ...base, speaker: "system", speakerName: null, line: scenario.dialogues[base.graphId].lines["line.alex.end.hung-up"] };
+    expect(view.line.length).toBeGreaterThan(0);
     const { overlay, rerender, onSelectOption } = renderOverlay({ view, narration: view.line });
 
     const region = within(overlay).getByTestId("choice-narration");

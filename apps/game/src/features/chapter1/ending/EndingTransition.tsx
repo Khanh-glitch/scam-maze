@@ -17,8 +17,28 @@ export type EndingTransitionOutcome = Pick<
   "id" | "title" | "consequence" | "simulationLabel"
 >;
 
+/** Authored aftermath text of the ending (from the localized scenario). */
+export interface EndingTransitionAftermath {
+  consequence: string;
+  phone: string;
+  laptop: string;
+  evidenceSummary: string;
+}
+
+/** The current narration line (from `useNarrationPlayback`). `null` text: nothing to show. */
+export interface EndingTransitionNarration {
+  speakerName: string | null;
+  text: string | null;
+  /** False hides the text when the clip is audible and subtitles are off. */
+  visible: boolean;
+  finished: boolean;
+  onAdvance: () => void;
+}
+
 export interface EndingTransitionProps {
   outcome: EndingTransitionOutcome;
+  aftermath?: EndingTransitionAftermath;
+  narration?: EndingTransitionNarration;
   onContinue: () => void;
 }
 
@@ -42,8 +62,9 @@ const ACCENTS: Record<OutcomeId, { icon: LucideIcon; text: string; border: strin
   "unfinished-case": { icon: CircleHelp, text: "text-[#b9a5f5]", border: "border-[#b9a5f5]/50" },
 };
 
-export const EndingTransition: React.FC<EndingTransitionProps> = ({ outcome, onContinue }) => {
+export const EndingTransition: React.FC<EndingTransitionProps> = ({ outcome, aftermath, narration, onContinue }) => {
   const { t } = useTranslation("chapter1");
+  const text = t as unknown as (key: string) => string;
   const reducedMotion = usePrefersReducedMotion();
   const [entered, setEntered] = useState(reducedMotion);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -94,6 +115,43 @@ export const EndingTransition: React.FC<EndingTransitionProps> = ({ outcome, onC
           <p className="text-base leading-relaxed text-[#f7f5ff]" data-variant={outcome.consequence.id}>
             {outcome.consequence.text}
           </p>
+        )}
+        {aftermath && (
+          <div className="space-y-3" data-testid="ending-aftermath">
+            <p className={UI.body} data-testid="ending-aftermath-consequence">
+              {aftermath.consequence}
+            </p>
+            <section aria-labelledby="ending-phone-heading" className={`${UI.card} space-y-1`}>
+              <h3 id="ending-phone-heading" className={UI.label}>
+                {text("debriefForensic.ending.phone")}
+              </h3>
+              <p className="text-sm leading-relaxed text-[#f7f5ff]">{aftermath.phone}</p>
+            </section>
+            <section aria-labelledby="ending-laptop-heading" className={`${UI.card} space-y-1`}>
+              <h3 id="ending-laptop-heading" className={UI.label}>
+                {text("debriefForensic.ending.laptop")}
+              </h3>
+              <p className="text-sm leading-relaxed text-[#f7f5ff]">{aftermath.laptop}</p>
+            </section>
+            <section aria-labelledby="ending-evidence-heading" className={`${UI.card} space-y-1`}>
+              <h3 id="ending-evidence-heading" className={UI.label}>
+                {text("debriefForensic.ending.evidence")}
+              </h3>
+              <p className="text-sm leading-relaxed text-[#f7f5ff]">{aftermath.evidenceSummary}</p>
+            </section>
+          </div>
+        )}
+        {narration && !narration.finished && narration.text !== null && (
+          <section aria-label={text("debriefForensic.ending.narration")} className="space-y-2" data-testid="ending-narration">
+            {narration.visible && (
+              <p className="text-sm italic leading-relaxed text-[#a9a4c4]" aria-live="polite">
+                {narration.text}
+              </p>
+            )}
+            <button type="button" onClick={narration.onAdvance} className={UI.buttonSecondary}>
+              {text("debriefForensic.ending.next")}
+            </button>
+          </section>
         )}
         <p className={`flex items-center gap-2 ${UI.card} text-sm font-semibold text-[#f7f5ff]`}>
           <Info className="h-4 w-4 shrink-0 text-[#b9a5f5]" aria-hidden="true" />

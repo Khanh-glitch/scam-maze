@@ -1,4 +1,3 @@
-// Re-enabled in task 10.5 once the scenario is assembled (all tests in this file are skipped until then).
 // Feature: chapter-01-voice-narrative, Property 7: Presentation equivalence
 // Feature: game-phone-call-ui-redesign, Property 5: Presentation equivalence across modes
 //
@@ -151,7 +150,7 @@ function renderedOptions(): { id: string; text: string; button: HTMLButtonElemen
   }));
 }
 
-describe.skip("CallPresentation with voice props, equivalence (Property 7)", () => {
+describe("CallPresentation with voice props, equivalence (Property 7)", () => {
   it(
     "driving the call through the presentation with a voice controller equals dispatching on the reducer",
     () => {
