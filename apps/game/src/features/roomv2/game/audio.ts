@@ -190,6 +190,9 @@ export class AudioEngine {
   ring(on: boolean) {
     const e = this.emit.phone;
     this.ringPending = false;
+    // The background (rain, city, clock) goes silent while the phone rings, and comes back after.
+    this.ringDuck = on ? 0 : 1;
+    this.applyDuck(on ? 0.15 : 0.6);
     if (!on) {
       if (this.ringSrc && this.ringGain) {
         const t = this.ctx.currentTime;
@@ -284,11 +287,13 @@ export class AudioEngine {
   private moodDuck = 1;
   /** Extra level while a voice line plays (narration), so the rain and the city do not cover it. */
   private voiceDuck = 1;
+  /** 0 while the ringtone plays, so the ringtone is not mixed with the background sound. */
+  private ringDuck = 1;
   duckCity(v: number) { this.moodDuck = v; this.applyDuck(0.8); }
   /** Lowers the rain, the city and the clock under a voice (true) or restores them (false). */
   duckForVoice(on: boolean) { this.voiceDuck = on ? VOICE_DUCK : 1; this.applyDuck(on ? 0.25 : 0.8); }
   private applyDuck(tau: number) {
-    const v = this.moodDuck * this.voiceDuck, t = this.ctx.currentTime;
+    const v = this.moodDuck * this.voiceDuck * this.ringDuck, t = this.ctx.currentTime;
     this.cityDuck?.gain.setTargetAtTime(v, t, tau);
     this.emit.window?.pa.gain.gain.setTargetAtTime(v, t, tau);
     this.emit.clock?.pa.gain.gain.setTargetAtTime(v, t, tau);

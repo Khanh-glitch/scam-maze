@@ -102,6 +102,17 @@ function expectCommonRules(root: HTMLElement, locale: GameLocale): void {
 }
 
 describe("PhoneCallScreen", () => {
+  it("draws a decorative status bar on both screens and the call buttons are round", () => {
+    for (const status of ["ringing", "active"] as const) {
+      const { unmount } = renderScreen({ view: view("en", status) });
+      const bar = screen.getByTestId("phone-status-bar");
+      expect(bar.getAttribute("aria-hidden")).toBe("true");
+      expect(bar.className).toContain("pointer-events-none");
+      expect(bar.textContent).toBe("9:41");
+      unmount();
+    }
+  });
+
   it("draws a Dynamic Island at the top of the screen, decorative and out of the way", () => {
     for (const status of ["ringing", "active"] as const) {
       const { unmount } = renderScreen({ view: view("en", status) });

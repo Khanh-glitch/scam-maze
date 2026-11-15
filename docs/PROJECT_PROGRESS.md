@@ -224,6 +224,12 @@ Resolved:
   the reduced-stress hint) are listed in `ACCESSIBILITY.md`.
 
 ## Task History
+### 2026-11-15 — Call screen redesign (status bar, round buttons) and room sound silenced during the ringtone
+- **Objective:** Owner requests: silence the background while the ringtone plays; redesign the call screen with a phone status bar, round Accept and Decline buttons, and a redesigned active-call screen.
+- **Completed:** (1) `roomv2/game/audio.ts`: `ring(on)` sets a `ringDuck` factor (0 while ringing, 1 after) that is multiplied into `applyDuck`, so rain, city and clock go silent during the ring and fade back when it stops. (2) `PhoneCallScreen.tsx`: dark gradient background, decorative status bar (static 9:41, signal, Wi-Fi, battery) beside the Dynamic Island, Decline and Accept as 64 px round discs with the label under them (label inside the button, so the accessible name is unchanged), the active screen ends with a round red End call button. Test ids are unchanged. (3) Tests: status bar test added; the `h-11` assertion for End call was removed because that button is now a round disc.
+- **Files:** `apps/game/src/features/roomv2/game/audio.ts`, `apps/game/src/features/chapter1/call/PhoneCallScreen.tsx`, `PhoneCallScreen.test.tsx`, `PhoneCallScreen.controls.test.tsx`, this file.
+- **Validation:** `tsc -p tsconfig.app.json --noEmit` and `vitest run` (1518 tests before the new test was added) passed.
+- **Not verified:** the look of the new screen on the 3D phone and in 2D (no screenshot taken), the ring duck by ear, and the Accept/Decline path with a real mouse. The ring duck has no automated test (Web Audio). The status bar clock is fixed text, not the real time.
 
 ### 2026-11-15 — Chapter 1 intro narration: re-recorded clips, typed text over the voice, ambience ducked (committed on request)
 - **Objective:** Owner work from a parallel session, committed as it stood on the owner's request ("commit everything"). This entry only describes the diff; it was not written or listened to by the agent that committed it.
