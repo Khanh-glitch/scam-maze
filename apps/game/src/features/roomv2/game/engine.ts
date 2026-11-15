@@ -767,6 +767,8 @@ export class Engine implements RoomStoryCommands {
     this.audio.duckCity(mood === 'tense' ? 0.25 : mood === 'quiet' ? 0.55 : 1);
   }
 
+  /** Story host: lowers the room's ambience while narration plays (true) and restores it (false). */
+  duckForVoice(on: boolean) { this.audio.duckForVoice(on); }
   /** Leaves the inspect pose even when the host would keep the player there. */
   closeInspect() { this.endInspect(true); }
 
