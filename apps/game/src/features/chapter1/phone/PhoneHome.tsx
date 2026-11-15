@@ -1,19 +1,17 @@
-// Phone home screen with the three apps: Messages, Calls and Northgate Bank (Requirement 7.1).
+// Phone home screen with the three apps: Messages, Calls and Voicemail (Requirement 5.5).
 // Each app is a button with an icon and visible text, so it works with mouse and keyboard.
 
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Landmark, MessageSquare, Phone } from "lucide-react";
+import { MessageSquare, Phone, Voicemail } from "lucide-react";
 import { formatNumber } from "../../../i18n/format";
 import { useGameLocale } from "../../../i18n/useGameLocale";
 
-export type PhoneAppId = "messages" | "calls" | "bank";
+export type PhoneAppId = "messages" | "calls" | "voicemail";
 
 export interface PhoneHomeProps {
   /** Number of unread messages; shown as text on the Messages app. */
   unreadCount: number;
-  /** Bank app title from Scenario_Data (for example "Northgate Bank"). */
-  bankAppTitle: string;
   onOpenApp: (app: PhoneAppId) => void;
 }
 
@@ -22,7 +20,7 @@ const APP_BUTTON =
 
 const APP_ICON = "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#7654d6] text-white";
 
-export const PhoneHome: React.FC<PhoneHomeProps> = ({ unreadCount, bankAppTitle, onOpenApp }) => {
+export const PhoneHome: React.FC<PhoneHomeProps> = ({ unreadCount, onOpenApp }) => {
   const { t } = useTranslation("chapter1");
   const locale = useGameLocale();
   return (
@@ -51,11 +49,11 @@ export const PhoneHome: React.FC<PhoneHomeProps> = ({ unreadCount, bankAppTitle,
           </button>
         </li>
         <li>
-          <button type="button" className={APP_BUTTON} onClick={() => onOpenApp("bank")}>
+          <button type="button" className={APP_BUTTON} onClick={() => onOpenApp("voicemail")}>
             <span className={APP_ICON}>
-              <Landmark className="h-5 w-5" aria-hidden="true" />
+              <Voicemail className="h-5 w-5" aria-hidden="true" />
             </span>
-            <span className="flex-1">{bankAppTitle}</span>
+            <span className="flex-1">{t("room.records.tabs.voicemail")}</span>
           </button>
         </li>
       </ul>

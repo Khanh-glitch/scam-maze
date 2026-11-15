@@ -61,3 +61,15 @@ export interface ScenarioMeta {
   description: string;
   learningGoal: string;
 }
+
+/** How far a piece of evidence can be trusted, by where it came from. Chapter-agnostic. */
+export type ProvenanceTrust = 'unverified' | 'pre-existing' | 'independent-confirmation';
+
+/** Kind of an entry in a debrief timeline. Chapter-agnostic. */
+export type DebriefTimelineKind =
+  | 'call'
+  | 'device'
+  | 'evidence'
+  | 'deduction'
+  | 'verification'
+  | 'decision';

@@ -1,186 +1,163 @@
 // Unit tests for the evidence registry: every discovery route, and duplicate and unavailable
-// rejection (Requirements 11.3, 11.4, 11.5, 12.4, 12.5, 18.1).
+// rejection. Uses the fixture scenario and builds states directly, so the reducer is not involved.
 
 import { describe, expect, it } from "vitest";
 
-import { CHAPTER_1_SCENARIO } from "./chapter1/scenario";
-import type { EvidenceId, InteractableId } from "./chapter1/ids";
+import { FIXTURE_SCENARIO, fixtureState } from "../../test/fixtureScenario";
+import type { EvidenceId } from "./chapter1/ids";
 import { canDiscover, discover, evidenceForClaim } from "./evidence";
-import { chapterReducer, createInitialState, REASONS } from "./reducer";
-import type { ChapterState, CoreAction } from "./types";
+import type { CallRecord, ChapterState, CoreAction } from "./types";
 
-function play(state: ChapterState, actions: readonly CoreAction[]): ChapterState {
-  let current = state;
+const S = FIXTURE_SCENARIO;
+
+/** Appends accepted-looking events for the given actions. */
+function withActions(state: ChapterState, actions: readonly CoreAction[]): ChapterState {
+  const events = [...state.events];
   for (const action of actions) {
-    const result = chapterReducer(current, action);
-    if (!result.accepted) throw new Error(`Rejected ${JSON.stringify(action)}: ${result.reason}`);
-    current = result.state;
+    events.push({
+      seq: events.length,
+      action,
+      derived: { evidence: [], flags: [], objectivesActivated: [], objectivesCompleted: [], debriefTags: [] },
+    });
   }
-  return current;
+  return { ...state, events };
 }
 
-const option = (optionId: string): CoreAction => ({ type: "SELECT_DIALOGUE_OPTION", optionId });
-const inspect = (evidenceId: EvidenceId): CoreAction => ({ type: "INSPECT_EVIDENCE", evidenceId });
-const started = (): ChapterState => play(createInitialState(), [{ type: "START_CHAPTER" }]);
-
-/** Evidence IDs discovered by the last accepted action. */
-const lastDerived = (state: ChapterState): EvidenceId[] => state.events.at(-1)?.derived.evidence ?? [];
+const callRecord = (status: CallRecord["status"]): CallRecord => ({
+  callId: "call.alex",
+  direction: "incoming",
+  displayName: "Unknown caller",
+  number: "+000 0100 2200",
+  status,
+  ringCount: 1,
+});
 
 describe("discovery routes", () => {
-  it.each<[InteractableId, EvidenceId]>([
-    ["obj.wallet", "ev.bank-card"],
-    ["obj.mailbox", "ev.bank-letter"],
-    ["obj.shop-poster", "ev.shop-poster"],
-    ["obj.notice-board", "ev.community-alert"],
-  ])("interact: %s reveals %s", (objectId, evidenceId) => {
-    const state = play(started(), [{ type: "INTERACT_OBJECT", objectId }]);
-    expect(state.discovered).toEqual([evidenceId]);
-    expect(lastDerived(state)).toEqual([evidenceId]);
+  it("interact: the object reveals its evidence, by state and by trigger", () => {
+    const state = fixtureState();
+    expect(canDiscover(state, "ev.account-activity", "interact", S)).toBe(false);
+    expect(canDiscover(state, "ev.account-activity", { via: "interact", objectId: "obj.receipts" }, S)).toBe(true);
+    expect(canDiscover(state, "ev.account-activity", { via: "interact", objectId: "obj.other" as never }, S)).toBe(false);
+    expect(canDiscover({ ...state, interacted: ["obj.receipts"] }, "ev.account-activity", "interact", S)).toBe(true);
   });
 
-  it("inspect: the urgent text is available from the start", () => {
-    const state = play(started(), [inspect("ev.sms-alert")]);
-    expect(state.discovered).toEqual(["ev.sms-alert"]);
+  it("inspect: holds only when the requirement holds", () => {
+    const state = fixtureState();
+    expect(canDiscover(state, "ev.shared-case-id", "inspect", S)).toBe(false);
+    const ready = fixtureState({ discovered: ["ev.notification-metadata"] });
+    expect(canDiscover(ready, "ev.shared-case-id", "inspect", S)).toBe(true);
   });
 
-  it("inspect: the caller's number is available once the scam call has rung", () => {
-    const state = play(started(), [
-      { type: "RING_CALL", callId: "call.scam-1", reason: "exploration-timer" },
-      { type: "END_CALL" },
-      inspect("ev.caller-number"),
+  it("dialogue-node: holds once the node was reached in the current or a finished conversation", () => {
+    const state = fixtureState();
+    expect(canDiscover(state, "ev.alex-statement", "dialogue-node", S)).toBe(false);
+    expect(canDiscover(state, "ev.alex-statement", { via: "dialogue-node", nodeId: "alex.open" }, S)).toBe(true);
+    expect(canDiscover(state, "ev.alex-statement", { via: "dialogue-node", nodeId: "alex.refused" }, S)).toBe(false);
+
+    const current = fixtureState({
+      conversation: { graphId: "dlg.alex", nodeId: "alex.open", callId: "call.alex", history: [] },
+    });
+    expect(canDiscover(current, "ev.alex-statement", "dialogue-node", S)).toBe(true);
+
+    const finished = fixtureState({
+      conversationHistory: [{ graphId: "dlg.alex", history: [], endNodeId: "alex.open" }],
+    });
+    expect(canDiscover(finished, "ev.alex-statement", "dialogue-node", S)).toBe(true);
+  });
+
+  it("device: a trigger for the item's own action reveals it", () => {
+    const state = fixtureState();
+    const trigger = { via: "device", deviceActionId: "dev.inspect-notification-origin" } as const;
+    expect(canDiscover(state, "ev.notification-metadata", trigger, S)).toBe(true);
+  });
+
+  it("device: a trigger for another action does not reveal it", () => {
+    const state = fixtureState();
+    const other = { via: "device", deviceActionId: "dev.open-bank-app" } as const;
+    expect(canDiscover(state, "ev.notification-metadata", other, S)).toBe(false);
+  });
+
+  it("device: by state, holds only after the action is in the event log", () => {
+    const state = fixtureState();
+    expect(canDiscover(state, "ev.notification-metadata", "device", S)).toBe(false);
+    const done = withActions(state, [
+      { type: "DEVICE_ACTION", deviceActionId: "dev.inspect-notification-origin" },
     ]);
-    expect(state.discovered).toEqual(["ev.caller-number"]);
+    expect(canDiscover(done, "ev.notification-metadata", "device", S)).toBe(true);
   });
 
-  it("inspect: the one-time-code text is available once the caller requested the code", () => {
-    const state = play(started(), [
-      { type: "RING_CALL", callId: "call.scam-1", reason: "exploration-timer" },
-      { type: "ANSWER_CALL" },
-      option("opt.scam.open.yes-what"),
-      option("opt.scam.code.hang-up"),
-      inspect("ev.otp-sms"),
-    ]);
-    expect(state.discovered).toEqual(["ev.otp-sms"]);
-    expect(state.phone.unread).toEqual(["msg.sms-alert"]);
+  it("device: fails when the action does not list the item in `reveals`", () => {
+    const scenario = {
+      ...S,
+      deviceActions: {
+        ...S.deviceActions,
+        "dev.inspect-notification-origin": {
+          ...S.deviceActions["dev.inspect-notification-origin"],
+          reveals: [],
+        },
+      },
+    };
+    const trigger = { via: "device", deviceActionId: "dev.inspect-notification-origin" } as const;
+    expect(canDiscover(fixtureState(), "ev.notification-metadata", trigger, scenario)).toBe(false);
   });
 
-  it("dialogue-node: the caller's partial details at scam.knows-details", () => {
-    const state = play(started(), [
-      { type: "RING_CALL", callId: "call.scam-1", reason: "exploration-timer" },
-      { type: "ANSWER_CALL" },
-      option("opt.scam.open.ask-proof"),
-    ]);
-    expect(state.discovered).toEqual(["ev.partial-info"]);
-    expect(lastDerived(state)).toEqual(["ev.partial-info"]);
+  it("device: a missing action definition never reveals", () => {
+    const scenario = { ...S, deviceActions: {} as typeof S.deviceActions };
+    const trigger = { via: "device", deviceActionId: "dev.inspect-notification-origin" } as const;
+    expect(canDiscover(fixtureState(), "ev.notification-metadata", trigger, scenario)).toBe(false);
   });
 
-  it("dialogue-node: Sam's story after the call", () => {
-    const state = play(started(), [
-      { type: "RING_CALL", callId: "call.scam-1", reason: "exploration-timer" },
-      { type: "ANSWER_CALL" },
-      { type: "END_CALL" },
-      { type: "TALK_TO_NPC", npcId: "npc.sam" },
-      option("opt.sam.ask.yes-called"),
-    ]);
-    expect(state.discovered).toEqual(["ev.sam-testimony"]);
-  });
-
-  it("dialogue-node: the official confirmation on the official line", () => {
-    const state = play(started(), [
-      { type: "INTERACT_OBJECT", objectId: "obj.mailbox" },
-      { type: "RING_CALL", callId: "call.scam-1", reason: "exploration-timer" },
-      { type: "END_CALL" },
-      { type: "VERIFY_CLAIM", claimId: "claim.caller-identity", method: "official-line" },
-      option("opt.official.greeting.wait"),
-      option("opt.official.agent.report"),
-    ]);
-    expect(state.discovered).toEqual(["ev.bank-letter", "ev.official-confirmation"]);
-    expect(lastDerived(state)).toEqual(["ev.official-confirmation"]);
-    expect(state.claims["claim.caller-identity"]).toBe("contradicted");
-  });
-
-  it("verify: the bank app evidence through VERIFY_CLAIM bank-app", () => {
-    const state = play(started(), [
-      { type: "OPEN_PHONE" },
-      { type: "VERIFY_CLAIM", claimId: "claim.account-suspended", method: "bank-app" },
-    ]);
-    expect(state.discovered).toEqual(["ev.bank-app"]);
+  it("rejects a route that differs from the item's route", () => {
+    const state = fixtureState();
+    expect(canDiscover(state, "ev.notification-metadata", "interact", S)).toBe(false);
+    expect(canDiscover(state, "ev.account-activity", "device", S)).toBe(false);
   });
 
   it("keeps discovery order", () => {
-    const state = play(started(), [
-      { type: "INTERACT_OBJECT", objectId: "obj.notice-board" },
-      inspect("ev.sms-alert"),
-      { type: "INTERACT_OBJECT", objectId: "obj.wallet" },
-    ]);
-    expect(state.discovered).toEqual(["ev.community-alert", "ev.sms-alert", "ev.bank-card"]);
+    const state = discover(discover(fixtureState(), "ev.account-activity"), "ev.alex-statement");
+    expect(state.discovered).toEqual(["ev.account-activity", "ev.alex-statement"]);
   });
 });
 
-describe("INSPECT_EVIDENCE rejection", () => {
-  it.each<EvidenceId>([
-    "ev.otp-sms",
-    "ev.caller-number",
-    "ev.bank-card",
-    "ev.bank-app",
-    "ev.partial-info",
-    "ev.official-confirmation",
-  ])('rejects %s with "Evidence not available yet." when its condition is not met', (evidenceId) => {
-    const state = started();
-    const result = chapterReducer(state, inspect(evidenceId));
-    expect(result).toEqual({ state, accepted: false, reason: "Evidence not available yet." });
-    expect(result.state).toBe(state);
+describe("canDiscover rejection", () => {
+  it("rejects unknown evidence IDs, including inherited property names", () => {
+    const state = fixtureState();
+    expect(canDiscover(state, "ev.unknown" as EvidenceId, "inspect", S)).toBe(false);
+    expect(canDiscover(state, "__proto__" as EvidenceId, "inspect", S)).toBe(false);
   });
 
-  it('rejects already discovered evidence with "Evidence already recorded." and keeps the state', () => {
-    const read = play(started(), [inspect("ev.sms-alert")]);
-    const result = chapterReducer(read, inspect("ev.sms-alert"));
-    expect(result.accepted).toBe(false);
-    expect(result.reason).toBe("Evidence already recorded.");
-    expect(result.state).toBe(read);
+  it("rejects already discovered evidence", () => {
+    const state = discover(fixtureState({ discovered: ["ev.notification-metadata"] }), "ev.notification-metadata");
+    const trigger = { via: "device", deviceActionId: "dev.inspect-notification-origin" } as const;
+    expect(canDiscover(state, "ev.notification-metadata", trigger, S)).toBe(false);
+    expect(canDiscover(state, "ev.shared-case-id", "inspect", S)).toBe(true);
+    const both = discover(state, "ev.shared-case-id");
+    expect(canDiscover(both, "ev.shared-case-id", "inspect", S)).toBe(false);
+  });
 
-    const withCard = play(started(), [{ type: "INTERACT_OBJECT", objectId: "obj.wallet" }]);
-    const again = chapterReducer(withCard, inspect("ev.bank-card"));
-    expect(again.reason).toBe(REASONS.evidenceAlreadyRecorded);
-    expect(again.state).toBe(withCard);
+  it("does not treat a declined call as having reached a dialogue node", () => {
+    const state = fixtureState({ call: { current: null, status: "idle", log: [callRecord("declined")] } });
+    expect(canDiscover(state, "ev.alex-statement", "dialogue-node", S)).toBe(false);
   });
 });
 
 describe("registry functions", () => {
-  it("canDiscover checks the route, the trigger and the condition", () => {
-    const state = started();
-    const s = CHAPTER_1_SCENARIO;
-    expect(canDiscover(state, "ev.sms-alert", "inspect", s)).toBe(true);
-    expect(canDiscover(state, "ev.sms-alert", "interact", s)).toBe(false);
-    expect(canDiscover(state, "ev.otp-sms", "inspect", s)).toBe(false);
-    expect(canDiscover(state, "ev.bank-card", { via: "interact", objectId: "obj.wallet" }, s)).toBe(true);
-    expect(canDiscover(state, "ev.bank-card", { via: "interact", objectId: "obj.mailbox" }, s)).toBe(false);
-    expect(canDiscover(state, "ev.bank-card", "interact", s)).toBe(false);
-    expect(canDiscover(state, "ev.bank-app", { via: "verify", method: "bank-app" }, s)).toBe(true);
-    expect(canDiscover(state, "ev.bank-app", { via: "verify", method: "official-line" }, s)).toBe(false);
-    expect(canDiscover(state, "ev.unknown" as EvidenceId, "inspect", s)).toBe(false);
-    expect(canDiscover(discover(state, "ev.sms-alert"), "ev.sms-alert", "inspect", s)).toBe(false);
-  });
-
   it("discover is an idempotent append that never mutates its input", () => {
-    const state = started();
-    const once = discover(state, "ev.bank-card");
+    const state = fixtureState();
+    const once = discover(state, "ev.account-activity");
     expect(once).not.toBe(state);
     expect(state.discovered).toEqual([]);
-    expect(once.discovered).toEqual(["ev.bank-card"]);
-    expect(discover(once, "ev.bank-card")).toBe(once);
+    expect(once.discovered).toEqual(["ev.account-activity"]);
+    expect(discover(once, "ev.account-activity")).toBe(once);
   });
 
   it("evidenceForClaim returns only discovered evidence, in discovery order, with stances", () => {
-    const state = play(started(), [
-      { type: "INTERACT_OBJECT", objectId: "obj.notice-board" },
-      { type: "INTERACT_OBJECT", objectId: "obj.shop-poster" },
-    ]);
-    const entries = evidenceForClaim(state, "claim.protected-account", CHAPTER_1_SCENARIO);
+    const state = fixtureState({ discovered: ["ev.shared-case-id", "ev.account-activity"] });
+    const entries = evidenceForClaim(state, "claim.claims-independent", S);
     expect(entries.map((entry) => [entry.evidence.id, entry.stance])).toEqual([
-      ["ev.community-alert", "contradicts"],
-      ["ev.shop-poster", "contradicts"],
+      ["ev.shared-case-id", "inconclusive"],
     ]);
-    expect(evidenceForClaim(state, "claim.caller-identity", CHAPTER_1_SCENARIO)).toEqual([]);
+    expect(evidenceForClaim(state, "claim.alex-identity", S)).toEqual([]);
+    expect(evidenceForClaim(fixtureState(), "claim.recovery-needed", S)).toEqual([]);
   });
 });

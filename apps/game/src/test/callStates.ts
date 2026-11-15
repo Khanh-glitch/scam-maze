@@ -1,16 +1,18 @@
 /**
  * Generated Chapter 1 call states for the call presentation property tests
- * (.kiro/specs/game-3d-phone-call-ui/design.md, "Testing Strategy"; Requirements 13.10, 13.11).
+ * (.kiro/specs/game-3d-phone-call-ui/design.md, "Testing Strategy"; Requirements 13.10, 13.11),
+ * rewritten for the double-deception graphs `dlg.alex`, `dlg.recovery` and `dlg.official-line`.
  *
  * For a seed, the helper picks one of the three Chapter 1 calls and builds its setup prefix:
- * - scam call: START_CHAPTER, RING_CALL call.scam-1;
- * - callback: a scam-call run that ends with no Decision, then RING_CALL call.callback;
- * - official line: the decision-panel prefix of the "verified" run in
- *   game/narrative/chapter1/playthroughs.test.ts, then VERIFY_CLAIM claim.caller-identity
- *   official-line.
- * It then either stops while the call rings (incoming calls only; the official line starts
- * active) or answers, and walks 0 to 6 randomly chosen available options. The locale (`en` or
- * `vi`) is generated too. Every state comes from `chapterReducer` through `runSequence`.
+ * - first call (`call.alex`): START_CHAPTER, RING_CALL call.alex;
+ * - third call (`call.recovery`): an Alex call that is answered, walked for 0 to 3 options that
+ *   set no Decision, hung up if still live, then the laptop notification is followed
+ *   (Review Security), which lets the third call ring, then RING_CALL call.recovery;
+ * - official line (`call.official`): the decision-panel prefix (the statement is read, the first
+ *   call is closed), then VERIFY_CLAIM with the saved official contact. The line starts active.
+ * It then either stops while the call rings (incoming calls only) or answers, and walks 0 to 6
+ * randomly chosen available options. The locale (`en` or `vi`) is generated too. Every state
+ * comes from `chapterReducer` through `runSequence`.
  *
  * The walk stops early when the conversation has no available option, and it never takes an
  * option that ends the call or sets an Outcome, so the final state always has a live call
@@ -35,13 +37,13 @@ import { createLcg, pick, randomInt } from "./seededRandom";
 export const CALL_STATE_SEED = 0x3d9c0a11;
 
 /** The three Chapter 1 calls a generated state can hold. */
-export const GENERATED_CALLS: readonly CallId[] = ["call.scam-1", "call.callback", "call.official"];
+export const GENERATED_CALLS: readonly CallId[] = ["call.alex", "call.recovery", "call.official"];
 
 /** Largest number of options walked after the call is answered (design: 0 to 6). */
 export const CALL_WALK_MAX_OPTIONS = 6;
 
-/** Largest number of options walked inside the first scam call of the callback prefix. */
-const CALLBACK_PREFIX_MAX_OPTIONS = 3;
+/** Largest number of options walked inside the first call of the third-call prefix. */
+const THIRD_CALL_PREFIX_MAX_OPTIONS = 3;
 
 const START: CoreAction = { type: "START_CHAPTER" };
 const ANSWER: CoreAction = { type: "ANSWER_CALL" };
@@ -52,28 +54,24 @@ function option(optionId: string): CoreAction {
 }
 
 /**
- * The prefix of the "verified" playthrough that ends with the decision panel offered and the
- * official option available (the bank card is found, the first scam call has ended, no
- * Decision). Copied from playthroughs.test.ts, which is a test file and exports nothing.
+ * A prefix that closes the first call (hung up at its first node), reads the paper statement and
+ * leaves the phone closed with no Decision. After it, the laptop notification exists, the saved
+ * official contact is known and the decision panel can be offered.
  */
 export const DECISION_PANEL_PREFIX: readonly CoreAction[] = [
   START,
-  { type: "INTERACT_OBJECT", objectId: "obj.wallet" },
-  { type: "RING_CALL", callId: "call.scam-1", reason: "first-interaction" },
+  { type: "INTERACT_OBJECT", objectId: "obj.receipts" },
+  { type: "RING_CALL", callId: "call.alex", reason: "first-interaction" },
   ANSWER,
-  option("opt.scam.open.ask-proof"),
-  option("opt.scam.knows.challenge"),
-  option("opt.scam.challenged.call-card"),
+  option("alex.opt.open.hang-up"),
   { type: "OPEN_PHONE" },
-  { type: "INSPECT_EVIDENCE", evidenceId: "ev.caller-number" },
-  { type: "VERIFY_CLAIM", claimId: "claim.account-suspended", method: "bank-app" },
   { type: "CLOSE_PHONE" },
 ];
 
 const OFFICIAL_LINE_CALL: CoreAction = {
   type: "VERIFY_CLAIM",
-  claimId: "claim.caller-identity",
-  method: "official-line",
+  claimId: "claim.alex-identity",
+  method: "saved-official-contact",
 };
 
 export interface GeneratedCallState {
@@ -137,29 +135,31 @@ function walkOptions(
   return state;
 }
 
-/** START_CHAPTER, RING_CALL call.scam-1. */
-function scamCallSetup(): CoreAction[] {
-  return [START, { type: "RING_CALL", callId: "call.scam-1", reason: "exploration-timer" }];
+/** START_CHAPTER, RING_CALL call.alex. */
+function firstCallSetup(): CoreAction[] {
+  return [START, { type: "RING_CALL", callId: "call.alex", reason: "exploration-timer" }];
 }
 
 /**
- * A first scam call that is answered, walked for 0 to 3 options that set no Decision, then hung
- * up if it is still live; then RING_CALL call.callback.
+ * A first call that is answered, walked for 0 to 3 options that set no Decision, then hung up if
+ * it is still live; then the notification is followed (Review Security, which lets the third call
+ * ring) and RING_CALL call.recovery.
  */
-function callbackSetup(next: () => number, seed: number): CoreAction[] {
-  const actions = [...scamCallSetup(), ANSWER];
+function thirdCallSetup(next: () => number, seed: number): CoreAction[] {
+  const actions = [...firstCallSetup(), ANSWER];
   let state = createInitialState();
   for (const action of actions) state = step(state, action, seed);
   state = walkOptions(
     next,
     state,
-    randomInt(next, 0, CALLBACK_PREFIX_MAX_OPTIONS),
+    randomInt(next, 0, THIRD_CALL_PREFIX_MAX_OPTIONS),
     (after) => after.decision === null,
     actions,
     seed,
   );
   if (state.call.current !== null) actions.push(END_CALL);
-  actions.push({ type: "RING_CALL", callId: "call.callback", reason: "callback" });
+  actions.push({ type: "DEVICE_ACTION", deviceActionId: "dev.review-security" });
+  actions.push({ type: "RING_CALL", callId: "call.recovery", reason: "follow-up" });
   return actions;
 }
 
@@ -175,10 +175,10 @@ export function generateCallState(seed: number): GeneratedCallState {
   const locale = pick(next, SUPPORTED_LOCALES);
 
   const setup =
-    callId === "call.scam-1"
-      ? scamCallSetup()
-      : callId === "call.callback"
-        ? callbackSetup(next, seed)
+    callId === "call.alex"
+      ? firstCallSetup()
+      : callId === "call.recovery"
+        ? thirdCallSetup(next, seed)
         : officialLineSetup();
 
   let state = createInitialState();

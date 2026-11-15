@@ -1,3 +1,5 @@
+// Feature: chapter-01-double-deception, Property 12: Ending selection is a deterministic total function
+// Outcome lock: once an ending is set it never changes and only FINISH_CHAPTER is accepted.
 import { describe, expect, it } from "vitest";
 import {
   CORE_PROPERTY_RUNS,
@@ -10,29 +12,32 @@ import {
   generateActionSequence,
   runSequence,
 } from "../../../test/chapterRuns";
-import { createLcg, randomInt } from "../../../test/seededRandom";
+import { createLcg, pick, randomInt } from "../../../test/seededRandom";
 import { CHAPTER_1_SCENARIO } from "../chapter1/scenario";
 import {
   CLAIM_IDS,
   DECISION_IDS,
+  DEVICE_ACTION_IDS,
   EVIDENCE_IDS,
   INTERACTABLE_IDS,
   NPC_IDS,
   OBJECTIVE_IDS,
   VERIFY_METHODS,
+  type DecisionId,
   type IncomingCallId,
 } from "../chapter1/ids";
+import { selectOutcome } from "../outcome";
 import { chapterReducer, isCoreAction } from "../reducer";
 import type { ChapterState, CoreAction, RingReason } from "../types";
 
 /** Distinct base seed so this file's cases differ from the other property files. */
-const TERMINAL_SEED = (CORE_PROPERTY_SEED ^ 0x00050005) >>> 0;
+const TERMINAL_SEED = (CORE_PROPERTY_SEED ^ 0x000c0013) >>> 0;
 
 /** Number of generated probe values per case, on top of the fixed lists. */
 const GENERATED_PROBES = 40;
 
-const INCOMING_CALLS: readonly IncomingCallId[] = ["call.scam-1", "call.callback"];
-const RING_REASONS: readonly RingReason[] = ["first-interaction", "exploration-timer", "re-ring", "callback"];
+const INCOMING_CALLS: readonly IncomingCallId[] = ["call.alex", "call.recovery"];
+const RING_REASONS: readonly RingReason[] = ["first-interaction", "exploration-timer", "re-ring", "callback", "follow-up"];
 
 /** Every authored option ID across all graphs, plus one that exists nowhere. */
 const OPTION_IDS: readonly string[] = [
@@ -61,11 +66,23 @@ const WELL_FORMED_ACTIONS: readonly CoreAction[] = [
   ),
   ...DECISION_IDS.map((decision): CoreAction => ({ type: "MAKE_DECISION", decision })),
   ...OBJECTIVE_IDS.map((objectiveId): CoreAction => ({ type: "COMPLETE_OBJECTIVE", objectiveId })),
+  ...DEVICE_ACTION_IDS.map((deviceActionId): CoreAction => ({ type: "DEVICE_ACTION", deviceActionId })),
+  { type: "COMBINE_EVIDENCE", evidenceIds: ["ev.alex-statement", "ev.shared-case-id"] },
   { type: "FINISH_CHAPTER" },
 ];
 
 function isFinish(value: unknown): boolean {
   return isCoreAction(value) && value.type === "FINISH_CHAPTER";
+}
+
+/** Picks a random decision that the reducer accepts in `state`, so all four endings occur. */
+function randomAcceptedDecision(next: () => number): (state: ChapterState) => DecisionId {
+  return (state) => {
+    const accepted = DECISION_IDS.filter(
+      (decision) => chapterReducer(state, { type: "MAKE_DECISION", decision }).accepted,
+    );
+    return accepted.length > 0 ? pick(next, accepted) : "refuse-and-stop";
+  };
 }
 
 /**
@@ -77,21 +94,22 @@ function outcomeStateFor(seed: number): ChapterState {
   const length = randomInt(next, 0, CORE_SEQUENCE_MAX_LENGTH);
   const run = runSequence(generateActionSequence(seed, length));
   const reached = run.states.find((state) => state.outcome !== null);
-  return reached ?? completeChapterFrom(run.final).outcomeState;
+  return reached ?? completeChapterFrom(run.final, undefined, undefined, randomAcceptedDecision(next)).outcomeState;
 }
 
 /** Seeded property runs can exceed Vitest's 5 s default when the machine is loaded. */
-const PROPERTY_TIMEOUT_MS = 60_000;
+const PROPERTY_TIMEOUT_MS = 120_000;
 
-describe("chapter core terminal state", () => {
+describe("chapter core terminal state (Property 12, outcome lock)", () => {
   it("accepts only FINISH_CHAPTER after the Outcome, and nothing after it", () => {
-    // Feature: chapter-01-the-urgent-call, Property 5: After the Outcome only FINISH_CHAPTER is accepted
     for (let index = 0; index < CORE_PROPERTY_RUNS; index += 1) {
       const seed = caseSeed(TERMINAL_SEED, index);
       const context = `seed ${seed} (case ${index})`;
       const outcomeState = outcomeStateFor(seed);
       expect(outcomeState.outcome, context).not.toBeNull();
       expect(outcomeState.status, context).not.toBe("finished");
+      // The locked outcome is the one the ending table selects for the recorded decision.
+      expect(outcomeState.outcome, `${context}, selection`).toBe(selectOutcome(outcomeState));
 
       const probes: unknown[] = [
         ...generateActionSequence(caseSeed(seed, 1), GENERATED_PROBES, outcomeState),
@@ -109,12 +127,13 @@ describe("chapter core terminal state", () => {
         expect(result.reason, where).toBeTruthy();
       }
 
-      // FINISH_CHAPTER is accepted once.
+      // FINISH_CHAPTER is accepted once and keeps the outcome and the decision.
       const finish = chapterReducer(outcomeState, { type: "FINISH_CHAPTER" });
       expect(finish.accepted, context).toBe(true);
       const finished = finish.state;
       expect(finished.status, context).toBe("finished");
       expect(finished.outcome, context).toBe(outcomeState.outcome);
+      expect(finished.decision, context).toBe(outcomeState.decision);
 
       // After FINISH_CHAPTER, everything is rejected unchanged, including FINISH_CHAPTER.
       for (const probe of probes) {

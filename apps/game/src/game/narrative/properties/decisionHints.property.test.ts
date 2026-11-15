@@ -1,3 +1,6 @@
+// Feature: chapter-01-double-deception, decision panel hints for the five decisions of Act V
+// (follow-recovery, follow-both, refuse-and-stop, verify-independently, report-deception).
+// Originally Property 9 of game-i18n-en-vi: a hint has a code exactly when it is a core reason.
 import { describe, expect, it } from "vitest";
 import {
   CORE_PROPERTY_RUNS,
@@ -10,8 +13,8 @@ import {
 } from "../../../test/chapterRuns";
 import { createLcg, randomInt } from "../../../test/seededRandom";
 import { CHAPTER_1_SCENARIO } from "../chapter1/scenario";
-import type { DecisionId } from "../chapter1/ids";
-import { REASONS, type ReasonCode } from "../reducer";
+import { DECISION_IDS, type DecisionId } from "../chapter1/ids";
+import { REASONS, createInitialState, type ReasonCode } from "../reducer";
 import { selectDecisionPanel } from "../selectors";
 import type { ChapterState, ScenarioDefinition } from "../types";
 
@@ -100,6 +103,16 @@ function checkPanel(
 const PROPERTY_TIMEOUT_MS = 60_000;
 
 describe("decision panel hint codes", () => {
+  it("lists exactly the five decisions and gives only verify-independently a pre-step", () => {
+    const panel = selectDecisionPanel(createInitialState(), CHAPTER_1_SCENARIO);
+    expect(panel.options.map((option) => option.id).sort()).toEqual([...DECISION_IDS].sort());
+    expect(DECISION_IDS).toHaveLength(5);
+    for (const option of panel.options) {
+      expect(option.preStep !== null, option.id).toBe(option.id === "verify-independently");
+      expect(option.available, option.id).toBe(false);
+    }
+  });
+
   it("sets hintCode exactly when the hint is a core reason", () => {
     // Feature: game-i18n-en-vi, Property 9: Decision hint codes match their reasons
     const scenarios: { scenario: ScenarioDefinition; marked: boolean }[] = [

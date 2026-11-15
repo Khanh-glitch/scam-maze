@@ -1,417 +1,364 @@
-// Chapter 1 "The Urgent Call": warning signs, the eleven Evidence_Items and journal notes.
-// Stances never prove a claim on their own; only the official line (an independent channel)
-// can set a claim to `contradicted`.
-// Pure TypeScript data. See design.md, "Evidence", and Requirements 11.1, 11.2, 11.10.
+// Chapter 1 evidence E01 to E11, warning signs and journal notes.
+// Two independent paths reach the same conclusion: physical (statement, note, calendar, Alex's
+// record) and digital (saved bank app, notification details). A single detail needs
+// interpretation and never proves a claim false. Only `ev.official-confirmation` (found in the
+// official-line node `off.confirm`) can contradict a claim. Identifiers come from sources.ts.
+// Pure data: no React, Three.js or i18n.
 
 import type { EvidenceItem, JournalNote, WarningSignDef } from "../types";
 import type { EvidenceId, WarningSignId } from "./ids";
+import {
+  ALEX_CALLBACK_NUMBER,
+  CASE_REFERENCE,
+  NOTIFICATION_APP,
+  NOTIFICATION_DOMAIN,
+  NOTIFICATION_NUMBER,
+  OFFICIAL_DOMAIN,
+  OFFICIAL_NUMBER,
+  PLAYER_NUMBER,
+  SAVED_APP,
+} from "./sources";
 
 export const CHAPTER_1_WARNING_SIGNS: Record<WarningSignId, WarningSignDef> = {
   "ws.urgency": {
     id: "ws.urgency",
-    label: "Urgency",
-    description:
-      "The message gives you very little time. Scammers rush people so they do not stop to check.",
+    label: "Pressure to act soon",
+    description: "The message asks you to act soon so that you have less time to think and check.",
   },
-  "ws.look-alike-link": {
-    id: "ws.look-alike-link",
-    label: "Look-alike link",
-    description:
-      "The link uses the bank's name, but it is not the bank's official website. Anyone can put a bank's name in a web address.",
+  "ws.unverified-sender": {
+    id: "ws.unverified-sender",
+    label: "Sender you have not checked",
+    description: "The sender, the address or the app is not one you set up or saved before today.",
+  },
+  "ws.caller-id-spoof": {
+    id: "ws.caller-id-spoof",
+    label: "Caller ID that does not fit",
+    description: "The number on the screen can be set by the caller. Here it shows your own number, which no bank would call from.",
+  },
+  "ws.self-supplied-contact": {
+    id: "ws.self-supplied-contact",
+    label: "Contact details supplied by the sender",
+    description: "The message gives its own number to call. A number from the sender proves nothing about who the sender is.",
+  },
+  "ws.shared-case-id": {
+    id: "ws.shared-case-id",
+    label: "The same case reference in separate contacts",
+    description: "Two contacts that look separate use the same reference. They may come from one source, so they do not confirm each other.",
+  },
+  "ws.validates-your-doubt": {
+    id: "ws.validates-your-doubt",
+    label: "Agreeing with your doubt",
+    description: "The caller praises your caution and then asks you to follow their own steps. Agreement is not proof.",
+  },
+  "ws.move-funds": {
+    id: "ws.move-funds",
+    label: "Request to move money",
+    description: "You are asked to move money to a place you did not choose, for protection.",
+  },
+  "ws.discourages-verification": {
+    id: "ws.discourages-verification",
+    label: "Discouraging a check",
+    description: "The caller says that checking with the bank is slow, useless or not allowed.",
   },
   "ws.code-request": {
     id: "ws.code-request",
-    label: "Request for a one-time code",
-    description:
-      "A one-time code lets someone sign in or approve a payment as you. A real bank does not ask you to read it out.",
-  },
-  "ws.unknown-number": {
-    id: "ws.unknown-number",
-    label: "Number you do not know",
-    description:
-      "The call came from a number that is not the bank's official number. Caller ID can also be faked, so the number alone proves nothing.",
-  },
-  "ws.move-money": {
-    id: "ws.move-money",
-    label: "Request to move money",
-    description:
-      "The caller asks you to move your money to another account to protect it. A real bank does not ask this.",
-  },
-  "ws.partial-details": {
-    id: "ws.partial-details",
-    label: "Knowing a few personal details",
-    description:
-      "The caller knows your name and part of your account number. These details can come from leaked data, so they do not prove who the caller is.",
-  },
-  "ws.emotional-pressure": {
-    id: "ws.emotional-pressure",
-    label: "Emotional pressure",
-    description:
-      "The caller makes you feel worried or guilty so that you act before you think.",
-  },
-  "ws.secrecy": {
-    id: "ws.secrecy",
-    label: "Request for secrecy",
-    description:
-      "The caller tells you not to talk to anyone about the call. Scammers do this so that nobody can help you check the story.",
-  },
-  "ws.inconsistent-story": {
-    id: "ws.inconsistent-story",
-    label: "Story that does not match",
-    description:
-      "What the caller says does not match what you can check on a channel you trust. A real account problem would match the bank's own record.",
-  },
-  "ws.changing-numbers": {
-    id: "ws.changing-numbers",
-    label: "Different numbers, same name",
-    description:
-      "Calls and texts that all claim to be the bank come from different numbers. A bank does not need many numbers to reach you, and a name on a screen can be faked.",
+    label: "Request for a code",
+    description: "You are asked to read out a one-time code that was sent to you. That code is only for you.",
   },
 };
 
 export const CHAPTER_1_EVIDENCE: Record<EvidenceId, EvidenceItem> = {
-  "ev.sms-alert": {
-    id: "ev.sms-alert",
-    title: "Urgent text message",
-    description:
-      "A text that says your Northgate Bank account is suspended and asks you to confirm your identity within 15 minutes at northgate-secure-verify.invalid.",
+  // E01: phone records, call details of Alex's call.
+  "ev.caller-id-anomaly": {
+    id: "ev.caller-id-anomaly",
+    title: "The caller ID shows your own number",
+    description: `The details of the first call show the caller ID ${PLAYER_NUMBER}. That is your own number. A caller can set the number that appears, so this detail needs interpretation. It is odd, but by itself it does not show who called.`,
     source: "device",
-    location: "Phone · Messages",
-    discovery: { via: "inspect", requires: [] },
+    location: "Phone, call details of the first call",
+    discovery: { via: "device", deviceActionId: "dev.open-call-details" },
+    sourceId: "src.call-alex",
     relations: [
       {
-        claimId: "claim.account-suspended",
+        claimId: "claim.alex-identity",
         stance: "needs-verification",
-        note: "The text says the account is suspended, but a text alone does not show that this is true.",
+        note: "An odd caller ID is a reason to check. It does not prove the caller is not from the bank.",
       },
     ],
-    warningSigns: ["ws.urgency", "ws.look-alike-link"],
-    relevance:
-      "Scam messages often create a short deadline and include a link that looks like the bank's website.",
-    debriefHint:
-      "The urgent text used a 15-minute deadline and a web address that is not the bank's official website.",
+    warningSigns: ["ws.caller-id-spoof"],
+    relevance: "Teaches that the number on the screen can be set by the caller, and that one odd detail is a reason to verify, not a verdict.",
+    debriefHint: "The call details of the first call showed your own number as the caller ID.",
   },
-  "ev.otp-sms": {
-    id: "ev.otp-sms",
-    title: "One-time code message",
-    description:
-      "A text with a one-time code from Northgate Bank. It says: \"Never share this code with anyone, including bank staff.\"",
+
+  // E02: laptop, notification details.
+  "ev.notification-metadata": {
+    id: "ev.notification-metadata",
+    title: "Where the notification comes from",
+    description: `The details show a sender domain ${NOTIFICATION_DOMAIN}, an app called ${NOTIFICATION_APP}, the case reference ${CASE_REFERENCE} and a contact number ${NOTIFICATION_NUMBER} that the notification gives itself. None of these match the bank records you saved, but the details need to be compared with those records before you decide.`,
     source: "device",
-    location: "Phone · Messages",
-    discovery: { via: "inspect", requires: [{ kind: "flag", flag: "otp_sent" }] },
+    location: "Laptop, notification details",
+    discovery: { via: "device", deviceActionId: "dev.inspect-notification-origin" },
+    sourceId: "src.notification",
     relations: [
       {
-        claimId: "claim.code-needed",
-        stance: "contradicts",
-        note: "The bank's own message says never to share the code, not even with bank staff.",
-      },
-    ],
-    warningSigns: ["ws.code-request"],
-    relevance:
-      "A one-time code is meant only for you. When someone asks for it, they may be trying to sign in as you.",
-    debriefHint:
-      "The one-time code message said never to share the code with anyone, including bank staff.",
-  },
-  "ev.caller-number": {
-    id: "ev.caller-number",
-    title: "Caller's number",
-    description: "The call history shows that \"Northgate Bank Security\" called from +000 555 0142.",
-    source: "device",
-    location: "Phone · Calls",
-    discovery: { via: "inspect", requires: [{ kind: "flag", flag: "scam1_rang" }] },
-    relations: [
-      {
-        claimId: "claim.caller-identity",
+        claimId: "claim.notification-genuine",
         stance: "needs-verification",
-        note: "The name on the screen comes from the caller. Compare the number with one you already trust.",
+        note: "The origin looks unfamiliar. Compare it with records you saved before today.",
       },
     ],
-    warningSigns: ["ws.unknown-number"],
-    relevance:
-      "The name and number on an incoming call can be faked. Check them against a number from your card or a bank letter.",
-    debriefHint: "The call history showed the number the caller used: +000 555 0142.",
+    warningSigns: ["ws.unverified-sender", "ws.self-supplied-contact"],
+    relevance: "Teaches how to read sender details, and that a number inside a message is not a trusted way to reach the bank.",
+    debriefHint: "The notification details showed a sender, an app and a number that you had not saved before.",
   },
-  "ev.bank-card": {
-    id: "ev.bank-card",
-    title: "Number on your bank card",
-    description: "The back of your Northgate Bank card shows the official number +000 555 0100.",
+
+  // E03: receipts prop, printed statement (physical path).
+  "ev.official-contact-paper": {
+    id: "ev.official-contact-paper",
+    title: "The contact number printed on your statement",
+    description: `Your paper statement prints the bank contact number ${OFFICIAL_NUMBER} and the address ${OFFICIAL_DOMAIN}. The paper was printed before today, so it is a record that neither caller wrote.`,
     source: "physical",
-    location: "Café table · wallet",
-    discovery: { via: "interact", objectId: "obj.wallet" },
+    location: "The folded bank statement among your receipts",
+    discovery: { via: "interact", objectId: "obj.receipts" },
+    sourceId: "src.statement-paper",
     relations: [
       {
-        claimId: "claim.caller-identity",
-        stance: "needs-verification",
-        note: "This is the bank's official number. Use it to check who really called.",
+        claimId: "claim.notification-genuine",
+        stance: "inconclusive",
+        note: "It shows a channel that existed before today. It does not say anything about the notification until you compare the numbers.",
       },
     ],
     warningSigns: [],
-    relevance:
-      "Your card gives you a number you can trust because you did not get it from the caller.",
-    debriefHint:
-      "Your wallet on the café table held your bank card with the official number +000 555 0100.",
+    relevance: "Teaches the habit of keeping a contact you trust from before any message arrives.",
+    debriefHint: "The paper statement in your receipts printed the bank number you could have used to check.",
   },
-  "ev.bank-letter": {
-    id: "ev.bank-letter",
-    title: "Letter from Northgate Bank",
-    description:
-      "A yearly statement letter that lists the support number +000 555 0100 and the website northgate.example. It says nothing about a problem with your account.",
-    source: "physical",
-    location: "Mailbox",
-    discovery: { via: "interact", objectId: "obj.mailbox" },
-    relations: [
-      {
-        claimId: "claim.caller-identity",
-        stance: "needs-verification",
-        note: "The letter gives the bank's official number. Use it to check who really called.",
-      },
-      {
-        claimId: "claim.account-suspended",
-        stance: "needs-verification",
-        note: "The letter does not mention a suspension, but it is older than the text, so check with the bank.",
-      },
-    ],
-    warningSigns: [],
-    relevance:
-      "Letters you already have give you the bank's real contact details. Compare them with the ones in a message or call.",
-    debriefHint:
-      "The letter in your mailbox showed the official number and the official website northgate.example.",
-  },
-  "ev.bank-app": {
-    id: "ev.bank-app",
-    title: "Northgate Bank app",
-    description:
-      "The Northgate Bank app on your phone shows your account as active, with no alerts and no pending transfers.",
+
+  // E03b: laptop, saved bank app, Contacts (digital path).
+  "ev.official-contact-app": {
+    id: "ev.official-contact-app",
+    title: "The contact saved in your bank app",
+    description: `The contacts page of ${SAVED_APP}, an app you installed before today, lists the bank number ${OFFICIAL_NUMBER} and the address ${OFFICIAL_DOMAIN}. It is the same number as on your paper statement.`,
     source: "device",
-    location: "Phone · Northgate Bank",
-    discovery: { via: "verify", method: "bank-app" },
+    location: "Laptop, bank app, contacts",
+    discovery: { via: "device", deviceActionId: "dev.open-saved-contacts" },
+    sourceId: "src.saved-app",
     relations: [
       {
-        claimId: "claim.account-suspended",
-        stance: "contradicts",
-        note: "The app you installed yourself shows no suspension.",
+        claimId: "claim.notification-genuine",
+        stance: "inconclusive",
+        note: "It shows the contact you saved. It does not confirm or deny the notification by itself.",
       },
     ],
     warningSigns: [],
-    relevance:
-      "Opening the bank's app yourself, without using a link from a message, is a way to check an alert.",
-    debriefHint:
-      "The Northgate Bank app on your phone showed your account as active with no alerts.",
+    relevance: "Gives a digital way to reach the same conclusion as the paper statement.",
+    debriefHint: "The bank app you installed yourself listed the same bank number as your statement.",
   },
-  "ev.shop-poster": {
-    id: "ev.shop-poster",
-    title: "Northgate notice in the shop window",
-    description:
-      "A Northgate Bank notice says the bank will never ask for your one-time code and will never ask you to move money to another account to protect it.",
-    source: "physical",
-    location: "Corner shop window",
-    discovery: { via: "interact", objectId: "obj.shop-poster" },
+
+  // E04: laptop, saved bank app, activity.
+  "ev.account-activity": {
+    id: "ev.account-activity",
+    title: "No flagged payment in the account activity",
+    description: "The activity page of your bank app shows your usual payments and no flagged or blocked payment. This is a quiet result, not proof. The app is not a live conversation with the bank, so it cannot answer whether a case exists.",
+    source: "device",
+    location: "Laptop, bank app, activity",
+    discovery: { via: "device", deviceActionId: "dev.open-account-activity" },
+    sourceId: "src.saved-app",
     relations: [
       {
-        claimId: "claim.code-needed",
-        stance: "contradicts",
-        note: "The bank says it never asks for one-time codes.",
-      },
-      {
-        claimId: "claim.protected-account",
-        stance: "contradicts",
-        note: "The bank says it never asks you to move money to protect it.",
+        claimId: "claim.recovery-needed",
+        stance: "inconclusive",
+        note: "A quiet activity page does not show whether a problem exists. Ask the bank through a channel you trust.",
       },
     ],
-    warningSigns: ["ws.code-request", "ws.move-money"],
-    relevance:
-      "Banks publish what they will never ask you to do. A request that goes against this is a strong warning sign.",
-    debriefHint:
-      "The notice in the shop window said Northgate never asks for codes or asks you to move money.",
+    warningSigns: [],
+    relevance: "Teaches that one quiet source is not an answer, and that checking is different from confirming.",
+    debriefHint: "The account activity page showed no flagged payment, which was worth a second check.",
   },
-  "ev.community-alert": {
-    id: "ev.community-alert",
-    title: "Neighbourhood alert",
-    description:
-      "An alert on the notice board says several neighbours got calls from people who said they were from a bank and asked them to move their savings to a \"protected account\".",
-    source: "physical",
-    location: "Notice board",
-    discovery: { via: "interact", objectId: "obj.notice-board" },
+
+  // E05: laptop, compare view, Alex's record against the notification.
+  "ev.shared-case-id": {
+    id: "ev.shared-case-id",
+    title: "The same case reference in two places",
+    description: `Alex gave the case reference ${CASE_REFERENCE} in the first call. The notification uses ${CASE_REFERENCE} too. Two separate contacts agree on a reference, but they may share one source. Agreement between them is not an independent confirmation.`,
+    source: "device",
+    location: "Laptop, compare view",
+    discovery: { via: "device", deviceActionId: "dev.compare-case-ref" },
+    sourceId: "src.notification",
     relations: [
       {
-        claimId: "claim.protected-account",
-        stance: "contradicts",
-        note: "Neighbours got the same request from callers who were not from a bank.",
+        claimId: "claim.claims-independent",
+        stance: "needs-verification",
+        note: "A shared reference can mean one source behind both. Check with someone who does not rely on either.",
       },
     ],
-    warningSigns: ["ws.move-money"],
-    relevance:
-      "The same story often reaches many people. Hearing it from others helps you spot the pattern.",
-    debriefHint:
-      "The community notice board described calls asking neighbours to move their savings to a \"protected account\".",
+    warningSigns: ["ws.shared-case-id"],
+    relevance: "Teaches that two messages repeating the same detail may be one source, not two witnesses.",
+    debriefHint: "Alex and the notification used the same case reference. Two contacts that agree can still come from one source.",
   },
-  "ev.partial-info": {
-    id: "ev.partial-info",
-    title: "What the caller knew",
-    description:
-      "The caller knew your name and the last four digits of your account number.",
+
+  // E06: note prop, the player's own reminder (physical path).
+  "ev.note-app-origin": {
+    id: "ev.note-app-origin",
+    title: "Your own reminder about how the bank contacts you",
+    description: `Your handwritten note says that your bank reaches you through the ${SAVED_APP} app and the number ${OFFICIAL_NUMBER} printed on your statement. The notification uses a different app, ${NOTIFICATION_APP}. This is a weak clue. The note only records your own habit and does not prove the notification is wrong.`,
+    source: "physical",
+    location: "Your handwritten reminder near the desk",
+    discovery: { via: "interact", objectId: "obj.note" },
+    sourceId: "src.note",
+    relations: [
+      {
+        claimId: "claim.notification-genuine",
+        stance: "contradicts",
+        note: "Weak. The notification does not follow your usual channel, but only a check with the bank can settle it.",
+      },
+    ],
+    warningSigns: ["ws.unverified-sender"],
+    relevance: "Shows that a personal rule you wrote earlier can help you spot a message that does not fit.",
+    debriefHint: "Your own note said how your bank contacts you, and the notification did not follow it.",
+  },
+
+  // E07: phone records, Alex's record (voicemail text or call summary).
+  "ev.alex-statement": {
+    id: "ev.alex-statement",
+    title: "What Alex said, in writing",
+    description: `The record of the first call says Alex gave the case reference ${CASE_REFERENCE}, asked for a code sent to your phone, and gave the callback number ${ALEX_CALLBACK_NUMBER}. It also says a notification and a follow-up team would come. These are claims from the caller, not facts you have checked.`,
+    source: "device",
+    location: "Phone, record of the first call",
+    discovery: { via: "device", deviceActionId: "dev.open-alex-record" },
+    sourceId: "src.call-alex",
+    relations: [
+      {
+        claimId: "claim.alex-identity",
+        stance: "needs-verification",
+        note: "The record shows what was claimed. It cannot show whether the claim is true.",
+      },
+    ],
+    warningSigns: ["ws.code-request", "ws.urgency", "ws.self-supplied-contact"],
+    relevance: "A written record makes the claims easy to compare later, and it foreshadows the notification and the follow-up team.",
+    debriefHint: "The record of the first call said a notification and a follow-up team would come. Both did.",
+  },
+
+  // E08: dialogue node rec.cites-case in the recovery call.
+  "ev.recovery-statement": {
+    id: "ev.recovery-statement",
+    title: "The third caller repeats the case reference",
+    description: `The third caller repeats the case reference ${CASE_REFERENCE} and says your money must be moved to a holding account for protection. The caller also agrees with your doubts. The same reference you already saw twice is a repeated claim, not a new witness.`,
     source: "dialogue",
-    location: "Scam call",
-    discovery: { via: "dialogue-node", nodeId: "scam.knows-details" },
+    location: "Third call, recovery caller",
+    discovery: { via: "dialogue-node", nodeId: "rec.cites-case" },
+    sourceId: "src.call-recovery",
     relations: [
       {
-        claimId: "claim.caller-identity",
-        stance: "inconclusive",
-        note: "These details can come from leaked data, so they do not show who the caller is.",
+        claimId: "claim.recovery-needed",
+        stance: "needs-verification",
+        note: "The caller asks for urgent action. Whether any action is needed is something only the bank can confirm.",
       },
     ],
-    warningSigns: ["ws.partial-details"],
-    relevance:
-      "Knowing a few personal details makes a caller sound real, but it does not prove that they work for your bank.",
-    debriefHint:
-      "Asking the caller how you could know they were from the bank would have shown that they only knew a few details.",
+    warningSigns: ["ws.shared-case-id", "ws.validates-your-doubt", "ws.move-funds", "ws.discourages-verification"],
+    relevance: "Shows how a third voice can borrow details from the first two to look independent.",
+    debriefHint: "The third caller repeated the same case reference and asked you to move money.",
   },
-  "ev.sam-testimony": {
-    id: "ev.sam-testimony",
-    title: "Sam's story",
-    description:
-      "Sam says a caller once told a friend that their account was in danger, asked for a code and then asked them to move money. Sam's advice is to call the number on your card, not the one that called you.",
-    source: "npc",
-    location: "Corner shop",
-    discovery: { via: "dialogue-node", nodeId: "sam.after-call.story" },
-    relations: [
-      {
-        claimId: "claim.caller-identity",
-        stance: "inconclusive",
-        note: "Sam's story matches this call, but it does not show who called you.",
-      },
-    ],
-    warningSigns: ["ws.emotional-pressure"],
-    relevance:
-      "Talking to someone you trust gives you time to think and often shows that the story is a known pattern.",
-    debriefHint: "Sam at the corner shop had heard of the same kind of call.",
-  },
+
+  // E09: official line, node off.confirm. The only item that can contradict claims.
   "ev.official-confirmation": {
     id: "ev.official-confirmation",
-    title: "Northgate official line",
-    description:
-      "You called Northgate on +000 555 0100. They have no record of a call to you today, your account is active, and they never ask for one-time codes or ask you to move money.",
+    title: "The bank line confirms no such case",
+    description: `You called ${OFFICIAL_NUMBER}, the number saved before today. The bank agent finds no case ${CASE_REFERENCE}, no security notification sent to you, and no recovery procedure that asks you to move money.`,
     source: "verification",
-    location: "Phone · official call",
-    discovery: { via: "dialogue-node", nodeId: "official.confirm" },
+    location: "Call to the saved bank number",
+    discovery: { via: "dialogue-node", nodeId: "off.confirm" },
+    sourceId: "src.official-line",
+    relations: [
+      { claimId: "claim.alex-identity", stance: "contradicts", note: "The bank has no record of this caller or case." },
+      { claimId: "claim.notification-genuine", stance: "contradicts", note: "The bank did not send the notification." },
+      { claimId: "claim.recovery-needed", stance: "contradicts", note: "No recovery procedure exists." },
+      { claimId: "claim.claims-independent", stance: "contradicts", note: "The callers and the notification share one origin." },
+    ],
+    warningSigns: [],
+    relevance: "Teaches the fix: stop, then ask through a channel you already trusted, not through one the sender gave you.",
+    debriefHint: "Calling the number you had saved before today would have settled the question.",
+  },
+
+  // E10: calendar prop (optional, weak).
+  "ev.calendar-routine": {
+    id: "ev.calendar-routine",
+    title: "No security appointment on your calendar",
+    description: "Your calendar shows the usual statement date and no bank security appointment. This is optional and weak. A missing entry fits what you remember, but it proves nothing about the calls.",
+    source: "physical",
+    location: "The wall calendar",
+    discovery: { via: "interact", objectId: "obj.calendar" },
+    sourceId: "src.calendar",
     relations: [
       {
-        claimId: "claim.caller-identity",
-        stance: "contradicts",
-        note: "The bank, reached on its official number, has no record of calling you.",
-      },
-      {
-        claimId: "claim.account-suspended",
-        stance: "contradicts",
-        note: "The bank says your account is active.",
-      },
-      {
-        claimId: "claim.code-needed",
-        stance: "contradicts",
-        note: "The bank says it never asks for one-time codes.",
+        claimId: "claim.recovery-needed",
+        stance: "inconclusive",
+        note: "Your routine gave no sign of a security matter, but a routine cannot rule one out.",
       },
     ],
     warningSigns: [],
-    relevance:
-      "Calling the bank yourself on a number you already trust is the most reliable way to check a call or message.",
-    debriefHint:
-      "Calling Northgate on the number from your card or letter would have confirmed that the bank did not call you.",
+    relevance: "An optional detail that shows how several weak signs differ from one confirmed fact.",
+    debriefHint: "Your calendar showed no security appointment. It is a weak sign, not proof.",
   },
-  "ev.transfer-check": {
-    id: "ev.transfer-check",
-    title: "No pending transfer on the account",
-    description:
-      "You asked the official line about the large transfer the caller mentioned. Northgate says there is no pending transfer and nothing is held on your account. This does not match the caller's story.",
-    source: "verification",
-    location: "Phone · official call",
-    discovery: { via: "dialogue-node", nodeId: "official.transfer" },
-    relations: [
-      {
-        claimId: "claim.account-suspended",
-        stance: "contradicts",
-        note: "The bank's own record shows no transfer and no hold, which does not match what the caller said.",
-      },
-    ],
-    warningSigns: ["ws.inconsistent-story"],
-    relevance:
-      "Asking a follow-up question on a channel you trust can show whether the caller's details match the official record.",
-    debriefHint:
-      "Asking Northgate about the transfer showed that the bank had no record of it, so the caller's story did not match.",
-  },
-  "ev.second-number": {
-    id: "ev.second-number",
-    title: "A third number that says \"Northgate\"",
-    description:
-      "The call history shows \"Northgate Case Desk\" calling from +000 555 0177. This is a different number from the first caller (+000 555 0142) and from the official number (+000 555 0100).",
+
+  // E11: phone records, call details of the third call (optional).
+  "ev.recovery-number-match": {
+    id: "ev.recovery-number-match",
+    title: "The third caller uses the number from the notification",
+    description: `The details of the third call show the caller ID ${NOTIFICATION_NUMBER}. That is the contact number the notification gave itself. The notification and the third caller may share one origin, though a number alone still needs checking.`,
     source: "device",
-    location: "Phone · Calls",
-    discovery: { via: "inspect", requires: [{ kind: "flag", flag: "followup_rang" }] },
+    location: "Phone, call details of the third call",
+    discovery: { via: "device", deviceActionId: "dev.open-recovery-details" },
+    sourceId: "src.call-recovery",
     relations: [
       {
-        claimId: "claim.caller-identity",
-        stance: "contradicts",
-        note: "The number does not match the official number on your card or letter.",
+        claimId: "claim.claims-independent",
+        stance: "needs-verification",
+        note: "A shared number suggests one origin. Confirm with the bank before you decide.",
       },
     ],
-    warningSigns: ["ws.unknown-number", "ws.changing-numbers"],
-    relevance:
-      "When a new number uses the bank's name, compare it with a number you already trust. You do not need to answer the call to do this.",
-    debriefHint:
-      "The follow-up call came from +000 555 0177, a third number that did not match the official number +000 555 0100.",
-  },
-  "ev.case-sms": {
-    id: "ev.case-sms",
-    title: "Case text with a look-alike address",
-    description:
-      "A text from \"Northgate Bank\" gives a case reference and asks you to review the case at northgate-case-review.invalid. This address does not match the official website northgate.example.",
-    source: "device",
-    location: "Phone · Messages",
-    discovery: { via: "inspect", requires: [{ kind: "flag", flag: "case_sms_sent" }] },
-    relations: [
-      {
-        claimId: "claim.caller-identity",
-        stance: "contradicts",
-        note: "The link does not match the bank's official website.",
-      },
-    ],
-    warningSigns: ["ws.look-alike-link", "ws.changing-numbers"],
-    relevance:
-      "A case reference makes a text look official, but the web address still has to match the bank's real website. Do not open links from a caller.",
-    debriefHint:
-      "The case text pointed to northgate-case-review.invalid, which does not match the official website northgate.example.",
-  },
-  "ev.shifting-story": {
-    id: "ev.shifting-story",
-    title: "The deadline changed",
-    description:
-      "In the first call the caller said you had a few minutes. When the caller called back, the story about the deadline was different. The two accounts do not match.",
-    source: "dialogue",
-    location: "Callback",
-    discovery: { via: "dialogue-node", nodeId: "callback.story-slip" },
-    relations: [
-      {
-        claimId: "claim.caller-identity",
-        stance: "contradicts",
-        note: "A real account problem has one clear record. A story that changes between calls is a warning sign.",
-      },
-    ],
-    warningSigns: ["ws.inconsistent-story", "ws.urgency"],
-    relevance:
-      "Remember what a caller said earlier. When the details change, ask about the difference or end the call and check on your own.",
-    debriefHint:
-      "Pointing out the earlier \"few minutes\" line showed that the caller's story about the deadline had changed.",
+    warningSigns: ["ws.self-supplied-contact", "ws.shared-case-id"],
+    relevance: "Connects the third call back to the notification, which was announced earlier.",
+    debriefHint: "The third call came from the same number that the notification had supplied.",
   },
 };
 
-/**
- * Contradiction chain (Requirement 11.10): the caller's number (+000 555 0142) differs from the
- * official number on the card and the letter (+000 555 0100). `JournalNote.requires` is an
- * all-of list, so the note is tied to the card; the letter carries the same number.
- */
 export const CHAPTER_1_JOURNAL_NOTES: JournalNote[] = [
   {
-    id: "note.number-mismatch",
-    requires: ["ev.caller-number", "ev.bank-card"],
-    text: "The numbers are different. That is a warning sign, but caller ID can be faked, so a matching number would not prove anything either.",
+    id: "note.own-number",
+    requires: ["ev.caller-id-anomaly"],
+    text: "The caller ID showed your own number. That is odd, but one odd detail is a reason to check, not an answer.",
+  },
+  {
+    id: "note.same-case-reference",
+    requires: ["ev.notification-metadata", "ev.shared-case-id"],
+    text: "The notification and the first caller use the same case reference, and the notification gives its own number. They may come from one source. Try combining these clues.",
+  },
+  {
+    id: "note.contact-differs-paper",
+    requires: ["ev.notification-metadata", "ev.official-contact-paper"],
+    text: "The number inside the notification is not the number printed on your statement. Compare them, then think about which one you trusted before today.",
+  },
+  {
+    id: "note.contact-differs-app",
+    requires: ["ev.notification-metadata", "ev.official-contact-app"],
+    text: "The number inside the notification is not the number saved in your bank app. Your own records point to a different contact.",
+  },
+  {
+    id: "note.two-paths",
+    requires: ["ev.official-contact-paper", "ev.official-contact-app"],
+    text: "Your paper statement and your bank app give the same number. Two records you kept before today agree with each other.",
+  },
+  {
+    id: "note.third-call-origin",
+    requires: ["ev.recovery-number-match", "ev.notification-metadata"],
+    text: "The third caller uses the number that the notification supplied. The first caller, the notification and the third caller may be one chain.",
+  },
+  {
+    id: "note.third-call-repeat",
+    requires: ["ev.recovery-statement", "ev.shared-case-id"],
+    text: "The third caller repeats the case reference from the first two contacts. Repeating a detail does not make a new witness.",
+  },
+  {
+    id: "note.confirmed",
+    requires: ["ev.official-confirmation"],
+    text: "The bank line you saved before today has no such case. This is a confirmation from outside the chain.",
   },
 ];

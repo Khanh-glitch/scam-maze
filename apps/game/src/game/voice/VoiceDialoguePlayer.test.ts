@@ -18,7 +18,7 @@ import {
 } from "./VoiceDialoguePlayer";
 import type { VoiceClipEntry, VoiceManifest } from "./manifestTypes";
 
-const GRAPH = "dlg.scam-call" as const;
+const GRAPH = "dlg.alex" as const;
 
 function clip(nodeId: string, locale: GameLocale, status: "present" | "missing" = "present"): VoiceClipEntry {
   return {

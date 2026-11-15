@@ -12,16 +12,20 @@ import type {
   CallId,
   ClaimId,
   DecisionId,
+  DeductionId,
+  DeviceActionId,
   DialogueGraphId,
   EvidenceId,
+  IncomingCallId,
   InteractableId,
   MessageId,
   NpcId,
   ObjectiveId,
   VerifyMethod,
 } from "./chapter1/ids";
-import { evaluateCondition, evaluateConditions } from "./conditions";
+import { evaluateConditions } from "./conditions";
 import { availableOptions, type DialogueOptionView } from "./dialogueEngine";
+import { canRecordDeduction, matchDeduction } from "./deductions";
 import { canDiscover } from "./evidence";
 import { canCompleteObjective } from "./objectives";
 import { REASONS, type ReasonCode } from "./reducer";
@@ -64,17 +68,10 @@ export const CLAIM_STATUS_TEXT: Record<ClaimStatus, string> = {
 /** Speaker name shown for the player's own lines. */
 export const PLAYER_SPEAKER_NAME = "You";
 
-/** Phone call history entries that reveal an Evidence_Item when opened (Requirement 11.10). */
-export const CALL_LOG_EVIDENCE: Partial<Record<CallId, EvidenceId>> = {
-  "call.scam-1": "ev.caller-number",
-  "call.callback": "ev.caller-number",
-  "call.followup": "ev.second-number",
-};
-
 /** Claim checked by each VERIFY_CLAIM method when the method is not tied to a decision. */
 const VERIFY_METHOD_CLAIM: Record<VerifyMethod, ClaimId> = {
-  "official-line": "claim.caller-identity",
-  "bank-app": "claim.account-suspended",
+  "saved-official-contact": "claim.alex-identity",
+  "bank-app": "claim.recovery-needed",
 };
 
 // ---------------------------------------------------------------------------
@@ -99,14 +96,22 @@ function memoByState<R>(
   };
 }
 
-function scam1Answered(state: ChapterState): boolean {
-  return state.call.log.some(
-    (record) => record.callId === "call.scam-1" && (record.status === "answered" || record.status === "ended"),
-  );
+function hasRung(state: ChapterState, callId: CallId): boolean {
+  return state.call.log.some((record) => record.callId === callId);
 }
 
-function scam1Ended(state: ChapterState): boolean {
-  return evaluateCondition({ kind: "callEnded", callId: "call.scam-1" }, state);
+function hasDoneDeviceAction(state: ChapterState, id: DeviceActionId): boolean {
+  return state.events.some((entry) => entry.action.type === "DEVICE_ACTION" && entry.action.deviceActionId === id);
+}
+
+function hasVerifiedBy(state: ChapterState, method: VerifyMethod): boolean {
+  return state.events.some((entry) => entry.action.type === "VERIFY_CLAIM" && entry.action.method === method);
+}
+
+function incomingCallIds(scenario: ScenarioDefinition): IncomingCallId[] {
+  return (Object.keys(scenario.calls) as CallId[]).filter(
+    (id): id is IncomingCallId => scenario.calls[id].direction === "incoming",
+  );
 }
 
 function isPlaying(state: ChapterState): boolean {
@@ -315,7 +320,7 @@ export interface DecisionOptionView {
 }
 
 export interface DecisionPanelView {
-  /** True while the first scam Call has ended and no Decision exists (Requirement 13.1). */
+  /** True while the last act is current, the chapter is playing and no decision exists. */
   offered: boolean;
   options: DecisionOptionView[];
 }
@@ -346,7 +351,13 @@ function scenarioHint(text: string): HintView {
  * and `preStep` (Requirements 13.1-13.3).
  */
 export const selectDecisionPanel = memoByState((state, scenario): DecisionPanelView => {
-  const offered = isPlaying(state) && state.decision === null && scam1Ended(state);
+  // The panel opens when the last act (Act V) has started and no decision exists yet.
+  const lastAct = scenario.acts[scenario.acts.length - 1];
+  const offered =
+    isPlaying(state) &&
+    state.decision === null &&
+    lastAct !== undefined &&
+    selectCurrentAct(state, scenario).id === lastAct.id;
   const busy = busyReasonCode(state);
   const options = (Object.keys(scenario.decisions) as DecisionId[]).map((id): DecisionOptionView => {
     const def = scenario.decisions[id];
@@ -398,10 +409,27 @@ export interface CallLogEntryView extends CallRecord {
   evidenceAvailable: boolean;
 }
 
+/**
+ * The evidence a call history entry can reveal: the first `inspect` item (not a phone message)
+ * whose requirements name this call (`callRang`, `callEnded` or `callClosed`). Derived from
+ * Scenario_Data, so there is no per-call mapping in code.
+ */
+function callLogEvidenceId(callId: CallId, state: ChapterState, scenario: ScenarioDefinition): EvidenceId | null {
+  const messageEvidence = new Set<EvidenceId>(Object.values(scenario.phone.messages).map((m) => m.evidenceId));
+  const candidates = (Object.keys(scenario.evidence) as EvidenceId[]).filter((id) => {
+    const discovery = scenario.evidence[id].discovery;
+    if (discovery.via !== "inspect" || messageEvidence.has(id)) return false;
+    return discovery.requires.some(
+      (c) => (c.kind === "callRang" || c.kind === "callEnded" || c.kind === "callClosed") && c.callId === callId,
+    );
+  });
+  return candidates.find((id) => !state.discovered.includes(id)) ?? candidates[0] ?? null;
+}
+
 /** Call history, oldest first, with the evidence each entry can reveal. */
 export const selectCallLog = memoByState((state, scenario): CallLogEntryView[] =>
   state.call.log.map((record) => {
-    const evidenceId = CALL_LOG_EVIDENCE[record.callId] ?? null;
+    const evidenceId = callLogEvidenceId(record.callId, state, scenario);
     return {
       ...record,
       // Caller name from the (possibly localized) scenario by call ID, else the stored record.
@@ -439,6 +467,276 @@ export const selectPhoneMessages = memoByState((state, scenario): PhoneMessageVi
       };
     }),
 );
+
+// ---------------------------------------------------------------------------
+// Deception state, ringing, device actions, phone records, combinations
+// ---------------------------------------------------------------------------
+
+export interface DeceptionView {
+  firstCallRejected: boolean;
+  notificationOpened: boolean;
+  notificationOriginInspected: boolean;
+  officialChannelVerified: boolean;
+  secondCallerTrusted: boolean;
+  /** Discovery order. */
+  evidenceDiscovered: EvidenceId[];
+  /** Recording order. */
+  deductionsUnlocked: DeductionId[];
+  finalDecision: DecisionId | null;
+}
+
+/** Typed projection of the deception facts in Chapter_State. No second store (Requirement 4.4). */
+export const selectDeception = memoByState(
+  (state): DeceptionView => ({
+    firstCallRejected: state.flags.first_call_rejected === true,
+    notificationOpened: state.flags.notification_opened === true,
+    notificationOriginInspected: state.flags.notification_origin_inspected === true,
+    officialChannelVerified: state.flags.official_channel_verified === true,
+    secondCallerTrusted: state.flags.second_caller_trusted === true,
+    evidenceDiscovered: [...state.discovered],
+    deductionsUnlocked: [...state.deductions],
+    finalDecision: state.decision,
+  }),
+);
+
+/**
+ * The incoming call that may ring now, or `null`. A call qualifies when the chapter is playing,
+ * no call, conversation or decision exists, the call has not rung yet, and one `ringWhen`
+ * alternative holds. The first qualifying call in scenario order is returned.
+ */
+export function selectRingableCall(
+  state: ChapterState,
+  scenario: ScenarioDefinition = CHAPTER_1_SCENARIO,
+): IncomingCallId | null {
+  if (!isPlaying(state) || state.decision !== null) return null;
+  if (state.call.current !== null || state.call.status === "ringing" || state.conversation !== null) return null;
+  for (const id of incomingCallIds(scenario)) {
+    if (hasRung(state, id)) continue;
+    if (scenario.calls[id].ringWhen.some((all) => evaluateConditions(all, state, scenario))) return id;
+  }
+  return null;
+}
+
+export interface DeviceActionView {
+  id: DeviceActionId;
+  label: string;
+  once: boolean;
+  /** True once an accepted DEVICE_ACTION with this ID is in the event log. */
+  done: boolean;
+  /** True when DEVICE_ACTION with this ID would be accepted now. */
+  available: boolean;
+}
+
+/** Device actions of one device that are available or already done. Unavailable ones are not listed. */
+function deviceActionViews(
+  state: ChapterState,
+  scenario: ScenarioDefinition,
+  device: "laptop" | "phone",
+): DeviceActionView[] {
+  const views: DeviceActionView[] = [];
+  for (const id of Object.keys(scenario.deviceActions) as DeviceActionId[]) {
+    const def = scenario.deviceActions[id];
+    if (def.device !== device) continue;
+    const done = hasDoneDeviceAction(state, id);
+    const available =
+      state.status === "playing" &&
+      state.outcome === null &&
+      !(def.once && done) &&
+      evaluateConditions(def.requires, state, scenario);
+    if (available || done) views.push({ id, label: def.label, once: def.once, done, available });
+  }
+  return views;
+}
+
+export type NotificationState = "none" | "new" | "opened" | "dismissed";
+
+export interface CompareRowView {
+  /** Identifier key, for example "domain". The UI translates the label. */
+  key: string;
+  /** Value on the notification, or `null` when the player has not seen it yet. */
+  notification: string | null;
+  /** Value on a record the player holds, or `null` when not seen yet. No match flag is given. */
+  reference: string | null;
+}
+
+export interface LaptopView {
+  notification: {
+    state: NotificationState;
+    originInspected: boolean;
+    handled: boolean;
+  };
+  bankApp: {
+    opened: boolean;
+    title: string;
+    /** Empty until the saved bank app is opened. */
+    screens: Array<{ id: string; title: string; body: string }>;
+  };
+  /** Values side by side. Never states whether they match. */
+  compareRows: CompareRowView[];
+  deviceActions: DeviceActionView[];
+}
+
+const COMPARE_KEYS = ["case", "domain", "contact", "app"] as const;
+
+function notificationState(state: ChapterState): NotificationState {
+  if (state.flags.notification_delivered !== true) return "none";
+  if (state.flags.notification_opened === true) return "opened";
+  if (state.flags.notification_dismissed === true) return "dismissed";
+  return "new";
+}
+
+function buildCompareRows(state: ChapterState, scenario: ScenarioDefinition): CompareRowView[] {
+  const notification = Object.hasOwn(scenario.sources, "src.notification") ? scenario.sources["src.notification"] : null;
+  if (!notification) return [];
+  const seen = state.flags.notification_opened === true || state.flags.notification_origin_inspected === true;
+  if (!seen) return [];
+  const heldSourceIds = new Set<string>();
+  for (const id of state.discovered) {
+    if (Object.hasOwn(scenario.evidence, id)) heldSourceIds.add(scenario.evidence[id].sourceId);
+  }
+  const rows: CompareRowView[] = [];
+  for (const key of COMPARE_KEYS) {
+    const own = notification.identifiers.find((identifier) => identifier.key === key);
+    if (!own) continue;
+    let reference: string | null = null;
+    if (key === "case") {
+      const caller = Object.hasOwn(scenario.sources, "src.call-alex") ? scenario.sources["src.call-alex"] : null;
+      const known = state.flags.case_id_heard === true;
+      reference = known ? (caller?.identifiers.find((i) => i.key === key)?.value ?? null) : null;
+    } else {
+      for (const source of Object.values(scenario.sources)) {
+        if (source.trust !== "pre-existing" || !heldSourceIds.has(source.id)) continue;
+        const found = source.identifiers.find((identifier) => identifier.key === key);
+        if (found) {
+          reference = found.value;
+          break;
+        }
+      }
+    }
+    rows.push({ key, notification: own.value, reference });
+  }
+  return rows;
+}
+
+/** The laptop screens: notification state, saved bank app, compare rows and device actions. */
+export const selectLaptopView = memoByState((state, scenario): LaptopView => {
+  const opened = state.flags.bank_app_opened === true;
+  return {
+    notification: {
+      state: notificationState(state),
+      originInspected: state.flags.notification_origin_inspected === true,
+      handled: state.flags.notification_handled === true,
+    },
+    bankApp: {
+      opened,
+      title: scenario.phone.bankApp.title,
+      screens: opened ? scenario.phone.bankApp.screens.map((screen) => ({ ...screen })) : [],
+    },
+    compareRows: buildCompareRows(state, scenario),
+    deviceActions: deviceActionViews(state, scenario, "laptop"),
+  };
+});
+
+export interface SavedContactView {
+  name: string;
+  /** Fictional number, plain text. */
+  number: string;
+  claimId: ClaimId;
+  /** True when VERIFY_CLAIM with `saved-official-contact` would be accepted now. */
+  available: boolean;
+  /** True once the saved contact was called. */
+  called: boolean;
+}
+
+export interface PhoneRecordsView {
+  calls: CallLogEntryView[];
+  /** Voicemail message from the first caller, when delivered. */
+  voicemail: PhoneMessageView | null;
+  /** Call summary message, when delivered. */
+  summaries: PhoneMessageView[];
+  /** `null` when the scenario has no outgoing official call. */
+  savedContact: SavedContactView | null;
+  deviceActions: DeviceActionView[];
+}
+
+/** Claim for the saved-contact check: the decision pre-step claim, else a default. */
+function savedContactClaim(scenario: ScenarioDefinition): ClaimId {
+  return (
+    Object.values(scenario.decisions).find((def) => def.preStep?.method === "saved-official-contact")?.preStep
+      ?.claimId ?? VERIFY_METHOD_CLAIM["saved-official-contact"]
+  );
+}
+
+/** True when VERIFY_CLAIM `saved-official-contact` mirrors the reducer guard. */
+function canCallSavedContact(state: ChapterState, scenario: ScenarioDefinition): boolean {
+  return (
+    isPlaying(state) &&
+    Object.hasOwn(scenario.calls, "call.official") &&
+    state.call.current === null &&
+    state.conversation === null &&
+    state.decision === null &&
+    (state.discovered.includes("ev.official-contact-paper") || state.discovered.includes("ev.official-contact-app"))
+  );
+}
+
+/** Call history, message summaries, voicemail and the saved-contact call. */
+export const selectPhoneRecords = memoByState((state, scenario): PhoneRecordsView => {
+  const messages = selectPhoneMessages(state, scenario);
+  const official = Object.hasOwn(scenario.calls, "call.official") ? scenario.calls["call.official"] : null;
+  return {
+    calls: selectCallLog(state, scenario),
+    voicemail: messages.find((message) => message.id === "msg.alex-voicemail") ?? null,
+    summaries: messages.filter((message) => message.id === "msg.alex-summary"),
+    savedContact: official
+      ? {
+          name: official.displayName,
+          number: official.number,
+          claimId: savedContactClaim(scenario),
+          available: canCallSavedContact(state, scenario),
+          called: state.call.log.some((record) => record.callId === "call.official"),
+        }
+      : null,
+    deviceActions: deviceActionViews(state, scenario, "phone"),
+  };
+});
+
+export interface CombinationItemView {
+  id: EvidenceId;
+  title: string;
+  /** Source label from Scenario_Data, or `null` when the item has no known source. */
+  sourceLabel: string | null;
+}
+
+export interface CombinationOptionsView {
+  /** Discovered evidence in discovery order. */
+  items: CombinationItemView[];
+  minSelection: 2;
+  maxSelection: 3;
+  /** Deductions already recorded, in recording order. */
+  recorded: Array<{ id: DeductionId; statement: string }>;
+}
+
+/**
+ * The evidence the player may select for a combination. It lists discovered evidence only and
+ * never says whether any selection matches: matching happens when COMBINE_EVIDENCE is submitted
+ * (Requirement 8.11).
+ */
+export const selectCombinationOptions = memoByState((state, scenario): CombinationOptionsView => {
+  const items: CombinationItemView[] = [];
+  for (const id of state.discovered) {
+    if (!Object.hasOwn(scenario.evidence, id)) continue;
+    const item = scenario.evidence[id];
+    items.push({
+      id,
+      title: item.title,
+      sourceLabel: Object.hasOwn(scenario.sources, item.sourceId) ? scenario.sources[item.sourceId].label : null,
+    });
+  }
+  const recorded = state.deductions
+    .filter((id) => Object.hasOwn(scenario.deductions, id))
+    .map((id) => ({ id, statement: scenario.deductions[id].statement }));
+  return { items, minSelection: 2, maxSelection: 3, recorded };
+});
 
 // ---------------------------------------------------------------------------
 // Candidate actions
@@ -482,40 +780,43 @@ export function enumerateCandidateActions(
       actions.push({ type: "TALK_TO_NPC", npcId: id });
     }
 
-    if (!scam1Answered(state)) {
-      const rang = state.call.log.some((record) => record.callId === "call.scam-1");
-      const reason = rang ? "re-ring" : state.interacted.length > 0 ? "first-interaction" : "exploration-timer";
-      actions.push({ type: "RING_CALL", callId: "call.scam-1", reason });
-    }
-    if (
-      scam1Ended(state) &&
-      state.decision === null &&
-      !state.call.log.some((record) => record.callId === "call.callback")
-    ) {
-      actions.push({ type: "RING_CALL", callId: "call.callback", reason: "callback" });
+    // Calls: mirror the reducer (never rang before, `ringWhen` holds, no decision).
+    if (state.decision === null) {
+      for (const id of incomingCallIds(scenario)) {
+        if (hasRung(state, id)) continue;
+        if (!scenario.calls[id].ringWhen.some((all) => evaluateConditions(all, state, scenario))) continue;
+        const reason = state.interacted.length > 0 ? "first-interaction" : "callback";
+        actions.push({ type: "RING_CALL", callId: id, reason });
+      }
     }
 
-    const callbackRecord = state.call.log.find((record) => record.callId === "call.callback");
-    if (
-      state.decision === null &&
-      callbackRecord !== undefined &&
-      (callbackRecord.status === "ended" || callbackRecord.status === "declined") &&
-      !state.call.log.some((record) => record.callId === "call.followup")
-    ) {
-      actions.push({ type: "RING_CALL", callId: "call.followup", reason: "follow-up" });
+    // Laptop and phone actions.
+    for (const id of Object.keys(scenario.deviceActions) as DeviceActionId[]) {
+      const def = scenario.deviceActions[id];
+      if (def.once && hasDoneDeviceAction(state, id)) continue;
+      if (evaluateConditions(def.requires, state, scenario)) actions.push({ type: "DEVICE_ACTION", deviceActionId: id });
     }
 
-    if (
-      state.decision === null &&
-      state.flags.scam1_rang === true &&
-      (state.discovered.includes("ev.bank-card") || state.discovered.includes("ev.bank-letter"))
-    ) {
-      const claimId =
-        Object.values(scenario.decisions).find((def) => def.preStep?.method === "official-line")?.preStep
-          ?.claimId ?? VERIFY_METHOD_CLAIM["official-line"];
-      actions.push({ type: "VERIFY_CLAIM", claimId, method: "official-line" });
+    // Combinations of discovered evidence: only the pairs and triples that would record a deduction.
+    const found = state.discovered;
+    const combos: EvidenceId[][] = [];
+    for (let i = 0; i < found.length; i += 1) {
+      for (let j = i + 1; j < found.length; j += 1) {
+        combos.push([found[i], found[j]]);
+        for (let k = j + 1; k < found.length; k += 1) combos.push([found[i], found[j], found[k]]);
+      }
     }
-    if (state.phone.open && !state.discovered.includes("ev.bank-app")) {
+    for (const evidenceIds of combos) {
+      const deduction = matchDeduction(evidenceIds, scenario);
+      if (deduction !== null && canRecordDeduction(state, deduction, scenario)) {
+        actions.push({ type: "COMBINE_EVIDENCE", evidenceIds });
+      }
+    }
+
+    if (canCallSavedContact(state, scenario)) {
+      actions.push({ type: "VERIFY_CLAIM", claimId: savedContactClaim(scenario), method: "saved-official-contact" });
+    }
+    if (state.phone.open && state.decision === null && !hasVerifiedBy(state, "bank-app")) {
       actions.push({ type: "VERIFY_CLAIM", claimId: VERIFY_METHOD_CLAIM["bank-app"], method: "bank-app" });
     }
 

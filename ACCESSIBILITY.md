@@ -69,7 +69,8 @@ the outcome. The chapter is fully playable with sound off.
   with white text, a contrast of about 4.98:1 (calculated from the colors, not
   measured on a screen); the hover color is `#b3343e`. The state of Mute and
   Speaker is not shown by color alone: `aria-pressed` is set, and Mute also
-  changes its icon and label.- **Notices.** A short text notice explains when sound is blocked by the
+  changes its icon and label.
+- **Notices.** A short text notice explains when sound is blocked by the
   browser, when a line is a development preview voice (not a recording), when a
   line is spoken in English while the caption is in Vietnamese, and when a line
   has no audio. Notices are in a polite `aria-live` region.
@@ -123,6 +124,52 @@ following, and no one has checked them yet:
   code that turns off the 3D ring vibration is controlled by "Reduce motion",
   not by reduced-stress mode.
 
+## Chapter 1 in the room: laptop, phone records, journal and ending
+
+Chapter 1 now takes place in the player's room (Room v2). The layer that holds the chapter
+overlays is `features/chapter1/room/RoomChapterLayer.tsx`. As with the call features above, none
+of this changes game state, and the chapter does not depend on sound.
+
+- **Laptop overlay.** It is a modal dialog (`role="dialog"`, `aria-modal="true"`, with an
+  accessible name) with tabs for the notification, the bank app, the compare view and the Review
+  Security page. When it opens, focus moves to its heading; when it closes, focus returns to
+  where it was. Tab and Shift+Tab stay inside the open dialog. It has no text inputs, forms or
+  links: addresses, case references and phone numbers are plain text, so nothing can be followed
+  by mistake and there is nothing to type.
+- **Phone records overlay.** It shows call history, messages and voicemail while no call is
+  active, and call details that can reveal a clue. It is part of the overlay stack, so Escape and
+  the Tab trap of the layer apply to it.
+- **Journal.** The evidence journal is a modal dialog. Combining clues is done by selecting
+  existing evidence items, without typing. A short status line (`role="status"`) says when too
+  many items are selected.
+- **Decision and confirmation.** The final decision panel is a modal dialog. Each choice has a
+  confirmation step before it is recorded.
+- **Escape.** One press closes the topmost overlay only. Escape does not close an active or
+  ringing call, the ending screen or the debrief. When no overlay is open, Escape opens the pause
+  menu.
+- **Live region.** A polite, visually hidden live region (`role="status"`, `aria-live="polite"`)
+  announces a new notification, a new clue and a recorded conclusion. The ending narration is
+  also a polite live region. These regions stay mounted so a line is not announced twice.
+- **Subtitles outside the phone.** Call lines are shown in the subtitle overlay on the game
+  screen, not on the phone (see "Captions" above). Narration lines of the ending are shown as
+  text while they are spoken.
+- **Reduced motion.** With reduced motion on (system setting or the in-game setting), the 3D
+  phone does not vibrate while ringing, the ending screen appears without a fade, and the call
+  caption does not fade. The 3D phone overlay is optional: when WebGL or the model is not
+  available, the same call screen is shown on a 2D phone.
+- **Not by color alone.** Clues the player missed are marked with the text label "Missed" in the
+  debrief, not only with color or an icon.
+
+### Not verified for the room chapter
+
+- Screen reader behavior of the laptop, phone and journal dialogs and of the live regions (NVDA,
+  VoiceOver, TalkBack) has not been tested.
+- Keyboard Tab order was tested from the DOM order in automated tests, not with real key presses
+  in a browser. Escape and overlay handling was checked only in jsdom.
+- Focus behavior on the 3D room itself (pointer lock and the return from an overlay) has not
+  been checked in a browser.
+- Contrast of the new overlays was not measured on a screen.
+- The Vietnamese text of these overlays has had no native-speaker review.
 ## Supported environments
 
 Tested goal: recent versions of Chrome, Edge, Firefox and Safari on desktop,

@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { GameSettings } from "@scammaze/shared-types";
 import { LoadingScreen } from "../../components/ui/LoadingScreen";
@@ -15,6 +15,10 @@ import type { RoomOptions } from "../roomv2/game/outside";
 import { HomeCallOverlay } from "./HomeCallOverlay";
 import { GO_HOME_KEY, PrologueHud, ProloguePauseMenu, PrologueTopBar } from "./PrologueHud";
 import { SettingsModal } from "../menu/SettingsModal";
+import type { ChapterSession } from "../../game/chapters/chapterSession";
+import type { SaveGameSource } from "../../game/saves/saveGame";
+import { RoomChapterLayer } from "../chapter1/room/RoomChapterLayer";
+import { RoomStoryBridge } from "../chapter1/room/roomStoryBridge";
 
 // The room is its own chunk, downloaded in the background while the player walks around.
 const loadRoomModule = () => import("../roomv2");
@@ -43,6 +47,15 @@ interface ProloguePageProps {
    */
   revealed: boolean;
   onBuildProgress?: (progress: PrologueBuildProgress) => void;
+  /**
+   * The new-game session. When set, the room stage mounts the chapter layer (the intro starts the
+   * chapter). Without it the room is the plain prologue room.
+   */
+  session?: ChapterSession;
+  /** The story bridge passed to the room engine. Default: one created and kept by this page. */
+  story?: RoomStoryBridge;
+  /** Where the chapter layer writes checkpoints. Default: this device's local storage. */
+  saveSource?: SaveGameSource;
 }
 
 /** White doorway into the room: how long the screen takes to white out, and to clear again on the other side. */
@@ -61,7 +74,7 @@ const PROLOGUE_CONTROLS: readonly IntroControlId[] = ["move", "look", "interact"
  * home to the apartment. This page owns the whole interface, in the chapter's style; the two
  * world pages only draw the 3D view.
  */
-export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSettings, onHoverSound, onBackToMenu, revealed, onBuildProgress }) => {
+export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSettings, onHoverSound, onBackToMenu, revealed, onBuildProgress, session, story, saveSource }) => {
   const { t, i18n } = useTranslation(["worlds", "loading"]);
   const [stage, setStage] = useState<Stage>("neighborhood");
   const [worldReady, setWorldReady] = useState(false);
@@ -82,6 +95,11 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
   const [roomOptions, setRoomOptions] = useState<RoomOptions | null>(null);
   const [waitingRoom, setWaitingRoom] = useState(false);
   const [white, setWhite] = useState({ on: false, ms: WHITE_IN_MS });
+  // One bridge for the room engine and the chapter layer, stable for the life of the page.
+  const ownBridge = useRef<RoomStoryBridge | null>(null);
+  if (story === undefined && ownBridge.current === null) ownBridge.current = new RoomStoryBridge();
+  const bridge = story ?? (ownBridge.current as RoomStoryBridge);
+  const [roomCommands, setRoomCommands] = useState(false);
   const pendingEnter = useRef(false);
   const streetRef = useRef<StreetEngine | null>(null);
   const roomRef = useRef<RoomEngine | null>(null);
@@ -91,6 +109,9 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
   progressRef.current = onBuildProgress;
   const soundRef = useRef(settings.soundEnabled);
   soundRef.current = settings.soundEnabled;
+
+  // The chapter happens in the apartment; checkpoints name that scene.
+  const layerSession = useMemo<ChapterSession>(() => ({ ...(session as ChapterSession), sceneId: "apartment" }), [session]);
 
   const minElapsed = useMinimumDisplayTime(HOME_LOADING_MIN_MS, waitingRoom);
 
@@ -225,7 +246,7 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
     setPaused(true);
     streetRef.current?.setPaused(true);
     if (document.pointerLockElement) document.exitPointerLock();
-  }, []);
+  }, [stage]);
 
   const resume = useCallback(() => {
     setSettingsOpen(false);
@@ -247,6 +268,8 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
       if (event.repeat) return;
       if (event.key === "Escape") {
         if (settingsOpen) return; // the settings dialog closes itself
+        // The chapter layer (intro, phone, laptop, journal, call, decision) owns Escape while it is open.
+        if (bridge.overlayOpen()) return;
         if (paused) {
           event.preventDefault();
           resume();
@@ -263,7 +286,7 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [paused, settingsOpen, playingStreet, playingRoom, resume, openPause, goHome]);
+  }, [bridge, paused, settingsOpen, playingStreet, playingRoom, resume, openPause, goHome]);
 
   const handleProgress = useCallback((step: BuildStep, fraction: number) => {
     const index = BUILD_STEPS.indexOf(step);
@@ -368,9 +391,25 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
               onBackToMenu={onBackToMenu}
               embedded
               options={roomOptions}
+              story={session ? bridge : undefined}
+              overlay={
+                session && stage === "room" ? (
+                  <RoomChapterLayer
+                    session={layerSession}
+                    settings={settings}
+                    bridge={bridge}
+                    saveSource={saveSource}
+                    engineReady={roomCommands}
+                    onReturnToMenu={onBackToMenu}
+                    modelAllowed={false}
+                  />
+                ) : undefined
+              }
               onUI={setRoomUI}
               onReady={(engine) => {
                 roomRef.current = engine;
+                if (session) bridge.commands = engine;
+                setRoomCommands(true);
                 setRoomBuilt(true);
                 if (pendingEnter.current) showRoomRef.current();
               }}
@@ -380,11 +419,11 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
       )}
       {stage === "room" && playingRoom && !paused && <PrologueHud objective={null} prompt={null} showResume={showResume} cursorMode={roomCursor} crosshair={false} />}
 
-      {inGame && !callOpen && !paused && (
+      {inGame && !callOpen && !paused && !(session && stage === "room") && (
         <PrologueTopBar soundEnabled={soundOn} onToggleSound={toggleSound} onOpenSettings={openPause} onHoverSound={onHoverSound} />
       )}
 
-      {paused && !settingsOpen && <ProloguePauseMenu onHoverSound={onHoverSound} onResume={resume} onOpenSettings={() => setSettingsOpen(true)} onReturnToMenu={onBackToMenu} />}
+      {paused && !settingsOpen && <ProloguePauseMenu note={session && stage === "room" ? null : undefined} onHoverSound={onHoverSound} onResume={resume} onOpenSettings={() => setSettingsOpen(true)} onReturnToMenu={onBackToMenu} />}
       <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} settings={settings} onUpdateSettings={onUpdateSettings} />
 
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[72] bg-white" style={{ opacity: white.on ? 1 : 0, transition: `opacity ${white.ms}ms ease` }} />
