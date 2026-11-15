@@ -108,7 +108,8 @@ describe("PhoneCallScreen", () => {
       const bar = screen.getByTestId("phone-status-bar");
       expect(bar.getAttribute("aria-hidden")).toBe("true");
       expect(bar.className).toContain("pointer-events-none");
-      expect(bar.textContent).toBe("9:41");
+      expect(screen.getByTestId("phone-status-time").textContent).toMatch(/^\d{2}:\d{2}$/);
+      expect(bar.querySelectorAll("svg")).toHaveLength(3);
       unmount();
     }
   });

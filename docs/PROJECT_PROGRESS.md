@@ -224,6 +224,12 @@ Resolved:
   the reduced-stress hint) are listed in `ACCESSIBILITY.md`.
 
 ## Task History
+### 2026-11-15 — Phone status bar: in-game clock, iOS-style icons, rounded screen corners
+- **Objective:** Owner feedback on the call screen: the top corners were square, the clock must match the game time, and the signal, Wi-Fi and battery icons did not look like an iPhone's.
+- **Completed:** (1) `game/clock/gameClock.ts` (pure): the room starts at 23:08; the room engine reports elapsed seconds each frame (`updateDevices`), and the phone formats the same value as HH:MM, so it matches the wall clock. (2) `call/PhoneStatusBar.tsx`: clock, Dynamic Island gap and icons in a 3-column grid; signal bars, Wi-Fi arcs and a battery pill with the level number (76) drawn as inline SVG; `tone` prop `dark` (white glyphs, used) or `light` (black glyphs, not used yet). (3) `PhoneCallScreen` section is clipped with `rounded-[13.7%/6.3%]` (iPhone 17 Pro screen radius, about 55 pt on 402 x 874 pt).
+- **Files:** `game/clock/gameClock.ts` and test, `features/roomv2/game/engine.ts`, `features/chapter1/call/PhoneStatusBar.tsx`, `PhoneCallScreen.tsx` and its test, this file.
+- **Validation:** `tsc -p tsconfig.app.json --noEmit` and `vitest run` (1521 tests) passed.
+- **Not verified:** the look on the 3D phone and in 2D (no screenshot). The icons are my own SVG drawings, because the owner's reference images could not be read from the chat as files. Outside the room (no engine running) the clock shows 23:08. The battery level is fixed.
 ### 2026-11-15 — Call screen redesign (status bar, round buttons) and room sound silenced during the ringtone
 - **Objective:** Owner requests: silence the background while the ringtone plays; redesign the call screen with a phone status bar, round Accept and Decline buttons, and a redesigned active-call screen.
 - **Completed:** (1) `roomv2/game/audio.ts`: `ring(on)` sets a `ringDuck` factor (0 while ringing, 1 after) that is multiplied into `applyDuck`, so rain, city and clock go silent during the ring and fade back when it stops. (2) `PhoneCallScreen.tsx`: dark gradient background, decorative status bar (static 9:41, signal, Wi-Fi, battery) beside the Dynamic Island, Decline and Accept as 64 px round discs with the label under them (label inside the button, so the accessible name is unchanged), the active screen ends with a round red End call button. Test ids are unchanged. (3) Tests: status bar test added; the `h-11` assertion for End call was removed because that button is now a round disc.
