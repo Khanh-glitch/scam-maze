@@ -401,7 +401,6 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
                     saveSource={saveSource}
                     engineReady={roomCommands}
                     onReturnToMenu={onBackToMenu}
-                    modelAllowed={false}
                   />
                 ) : undefined
               }

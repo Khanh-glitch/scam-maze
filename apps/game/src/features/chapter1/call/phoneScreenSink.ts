@@ -23,6 +23,12 @@ export interface PhoneScreenSink {
   current(): ScreenPlacement | null;
   /** Adds a listener; returns a function that removes it. */
   subscribe(listener: (rect: ScreenPlacement | null) => void): () => void;
+  /**
+   * The 3D phone is loaded, compiled and waiting (the room mounts it on entry): a rectangle will
+   * follow within a frame or two of a call opening, so the screen host may wait for it.
+   */
+  setWarm(warm: boolean): void;
+  isWarm(): boolean;
 }
 
 /** Changes smaller than this on every edge (CSS px) are ignored. */
@@ -43,6 +49,7 @@ function isNegligibleChange(previous: ScreenPlacement, next: ScreenPlacement): b
 
 export function createPhoneScreenSink(): PhoneScreenSink {
   let last: ScreenPlacement | null = null;
+  let warm = false;
   const listeners = new Set<(rect: ScreenPlacement | null) => void>();
 
   return {
@@ -59,6 +66,12 @@ export function createPhoneScreenSink(): PhoneScreenSink {
       return () => {
         listeners.delete(listener);
       };
+    },
+    setWarm(next) {
+      warm = next;
+    },
+    isWarm() {
+      return warm;
     },
   };
 }

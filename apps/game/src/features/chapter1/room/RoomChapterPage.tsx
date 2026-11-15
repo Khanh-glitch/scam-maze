@@ -124,7 +124,6 @@ export const RoomChapterPage: React.FC<RoomChapterPageProps> = ({
               saveSource={saveSource}
               engineReady={engineReady}
               onReturnToMenu={onReturnToMenu}
-              modelAllowed={false}
             />
           }
         />

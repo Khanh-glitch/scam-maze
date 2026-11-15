@@ -38,9 +38,9 @@ vi.mock("../call/PhoneModel3D", async () => {
   }
   return {
     PhoneModelBoundary: Boundary,
-    PhoneModel3D: () => {
+    PhoneModel3D: ({ live }: { live: boolean }) => {
       if (throwFromModel) throw new Error("model failed");
-      return <div data-testid="fake-phone-model" />;
+      return <div data-testid="fake-phone-model" data-live={live ? "true" : "false"} />;
     },
   };
 });
@@ -69,21 +69,30 @@ describe("RoomPhoneModelLayer", () => {
     vi.restoreAllMocks();
   });
 
-  it("mounts a demand-driven, non-interactive canvas while a call is shown and unmounts after", () => {
-    const { rerenderWith } = renderLayer();
-    expect(screen.getByTestId("fake-phone-model")).toBeTruthy();
+  it("shows a demand-driven, non-interactive canvas while a call is shown", () => {
+    renderLayer();
+    expect(screen.getByTestId("fake-phone-model").getAttribute("data-live")).toBe("true");
     const wrapper = screen.getByTestId("room-phone-model-layer");
     expect(wrapper.getAttribute("aria-hidden")).toBe("true");
     expect(wrapper.className).toContain("pointer-events-none");
+    expect(wrapper.style.visibility).toBe("visible");
     expect(canvasProps[0].frameloop).toBe("demand");
-
-    rerenderWith({ active: false });
-    expect(screen.queryByTestId("room-phone-model-layer")).toBeNull();
   });
-
-  it("mounts nothing before a call", () => {
-    renderLayer({ active: false });
-    expect(screen.queryByTestId("fake-canvas")).toBeNull();
+  it("is mounted before any call, hidden, so the model is loaded and compiled before the first ring", () => {
+    const { rerenderWith } = renderLayer({ active: false });
+    const wrapper = screen.getByTestId("room-phone-model-layer");
+    expect(screen.getByTestId("fake-phone-model").getAttribute("data-live")).toBe("false");
+    expect(wrapper.style.visibility).toBe("hidden");
+    // The call opens: the same canvas is shown, nothing is mounted again.
+    const canvasMounts = canvasProps.length;
+    rerenderWith({ active: true });
+    expect(screen.getByTestId("room-phone-model-layer")).toBe(wrapper);
+    expect(wrapper.style.visibility).toBe("visible");
+    expect(screen.getByTestId("fake-phone-model").getAttribute("data-live")).toBe("true");
+    expect(canvasProps.length).toBeGreaterThanOrEqual(canvasMounts);
+    // The call ends: hidden again, still mounted.
+    rerenderWith({ active: false });
+    expect(screen.getByTestId("room-phone-model-layer").style.visibility).toBe("hidden");
   });
 
   it("mounts nothing when the model is not allowed (2D screen is used)", () => {

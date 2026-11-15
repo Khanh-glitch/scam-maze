@@ -102,6 +102,19 @@ function expectCommonRules(root: HTMLElement, locale: GameLocale): void {
 }
 
 describe("PhoneCallScreen", () => {
+  it("draws a Dynamic Island at the top of the screen, decorative and out of the way", () => {
+    for (const status of ["ringing", "active"] as const) {
+      const { unmount } = renderScreen({ view: view("en", status) });
+      const island = screen.getByTestId("dynamic-island");
+      expect(island.getAttribute("aria-hidden")).toBe("true");
+      expect(island.className).toContain("pointer-events-none");
+      expect(island.className).toContain("rounded-full");
+      expect(island.className).toContain("bg-black");
+      expect(island.textContent).toBe("");
+      expect(island.getAttribute("tabindex")).toBeNull();
+      unmount();
+    }
+  });
   for (const locale of LOCALES) {
     const text = PHONE_TEXT[locale];
 
