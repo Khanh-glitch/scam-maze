@@ -62,7 +62,7 @@ export const DECISIONS_VI: NarrativeOverlay = {
   "debrief/decisionNotes/checked-account-activity":
     "Bạn đã xem hoạt động tài khoản. Không có khoản thanh toán nào bị đánh dấu, và điều đó chưa giải quyết được câu hỏi. Chỉ ngân hàng mới xác nhận được có hồ sơ hay không.",
   "debrief/decisionNotes/checked-saved-contacts":
-    "Bạn đã mở các liên hệ đã lưu trong ứng dụng ngân hàng. Số chính thức ở đó (+000 0100 0800) được lưu từ trước hôm nay, nên đây là kênh bạn có thể tin để kiểm tra một lời khẳng định.",
+    "Bạn đã mở các liên hệ đã lưu trong ứng dụng ngân hàng. Số chính thức ở đó (+000 0100 0800) được lưu từ trước hôm nay, nên bạn có thể đối chiếu nó với những gì người gọi nói.",
   "debrief/decisionNotes/compared-case-ref":
     "Bạn đã so mã hồ sơ trong bản ghi của Alex với thông báo. Cả hai dùng NG-4471-X. Hai nguồn dùng chung một mã định danh có thể có cùng một tác giả.",
   "debrief/decisionNotes/compared-contacts":

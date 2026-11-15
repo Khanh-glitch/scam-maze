@@ -44,7 +44,7 @@ export const CHAPTER_1_DEBRIEF: DebriefContent = {
       "You opened the bank app you installed yourself. That is a better place to look than a link or contact in a message, but the app on its own cannot confirm what a caller said.",
     "checked-account-activity":
       "You checked the account activity. It showed no flagged payment, which did not settle the question. Only the bank can confirm whether a case exists.",
-    "checked-saved-contacts": `You opened the saved contacts in the bank app. The official number there (${OFFICIAL_NUMBER}) was saved before today, so it is a channel you can trust to verify a claim.`,
+    "checked-saved-contacts": `You opened the saved contacts in the bank app. The official number there (${OFFICIAL_NUMBER}) was saved before today, so you can compare it with what the caller says.`,
     "compared-case-ref": `You compared the case reference in Alex's record with the notification. Both used ${CASE_REFERENCE}. Two sources that share one identifier may have one author.`,
     "compared-contacts":
       "You compared the contact in the notification with your saved records. The numbers did not match, which is a sign the notification did not come from your bank.",
@@ -63,7 +63,7 @@ export const CHAPTER_1_DEBRIEF: DebriefContent = {
 
     // Reducer tags.
     "hung-up":
-      "You ended a call. You can always do that. Ending a call and then checking through a number you trust is the key step.",
+      "You ended a call. You can always do that. Ending a call and then checking through a number you already had saved is the key step.",
 
     // Final decisions.
     "decided-follow-recovery":
