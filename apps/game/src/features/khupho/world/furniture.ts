@@ -371,10 +371,16 @@ export function motorbike(b: Builder, x: number, y: number, z: number, yaw: numb
 }
 
 /**
- * Penguin trash bin (thùng rác chim cánh cụt), front = +z: black body, white belly with the
- * dark opening for the rubbish, orange beak and feet.
+ * Penguin trash bin (thùng rác chim cánh cụt), front = +z. Fallback when the model did not
+ * load: black body, white belly with the dark opening for the rubbish, orange beak and feet.
  */
 export function penguinBin(b: Builder, x: number, y: number, z: number, yaw: number) {
+  // The owner's penguin bin model when it loaded; the procedural one below otherwise.
+  if (hasProp('trash-bin')) {
+    const sz = propSize('trash-bin')!;
+    cl(b, x, y, z, yaw, () => { b.prop('trash-bin', 0, 0, 0); b.col(-sz.x / 2, 0, -sz.z / 2, sz.x, sz.y, sz.z); });
+    return;
+  }
   cl(b, x, y, z, yaw, () => {
     const black = 'g:#1c1f24', white = 'g:#f1f0ea', orange = 'g:#e8891e';
     const shaped = (g: THREE.BufferGeometry, sx: number, sy: number, sz: number) => { g.scale(sx, sy, sz); return g; };

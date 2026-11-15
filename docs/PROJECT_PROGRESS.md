@@ -302,6 +302,14 @@ This entry replaces the partial per-task entries (3.7, 10.3, 12.4) that were wri
    - The Speaker toggle is a per-call override, as in the phone UI redesign.
 10. **Follow-ups:** human playtest and pacing tuning; native-speaker review of the Vietnamese text; consider more distinct voices; engine-level tests for the story port; open the pull request (the documentation is committed and the branch is pushed without force).
 
+### 2026-11-15 — Street bins use the owner's penguin bin model
+
+- **Objective:** the owner pointed out that a penguin bin model already exists (`Prop_TrashBin` in `street-props.optimized.glb`, beside the banh mi cart); the street bins should use it instead of the procedural penguin.
+- **Completed:** `streetFurniture.ts` gets a `trash-bin` kind that takes a node from a shared file (`source`), scaled to 1.05 m and turned from +X to +Z; `furniture.ts` `penguinBin` draws it (instanced) with a collider and keeps the procedural penguin as the fallback. Also merged `origin/main` into the branch (`docs/PROJECT_PROGRESS.md` conflict: both sets of entries kept, newest first).
+- **Files modified:** `apps/game/src/features/khupho/world/{streetFurniture,furniture}.ts`, `docs/PROJECT_PROGRESS.md`.
+- **Validation:** after the merge, `pnpm typecheck`, `pnpm build` and `npx vitest --run` (168 files, 1509 tests) passed. After the bin change: `pnpm typecheck`, `pnpm build`, khupho/prologue/app/config tests. A headless screenshot of the grocery front shows the model facing the street; 7 bins placed.
+- **Not verified:** real-GPU look and FPS.
+
 ### 2026-11-15 — Parked bikes clear of doors, penguin bins, model residents
 
 - **Objective:** owner feedback on `/khupho`: parked bikes block front doors, sit on the seated customers and stick into the grocery goods; bike kinds come in clusters; the green bins should be penguins; the people at home should use the street NPC models with their own outfit colors.

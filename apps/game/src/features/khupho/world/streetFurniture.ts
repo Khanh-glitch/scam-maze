@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { STREET_PROPS_MODELS_BASE } from '../../../config/assetPaths';
+import { STREET_PROPS_GLB, STREET_PROPS_MODELS_BASE } from '../../../config/assetPaths';
 
 /**
  * Street furniture and parked vehicles drawn from models (scripts/optimize-street-props.cjs):
@@ -14,7 +14,7 @@ import { STREET_PROPS_MODELS_BASE } from '../../../config/assetPaths';
  * draw per material and 24 m chunk, however many copies there are. If the models did not load,
  * the helpers build their procedural versions as before.
  */
-export type PropKind = 'stool-low' | 'stool-high' | 'table-set' | 'bike-cg125' | 'bike-supercub' | 'bike-fatboy' | 'bike-bobber' | 'bike-pcx';
+export type PropKind = 'stool-low' | 'stool-high' | 'table-set' | 'bike-cg125' | 'bike-supercub' | 'bike-fatboy' | 'bike-bobber' | 'bike-pcx' | 'trash-bin';
 
 interface PropSpec {
   /** Real size in meters: the model is scaled so this dimension matches. */
@@ -23,6 +23,8 @@ interface PropSpec {
   /** Turn (radians, about Y) that makes the model face +Z like the procedural props. */
   yaw?: number;
   shadow: boolean;
+  /** Node to use from a shared file instead of `<kind>.optimized.glb` (the street environment's props). */
+  source?: { file: string; node: string };
 }
 
 /** Height of the low stool seat (m); seated characters use it (people.ts). */
@@ -38,6 +40,9 @@ const SPECS: Record<PropKind, PropSpec> = {
   'bike-fatboy': { length: 2.37, shadow: true },
   'bike-bobber': { length: 2.2, shadow: true },
   'bike-pcx': { length: 1.94, yaw: -Math.PI / 2, shadow: true },
+  // The owner's penguin bin, from the street environment (the same model stands beside the banh mi cart).
+  // Authored facing +X; turned to face +Z.
+  'trash-bin': { height: 1.05, yaw: -Math.PI / 2, shadow: true, source: { file: STREET_PROPS_GLB, node: 'Prop_TrashBin' } },
 };
 
 export const PARKED_BIKES: readonly PropKind[] = ['bike-cg125', 'bike-supercub', 'bike-fatboy', 'bike-bobber', 'bike-pcx'];
@@ -113,8 +118,12 @@ export async function loadStreetFurniture(): Promise<void> {
   await Promise.all((Object.keys(SPECS) as PropKind[]).map(async (kind) => {
     if (prepared.has(kind)) return;
     try {
-      const gltf = await loader.loadAsync(`${STREET_PROPS_MODELS_BASE}/${kind}.optimized.glb`);
-      prepared.set(kind, prepare(kind, gltf.scene));
+      const src = SPECS[kind].source;
+      const gltf = await loader.loadAsync(src ? src.file : `${STREET_PROPS_MODELS_BASE}/${kind}.optimized.glb`);
+      const node = src ? gltf.scene.getObjectByName(src.node) : gltf.scene;
+      if (!node) throw new Error(`node "${src!.node}" not found`);
+      if (src) { node.removeFromParent(); node.position.set(0, 0, 0); }
+      prepared.set(kind, prepare(kind, node));
     } catch (err) {
       console.warn(`[khupho] prop "${kind}" failed to load`, err);
     }
