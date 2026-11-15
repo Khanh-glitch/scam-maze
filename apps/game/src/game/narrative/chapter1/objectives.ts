@@ -17,7 +17,7 @@ export const CHAPTER_1_OBJECTIVES: Record<ObjectiveId, Objective> = {
     text: "Look at the new message on your laptop.",
     activateWhen: [{ kind: "flag", flag: "notification_delivered" }],
     completeWhen: [{ kind: "flag", flag: "notification_handled" }],
-    hint: "Something on the laptop screen changed after the call.",
+    hint: "Something on the laptop screen changed after the call. You can also look around your room.",
   },
   "obj.investigate": {
     id: "obj.investigate",
@@ -39,7 +39,7 @@ export const CHAPTER_1_OBJECTIVES: Record<ObjectiveId, Objective> = {
         count: 3,
       },
     ],
-    hint: "Check the laptop, the desk papers and the things you already keep in your room.",
+    hint: "Check the laptop, the desk papers and the things you already keep in your room. Another call may follow.",
   },
   "obj.answer-recovery": {
     id: "obj.answer-recovery",

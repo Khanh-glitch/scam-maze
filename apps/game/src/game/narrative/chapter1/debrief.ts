@@ -81,7 +81,7 @@ export const CHAPTER_1_DEBRIEF: DebriefContent = {
   analysis: {
     pressureBuilt:
       "Alex used urgency, authority and a case ID to make the call feel official. Each reply added pressure and made it harder to stop and check. The goal was a code, given before you could verify anything.",
-    whyWarningLooked: `The laptop notification arrived right after you refused the first caller, and it agreed with you. That made it feel like proof that you chose well. It also gave you contact details of its own, and the third caller used the same case reference, ${CASE_REFERENCE}. Things that agree with each other are not independent if they come from one source.`,
+    whyWarningLooked: `The laptop notification arrived right after you refused the first caller, and it agreed with you. That made it feel like proof that you chose well. It also gave you contact details of its own, and it quoted the same case reference, ${CASE_REFERENCE}. Things that agree with each other are not independent if they come from one source.`,
     thirdCallerNote:
       "The third caller repeated the same case reference and the same contact as the notification. That is not independent evidence. Only the call you made to the saved bank contact came from a channel that existed before the scare.",
     trapNotes: {
