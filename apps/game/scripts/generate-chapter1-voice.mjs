@@ -34,6 +34,8 @@ const MAX_CLIP_MS = 25_000;
 const MAX_LOCALE_BYTES = 6 * 1024 * 1024;
 const DURATION_TOLERANCE_MS = 120;
 const CLIP_MIME = "audio/mpeg";
+/** `voiceNote` of clips the owner supplied; such clips are never regenerated while their text is current. */
+const OWNER_SUPPLIED_NOTE = "Supplied by the project owner";
 const LOCALES = ["en", "vi"];
 
 // ---------------------------------------------------------------------------------------------
@@ -258,7 +260,10 @@ async function main() {
     const stillGood = (entry, job) => {
       if (entry === undefined || entry.status !== "present" || entry.origin !== "tts-generated") return false;
       if (entry.sourceTextHash !== job.textHash) return false; // text changed
-      if (entry.voiceNote !== castNote(job)) return false; // cast, rate, pitch or tone changed
+      // Clips the owner supplied (made outside this repository) are kept while their text is current:
+      // a run must never replace them with a local speech voice.
+      const supplied = entry.voiceNote === OWNER_SUPPLIED_NOTE;
+      if (!supplied && entry.voiceNote !== castNote(job)) return false; // cast, rate, pitch or tone changed
       const file = path.join(APP_ROOT, job.outMp3);
       if (!existsSync(file)) return false;
       const buf = readFileSync(file);
