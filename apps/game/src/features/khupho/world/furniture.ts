@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Builder } from './builder';
+import { hasProp, propSize, STOOL_LOW_HEIGHT, type PropKind } from './streetFurniture';
 
 const PI = Math.PI;
 export const cl = (b: Builder, x: number, y: number, z: number, yaw: number, fn: () => void) => { b.push(x, y, z, yaw); fn(); b.pop(); };
@@ -148,11 +149,39 @@ export function diningTable(b: Builder, x: number, y: number, z: number, yaw: nu
     if (chairs >= 4) { ch(w / 2 + 0.28, 0, -PI / 2); ch(-w / 2 - 0.28, 0, PI / 2); }
   });
 }
-export function stool(b: Builder, x: number, y: number, z: number, color = '#d9382a') {
+/** Small stable hash of a position, for picking variants without using the world's random stream. */
+const spot = (x: number, z: number) => Math.abs(Math.floor(Math.sin(x * 12.9898 + z * 78.233) * 43758.5453));
+
+/**
+ * Low plastic stool. `seat` sets the seat height (m) when a procedural person sits on it (their
+ * pose expects ~0.42 m); the stool model is scaled up to it.
+ */
+export function stool(b: Builder, x: number, y: number, z: number, color = '#d9382a', seat?: number) {
+  if (hasProp('stool-low')) {
+    const k = seat ? seat / STOOL_LOW_HEIGHT : 1, sz = propSize('stool-low')!;
+    b.prop('stool-low', x, y, z, (spot(x, z) % 4) * (PI / 2) + (spot(z, x) % 20 - 10) * 0.02, k);
+    // At least 0.45 m tall: Physics.collide ignores anything a foot can step over.
+    b.col(x - (sz.x * k) / 2, y, z - (sz.z * k) / 2, sz.x * k, Math.max(0.45, sz.y * k), sz.z * k);
+    return;
+  }
   b.cyl(x, y + 0.2, z, 0.17, 0.035, 'g:' + color, 14);
   for (let i = 0; i < 4; i++) { const a = i * PI / 2 + PI / 4; b.cyl(x + Math.cos(a) * 0.13, y, z + Math.sin(a) * 0.13, 0.018, 0.2, 'g:' + color, 6, 0.015); }
   b.box(x - 0.1, y + 0.1, z - 0.003, 0.2, 0.012, 0.012, 'g:' + color); b.box(x - 0.003, y + 0.1, z - 0.1, 0.012, 0.012, 0.2, 'g:' + color);
   b.col(x - 0.17, y, z - 0.17, 0.34, 0.42, 0.34);
+}
+/**
+ * A street table with four stools (one model). Falls back to a procedural low table with three
+ * stools. Only the table blocks; the stools are low enough to walk around.
+ */
+export function tableSet(b: Builder, x: number, y: number, z: number, yaw = 0, color = '#3b78d6') {
+  if (hasProp('table-set')) {
+    const sz = propSize('table-set')!;
+    b.prop('table-set', x, y, z, yaw);
+    cl(b, x, y, z, yaw, () => { b.col(-sz.x * 0.22, 0, -sz.z * 0.2, sz.x * 0.44, 0.5, sz.z * 0.4); });
+    return;
+  }
+  lowTable(b, x, y, z, color);
+  cl(b, x, y, z, yaw, () => { stool(b, -0.5, 0, 0, '#d9382a'); stool(b, 0.5, 0, 0, '#2a9fd6'); stool(b, 0, 0, 0.5, '#e8c02a'); });
 }
 export function lowTable(b: Builder, x: number, y: number, z: number, color = '#3a7bd5', r = 0.32) {
   b.cyl(x, y + 0.42, z, r, 0.03, 'g:' + color, 18);
@@ -275,7 +304,17 @@ export function mirrorWall(b: Builder, x: number, y: number, z: number, yaw: num
 }
 
 /** motorbike (xe máy): eased tank/seat/cowls, spoked-looking wheels with tyre + rim + hub, chrome exhaust & mirrors */
+/** Parked bike variants, weighted toward the scooters and step-throughs common on Vietnamese streets. */
+const BIKE_MIX: PropKind[] = ['bike-pcx', 'bike-supercub', 'bike-pcx', 'bike-cg125', 'bike-supercub', 'bike-pcx', 'bike-cg125', 'bike-supercub', 'bike-bobber', 'bike-fatboy'];
 export function motorbike(b: Builder, x: number, y: number, z: number, yaw: number, color = '#c92f2a', stand = true) {
+  // Parked bikes use one of the bike models; riding bikes (stand = false) stay procedural.
+  const models = stand ? BIKE_MIX.filter(hasProp) : [];
+  if (models.length) {
+    const kind: PropKind = models[spot(x, z) % models.length];
+    const sz = propSize(kind)!;
+    cl(b, x, y, z, yaw, () => { b.prop(kind, 0, 0, 0); b.col(-sz.x / 2, 0, -sz.z / 2, sz.x, Math.min(1.1, sz.y), sz.z); });
+    return;
+  }
   cl(b, x, y, z, yaw, () => { // front = +z
     const tyre = 'r:#151515', rim = 'm:#a9adb1', chrome = 'm:#c4c8cc', plastic = 'g:' + color;
     const wheel = (zz: number) => {

@@ -1,0 +1,250 @@
+{
+  "name": "juno3",
+  "source": {
+    "prompt": "a woman in a red hooded windbreaker, grey cargo trousers and black hiking boots, with a short black bob haircut",
+    "image": "reference.png"
+  },
+  "springs": null,
+  "face": {
+    "jaw_bone": "jaw",
+    "jaw_open_deg": 18,
+    "morphs": [
+      "blink_L",
+      "blink_R",
+      "brows_up",
+      "pucker",
+      "smile"
+    ],
+    "note": "morph targets on the LOD0 mesh; clips never key them. Blink both eyes for ~0.15 s every 2-6 s; for speech rotate the jaw about its local X toward jaw_open_deg (a/o) with pucker for o/u, driven by the audio's loudness."
+  },
+  "style": {
+    "name": "realistic",
+    "shading": "PBR (metallic-roughness), as authored"
+  },
+  "units": "metres, Y-up in glTF / Z-up in Blender, facing +Z (glTF)",
+  "origin": "on the floor, under the root (pelvis) joint - the pivot a turn in place rotates about",
+  "capsule": {
+    "radius_m": 0.252,
+    "height_m": 1.69,
+    "center_m": [
+      0.0,
+      0.845,
+      0.0
+    ],
+    "note": "glTF axes (Y up); measured on the first idle frame"
+  },
+  "height_m": 1.7,
+  "triangles": 67157,
+  "skeleton": {
+    "convention": "Mixamo",
+    "prefix": "mixamorig:",
+    "bones": 64,
+    "root": "mixamorig:Hips",
+    "rest_pose": "T-pose"
+  },
+  "clips": [
+    {
+      "name": "crouch_idle",
+      "frames": 249,
+      "seconds": 4.133,
+      "loop": true,
+      "ground_speed_mps": 0.0
+    },
+    {
+      "name": "crouch_walk",
+      "frames": 68,
+      "seconds": 1.117,
+      "loop": true,
+      "ground_speed_mps": 1.444,
+      "travel_deg": 0.0,
+      "left_contact_phase": 0.1791
+    },
+    {
+      "name": "fall",
+      "frames": 181,
+      "seconds": 3.0,
+      "loop": true,
+      "ground_speed_mps": 0.0,
+      "grounded": false
+    },
+    {
+      "name": "idle",
+      "frames": 98,
+      "seconds": 1.617,
+      "loop": true,
+      "ground_speed_mps": 0.0
+    },
+    {
+      "name": "jog",
+      "frames": 48,
+      "seconds": 0.783,
+      "loop": true,
+      "ground_speed_mps": 2.324,
+      "travel_deg": 0.0,
+      "left_contact_phase": 0.234
+    },
+    {
+      "name": "jog_back",
+      "frames": 48,
+      "seconds": 0.783,
+      "loop": true,
+      "ground_speed_mps": 2.075,
+      "travel_deg": 180.0,
+      "left_contact_phase": 0.2553
+    },
+    {
+      "name": "jump",
+      "frames": 141,
+      "seconds": 2.333,
+      "loop": false,
+      "ground_speed_mps": 0.0,
+      "takeoff_s": 0.85,
+      "landing_s": 1.45,
+      "apex_foot_height_m": 0.576,
+      "entry_s": 0.6,
+      "note": "in place horizontally, but the clip keeps its vertical motion: the hips rise along the arc. Launch the capsule at takeoff_s with the arc's own speed and cancel the clip's lift while airborne (the playground does), or let the clip carry the height and keep the capsule grounded - not both"
+    },
+    {
+      "name": "land",
+      "frames": 127,
+      "seconds": 2.1,
+      "loop": false,
+      "ground_speed_mps": 0.0,
+      "touchdown_s": 0.35
+    },
+    {
+      "name": "run",
+      "frames": 43,
+      "seconds": 0.7,
+      "loop": true,
+      "ground_speed_mps": 4.044,
+      "travel_deg": 0.0,
+      "left_contact_phase": 0.2381
+    },
+    {
+      "name": "sprint",
+      "frames": 65,
+      "seconds": 1.067,
+      "loop": true,
+      "ground_speed_mps": 5.683,
+      "travel_deg": 0.0,
+      "left_contact_phase": 0.6406
+    },
+    {
+      "name": "strafe_left",
+      "frames": 69,
+      "seconds": 1.133,
+      "loop": true,
+      "ground_speed_mps": 1.028,
+      "travel_deg": 90.0,
+      "left_contact_phase": 0.2059
+    },
+    {
+      "name": "strafe_right",
+      "frames": 69,
+      "seconds": 1.133,
+      "loop": true,
+      "ground_speed_mps": 1.035,
+      "travel_deg": -90.0,
+      "left_contact_phase": 0.1618
+    },
+    {
+      "name": "turn_180",
+      "frames": 98,
+      "seconds": 1.617,
+      "loop": false,
+      "ground_speed_mps": 0.005,
+      "turn_deg": 176.1
+    },
+    {
+      "name": "turn_left",
+      "frames": 57,
+      "seconds": 0.933,
+      "loop": false,
+      "ground_speed_mps": 0.007,
+      "turn_deg": 90.0
+    },
+    {
+      "name": "turn_right",
+      "frames": 57,
+      "seconds": 0.933,
+      "loop": false,
+      "ground_speed_mps": 0.007,
+      "turn_deg": -90.0
+    },
+    {
+      "name": "walk",
+      "frames": 66,
+      "seconds": 1.083,
+      "loop": true,
+      "ground_speed_mps": 1.359,
+      "travel_deg": 0.0,
+      "left_contact_phase": 0.2
+    },
+    {
+      "name": "walk_back",
+      "frames": 63,
+      "seconds": 1.033,
+      "loop": true,
+      "ground_speed_mps": 1.107,
+      "travel_deg": 180.0,
+      "left_contact_phase": 0.1774
+    },
+    {
+      "name": "wave",
+      "frames": 68,
+      "seconds": 1.117,
+      "loop": false,
+      "ground_speed_mps": 0.0
+    }
+  ],
+  "files": {
+    "gltf": "juno3.glb",
+    "fbx": "juno3.fbx",
+    "textures": [
+      "textures/juno3_albedo.png",
+      "textures/juno3_normal.png",
+      "textures/juno3_orm.png",
+      "textures/juno3_metallic_smoothness.png",
+      "textures/juno3_occlusion.png",
+      "textures/juno3_normal_directx.png"
+    ]
+  },
+  "lods": {
+    "fbx": [
+      {
+        "lod": 0,
+        "ratio": 1.0,
+        "triangles": 67157
+      },
+      {
+        "lod": 1,
+        "ratio": 0.4,
+        "triangles": 26862
+      },
+      {
+        "lod": 2,
+        "ratio": 0.15,
+        "triangles": 10072
+      }
+    ],
+    "note": "the FBX meshes are named _LOD0/_LOD1/_LOD2, which Unity turns into an LOD Group on import; the glTF carries LOD0 only - Godot and Unreal generate their own LODs on import"
+  },
+  "materials": {
+    "workflow": "metallic-roughness",
+    "maps": {
+      "albedo": "sRGB",
+      "normal": "tangent space, OpenGL (+Y)",
+      "normal_directx": "tangent space, DirectX (-Y)",
+      "orm": "R occlusion, G roughness, B metallic (linear)",
+      "metallic_smoothness": "R metallic, A smoothness = 1 - roughness (linear)",
+      "occlusion": "greyscale ambient occlusion (linear)"
+    },
+    "per_engine": {
+      "glTF / Godot / three.js": "everything is already wired inside the .glb",
+      "Unreal": "import the .glb (or .fbx); Base Color = albedo, Normal = normal_directx, ORM = orm (occlusion R, roughness G, metallic B) - Unreal's native packing",
+      "Unity URP / Standard": "import the .fbx; Base Map = albedo, Normal Map = normal, Metallic Map = metallic_smoothness (smoothness source: metallic alpha), Occlusion = occlusion; set the rig to Humanoid - the Mixamo names auto-map"
+    }
+  },
+  "animation_licence": "Clips are retargeted Mixamo captures; see README before commercial use."
+}
