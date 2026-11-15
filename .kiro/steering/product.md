@@ -14,7 +14,7 @@ working summary.
 
 A browser-based, first-person 3D narrative game in a small, persistent, fictional world. Scams
 reach the player the way they do in life: through an in-game smartphone (calls, messages, a bank
-app) and through people in the street. Chapters are self-contained stories in the same world.
+app) and through people and devices in the world (for example a laptop in the player's room). Chapters are self-contained stories in the same world.
 
 North star: a safe, living world where people learn to spot scams before facing them in real life.
 
@@ -27,9 +27,12 @@ North star: a safe, living world where people learn to spot scams before facing 
 ## Core loop
 
 physical world, then digital interaction, then investigation, then decision, then consequence,
-then learning (debrief). Chapter 1 ("The Urgent Call") is the implemented reference: a scam call,
-evidence in the street and on the phone, independent verification, one of four outcomes
-(`verified`, `investigator`, `uncertain`, `risky`) and a debrief built from the event log.
+then learning (debrief). Chapter 1 ("The Urgent Call", narrative subtitle "The False Victory") is the implemented
+reference: a first scam call the player can reject, then a second scam that looks like the fix,
+evidence in the player's room (laptop, phone records, papers), combining clues into
+deductions, independent verification, one of four endings (`false-victory`, `perfect-chain`,
+`break-the-chain`, `unfinished-case`) and a forensic debrief built from the event log. It is
+covered by automated tests; no human has playtested it yet.
 
 ## Principles
 
@@ -41,7 +44,7 @@ evidence in the street and on the phone, independent verification, one of four o
   propose wording, and the game must work offline without it.
 - Fictional everything: brands, people, phone numbers (`+000...`), reserved domains (`.test`,
   `.example`, `.invalid`). Never "safe" as a verdict (see `safety.md`).
-- Small scope done well: one street and a few showcase maps (`/ueh`, `/hue`, `/mientay`) over an
+- Small scope done well: one neighborhood, one apartment and a few showcase maps (`/ueh`, `/hue`, `/mientay`) over an
   open world. Stylized realism; no horror direction.
 
 ## Value proposition
