@@ -175,7 +175,8 @@ describe("App chapter routing", () => {
     expect(harness.roomProps?.story).toBeInstanceOf(RoomStoryBridge);
     expect(harness.layerProps?.bridge).toBe(harness.roomProps?.story);
     expect(harness.layerProps?.session).toMatchObject({ chapterId: "chapter-1", sceneId: "apartment" });
-    expect(harness.layerProps?.modelAllowed).toBe(false);
+    // The page no longer forces the 2D call screen: the layer decides from the WebGL probe (3D phone, 2D fallback).
+    expect(harness.layerProps?.modelAllowed).toBeUndefined();
     expect(harness.roomProps?.options).toBeUndefined();
   });
 

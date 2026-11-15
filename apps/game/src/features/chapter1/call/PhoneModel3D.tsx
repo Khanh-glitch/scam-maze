@@ -62,6 +62,12 @@ const PHONE_TILT_X = -0.07;
 const DEFAULT_FOV_DEG = 70;
 
 export interface PhoneModel3DProps {
+  /**
+   * True while a call is shown. False keeps the model loaded, compiled and uploaded (the room
+   * mounts it on entry so the first ring shows the phone at once), but publishes no screen
+   * rectangle; the canvas is hidden by the layer meanwhile.
+   */
+  live: boolean;
   /** Call status from the page, as a prop. */
   ringing: boolean;
   reducedMotion: boolean;
@@ -78,10 +84,11 @@ const SCREEN_CORNERS: ReadonlyArray<readonly [number, number]> = [
   [-SCREEN_WIDTH_M / 2, -SCREEN_HEIGHT_M / 2],
 ];
 
-export const PhoneModel3D: FC<PhoneModel3DProps> = ({ ringing, reducedMotion, openedAt, screenSink }) => {
+export const PhoneModel3D: FC<PhoneModel3DProps> = ({ live, ringing, reducedMotion, openedAt, screenSink }) => {
   const { scene } = useCallPhoneGLTF();
   const size = useThree((state) => state.size);
   const gl = useThree((state) => state.gl);
+  const invalidate = useThree((state) => state.invalidate);
 
   const model = useMemo(() => {
     const clone = scene.clone(true);
@@ -137,14 +144,28 @@ export const PhoneModel3D: FC<PhoneModel3DProps> = ({ ringing, reducedMotion, op
   const animateEntryRef = useRef(true);
 
   // Latest props for the frame callback without re-subscribing it.
-  const propsRef = useRef({ ringing, reducedMotion, openedAt, screenSink });
-  propsRef.current = { ringing, reducedMotion, openedAt, screenSink };
-
+  const propsRef = useRef({ live, ringing, reducedMotion, openedAt, screenSink });
+  propsRef.current = { live, ringing, reducedMotion, openedAt, screenSink };
   useEffect(() => {
     return () => {
       screenSink.publish(null);
     };
   }, [screenSink]);
+  // The model is parsed and the reflection map exists: the call screen may wait for the first frame.
+  useEffect(() => {
+    screenSink.setWarm(true);
+    return () => screenSink.setWarm(false);
+  }, [screenSink]);
+  // A call opens: the entry slide starts from this moment, and the first frame is drawn at once.
+  // A call ends: the stale rectangle is dropped so the next call does not start from it.
+  useEffect(() => {
+    if (live) {
+      firstFrameAtRef.current = null;
+      invalidate();
+    } else {
+      screenSink.publish(null);
+    }
+  }, [live, invalidate, screenSink]);
 
   // Default priority (0): R3F keeps rendering. Mounted after the player, so this runs after the
   // player runtime has moved the camera in the same frame.
@@ -154,7 +175,7 @@ export const PhoneModel3D: FC<PhoneModel3DProps> = ({ ringing, reducedMotion, op
     const dimming = dimmingRef.current;
     if (!rig || !anchor || !dimming) return;
     const props = propsRef.current;
-
+    if (!props.live) return; // loaded and compiled, waiting for the first ring
     const now = performance.now();
     if (firstFrameAtRef.current === null) {
       firstFrameAtRef.current = now;

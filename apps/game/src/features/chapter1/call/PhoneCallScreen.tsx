@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { usePrefersReducedMotion } from "../../../components/ui/usePrefersReducedMotion";
 import { UI } from "../theme";
+import { PhoneStatusBar } from "./PhoneStatusBar";
 import { formatCallDuration } from "./callTimer";
 import type { PhoneCallView } from "./callDialogueView";
 
@@ -71,6 +72,14 @@ const AVATAR_CLASS =
   "flex shrink-0 items-center justify-center rounded-full border border-[#7654d6]/50 bg-[#171521] text-[#b9a5f5]";
 const ROUND_BASE_CLASS =
   "flex shrink-0 items-center justify-center rounded-full border text-[#f7f5ff] motion-safe:transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b9a5f5] disabled:cursor-not-allowed disabled:border-[#38344f] disabled:bg-[#38344f] disabled:text-[#a9a4c4] cursor-pointer";
+/** Big round accept, decline and end-call buttons: a colored disc with the label below it, inside one button. */
+// No focus ring: Accept takes focus when the call rings, and a ring around the label looked wrong on the phone glass.
+const CALL_BUTTON_CLASS =
+  "group flex shrink-0 cursor-pointer flex-col items-center gap-1.5 rounded-xl outline-none disabled:cursor-not-allowed";
+const CALL_DISC_CLASS =
+  "flex h-16 w-16 items-center justify-center rounded-full motion-safe:transition-colors group-disabled:bg-[#38344f] group-disabled:text-[#a9a4c4]";
+const DECLINE_DISC_CLASS = "bg-[#c93c47] text-white group-hover:bg-[#b3343e]";
+const ACCEPT_DISC_CLASS = "bg-[#4fd1b5] text-[#171521] group-hover:bg-[#6ee0c7]";
 const ROUND_OFF_CLASS = "border-[#38344f] bg-[#171521] hover:border-[#7654d6] hover:bg-[#26233a]";
 const ROUND_ON_CLASS = "border-[#7654d6] bg-[#7654d6] hover:bg-[#8b6be8]";
 
@@ -156,9 +165,18 @@ export const PhoneCallScreen: React.FC<PhoneCallScreenProps> = ({
     <section
       aria-label={t("phone.callPresentation.screenLabel")}
       data-testid={ringing ? "incoming-call-screen" : "call-screen"}
-      className={`flex h-full w-full flex-col overflow-hidden px-4 py-5 text-center text-[#f7f5ff] ${groupGap}`}
+      className={`relative flex h-full w-full flex-col overflow-hidden rounded-[13.7%/6.3%] px-4 pb-6 pt-[15%] text-center text-[#f7f5ff] ${groupGap}`}
+      style={{ background: "linear-gradient(180deg, #1d1a33 0%, #0e0c18 100%)" }}
     >
       {vibrating ? <style>{VIBRATE_KEYFRAMES}</style> : null}
+      {/* Dynamic Island: a black pill at the top of the glass (iPhone 17 Pro: 126 x 37 pt on a 402 x 874 pt screen). */}
+      <div
+        aria-hidden="true"
+        data-testid="dynamic-island"
+        className="pointer-events-none absolute left-1/2 top-[1.25%] h-[4.2%] w-[31%] -translate-x-1/2 rounded-full bg-black"
+      />
+
+      <PhoneStatusBar />
 
       {ringing ? (
         <>
@@ -189,27 +207,31 @@ export const PhoneCallScreen: React.FC<PhoneCallScreenProps> = ({
             </div>
           </div>
 
-          <div className="flex w-full flex-col gap-3 @min-[220px]:flex-row">
+          <div className="flex w-full shrink-0 items-start justify-around">
             <button
-              type="button"
-              className={`${UI.buttonEndCall} flex-1`}
-              onClick={onDecline}
-              disabled={disabled}
-              data-testid="incoming-call-decline"
+                type="button"
+                className={CALL_BUTTON_CLASS}
+                onClick={onDecline}
+                disabled={disabled}
+                data-testid="incoming-call-decline"
             >
-              <PhoneOff className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span>{t("phone.incomingCall.decline")}</span>
+              <span className={`${CALL_DISC_CLASS} ${DECLINE_DISC_CLASS}`}>
+                <PhoneOff className="h-7 w-7 shrink-0" aria-hidden="true" />
+              </span>
+              <span className="text-sm text-[#f7f5ff]">{t("phone.incomingCall.decline")}</span>
             </button>
             <button
-              ref={acceptRef}
-              type="button"
-              className={`${UI.buttonAccept} flex-1`}
-              onClick={onAccept}
-              disabled={disabled}
-              data-testid="incoming-call-accept"
+                ref={acceptRef}
+                type="button"
+                className={CALL_BUTTON_CLASS}
+                onClick={onAccept}
+                disabled={disabled}
+                data-testid="incoming-call-accept"
             >
-              <Phone className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span>{t("phone.incomingCall.accept")}</span>
+              <span className={`${CALL_DISC_CLASS} ${ACCEPT_DISC_CLASS}`}>
+                <Phone className="h-7 w-7 shrink-0" aria-hidden="true" />
+              </span>
+              <span className="text-sm text-[#f7f5ff]">{t("phone.incomingCall.accept")}</span>
             </button>
           </div>
         </>
@@ -280,15 +302,15 @@ export const PhoneCallScreen: React.FC<PhoneCallScreenProps> = ({
           <button
             ref={hangUpRef}
             type="button"
-            className={`${UI.buttonEndCall} mx-auto min-w-[140px] shrink-0 ${
-              compact ? "h-11" : "h-12"
-            }`}
+            className={`${CALL_BUTTON_CLASS} mx-auto`}
             onClick={onHangUp}
             disabled={disabled}
             data-testid="call-screen-hang-up"
           >
-            <PhoneOff className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>{t("phone.call.hangUp")}</span>
+            <span className={`${CALL_DISC_CLASS} ${DECLINE_DISC_CLASS}`}>
+              <PhoneOff className="h-7 w-7 shrink-0" aria-hidden="true" />
+            </span>
+            <span className="text-sm text-[#f7f5ff]">{t("phone.call.hangUp")}</span>
           </button>
         </>
       )}

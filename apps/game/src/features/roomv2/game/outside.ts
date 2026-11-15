@@ -38,6 +38,8 @@ export interface RoomStoryCommands {
   /** Short notification sound at the laptop. */
   chime(): void;
   setMood(mood: 'calm' | 'quiet' | 'tense'): void;
+  /** Lowers the room's ambience under narration (true) or restores it (false). Optional. */
+  duckForVoice?(on: boolean): void;
   /** Leaves the inspect pose even when `canLeaveInspect` says no. */
   closeInspect(): void;
   /** Shows (true) or hides (false) the cursor while a host overlay is open. `Engine` already has it. */

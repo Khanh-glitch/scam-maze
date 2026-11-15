@@ -26,7 +26,8 @@ setting in mind (`HuePage` does not read it yet).
 
 - A performance claim needs a number and a method: draw calls and triangles
   (`renderer.info.render`), frame time, GPU, browser, resolution. Mekong has
-  `window.__MEKONG_DEBUG__` (`mientay/engine/profiling.ts`).
+  `window.__MEKONG_DEBUG__` (scene audits in `game/world/profiling.ts`, shared infrastructure, not
+  Mekong-specific despite the debug global's name).
 - Headless Chrome uses software WebGL (SwiftShader): good for relative draw-call and frame-count
   comparisons, not for real FPS. Say which one you measured. No real-GPU numbers are recorded yet.
 
