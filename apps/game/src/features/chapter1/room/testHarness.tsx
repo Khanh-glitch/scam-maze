@@ -70,7 +70,9 @@ export interface LayerRig {
 }
 
 /** Renders the layer. Without `restoreActions` it starts a new game at the intro. */
-export function setupLayer(options: { restoreActions?: readonly CoreAction[]; manifest?: VoiceManifest } = {}): LayerRig {
+export function setupLayer(
+  options: { restoreActions?: readonly CoreAction[]; manifest?: VoiceManifest; saveSource?: SaveGameSource } = {},
+): LayerRig {
   const bridge = new RoomStoryBridge();
   const commands = fakeCommands();
   bridge.commands = commands;
@@ -94,7 +96,7 @@ export function setupLayer(options: { restoreActions?: readonly CoreAction[]; ma
       session={session}
       settings={DEFAULT_SETTINGS}
       bridge={bridge}
-      saveSource={nullSaveSource}
+      saveSource={options.saveSource ?? nullSaveSource}
       ringSettleMs={0}
       onReturnToMenu={onReturnToMenu}
       onStoreReady={(s) => {
