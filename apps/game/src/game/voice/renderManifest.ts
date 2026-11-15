@@ -44,11 +44,14 @@ function orderedEntry(entry: VoiceClipEntry): Record<string, unknown> {
 /** Produces deterministic TypeScript source for `chapter1.manifest.ts`. */
 export function renderManifest(manifest: VoiceManifest): string {
   const clips = [...manifest.clips].sort(compareEntries).map(orderedEntry);
-  const literal = {
+  const literal: Record<string, unknown> = {
     schemaVersion: manifest.schemaVersion,
     chapterId: manifest.chapterId,
-    clips,
   };
+  if (manifest.chapterContentVersion !== undefined) {
+    literal.chapterContentVersion = manifest.chapterContentVersion;
+  }
+  literal.clips = clips;
   const body = JSON.stringify(literal, null, 2);
   return [
     MANIFEST_HEADER,

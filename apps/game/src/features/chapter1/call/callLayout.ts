@@ -57,15 +57,21 @@ export const MAX_SCREEN_HEIGHT = 660;
 export const MIN_CHOICE_WIDTH = 280;
 /** The subtitle region is never taller than this, in CSS pixels. */
 export const SUBTITLE_MAX_HEIGHT = 104;
+/** The narrow layout never gives the subtitle more than this, in CSS pixels (a long line scrolls). */
+export const NARROW_SUBTITLE_MAX_HEIGHT = 140;
 /** The narrow layout gives the subtitle at least this height when room allows, in CSS pixels. */
 export const SUBTITLE_MIN_HEIGHT = 56;
 /** Share of the space below the screen that the narrow layout offers to the subtitle. */
-export const SUBTITLE_NARROW_SHARE = 0.35;
+export const SUBTITLE_NARROW_SHARE = 0.3;
 
 const NARROW_MARGIN = 12;
 const WIDE_MARGIN = 24;
 const NARROW_MIN_SCREEN_HEIGHT = 288;
-const NARROW_SCREEN_HEIGHT_RATIO = 0.6;
+/**
+ * The phone takes less than half of a narrow viewport so the reply list (up to 4 options) gets
+ * the rest of the height. The reply region still scrolls when the replies do not fit.
+ */
+const NARROW_SCREEN_HEIGHT_RATIO = 0.45;
 /** Leaves room above and below the glass so the whole phone body and its frame are visible. */
 const WIDE_SCREEN_HEIGHT_RATIO = 0.8;
 const MAX_CHOICE_WIDTH = 720;
@@ -95,7 +101,7 @@ export function computeCallLayout(viewport: Viewport): CallLayout {
     const remaining = Math.max(0, H - screenBottom - 2 * m);
     const subtitleHeight = Math.min(
       remaining,
-      SUBTITLE_MAX_HEIGHT,
+      NARROW_SUBTITLE_MAX_HEIGHT,
       Math.max(SUBTITLE_MIN_HEIGHT, Math.round(SUBTITLE_NARROW_SHARE * remaining)),
     );
     const subtitle: Rect = {

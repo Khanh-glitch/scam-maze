@@ -10,6 +10,12 @@ describe("prologue gate", () => {
     expect(shouldPlayPrologue({ origin: "saved-game" }, "")).toBe(false);
   });
 
+  it("never plays for a saved game, with or without the skip flag", () => {
+    expect(shouldPlayPrologue({ origin: "saved-game" }, "?skip-prologue")).toBe(false);
+    expect(shouldPlayPrologue({ origin: "saved-game" }, "?other=1")).toBe(false);
+    expect(shouldPlayPrologue({ origin: "new-game" }, "?other=1")).toBe(true);
+  });
+
   it("can be skipped with ?skip-prologue", () => {
     expect(shouldPlayPrologue({ origin: "new-game" }, "?skip-prologue")).toBe(false);
     expect(shouldPlayPrologue({ origin: "new-game" }, "?skip-prologue=1&x=2")).toBe(false);

@@ -1,3 +1,4 @@
+// Feature: chapter-01-double-deception, Property 8: The core is independent of audio, locale and settings (AI-off and audio-off runs produce identical states)
 /**
  * Property 8: The core is independent of audio, locale and settings (design.md,
  * "Correctness Properties").
@@ -237,7 +238,6 @@ function findViolation(actions: readonly unknown[], plan: EventPlan): string | n
 }
 
 describe("Chapter 1 audio, locale and settings independence", () => {
-  // Feature: chapter-01-voice-narrative, Property 8: The core is independent of audio, locale and settings
   it("gives the same Chapter_State with or without player events and language switches", () => {
     let interleavedCases = 0;
     for (let index = 0; index < CORE_PROPERTY_RUNS; index += 1) {

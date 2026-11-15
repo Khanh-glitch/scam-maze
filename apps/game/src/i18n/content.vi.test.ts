@@ -142,8 +142,8 @@ describe("Vietnamese content lint: coverage", () => {
     }
     expect(OVERLAY_ENTRIES.length).toBe(Object.keys(CHAPTER_1_NARRATIVE_VI).length);
     expect(OVERLAY_ENTRIES.length).toBeGreaterThan(100);
-    expect(ALL_ENTRIES.some((entry) => entry.vi.includes("northgate-secure-verify.invalid"))).toBe(true);
-    expect(ALL_ENTRIES.some((entry) => entry.vi.includes("+000 555 0142"))).toBe(true);
+    expect(ALL_ENTRIES.some((entry) => entry.vi.includes("northgate-alerts.invalid"))).toBe(true);
+    expect(ALL_ENTRIES.some((entry) => entry.vi.includes("+000 0100 7771"))).toBe(true);
   });
 });
 

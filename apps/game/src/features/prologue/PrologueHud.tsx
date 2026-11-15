@@ -129,10 +129,10 @@ export const PrologueHud: React.FC<PrologueHudProps> = ({ objective, prompt, sho
       </div>
 
       <div className="absolute bottom-4 left-[clamp(1rem,3vw,2.5rem)] right-[clamp(1rem,3vw,2.5rem)] z-10 flex items-end justify-between gap-4">
-        <div className={`pointer-events-none flex flex-wrap items-center gap-x-5 gap-y-2 font-menu text-xs font-semibold uppercase tracking-[0.14em] text-zinc-300 ${SHADOW}`}>
+        <div data-testid="hud-key-hints" className={`pointer-events-none flex flex-wrap items-center gap-x-5 max-sm:hidden gap-y-2 font-menu text-xs font-semibold uppercase tracking-[0.14em] text-zinc-300 ${SHADOW}`}>
           <span className="flex items-center gap-1.5">
             <kbd className={KEYCAP}>Ctrl</kbd>
-            {cursorMode ? t("worlds:khupho.game.story.hideCursor") : t("worlds:khupho.game.story.showCursor")}
+            {t("chapter1:room.hud.mouseKeyHint")}
           </span>
           <span className="flex items-center gap-1.5">
             <kbd className={KEYCAP}>Esc</kbd>
@@ -157,10 +157,12 @@ export interface ProloguePauseMenuProps {
   onOpenSettings: () => void;
   onReturnToMenu: () => void;
   onHoverSound?: () => void;
+  /** Text under the entries. Default: the prologue's "not saved yet" note. `null` hides it. */
+  note?: string | null;
 }
 
 /** Pause menu in the main menu's style. The prologue has no save yet, so leaving restarts the evening. */
-export const ProloguePauseMenu: React.FC<ProloguePauseMenuProps> = ({ onResume, onOpenSettings, onReturnToMenu, onHoverSound }) => {
+export const ProloguePauseMenu: React.FC<ProloguePauseMenuProps> = ({ onResume, onOpenSettings, onReturnToMenu, onHoverSound, note }) => {
   const { t } = useTranslation(["chapter1", "worlds"]);
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   // One highlighted entry, as on the main menu: it follows the pointer, focus and the arrow / W S keys.
@@ -230,7 +232,9 @@ export const ProloguePauseMenu: React.FC<ProloguePauseMenuProps> = ({ onResume, 
             );
           })}
         </ul>
-        <p className="mt-6 max-w-sm text-sm leading-relaxed text-zinc-400">{t("worlds:khupho.game.story.pauseNote")}</p>
+        {note !== null && (
+          <p className="mt-6 max-w-sm text-sm leading-relaxed text-zinc-400">{note ?? t("worlds:khupho.game.story.pauseNote")}</p>
+        )}
       </div>
     </div>
   );

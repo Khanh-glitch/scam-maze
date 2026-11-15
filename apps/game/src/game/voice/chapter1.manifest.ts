@@ -4,2274 +4,1855 @@ import type { VoiceManifest } from "./manifestTypes";
 export const chapter1VoiceManifest: VoiceManifest = {
   "schemaVersion": 1,
   "chapterId": "chapter-1",
+  "chapterContentVersion": "b1b15925",
   "clips": [
     {
-      "clipId": "callback.code-request",
-      "nodeId": "callback.code-request",
-      "graphId": "dlg.callback",
-      "speakerId": "spk.alex",
+      "clipId": "after.a.1",
+      "nodeId": "after.a.1",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
       "locale": "en",
       "status": "present",
       "sources": [
         {
-          "src": "/audio/chapter01/en/callback.code-request.mp3",
+          "src": "/audio/chapter01/en/after.a.1.mp3",
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 5795,
-      "bytes": 34559,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft David, rate 1.05, pitch 1, tone pressuring",
+      "durationMs": 15374,
+      "bytes": 92231,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
       "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "4273d073"
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "815576ad"
     },
     {
-      "clipId": "callback.code-request",
-      "nodeId": "callback.code-request",
-      "graphId": "dlg.callback",
-      "speakerId": "spk.alex",
+      "clipId": "after.a.1",
+      "nodeId": "after.a.1",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
       "locale": "vi",
       "status": "present",
       "sources": [
         {
-          "src": "/audio/chapter01/vi/callback.code-request.mp3",
+          "src": "/audio/chapter01/vi/after.a.1.mp3",
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 7595,
-      "bytes": 45359,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft An, rate 1.05, pitch 1, tone pressuring",
+      "durationMs": 16450,
+      "bytes": 98495,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.855, pitch 0.9, tone reassuring",
       "origin": "tts-generated",
       "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "3fa003f4"
+      "sourceTextHash": "931317c7"
     },
     {
-      "clipId": "callback.exposed",
-      "nodeId": "callback.exposed",
-      "graphId": "dlg.callback",
-      "speakerId": "spk.alex",
+      "clipId": "after.a.2",
+      "nodeId": "after.a.2",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
       "locale": "en",
       "status": "present",
       "sources": [
         {
-          "src": "/audio/chapter01/en/callback.exposed.mp3",
+          "src": "/audio/chapter01/en/after.a.2.mp3",
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 10620,
-      "bytes": 63719,
-      "tone": "defensive",
-      "voiceNote": "Microsoft David, rate 1, pitch 1, tone defensive",
+      "durationMs": 13142,
+      "bytes": 78839,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
       "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "f6eb9b11"
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "a1c25272"
     },
     {
-      "clipId": "callback.exposed",
-      "nodeId": "callback.exposed",
-      "graphId": "dlg.callback",
-      "speakerId": "spk.alex",
+      "clipId": "after.a.2",
+      "nodeId": "after.a.2",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
       "locale": "vi",
       "status": "present",
       "sources": [
         {
-          "src": "/audio/chapter01/vi/callback.exposed.mp3",
+          "src": "/audio/chapter01/vi/after.a.2.mp3",
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 11015,
+      "durationMs": 13894,
+      "bytes": 83159,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.855, pitch 0.9, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "9a4e5f0e"
+    },
+    {
+      "clipId": "after.a.3",
+      "nodeId": "after.a.3",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/after.a.3.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 12325,
+      "bytes": 73871,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "746abdd7"
+    },
+    {
+      "clipId": "after.a.3",
+      "nodeId": "after.a.3",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/after.a.3.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 12586,
+      "bytes": 75383,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.855, pitch 0.9, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "ed3addb6"
+    },
+    {
+      "clipId": "after.b.1",
+      "nodeId": "after.b.1",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/after.b.1.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 8993,
+      "bytes": 53783,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "f4ef711b"
+    },
+    {
+      "clipId": "after.b.1",
+      "nodeId": "after.b.1",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/after.b.1.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 9360,
+      "bytes": 55943,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.855, pitch 0.9, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "ce826909"
+    },
+    {
+      "clipId": "after.b.2",
+      "nodeId": "after.b.2",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/after.b.2.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 13656,
+      "bytes": 81863,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "8369f4f7"
+    },
+    {
+      "clipId": "after.b.2",
+      "nodeId": "after.b.2",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/after.b.2.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 12284,
+      "bytes": 73655,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.855, pitch 0.9, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "fa610b98"
+    },
+    {
+      "clipId": "after.b.3",
+      "nodeId": "after.b.3",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/after.b.3.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 13896,
+      "bytes": 83375,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "53dcbe36"
+    },
+    {
+      "clipId": "after.b.3",
+      "nodeId": "after.b.3",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/after.b.3.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 14020,
+      "bytes": 84023,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.855, pitch 0.9, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "a34dd293"
+    },
+    {
+      "clipId": "after.c.1",
+      "nodeId": "after.c.1",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/after.c.1.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 11434,
+      "bytes": 68471,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "54961ab9"
+    },
+    {
+      "clipId": "after.c.1",
+      "nodeId": "after.c.1",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/after.c.1.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 11654,
+      "bytes": 69767,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.855, pitch 0.9, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "9ae1aa68"
+    },
+    {
+      "clipId": "after.c.2",
+      "nodeId": "after.c.2",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/after.c.2.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 10980,
       "bytes": 65879,
-      "tone": "defensive",
-      "voiceNote": "Microsoft An, rate 1, pitch 1, tone defensive",
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
       "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "b0230581"
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "f2e88d49"
     },
     {
-      "clipId": "callback.final-call",
-      "nodeId": "callback.final-call",
-      "graphId": "dlg.callback",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/callback.final-call.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 6690,
-      "bytes": 39959,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft David, rate 1.05, pitch 1, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "b53df1c9"
-    },
-    {
-      "clipId": "callback.final-call",
-      "nodeId": "callback.final-call",
-      "graphId": "dlg.callback",
-      "speakerId": "spk.alex",
+      "clipId": "after.c.2",
+      "nodeId": "after.c.2",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
       "locale": "vi",
       "status": "present",
       "sources": [
         {
-          "src": "/audio/chapter01/vi/callback.final-call.mp3",
+          "src": "/audio/chapter01/vi/after.c.2.mp3",
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 6700,
-      "bytes": 40175,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft An, rate 1.05, pitch 1, tone pressuring",
+      "durationMs": 11833,
+      "bytes": 70847,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.855, pitch 0.9, tone reassuring",
       "origin": "tts-generated",
       "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "1892bed6"
+      "sourceTextHash": "e671b680"
     },
     {
-      "clipId": "callback.move-money",
-      "nodeId": "callback.move-money",
-      "graphId": "dlg.callback",
-      "speakerId": "spk.alex",
+      "clipId": "after.c.3",
+      "nodeId": "after.c.3",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
       "locale": "en",
       "status": "present",
       "sources": [
         {
-          "src": "/audio/chapter01/en/callback.move-money.mp3",
+          "src": "/audio/chapter01/en/after.c.3.mp3",
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 8530,
+      "durationMs": 9347,
+      "bytes": 55943,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "43fe758b"
+    },
+    {
+      "clipId": "after.c.3",
+      "nodeId": "after.c.3",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/after.c.3.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 8500,
       "bytes": 50975,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft David, rate 1.05, pitch 1, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "cd071c96"
-    },
-    {
-      "clipId": "callback.move-money",
-      "nodeId": "callback.move-money",
-      "graphId": "dlg.callback",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/callback.move-money.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 8952,
-      "bytes": 53567,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft An, rate 1.05, pitch 1, tone pressuring",
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.855, pitch 0.9, tone reassuring",
       "origin": "tts-generated",
       "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "23b15159"
+      "sourceTextHash": "303ad7ba"
     },
     {
-      "clipId": "callback.number-again",
-      "nodeId": "callback.number-again",
-      "graphId": "dlg.callback",
-      "speakerId": "spk.alex",
+      "clipId": "after.c.secret.1",
+      "nodeId": "after.c.secret.1",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
       "locale": "en",
       "status": "present",
       "sources": [
         {
-          "src": "/audio/chapter01/en/callback.number-again.mp3",
+          "src": "/audio/chapter01/en/after.c.secret.1.mp3",
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 7730,
-      "bytes": 46223,
-      "tone": "defensive",
-      "voiceNote": "Microsoft David, rate 1, pitch 1, tone defensive",
+      "durationMs": 13944,
+      "bytes": 83591,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
       "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "64f358e5"
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "8fb1123d"
     },
     {
-      "clipId": "callback.number-again",
-      "nodeId": "callback.number-again",
-      "graphId": "dlg.callback",
-      "speakerId": "spk.alex",
+      "clipId": "after.c.secret.1",
+      "nodeId": "after.c.secret.1",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
       "locale": "vi",
       "status": "present",
       "sources": [
         {
-          "src": "/audio/chapter01/vi/callback.number-again.mp3",
+          "src": "/audio/chapter01/vi/after.c.secret.1.mp3",
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 7770,
+      "durationMs": 13627,
+      "bytes": 81647,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.855, pitch 0.9, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "32690525"
+    },
+    {
+      "clipId": "after.c.secret.2",
+      "nodeId": "after.c.secret.2",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/after.c.secret.2.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 14272,
+      "bytes": 85535,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "ab386f4e"
+    },
+    {
+      "clipId": "after.c.secret.2",
+      "nodeId": "after.c.secret.2",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/after.c.secret.2.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 16042,
+      "bytes": 96119,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.855, pitch 0.9, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "32c772cc"
+    },
+    {
+      "clipId": "after.d.1",
+      "nodeId": "after.d.1",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/after.d.1.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 7746,
       "bytes": 46439,
-      "tone": "defensive",
-      "voiceNote": "Microsoft An, rate 1, pitch 1, tone defensive",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "9c0be03a"
-    },
-    {
-      "clipId": "callback.open",
-      "nodeId": "callback.open",
-      "graphId": "dlg.callback",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/callback.open.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 7540,
-      "bytes": 45143,
-      "tone": "impatient",
-      "voiceNote": "Microsoft David, rate 1.1, pitch 1, tone impatient",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "8bea8a89"
-    },
-    {
-      "clipId": "callback.open",
-      "nodeId": "callback.open",
-      "graphId": "dlg.callback",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/callback.open.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 8083,
-      "bytes": 48383,
-      "tone": "impatient",
-      "voiceNote": "Microsoft An, rate 1.1, pitch 1, tone impatient",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "bb1461ec"
-    },
-    {
-      "clipId": "callback.sms-case",
-      "nodeId": "callback.sms-case",
-      "graphId": "dlg.callback",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/callback.sms-case.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 8460,
-      "bytes": 50759,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft David, rate 0.95, pitch 1, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "4c8496cc"
-    },
-    {
-      "clipId": "callback.sms-case",
-      "nodeId": "callback.sms-case",
-      "graphId": "dlg.callback",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/callback.sms-case.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10990,
-      "bytes": 65879,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft An, rate 0.95, pitch 1, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "228629ae"
-    },
-    {
-      "clipId": "callback.story-slip",
-      "nodeId": "callback.story-slip",
-      "graphId": "dlg.callback",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/callback.story-slip.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 8780,
-      "bytes": 52487,
-      "tone": "defensive",
-      "voiceNote": "Microsoft David, rate 1, pitch 1, tone defensive",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "fd661bbd"
-    },
-    {
-      "clipId": "callback.story-slip",
-      "nodeId": "callback.story-slip",
-      "graphId": "dlg.callback",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/callback.story-slip.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 7480,
-      "bytes": 44711,
-      "tone": "defensive",
-      "voiceNote": "Microsoft An, rate 1, pitch 1, tone defensive",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "e75f763d"
-    },
-    {
-      "clipId": "callback.threat",
-      "nodeId": "callback.threat",
-      "graphId": "dlg.callback",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/callback.threat.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 6585,
-      "bytes": 39311,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft David, rate 1.05, pitch 1, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "3c2d0a49"
-    },
-    {
-      "clipId": "callback.threat",
-      "nodeId": "callback.threat",
-      "graphId": "dlg.callback",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/callback.threat.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 7623,
-      "bytes": 45575,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft An, rate 1.05, pitch 1, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "acb80202"
-    },
-    {
-      "clipId": "callback.time-up",
-      "nodeId": "callback.time-up",
-      "graphId": "dlg.callback",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/callback.time-up.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 6755,
-      "bytes": 40391,
-      "tone": "impatient",
-      "voiceNote": "Microsoft David, rate 1.1, pitch 1, tone impatient",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "3d3917a8"
-    },
-    {
-      "clipId": "callback.time-up",
-      "nodeId": "callback.time-up",
-      "graphId": "dlg.callback",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/callback.time-up.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 7095,
-      "bytes": 42551,
-      "tone": "impatient",
-      "voiceNote": "Microsoft An, rate 1.1, pitch 1, tone impatient",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "c309ba5f"
-    },
-    {
-      "clipId": "followup.badge",
-      "nodeId": "followup.badge",
-      "graphId": "dlg.followup",
-      "speakerId": "spk.case-officer",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/followup.badge.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 8723,
-      "bytes": 52271,
-      "tone": "professional",
-      "voiceNote": "Microsoft Mark, rate 0.95, pitch 0.9, tone professional",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
-      "sourceTextHash": "d1df3a21"
-    },
-    {
-      "clipId": "followup.badge",
-      "nodeId": "followup.badge",
-      "graphId": "dlg.followup",
-      "speakerId": "spk.case-officer",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/followup.badge.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 8755,
-      "bytes": 52487,
-      "tone": "professional",
-      "voiceNote": "Microsoft An, rate 0.95, pitch 0.8, tone professional",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "baead3ad"
-    },
-    {
-      "clipId": "followup.case-details",
-      "nodeId": "followup.case-details",
-      "graphId": "dlg.followup",
-      "speakerId": "spk.case-officer",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/followup.case-details.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 7293,
-      "bytes": 43631,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft Mark, rate 0.903, pitch 0.9, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
-      "sourceTextHash": "c3eff55d"
-    },
-    {
-      "clipId": "followup.case-details",
-      "nodeId": "followup.case-details",
-      "graphId": "dlg.followup",
-      "speakerId": "spk.case-officer",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/followup.case-details.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 8587,
-      "bytes": 51407,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft An, rate 0.903, pitch 0.8, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "63ad5e85"
-    },
-    {
-      "clipId": "followup.close",
-      "nodeId": "followup.close",
-      "graphId": "dlg.followup",
-      "speakerId": "spk.case-officer",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/followup.close.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 5056,
-      "bytes": 30239,
-      "tone": "impatient",
-      "voiceNote": "Microsoft Mark, rate 1.045, pitch 0.9, tone impatient",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
-      "sourceTextHash": "1a779c95"
-    },
-    {
-      "clipId": "followup.close",
-      "nodeId": "followup.close",
-      "graphId": "dlg.followup",
-      "speakerId": "spk.case-officer",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/followup.close.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 6200,
-      "bytes": 37151,
-      "tone": "impatient",
-      "voiceNote": "Microsoft An, rate 1.045, pitch 0.8, tone impatient",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "db0799f3"
-    },
-    {
-      "clipId": "followup.code-used",
-      "nodeId": "followup.code-used",
-      "graphId": "dlg.followup",
-      "speakerId": "spk.case-officer",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/followup.code-used.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 9262,
-      "bytes": 55511,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft Mark, rate 0.997, pitch 0.9, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
-      "sourceTextHash": "090808d4"
-    },
-    {
-      "clipId": "followup.code-used",
-      "nodeId": "followup.code-used",
-      "graphId": "dlg.followup",
-      "speakerId": "spk.case-officer",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/followup.code-used.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10992,
-      "bytes": 65879,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft An, rate 0.997, pitch 0.8, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "698a8d03"
-    },
-    {
-      "clipId": "followup.open",
-      "nodeId": "followup.open",
-      "graphId": "dlg.followup",
-      "speakerId": "spk.case-officer",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/followup.open.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 8818,
-      "bytes": 52703,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft Mark, rate 0.997, pitch 0.9, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
-      "sourceTextHash": "889537e4"
-    },
-    {
-      "clipId": "followup.open",
-      "nodeId": "followup.open",
-      "graphId": "dlg.followup",
-      "speakerId": "spk.case-officer",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/followup.open.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10645,
-      "bytes": 63719,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft An, rate 0.997, pitch 0.8, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "289dd288"
-    },
-    {
-      "clipId": "followup.pressure-final",
-      "nodeId": "followup.pressure-final",
-      "graphId": "dlg.followup",
-      "speakerId": "spk.case-officer",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/followup.pressure-final.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 9371,
-      "bytes": 56159,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft Mark, rate 0.997, pitch 0.9, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
-      "sourceTextHash": "c1c9a739"
-    },
-    {
-      "clipId": "followup.pressure-final",
-      "nodeId": "followup.pressure-final",
-      "graphId": "dlg.followup",
-      "speakerId": "spk.case-officer",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/followup.pressure-final.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 12408,
-      "bytes": 74303,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft An, rate 0.997, pitch 0.8, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "f23a7961"
-    },
-    {
-      "clipId": "followup.secrecy",
-      "nodeId": "followup.secrecy",
-      "graphId": "dlg.followup",
-      "speakerId": "spk.case-officer",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/followup.secrecy.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 9210,
-      "bytes": 55079,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft Mark, rate 0.997, pitch 0.9, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
-      "sourceTextHash": "d6fb58bb"
-    },
-    {
-      "clipId": "followup.secrecy",
-      "nodeId": "followup.secrecy",
-      "graphId": "dlg.followup",
-      "speakerId": "spk.case-officer",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/followup.secrecy.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10088,
-      "bytes": 60479,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft An, rate 0.997, pitch 0.8, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "c71da108"
-    },
-    {
-      "clipId": "official.advice",
-      "nodeId": "official.advice",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/official.advice.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 8866,
-      "bytes": 53135,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft Zira, rate 0.95, pitch 1, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Zira",
-      "sourceTextHash": "b4407107"
-    },
-    {
-      "clipId": "official.advice",
-      "nodeId": "official.advice",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/official.advice.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10747,
-      "bytes": 64367,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft An, rate 0.95, pitch 1.2, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "4384632b"
-    },
-    {
-      "clipId": "official.agent",
-      "nodeId": "official.agent",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/official.agent.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 5425,
-      "bytes": 32399,
-      "tone": "professional",
-      "voiceNote": "Microsoft Zira, rate 1, pitch 1, tone professional",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Zira",
-      "sourceTextHash": "c59e367b"
-    },
-    {
-      "clipId": "official.agent",
-      "nodeId": "official.agent",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/official.agent.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 6215,
-      "bytes": 37151,
-      "tone": "professional",
-      "voiceNote": "Microsoft An, rate 1, pitch 1.2, tone professional",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "fcb4af57"
-    },
-    {
-      "clipId": "official.confirm",
-      "nodeId": "official.confirm",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/official.confirm.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 8585,
-      "bytes": 51407,
-      "tone": "professional",
-      "voiceNote": "Microsoft Zira, rate 1, pitch 1, tone professional",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Zira",
-      "sourceTextHash": "f7993a4d"
-    },
-    {
-      "clipId": "official.confirm",
-      "nodeId": "official.confirm",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/official.confirm.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10630,
-      "bytes": 63719,
-      "tone": "professional",
-      "voiceNote": "Microsoft An, rate 1, pitch 1.2, tone professional",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "14c7bd16"
-    },
-    {
-      "clipId": "official.hub",
-      "nodeId": "official.hub",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/official.hub.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 3153,
-      "bytes": 18791,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft Zira, rate 0.95, pitch 1, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Zira",
-      "sourceTextHash": "2b16776a"
-    },
-    {
-      "clipId": "official.hub",
-      "nodeId": "official.hub",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/official.hub.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 3561,
-      "bytes": 21167,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft An, rate 0.95, pitch 1.2, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "4bd722bc"
-    },
-    {
-      "clipId": "official.locked",
-      "nodeId": "official.locked",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/official.locked.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 9718,
-      "bytes": 58103,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft Zira, rate 0.95, pitch 1, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Zira",
-      "sourceTextHash": "9a5451c4"
-    },
-    {
-      "clipId": "official.locked",
-      "nodeId": "official.locked",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/official.locked.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 11014,
-      "bytes": 65879,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft An, rate 0.95, pitch 1.2, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "f9c7de80"
-    },
-    {
-      "clipId": "official.numbers",
-      "nodeId": "official.numbers",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/official.numbers.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 7260,
-      "bytes": 43415,
-      "tone": "professional",
-      "voiceNote": "Microsoft Zira, rate 1, pitch 1, tone professional",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Zira",
-      "sourceTextHash": "6aae00c4"
-    },
-    {
-      "clipId": "official.numbers",
-      "nodeId": "official.numbers",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/official.numbers.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 7135,
-      "bytes": 42767,
-      "tone": "professional",
-      "voiceNote": "Microsoft An, rate 1, pitch 1.2, tone professional",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "1f8ab0eb"
-    },
-    {
-      "clipId": "official.numbers-match",
-      "nodeId": "official.numbers-match",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/official.numbers-match.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 7175,
-      "bytes": 42983,
-      "tone": "professional",
-      "voiceNote": "Microsoft Zira, rate 1, pitch 1, tone professional",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Zira",
-      "sourceTextHash": "ca389540"
-    },
-    {
-      "clipId": "official.numbers-match",
-      "nodeId": "official.numbers-match",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/official.numbers-match.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 8160,
-      "bytes": 48815,
-      "tone": "professional",
-      "voiceNote": "Microsoft An, rate 1, pitch 1.2, tone professional",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "46600a7e"
-    },
-    {
-      "clipId": "official.report-basic",
-      "nodeId": "official.report-basic",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/official.report-basic.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 8085,
-      "bytes": 48383,
-      "tone": "professional",
-      "voiceNote": "Microsoft Zira, rate 1, pitch 1, tone professional",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Zira",
-      "sourceTextHash": "a7540a89"
-    },
-    {
-      "clipId": "official.report-basic",
-      "nodeId": "official.report-basic",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/official.report-basic.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 8185,
-      "bytes": 49031,
-      "tone": "professional",
-      "voiceNote": "Microsoft An, rate 1, pitch 1.2, tone professional",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "d9e63f9a"
-    },
-    {
-      "clipId": "official.report-filed",
-      "nodeId": "official.report-filed",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/official.report-filed.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 7452,
-      "bytes": 44495,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft Zira, rate 0.95, pitch 1, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Zira",
-      "sourceTextHash": "20c1816e"
-    },
-    {
-      "clipId": "official.report-filed",
-      "nodeId": "official.report-filed",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/official.report-filed.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 9177,
-      "bytes": 54863,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft An, rate 0.95, pitch 1.2, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "6a292842"
-    },
-    {
-      "clipId": "official.report-intro",
-      "nodeId": "official.report-intro",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/official.report-intro.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 4710,
-      "bytes": 28079,
-      "tone": "professional",
-      "voiceNote": "Microsoft Zira, rate 1, pitch 1, tone professional",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Zira",
-      "sourceTextHash": "92b3f411"
-    },
-    {
-      "clipId": "official.report-intro",
-      "nodeId": "official.report-intro",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/official.report-intro.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 4995,
-      "bytes": 29807,
-      "tone": "professional",
-      "voiceNote": "Microsoft An, rate 1, pitch 1.2, tone professional",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "49447c2b"
-    },
-    {
-      "clipId": "official.transfer",
-      "nodeId": "official.transfer",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/official.transfer.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 8265,
-      "bytes": 49463,
-      "tone": "professional",
-      "voiceNote": "Microsoft Zira, rate 1, pitch 1, tone professional",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Zira",
-      "sourceTextHash": "7510b5e3"
-    },
-    {
-      "clipId": "official.transfer",
-      "nodeId": "official.transfer",
-      "graphId": "dlg.official-line",
-      "speakerId": "spk.northgate-agent",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/official.transfer.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10705,
-      "bytes": 64151,
-      "tone": "professional",
-      "voiceNote": "Microsoft An, rate 1, pitch 1.2, tone professional",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "8a2392e8"
-    },
-    {
-      "clipId": "sam.after-call.advice",
-      "nodeId": "sam.after-call.advice",
-      "graphId": "dlg.shopkeeper",
-      "speakerId": "spk.sam",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/sam.after-call.advice.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 11100,
-      "bytes": 66527,
       "tone": "reassuring",
       "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
       "origin": "tts-generated",
       "credit": "Generated locally with the Windows speech voice Microsoft Mark",
-      "sourceTextHash": "eb4834d4"
+      "sourceTextHash": "295b9ce7"
     },
     {
-      "clipId": "sam.after-call.advice",
-      "nodeId": "sam.after-call.advice",
-      "graphId": "dlg.shopkeeper",
-      "speakerId": "spk.sam",
+      "clipId": "after.d.1",
+      "nodeId": "after.d.1",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
       "locale": "vi",
       "status": "present",
       "sources": [
         {
-          "src": "/audio/chapter01/vi/sam.after-call.advice.mp3",
+          "src": "/audio/chapter01/vi/after.d.1.mp3",
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 13085,
-      "bytes": 78407,
+      "durationMs": 8951,
+      "bytes": 53567,
       "tone": "reassuring",
-      "voiceNote": "Microsoft An, rate 0.903, pitch 0.9, tone reassuring",
+      "voiceNote": "Microsoft An, rate 0.855, pitch 0.9, tone reassuring",
       "origin": "tts-generated",
       "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "5e5c3f7e"
+      "sourceTextHash": "49a3807e"
     },
     {
-      "clipId": "sam.after-call.ask",
-      "nodeId": "sam.after-call.ask",
-      "graphId": "dlg.shopkeeper",
-      "speakerId": "spk.sam",
+      "clipId": "after.d.2",
+      "nodeId": "after.d.2",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
       "locale": "en",
       "status": "present",
       "sources": [
         {
-          "src": "/audio/chapter01/en/sam.after-call.ask.mp3",
+          "src": "/audio/chapter01/en/after.d.2.mp3",
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 6721,
-      "bytes": 40175,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
-      "sourceTextHash": "a4f96860"
-    },
-    {
-      "clipId": "sam.after-call.ask",
-      "nodeId": "sam.after-call.ask",
-      "graphId": "dlg.shopkeeper",
-      "speakerId": "spk.sam",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/sam.after-call.ask.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 7152,
-      "bytes": 42767,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft An, rate 0.903, pitch 0.9, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "82a5f6df"
-    },
-    {
-      "clipId": "sam.after-call.numbers",
-      "nodeId": "sam.after-call.numbers",
-      "graphId": "dlg.shopkeeper",
-      "speakerId": "spk.sam",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/sam.after-call.numbers.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 13441,
-      "bytes": 80567,
+      "durationMs": 14323,
+      "bytes": 85751,
       "tone": "reassuring",
       "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
       "origin": "tts-generated",
       "credit": "Generated locally with the Windows speech voice Microsoft Mark",
-      "sourceTextHash": "23119cbc"
+      "sourceTextHash": "a6f3b83a"
     },
     {
-      "clipId": "sam.after-call.numbers",
-      "nodeId": "sam.after-call.numbers",
-      "graphId": "dlg.shopkeeper",
-      "speakerId": "spk.sam",
+      "clipId": "after.d.2",
+      "nodeId": "after.d.2",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
       "locale": "vi",
       "status": "present",
       "sources": [
         {
-          "src": "/audio/chapter01/vi/sam.after-call.numbers.mp3",
+          "src": "/audio/chapter01/vi/after.d.2.mp3",
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 12098,
-      "bytes": 72575,
+      "durationMs": 14702,
+      "bytes": 88127,
       "tone": "reassuring",
-      "voiceNote": "Microsoft An, rate 0.903, pitch 0.9, tone reassuring",
+      "voiceNote": "Microsoft An, rate 0.855, pitch 0.9, tone reassuring",
       "origin": "tts-generated",
       "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "af74c600"
+      "sourceTextHash": "8ab4d648"
     },
     {
-      "clipId": "sam.after-call.story",
-      "nodeId": "sam.after-call.story",
-      "graphId": "dlg.shopkeeper",
-      "speakerId": "spk.sam",
+      "clipId": "after.d.3",
+      "nodeId": "after.d.3",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
       "locale": "en",
       "status": "present",
       "sources": [
         {
-          "src": "/audio/chapter01/en/sam.after-call.story.mp3",
+          "src": "/audio/chapter01/en/after.d.3.mp3",
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 8881,
-      "bytes": 53135,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
-      "sourceTextHash": "6f02e498"
-    },
-    {
-      "clipId": "sam.after-call.story",
-      "nodeId": "sam.after-call.story",
-      "graphId": "dlg.shopkeeper",
-      "speakerId": "spk.sam",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/sam.after-call.story.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 9181,
-      "bytes": 55079,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft An, rate 0.903, pitch 0.9, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "ed3b1833"
-    },
-    {
-      "clipId": "sam.before.coffee",
-      "nodeId": "sam.before.coffee",
-      "graphId": "dlg.shopkeeper",
-      "speakerId": "spk.sam",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/sam.before.coffee.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 6971,
-      "bytes": 41687,
+      "durationMs": 11498,
+      "bytes": 68903,
       "tone": "reassuring",
       "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
       "origin": "tts-generated",
       "credit": "Generated locally with the Windows speech voice Microsoft Mark",
-      "sourceTextHash": "8d13d01f"
+      "sourceTextHash": "e234d365"
     },
     {
-      "clipId": "sam.before.coffee",
-      "nodeId": "sam.before.coffee",
-      "graphId": "dlg.shopkeeper",
-      "speakerId": "spk.sam",
+      "clipId": "after.d.3",
+      "nodeId": "after.d.3",
+      "graphId": "dlg.aftermath",
+      "speakerId": "spk.narrator",
       "locale": "vi",
       "status": "present",
       "sources": [
         {
-          "src": "/audio/chapter01/vi/sam.before.coffee.mp3",
+          "src": "/audio/chapter01/vi/after.d.3.mp3",
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 7425,
-      "bytes": 44495,
+      "durationMs": 12034,
+      "bytes": 72143,
       "tone": "reassuring",
-      "voiceNote": "Microsoft An, rate 0.903, pitch 0.9, tone reassuring",
+      "voiceNote": "Microsoft An, rate 0.855, pitch 0.9, tone reassuring",
       "origin": "tts-generated",
       "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "5a79eb63"
+      "sourceTextHash": "3d9e073e"
     },
     {
-      "clipId": "sam.before.greet",
-      "nodeId": "sam.before.greet",
-      "graphId": "dlg.shopkeeper",
-      "speakerId": "spk.sam",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/sam.before.greet.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 5423,
-      "bytes": 32399,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
-      "sourceTextHash": "15557bf5"
-    },
-    {
-      "clipId": "sam.before.greet",
-      "nodeId": "sam.before.greet",
-      "graphId": "dlg.shopkeeper",
-      "speakerId": "spk.sam",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/sam.before.greet.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 5597,
-      "bytes": 33479,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft An, rate 0.903, pitch 0.9, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "d1b14fe1"
-    },
-    {
-      "clipId": "sam.before.notice",
-      "nodeId": "sam.before.notice",
-      "graphId": "dlg.shopkeeper",
-      "speakerId": "spk.sam",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/sam.before.notice.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 9966,
-      "bytes": 59615,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
-      "sourceTextHash": "48bb4a20"
-    },
-    {
-      "clipId": "sam.before.notice",
-      "nodeId": "sam.before.notice",
-      "graphId": "dlg.shopkeeper",
-      "speakerId": "spk.sam",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/sam.before.notice.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 9925,
-      "bytes": 59399,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft An, rate 0.903, pitch 0.9, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "8c975d28"
-    },
-    {
-      "clipId": "sam.before.phones",
-      "nodeId": "sam.before.phones",
-      "graphId": "dlg.shopkeeper",
-      "speakerId": "spk.sam",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/sam.before.phones.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10787,
-      "bytes": 64583,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
-      "sourceTextHash": "f40d12f0"
-    },
-    {
-      "clipId": "sam.before.phones",
-      "nodeId": "sam.before.phones",
-      "graphId": "dlg.shopkeeper",
-      "speakerId": "spk.sam",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/sam.before.phones.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10885,
-      "bytes": 65231,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft An, rate 0.903, pitch 0.9, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "a2d5cfbf"
-    },
-    {
-      "clipId": "scam.account-details",
-      "nodeId": "scam.account-details",
-      "graphId": "dlg.scam-call",
+      "clipId": "alex.callback",
+      "nodeId": "alex.callback",
+      "graphId": "dlg.alex",
       "speakerId": "spk.alex",
       "locale": "en",
       "status": "present",
       "sources": [
         {
-          "src": "/audio/chapter01/en/scam.account-details.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 9040,
-      "bytes": 54215,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft David, rate 1.05, pitch 1, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "e9fae3ed"
-    },
-    {
-      "clipId": "scam.account-details",
-      "nodeId": "scam.account-details",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/scam.account-details.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 8251,
-      "bytes": 49463,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft An, rate 1.05, pitch 1, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "c827cfe2"
-    },
-    {
-      "clipId": "scam.app-check",
-      "nodeId": "scam.app-check",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/scam.app-check.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 9695,
-      "bytes": 58103,
-      "tone": "defensive",
-      "voiceNote": "Microsoft David, rate 1, pitch 1, tone defensive",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "22554872"
-    },
-    {
-      "clipId": "scam.app-check",
-      "nodeId": "scam.app-check",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/scam.app-check.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10030,
-      "bytes": 60047,
-      "tone": "defensive",
-      "voiceNote": "Microsoft An, rate 1, pitch 1, tone defensive",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "4bd6cfe0"
-    },
-    {
-      "clipId": "scam.app-excuse",
-      "nodeId": "scam.app-excuse",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/scam.app-excuse.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10730,
-      "bytes": 64367,
-      "tone": "defensive",
-      "voiceNote": "Microsoft David, rate 1, pitch 1, tone defensive",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "d7807c43"
-    },
-    {
-      "clipId": "scam.app-excuse",
-      "nodeId": "scam.app-excuse",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/scam.app-excuse.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 9080,
-      "bytes": 54431,
-      "tone": "defensive",
-      "voiceNote": "Microsoft An, rate 1, pitch 1, tone defensive",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "b61eb32f"
-    },
-    {
-      "clipId": "scam.challenged",
-      "nodeId": "scam.challenged",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/scam.challenged.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10325,
-      "bytes": 61775,
-      "tone": "defensive",
-      "voiceNote": "Microsoft David, rate 1, pitch 1, tone defensive",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "60701a56"
-    },
-    {
-      "clipId": "scam.challenged",
-      "nodeId": "scam.challenged",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/scam.challenged.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10310,
-      "bytes": 61775,
-      "tone": "defensive",
-      "voiceNote": "Microsoft An, rate 1, pitch 1, tone defensive",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "47a7718c"
-    },
-    {
-      "clipId": "scam.code-excuse",
-      "nodeId": "scam.code-excuse",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/scam.code-excuse.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10695,
-      "bytes": 64151,
-      "tone": "defensive",
-      "voiceNote": "Microsoft David, rate 1, pitch 1, tone defensive",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "353f6d99"
-    },
-    {
-      "clipId": "scam.code-excuse",
-      "nodeId": "scam.code-excuse",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/scam.code-excuse.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 9515,
-      "bytes": 57023,
-      "tone": "defensive",
-      "voiceNote": "Microsoft An, rate 1, pitch 1, tone defensive",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "ce887a58"
-    },
-    {
-      "clipId": "scam.code-request",
-      "nodeId": "scam.code-request",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/scam.code-request.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 8005,
-      "bytes": 47951,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft David, rate 1.05, pitch 1, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "4152e9bb"
-    },
-    {
-      "clipId": "scam.code-request",
-      "nodeId": "scam.code-request",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/scam.code-request.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10579,
-      "bytes": 63287,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft An, rate 1.05, pitch 1, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "81930b73"
-    },
-    {
-      "clipId": "scam.deflect",
-      "nodeId": "scam.deflect",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/scam.deflect.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 8730,
-      "bytes": 52271,
-      "tone": "impatient",
-      "voiceNote": "Microsoft David, rate 1.1, pitch 1, tone impatient",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "bd2c4e3b"
-    },
-    {
-      "clipId": "scam.deflect",
-      "nodeId": "scam.deflect",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/scam.deflect.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 9434,
-      "bytes": 56591,
-      "tone": "impatient",
-      "voiceNote": "Microsoft An, rate 1.1, pitch 1, tone impatient",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "72db0b7c"
-    },
-    {
-      "clipId": "scam.details",
-      "nodeId": "scam.details",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/scam.details.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10150,
-      "bytes": 60695,
-      "tone": "professional",
-      "voiceNote": "Microsoft David, rate 1, pitch 1, tone professional",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "ce2b9a10"
-    },
-    {
-      "clipId": "scam.details",
-      "nodeId": "scam.details",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/scam.details.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10800,
-      "bytes": 64799,
-      "tone": "professional",
-      "voiceNote": "Microsoft An, rate 1, pitch 1, tone professional",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "4829c826"
-    },
-    {
-      "clipId": "scam.guilt",
-      "nodeId": "scam.guilt",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/scam.guilt.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 8855,
-      "bytes": 52919,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft David, rate 1.05, pitch 1, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "0db6e4bc"
-    },
-    {
-      "clipId": "scam.guilt",
-      "nodeId": "scam.guilt",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/scam.guilt.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 9612,
-      "bytes": 57671,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft An, rate 1.05, pitch 1, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "2a3b8f59"
-    },
-    {
-      "clipId": "scam.identity",
-      "nodeId": "scam.identity",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/scam.identity.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 11710,
-      "bytes": 70199,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft David, rate 0.95, pitch 1, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "4c6849c6"
-    },
-    {
-      "clipId": "scam.identity",
-      "nodeId": "scam.identity",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/scam.identity.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10960,
-      "bytes": 65663,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft An, rate 0.95, pitch 1, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "d6a907db"
-    },
-    {
-      "clipId": "scam.knows-details",
-      "nodeId": "scam.knows-details",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/scam.knows-details.mp3",
+          "src": "/audio/chapter01/en/alex.callback.mp3",
           "type": "audio/mpeg"
         }
       ],
       "durationMs": 9935,
       "bytes": 59399,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft David, rate 0.95, pitch 1, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "d0394c68"
-    },
-    {
-      "clipId": "scam.knows-details",
-      "nodeId": "scam.knows-details",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/scam.knows-details.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10484,
-      "bytes": 62855,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft An, rate 0.95, pitch 1, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "fe9d98f0"
-    },
-    {
-      "clipId": "scam.link-defend",
-      "nodeId": "scam.link-defend",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/scam.link-defend.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 9240,
-      "bytes": 55295,
-      "tone": "defensive",
-      "voiceNote": "Microsoft David, rate 1, pitch 1, tone defensive",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "dde8c13d"
-    },
-    {
-      "clipId": "scam.link-defend",
-      "nodeId": "scam.link-defend",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/scam.link-defend.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 8885,
-      "bytes": 53135,
-      "tone": "defensive",
-      "voiceNote": "Microsoft An, rate 1, pitch 1, tone defensive",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "0ae90d22"
-    },
-    {
-      "clipId": "scam.move-money",
-      "nodeId": "scam.move-money",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/scam.move-money.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10859,
-      "bytes": 65015,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft David, rate 1.05, pitch 1, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "18223e6f"
-    },
-    {
-      "clipId": "scam.move-money",
-      "nodeId": "scam.move-money",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/scam.move-money.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 12952,
-      "bytes": 77543,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft An, rate 1.05, pitch 1, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "cb7f72d3"
-    },
-    {
-      "clipId": "scam.open",
-      "nodeId": "scam.open",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/scam.open.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 9940,
-      "bytes": 59615,
-      "tone": "professional",
-      "voiceNote": "Microsoft David, rate 1, pitch 1, tone professional",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "59c6fd1e"
-    },
-    {
-      "clipId": "scam.open",
-      "nodeId": "scam.open",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/scam.open.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 11685,
-      "bytes": 69983,
-      "tone": "professional",
-      "voiceNote": "Microsoft An, rate 1, pitch 1, tone professional",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "e47ccb50"
-    },
-    {
-      "clipId": "scam.sms-link",
-      "nodeId": "scam.sms-link",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/scam.sms-link.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 9400,
-      "bytes": 56375,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft David, rate 0.95, pitch 1, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "7867ab49"
-    },
-    {
-      "clipId": "scam.sms-link",
-      "nodeId": "scam.sms-link",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/scam.sms-link.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 9872,
-      "bytes": 59183,
-      "tone": "reassuring",
-      "voiceNote": "Microsoft An, rate 0.95, pitch 1, tone reassuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "8ec1118b"
-    },
-    {
-      "clipId": "scam.stay-on-line",
-      "nodeId": "scam.stay-on-line",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/scam.stay-on-line.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 9320,
-      "bytes": 55727,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft David, rate 1.05, pitch 1, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "5d5879c2"
-    },
-    {
-      "clipId": "scam.stay-on-line",
-      "nodeId": "scam.stay-on-line",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "vi",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/vi/scam.stay-on-line.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 10269,
-      "bytes": 61559,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft An, rate 1.05, pitch 1, tone pressuring",
-      "origin": "tts-generated",
-      "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "1c5f3915"
-    },
-    {
-      "clipId": "scam.time",
-      "nodeId": "scam.time",
-      "graphId": "dlg.scam-call",
-      "speakerId": "spk.alex",
-      "locale": "en",
-      "status": "present",
-      "sources": [
-        {
-          "src": "/audio/chapter01/en/scam.time.mp3",
-          "type": "audio/mpeg"
-        }
-      ],
-      "durationMs": 8725,
-      "bytes": 52271,
       "tone": "impatient",
       "voiceNote": "Microsoft David, rate 1.1, pitch 1, tone impatient",
       "origin": "tts-generated",
       "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "321e3736"
+      "sourceTextHash": "a99fb159"
     },
     {
-      "clipId": "scam.time",
-      "nodeId": "scam.time",
-      "graphId": "dlg.scam-call",
+      "clipId": "alex.callback",
+      "nodeId": "alex.callback",
+      "graphId": "dlg.alex",
       "speakerId": "spk.alex",
       "locale": "vi",
       "status": "present",
       "sources": [
         {
-          "src": "/audio/chapter01/vi/scam.time.mp3",
+          "src": "/audio/chapter01/vi/alex.callback.mp3",
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 7830,
-      "bytes": 46871,
+      "durationMs": 9249,
+      "bytes": 55295,
       "tone": "impatient",
       "voiceNote": "Microsoft An, rate 1.1, pitch 1, tone impatient",
       "origin": "tts-generated",
       "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "008745e3"
+      "sourceTextHash": "786437e7"
     },
     {
-      "clipId": "scam.time-insist",
-      "nodeId": "scam.time-insist",
-      "graphId": "dlg.scam-call",
+      "clipId": "alex.code-taken",
+      "nodeId": "alex.code-taken",
+      "graphId": "dlg.alex",
       "speakerId": "spk.alex",
       "locale": "en",
       "status": "present",
       "sources": [
         {
-          "src": "/audio/chapter01/en/scam.time-insist.mp3",
+          "src": "/audio/chapter01/en/alex.code-taken.mp3",
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 9240,
-      "bytes": 55295,
-      "tone": "pressuring",
-      "voiceNote": "Microsoft David, rate 1.05, pitch 1, tone pressuring",
+      "durationMs": 10680,
+      "bytes": 63935,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft David, rate 0.95, pitch 1, tone reassuring",
       "origin": "tts-generated",
       "credit": "Generated locally with the Windows speech voice Microsoft David",
-      "sourceTextHash": "88a559c6"
+      "sourceTextHash": "aebc3d3d"
     },
     {
-      "clipId": "scam.time-insist",
-      "nodeId": "scam.time-insist",
-      "graphId": "dlg.scam-call",
+      "clipId": "alex.code-taken",
+      "nodeId": "alex.code-taken",
+      "graphId": "dlg.alex",
       "speakerId": "spk.alex",
       "locale": "vi",
       "status": "present",
       "sources": [
         {
-          "src": "/audio/chapter01/vi/scam.time-insist.mp3",
+          "src": "/audio/chapter01/vi/alex.code-taken.mp3",
           "type": "audio/mpeg"
         }
       ],
-      "durationMs": 8204,
-      "bytes": 49031,
+      "durationMs": 10047,
+      "bytes": 60263,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.95, pitch 1, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "ae095c08"
+    },
+    {
+      "clipId": "alex.defend",
+      "nodeId": "alex.defend",
+      "graphId": "dlg.alex",
+      "speakerId": "spk.alex",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/alex.defend.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 11745,
+      "bytes": 70415,
+      "tone": "defensive",
+      "voiceNote": "Microsoft David, rate 1, pitch 1, tone defensive",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft David",
+      "sourceTextHash": "f49b22ea"
+    },
+    {
+      "clipId": "alex.defend",
+      "nodeId": "alex.defend",
+      "graphId": "dlg.alex",
+      "speakerId": "spk.alex",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/alex.defend.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 12120,
+      "bytes": 72575,
+      "tone": "defensive",
+      "voiceNote": "Microsoft An, rate 1, pitch 1, tone defensive",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "6b1ac625"
+    },
+    {
+      "clipId": "alex.details",
+      "nodeId": "alex.details",
+      "graphId": "dlg.alex",
+      "speakerId": "spk.alex",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/alex.details.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 11090,
+      "bytes": 66527,
+      "tone": "pressuring",
+      "voiceNote": "Microsoft David, rate 1.05, pitch 1, tone pressuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft David",
+      "sourceTextHash": "5c3f9495"
+    },
+    {
+      "clipId": "alex.details",
+      "nodeId": "alex.details",
+      "graphId": "dlg.alex",
+      "speakerId": "spk.alex",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/alex.details.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 11342,
+      "bytes": 68039,
       "tone": "pressuring",
       "voiceNote": "Microsoft An, rate 1.05, pitch 1, tone pressuring",
       "origin": "tts-generated",
       "credit": "Generated locally with the Windows speech voice Microsoft An",
-      "sourceTextHash": "97b7bbf2"
+      "sourceTextHash": "73d77706"
+    },
+    {
+      "clipId": "alex.open",
+      "nodeId": "alex.open",
+      "graphId": "dlg.alex",
+      "speakerId": "spk.alex",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/alex.open.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 10620,
+      "bytes": 63719,
+      "tone": "professional",
+      "voiceNote": "Microsoft David, rate 1, pitch 1, tone professional",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft David",
+      "sourceTextHash": "0f7e6323"
+    },
+    {
+      "clipId": "alex.open",
+      "nodeId": "alex.open",
+      "graphId": "dlg.alex",
+      "speakerId": "spk.alex",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/alex.open.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 10305,
+      "bytes": 61775,
+      "tone": "professional",
+      "voiceNote": "Microsoft An, rate 1, pitch 1, tone professional",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "97741c9b"
+    },
+    {
+      "clipId": "alex.pressure",
+      "nodeId": "alex.pressure",
+      "graphId": "dlg.alex",
+      "speakerId": "spk.alex",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/alex.pressure.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 12035,
+      "bytes": 72143,
+      "tone": "pressuring",
+      "voiceNote": "Microsoft David, rate 1.05, pitch 1, tone pressuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft David",
+      "sourceTextHash": "76049044"
+    },
+    {
+      "clipId": "alex.pressure",
+      "nodeId": "alex.pressure",
+      "graphId": "dlg.alex",
+      "speakerId": "spk.alex",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/alex.pressure.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 10835,
+      "bytes": 64799,
+      "tone": "pressuring",
+      "voiceNote": "Microsoft An, rate 1.05, pitch 1, tone pressuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "df5f180a"
+    },
+    {
+      "clipId": "alex.proof",
+      "nodeId": "alex.proof",
+      "graphId": "dlg.alex",
+      "speakerId": "spk.alex",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/alex.proof.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 15640,
+      "bytes": 93743,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft David, rate 0.95, pitch 1, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft David",
+      "sourceTextHash": "ca600cfb"
+    },
+    {
+      "clipId": "alex.proof",
+      "nodeId": "alex.proof",
+      "graphId": "dlg.alex",
+      "speakerId": "spk.alex",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/alex.proof.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 13542,
+      "bytes": 81215,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.95, pitch 1, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "3ce3248b"
+    },
+    {
+      "clipId": "alex.refused",
+      "nodeId": "alex.refused",
+      "graphId": "dlg.alex",
+      "speakerId": "spk.alex",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/alex.refused.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 14045,
+      "bytes": 84239,
+      "tone": "impatient",
+      "voiceNote": "Microsoft David, rate 1.1, pitch 1, tone impatient",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft David",
+      "sourceTextHash": "429562cc"
+    },
+    {
+      "clipId": "alex.refused",
+      "nodeId": "alex.refused",
+      "graphId": "dlg.alex",
+      "speakerId": "spk.alex",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/alex.refused.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 12719,
+      "bytes": 76247,
+      "tone": "impatient",
+      "voiceNote": "Microsoft An, rate 1.1, pitch 1, tone impatient",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "8e8ff702"
+    },
+    {
+      "clipId": "alex.who",
+      "nodeId": "alex.who",
+      "graphId": "dlg.alex",
+      "speakerId": "spk.alex",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/alex.who.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 12140,
+      "bytes": 72791,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft David, rate 0.95, pitch 1, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft David",
+      "sourceTextHash": "bd18eac0"
+    },
+    {
+      "clipId": "alex.who",
+      "nodeId": "alex.who",
+      "graphId": "dlg.alex",
+      "speakerId": "spk.alex",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/alex.who.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 12279,
+      "bytes": 73655,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.95, pitch 1, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "1504473a"
+    },
+    {
+      "clipId": "intro.1",
+      "nodeId": "intro.1",
+      "graphId": "dlg.intro",
+      "speakerId": "spk.narrator",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/intro.1.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 5963,
+      "bytes": 35639,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "953d86e7"
+    },
+    {
+      "clipId": "intro.1",
+      "nodeId": "intro.1",
+      "graphId": "dlg.intro",
+      "speakerId": "spk.narrator",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/intro.1.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 6462,
+      "bytes": 38663,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.855, pitch 0.9, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "5e91fbe4"
+    },
+    {
+      "clipId": "intro.2",
+      "nodeId": "intro.2",
+      "graphId": "dlg.intro",
+      "speakerId": "spk.narrator",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/intro.2.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 5450,
+      "bytes": 32615,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "7961f797"
+    },
+    {
+      "clipId": "intro.2",
+      "nodeId": "intro.2",
+      "graphId": "dlg.intro",
+      "speakerId": "spk.narrator",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/intro.2.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 5834,
+      "bytes": 34991,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.855, pitch 0.9, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "cac9b866"
+    },
+    {
+      "clipId": "intro.3",
+      "nodeId": "intro.3",
+      "graphId": "dlg.intro",
+      "speakerId": "spk.narrator",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/intro.3.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 4617,
+      "bytes": 27647,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Mark, rate 0.903, pitch 1, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "bb1f9cf4"
+    },
+    {
+      "clipId": "intro.3",
+      "nodeId": "intro.3",
+      "graphId": "dlg.intro",
+      "speakerId": "spk.narrator",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/intro.3.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 4474,
+      "bytes": 26783,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.855, pitch 0.9, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "7b2fafba"
+    },
+    {
+      "clipId": "off.advice",
+      "nodeId": "off.advice",
+      "graphId": "dlg.official-line",
+      "speakerId": "spk.northgate-agent",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/off.advice.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 21255,
+      "bytes": 127439,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Zira, rate 0.95, pitch 1, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Zira",
+      "sourceTextHash": "a8ee1d2c"
+    },
+    {
+      "clipId": "off.advice",
+      "nodeId": "off.advice",
+      "graphId": "dlg.official-line",
+      "speakerId": "spk.northgate-agent",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/off.advice.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 20874,
+      "bytes": 125063,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.95, pitch 1.2, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "5609dada"
+    },
+    {
+      "clipId": "off.ask",
+      "nodeId": "off.ask",
+      "graphId": "dlg.official-line",
+      "speakerId": "spk.northgate-agent",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/off.ask.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 7108,
+      "bytes": 42551,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Zira, rate 0.95, pitch 1, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Zira",
+      "sourceTextHash": "ef532d99"
+    },
+    {
+      "clipId": "off.ask",
+      "nodeId": "off.ask",
+      "graphId": "dlg.official-line",
+      "speakerId": "spk.northgate-agent",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/off.ask.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 7252,
+      "bytes": 43415,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.95, pitch 1.2, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "78e9ef53"
+    },
+    {
+      "clipId": "off.confirm",
+      "nodeId": "off.confirm",
+      "graphId": "dlg.official-line",
+      "speakerId": "spk.northgate-agent",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/off.confirm.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 15105,
+      "bytes": 90503,
+      "tone": "professional",
+      "voiceNote": "Microsoft Zira, rate 1, pitch 1, tone professional",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Zira",
+      "sourceTextHash": "afa065f7"
+    },
+    {
+      "clipId": "off.confirm",
+      "nodeId": "off.confirm",
+      "graphId": "dlg.official-line",
+      "speakerId": "spk.northgate-agent",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/off.confirm.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 14490,
+      "bytes": 86831,
+      "tone": "professional",
+      "voiceNote": "Microsoft An, rate 1, pitch 1.2, tone professional",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "db9f8836"
+    },
+    {
+      "clipId": "off.open",
+      "nodeId": "off.open",
+      "graphId": "dlg.official-line",
+      "speakerId": "spk.northgate-agent",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/off.open.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 8385,
+      "bytes": 50111,
+      "tone": "professional",
+      "voiceNote": "Microsoft Zira, rate 1, pitch 1, tone professional",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Zira",
+      "sourceTextHash": "82dece6b"
+    },
+    {
+      "clipId": "off.open",
+      "nodeId": "off.open",
+      "graphId": "dlg.official-line",
+      "speakerId": "spk.northgate-agent",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/off.open.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 9370,
+      "bytes": 56159,
+      "tone": "professional",
+      "voiceNote": "Microsoft An, rate 1, pitch 1.2, tone professional",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "df7f8868"
+    },
+    {
+      "clipId": "off.report",
+      "nodeId": "off.report",
+      "graphId": "dlg.official-line",
+      "speakerId": "spk.northgate-agent",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/off.report.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 15545,
+      "bytes": 93095,
+      "tone": "professional",
+      "voiceNote": "Microsoft Zira, rate 1, pitch 1, tone professional",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Zira",
+      "sourceTextHash": "542f87ac"
+    },
+    {
+      "clipId": "off.report",
+      "nodeId": "off.report",
+      "graphId": "dlg.official-line",
+      "speakerId": "spk.northgate-agent",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/off.report.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 15105,
+      "bytes": 90503,
+      "tone": "professional",
+      "voiceNote": "Microsoft An, rate 1, pitch 1.2, tone professional",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "b4dc1dda"
+    },
+    {
+      "clipId": "rec.cites-case",
+      "nodeId": "rec.cites-case",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/rec.cites-case.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 6445,
+      "bytes": 38663,
+      "tone": "professional",
+      "voiceNote": "Microsoft Mark, rate 0.95, pitch 0.9, tone professional",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "7d23977a"
+    },
+    {
+      "clipId": "rec.cites-case",
+      "nodeId": "rec.cites-case",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/rec.cites-case.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 8316,
+      "bytes": 49895,
+      "tone": "professional",
+      "voiceNote": "Microsoft An, rate 0.95, pitch 0.8, tone professional",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "eed21b54"
+    },
+    {
+      "clipId": "rec.confirms-alex",
+      "nodeId": "rec.confirms-alex",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/rec.confirms-alex.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 10492,
+      "bytes": 62855,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Mark, rate 0.903, pitch 0.9, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "920e00e6"
+    },
+    {
+      "clipId": "rec.confirms-alex",
+      "nodeId": "rec.confirms-alex",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/rec.confirms-alex.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 10583,
+      "bytes": 63287,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.903, pitch 0.8, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "68ad2db1"
+    },
+    {
+      "clipId": "rec.deflect-case",
+      "nodeId": "rec.deflect-case",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/rec.deflect-case.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 10723,
+      "bytes": 64151,
+      "tone": "defensive",
+      "voiceNote": "Microsoft Mark, rate 0.95, pitch 0.9, tone defensive",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "566775b4"
+    },
+    {
+      "clipId": "rec.deflect-case",
+      "nodeId": "rec.deflect-case",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/rec.deflect-case.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 12104,
+      "bytes": 72575,
+      "tone": "defensive",
+      "voiceNote": "Microsoft An, rate 0.95, pitch 0.8, tone defensive",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "cb4e0169"
+    },
+    {
+      "clipId": "rec.deflect-number",
+      "nodeId": "rec.deflect-number",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/rec.deflect-number.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 14805,
+      "bytes": 88775,
+      "tone": "defensive",
+      "voiceNote": "Microsoft Mark, rate 0.95, pitch 0.9, tone defensive",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "34ddaa62"
+    },
+    {
+      "clipId": "rec.deflect-number",
+      "nodeId": "rec.deflect-number",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/rec.deflect-number.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 13955,
+      "bytes": 83591,
+      "tone": "defensive",
+      "voiceNote": "Microsoft An, rate 0.95, pitch 0.8, tone defensive",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "68fdec90"
+    },
+    {
+      "clipId": "rec.deflects-verify",
+      "nodeId": "rec.deflects-verify",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/rec.deflects-verify.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 10446,
+      "bytes": 62639,
+      "tone": "defensive",
+      "voiceNote": "Microsoft Mark, rate 0.95, pitch 0.9, tone defensive",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "fa07c31c"
+    },
+    {
+      "clipId": "rec.deflects-verify",
+      "nodeId": "rec.deflects-verify",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/rec.deflects-verify.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 12759,
+      "bytes": 76463,
+      "tone": "defensive",
+      "voiceNote": "Microsoft An, rate 0.95, pitch 0.8, tone defensive",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "0fdd01db"
+    },
+    {
+      "clipId": "rec.pressure",
+      "nodeId": "rec.pressure",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/rec.pressure.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 11768,
+      "bytes": 70415,
+      "tone": "pressuring",
+      "voiceNote": "Microsoft Mark, rate 0.997, pitch 0.9, tone pressuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "9db3e578"
+    },
+    {
+      "clipId": "rec.pressure",
+      "nodeId": "rec.pressure",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/rec.pressure.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 13705,
+      "bytes": 82079,
+      "tone": "pressuring",
+      "voiceNote": "Microsoft An, rate 0.997, pitch 0.8, tone pressuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "63fcbaca"
+    },
+    {
+      "clipId": "rec.procedure",
+      "nodeId": "rec.procedure",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/rec.procedure.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 13967,
+      "bytes": 83591,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Mark, rate 0.903, pitch 0.9, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "f6cf8dad"
+    },
+    {
+      "clipId": "rec.procedure",
+      "nodeId": "rec.procedure",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/rec.procedure.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 15176,
+      "bytes": 90935,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.903, pitch 0.8, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "a884a50e"
+    },
+    {
+      "clipId": "rec.start.blank",
+      "nodeId": "rec.start.blank",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/rec.start.blank.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 9820,
+      "bytes": 58751,
+      "tone": "professional",
+      "voiceNote": "Microsoft Mark, rate 0.95, pitch 0.9, tone professional",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "2fe4b6f9"
+    },
+    {
+      "clipId": "rec.start.blank",
+      "nodeId": "rec.start.blank",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/rec.start.blank.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 11229,
+      "bytes": 67175,
+      "tone": "professional",
+      "voiceNote": "Microsoft An, rate 0.95, pitch 0.8, tone professional",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "a31bf35c"
+    },
+    {
+      "clipId": "rec.start.confronted",
+      "nodeId": "rec.start.confronted",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/rec.start.confronted.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 12613,
+      "bytes": 75599,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Mark, rate 0.903, pitch 0.9, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "56997e97"
+    },
+    {
+      "clipId": "rec.start.confronted",
+      "nodeId": "rec.start.confronted",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/rec.start.confronted.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 15478,
+      "bytes": 92663,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.903, pitch 0.8, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "9b8867a2"
+    },
+    {
+      "clipId": "rec.start.followed",
+      "nodeId": "rec.start.followed",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/rec.start.followed.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 11487,
+      "bytes": 68903,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Mark, rate 0.903, pitch 0.9, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "8307c6c7"
+    },
+    {
+      "clipId": "rec.start.followed",
+      "nodeId": "rec.start.followed",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/rec.start.followed.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 13313,
+      "bytes": 79703,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.903, pitch 0.8, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "9d248f95"
+    },
+    {
+      "clipId": "rec.start.inspected",
+      "nodeId": "rec.start.inspected",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/rec.start.inspected.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 12352,
+      "bytes": 74087,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Mark, rate 0.903, pitch 0.9, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "1fac97e8"
+    },
+    {
+      "clipId": "rec.start.inspected",
+      "nodeId": "rec.start.inspected",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/rec.start.inspected.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 12611,
+      "bytes": 75599,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.903, pitch 0.8, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "d28c80a6"
+    },
+    {
+      "clipId": "rec.start.verified",
+      "nodeId": "rec.start.verified",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/rec.start.verified.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 13433,
+      "bytes": 80567,
+      "tone": "professional",
+      "voiceNote": "Microsoft Mark, rate 0.95, pitch 0.9, tone professional",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "bbcaa6e7"
+    },
+    {
+      "clipId": "rec.start.verified",
+      "nodeId": "rec.start.verified",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/rec.start.verified.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 15799,
+      "bytes": 94607,
+      "tone": "professional",
+      "voiceNote": "Microsoft An, rate 0.95, pitch 0.8, tone professional",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "cb9f3498"
+    },
+    {
+      "clipId": "rec.trusted",
+      "nodeId": "rec.trusted",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "en",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/en/rec.trusted.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 9093,
+      "bytes": 54431,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft Mark, rate 0.903, pitch 0.9, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft Mark",
+      "sourceTextHash": "c6332971"
+    },
+    {
+      "clipId": "rec.trusted",
+      "nodeId": "rec.trusted",
+      "graphId": "dlg.recovery",
+      "speakerId": "spk.recovery",
+      "locale": "vi",
+      "status": "present",
+      "sources": [
+        {
+          "src": "/audio/chapter01/vi/rec.trusted.mp3",
+          "type": "audio/mpeg"
+        }
+      ],
+      "durationMs": 10784,
+      "bytes": 64583,
+      "tone": "reassuring",
+      "voiceNote": "Microsoft An, rate 0.903, pitch 0.8, tone reassuring",
+      "origin": "tts-generated",
+      "credit": "Generated locally with the Windows speech voice Microsoft An",
+      "sourceTextHash": "3d895420"
     }
   ]
 };

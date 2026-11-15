@@ -43,6 +43,16 @@ export function evaluateCondition(
       return state.claims[condition.claimId] === condition.status;
     case "callRang":
       return state.call.log.some((record) => record.callId === condition.callId);
+    case "callClosed":
+      return state.call.log.some(
+        (record) =>
+          record.callId === condition.callId &&
+          (record.status === "ended" || record.status === "declined" || record.status === "missed"),
+      );
+    case "deductionRecorded":
+      return state.deductions.includes(condition.deductionId);
+    case "decisionIs":
+      return state.decision === condition.decision;
     case "objectiveCompleted":
       return state.objectives.completed.includes(condition.objectiveId);
     case "outcomeSet":

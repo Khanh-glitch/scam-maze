@@ -1,4 +1,4 @@
-// Phone overlay: the responsive phone frame and the app router (Requirements 7.1-7.9).
+// Phone overlay: the responsive phone frame and the app router (Requirements 5.5, 13.6).
 // Below 640 CSS pixels the frame fills the viewport width; at 640 px and wider it is a phone
 // frame at most 380 px wide (Tailwind `sm` breakpoint = 640 px).
 // The overlay holds no game state: it renders selector views and reports intent through callbacks.
@@ -8,45 +8,46 @@
 import React, { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Scale, X } from "lucide-react";
-import type { EvidenceId } from "../../../game/narrative/chapter1/ids";
-import type { CallLogEntryView, PhoneMessageView } from "../../../game/narrative/selectors";
-import type { PhoneContent } from "../../../game/narrative/types";
+import type { ClaimId, DeviceActionId, EvidenceId } from "../../../game/narrative/chapter1/ids";
+import type { PhoneMessageView, PhoneRecordsView } from "../../../game/narrative/selectors";
+import { ScreenSurface } from "../room/ScreenSurface";
+import { useScreenQuad } from "../room/useScreenQuad";
 import { UI } from "../theme";
-import { BankApp } from "./BankApp";
 import { CallHistoryApp } from "./CallHistoryApp";
 import { MessagesApp } from "./MessagesApp";
 import { PhoneHome, type PhoneAppId } from "./PhoneHome";
+import { VoicemailApp } from "./VoicemailApp";
 
 export type PhoneRoute = "home" | PhoneAppId;
 
 export interface PhoneOverlayProps {
-  /** From `selectPhoneMessages(state)`. */
+  /** From `selectPhoneRecords(state, scenario)`. */
+  records: PhoneRecordsView;
+  /** From `selectPhoneMessages(state, scenario)`. The voicemail and call summary show in Voicemail. */
   messages: readonly PhoneMessageView[];
-  /** From `selectCallLog(state)`. */
-  callLog: readonly CallLogEntryView[];
-  /** From `CHAPTER_1_SCENARIO.phone.bankApp`. */
-  bankApp: PhoneContent["bankApp"];
   /** Dispatch INSPECT_EVIDENCE for this evidence item. */
   onInspectEvidence: (evidenceId: EvidenceId) => void;
-  /** Dispatch VERIFY_CLAIM with method `bank-app`. */
-  onVerifyBankApp: () => void;
+  /** Dispatch DEVICE_ACTION for this phone action. */
+  onDeviceAction: (id: DeviceActionId) => void;
+  /** Dispatch VERIFY_CLAIM with method `saved-official-contact` for this claim. */
+  onCallSavedContact: (claimId: ClaimId) => void;
   /** Dispatch CLOSE_PHONE (and pop the overlay). */
   onClose: () => void;
-  /** App shown when the phone opens. Defaults to the home screen (Requirement 7.1). */
+  /** App shown when the phone opens. Defaults to the home screen. */
   initialRoute?: PhoneRoute;
   /**
    * Opens the decision panel. Pass it only while `selectDecisionPanel(state).offered` is true;
-   * the home screen then shows a "Decide" button (Requirement 13.1).
+   * the home screen then shows a "Decide" button.
    */
   onDecide?: () => void;
 }
 
 export const PhoneOverlay: React.FC<PhoneOverlayProps> = ({
+  records,
   messages,
-  callLog,
-  bankApp,
   onInspectEvidence,
-  onVerifyBankApp,
+  onDeviceAction,
+  onCallSavedContact,
   onClose,
   initialRoute = "home",
   onDecide,
@@ -54,26 +55,49 @@ export const PhoneOverlay: React.FC<PhoneOverlayProps> = ({
   const { t } = useTranslation("chapter1");
   const [route, setRoute] = useState<PhoneRoute>(initialRoute);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  // On the projected phone display when the 3D screen is visible; otherwise the flat phone frame.
+  const layout = useScreenQuad("phone");
+  const onScreen = layout.mode === "surface";
 
   // Move focus into the phone when it opens and when the screen changes, for keyboard users.
   useEffect(() => {
     headingRef.current?.focus();
   }, [route]);
 
-  const unreadCount = messages.filter((message) => message.unread).length;
+  const recordIds = new Set<string>(
+    [records.voicemail, ...records.summaries].flatMap((message) => (message === null ? [] : [message.id])),
+  );
+  const otherMessages = messages.filter((message) => !recordIds.has(message.id));
+  const unreadCount = otherMessages.filter((message) => message.unread).length;
   const goHome = () => setRoute("home");
-  // The bank app title is narrative content from the display scenario, not UI chrome.
-  const title = route === "bank" ? bankApp.title : t(`phone.routes.${route}`);
+  const title = route === "voicemail" ? t("room.records.tabs.voicemail") : t(`phone.routes.${route}`);
 
   let content: ReactNode;
   if (route === "messages") {
-    content = <MessagesApp messages={messages} onInspectEvidence={onInspectEvidence} onBack={goHome} />;
+    content = <MessagesApp messages={otherMessages} onInspectEvidence={onInspectEvidence} onBack={goHome} />;
   } else if (route === "calls") {
-    content = <CallHistoryApp calls={callLog} onInspectEvidence={onInspectEvidence} onBack={goHome} />;
-  } else if (route === "bank") {
-    content = <BankApp bankApp={bankApp} onVerifyBankApp={onVerifyBankApp} onBack={goHome} />;
+    content = (
+      <CallHistoryApp
+        calls={records.calls}
+        deviceActions={records.deviceActions}
+        savedContact={records.savedContact}
+        onDeviceAction={onDeviceAction}
+        onCallSavedContact={onCallSavedContact}
+        onBack={goHome}
+      />
+    );
+  } else if (route === "voicemail") {
+    content = (
+      <VoicemailApp
+        voicemail={records.voicemail}
+        summaries={records.summaries}
+        deviceActions={records.deviceActions}
+        onDeviceAction={onDeviceAction}
+        onBack={goHome}
+      />
+    );
   } else {
-    const home = <PhoneHome unreadCount={unreadCount} bankAppTitle={bankApp.title} onOpenApp={setRoute} />;
+    const home = <PhoneHome unreadCount={unreadCount} onOpenApp={setRoute} />;
     content = onDecide ? (
       <div className="space-y-4">
         {home}
@@ -91,12 +115,16 @@ export const PhoneOverlay: React.FC<PhoneOverlayProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-[#171521]/70 sm:p-4">
+    <ScreenSurface layout={layout} device="phone" panelWrapperClassName="fixed inset-0 z-40 flex items-center justify-center bg-[#171521]/70 sm:p-4">
       <div
         role="dialog"
         aria-modal="true"
         aria-label={t("phone.overlay.name")}
-        className="flex h-full max-h-full w-full flex-col overflow-hidden bg-[#1d1b2b] text-[#f7f5ff] shadow-xl sm:h-[min(720px,100%)] sm:max-w-[380px] sm:rounded-[2rem] sm:border-4 sm:border-[#38344f]"
+        className={
+          onScreen
+            ? "flex h-full w-full flex-col overflow-hidden bg-[#1d1b2b] text-[#f7f5ff]"
+            : "flex h-full max-h-full w-full flex-col overflow-hidden bg-[#1d1b2b] text-[#f7f5ff] shadow-xl sm:h-[min(720px,100%)] sm:max-w-[380px] sm:rounded-[2rem] sm:border-4 sm:border-[#38344f]"
+        }
         data-phone-frame
       >
         <div className="flex items-center justify-between gap-2 border-b border-[#38344f] bg-[#171521] px-4 py-3">
@@ -115,6 +143,6 @@ export const PhoneOverlay: React.FC<PhoneOverlayProps> = ({
         </div>
         <div className="flex-1 overflow-y-auto p-4">{content}</div>
       </div>
-    </div>
+    </ScreenSurface>
   );
 };

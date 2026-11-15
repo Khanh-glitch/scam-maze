@@ -3,8 +3,9 @@
 // It is rendered by `CallPresentation` as a sibling of `PhoneScreenHost`, never inside it.
 // See design.md, "`CallSubtitleOverlay`", and Requirements 5.1, 5.2, 5.6 to 5.11, 6.8 and 10.5.
 //
-// - Root: fixed at `region` (`layout.subtitle`), `pointer-events: none`, not a tab stop,
-//   `maxHeight: region.height`, vertical scroll only (a long line scrolls, it is never cut).
+// - Root: fixed at `region` (`layout.subtitle`), `pointer-events: none`, not a tab stop. Its height
+//   follows its content up to `maxHeight: region.height` (border-box, so padding and border are
+//   inside the cap); a longer line scrolls, it is never cut.
 // - Two persistent polite live regions (the line and the notice) that are never remounted, so a
 //   re-render with the same line makes no new announcement.
 // - Transparent, without border, when there is nothing to show.
@@ -68,6 +69,7 @@ export const CallSubtitleOverlay: React.FC<CallSubtitleOverlayProps> = ({
         top: region.top,
         width: region.width,
         maxHeight: region.height,
+        boxSizing: "border-box",
         overflowY: "auto",
         overflowX: "hidden",
         pointerEvents: "none",

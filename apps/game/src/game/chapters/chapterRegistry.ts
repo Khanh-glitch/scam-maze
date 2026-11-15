@@ -83,7 +83,7 @@ export const CHAPTERS: readonly ChapterDefinition[] = [
         optional: true,
       },
     ],
-    // Playable: the App shell renders features/chapter1/ChapterOnePage after loading.
+    // Playable: the App shell renders the prologue or features/chapter1/room/RoomChapterPage after loading.
     gameplayAvailable: true,
   },
 ];

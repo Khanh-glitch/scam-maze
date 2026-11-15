@@ -8,7 +8,6 @@ import { HuePage } from "../features/hue";
 import { MenuStartupLoading } from "../features/loading/MenuStartupLoading";
 import { ChapterLoadingFlow } from "../features/loading/ChapterLoadingFlow";
 import { ChapterPlaceholder } from "../features/chapter/ChapterPlaceholder";
-import { ChapterOnePage } from "../features/chapter1/ChapterOnePage";
 import { shouldPlayPrologue } from "../features/prologue/prologueGate";
 import type { PrologueBuildProgress } from "../features/prologue/ProloguePage";
 import type { LoadingHold } from "../features/loading/ChapterLoadingFlow";
@@ -33,6 +32,10 @@ const MientayPage = lazy(() => import("../features/mientay").then((module) => ({
 const ProloguePage = lazy(() => import("../features/prologue").then((module) => ({ default: module.ProloguePage })));
 const KhuphoPage = lazy(() => import("../features/khupho").then((module) => ({ default: module.KhuphoPage })));
 const RoomV2Page = lazy(() => import("../features/roomv2").then((module) => ({ default: module.RoomV2Page })));
+// The rebuilt Chapter 1 page (saved games and ?skip-prologue) is the room plus the chapter layer.
+const RoomChapterPage = lazy(() =>
+  import("../features/chapter1/room/RoomChapterPage").then((module) => ({ default: module.RoomChapterPage })),
+);
 
 /** `window.localStorage` itself can throw (for example when storage is blocked). */
 function getBrowserStorage(): Storage | undefined {
@@ -203,8 +206,9 @@ export const App: React.FC = () => {
   const ambientFadedInRef = useRef<boolean>(false);
   // Menu music is faded out on chapter screens; the street ambient keeps playing.
   const onMenuScreen = screen.kind === "menu";
-  // The prologue world plays the same street recording itself (muffled indoors), so the menu's copy fades out.
-  const inPrologue = screen.kind === "prologue";
+  // The prologue and the chapter room play their own sound (the street recording, muffled indoors),
+  // so the menu's copy fades out.
+  const inPrologue = screen.kind === "prologue" || screen.kind === "chapter";
   const onMenuScreenRef = useRef(onMenuScreen);
   onMenuScreenRef.current = onMenuScreen;
 
@@ -587,6 +591,8 @@ export const App: React.FC = () => {
               onBackToMenu={handleReturnToMenu}
               revealed={screen.kind === "prologue"}
               onBuildProgress={setPrologueBuild}
+              session={screen.kind === "prologue" ? screen.session : undefined}
+              saveSource={saveSource}
             />
           </Suspense>
         </div>
@@ -601,25 +607,24 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/*
-        A playable chapter replaces the menu. The menu canvas stays mounted and paused
-        (frameloop "never") underneath, so returning to the menu needs no reload.
-        A chapter without a playable scene (gameplayAvailable is false) ends at the placeholder.
-      */}
-
+      {/* Saved games and ?skip-prologue: the apartment with the chapter layer. Chapters without gameplay keep the placeholder. */}
       {screen.kind === "chapter" &&
         (getChapter(screen.session.chapterId)?.gameplayAvailable ? (
-          <div className="absolute inset-0 z-40">
-            <ChapterOnePage
-              session={screen.session}
-              settings={settings}
-              onReturnToMenu={handleReturnToMenu}
-            />
+          <div key="chapter" className="absolute inset-0 z-40">
+            <Suspense fallback={<div className="h-full w-full bg-black" aria-busy="true" />}>
+              <RoomChapterPage
+                session={screen.session}
+                settings={settings}
+                onUpdateSettings={handleUpdateSettings}
+                onHoverSound={playHoverSound}
+                onReturnToMenu={handleReturnToMenu}
+                saveSource={saveSource}
+              />
+            </Suspense>
           </div>
         ) : (
           <ChapterPlaceholder session={screen.session} onBackToMenu={handleReturnToMenu} />
         ))}
-
       {/* Startup screen for the menu's own 3D scene */}
       {showLoading && (
         <MenuStartupLoading
