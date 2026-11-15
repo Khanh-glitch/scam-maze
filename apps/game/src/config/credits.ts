@@ -12,6 +12,12 @@ export type CreditItemId =
   | "muaHaThu18"
   | "neuNgayMai"
   | "callPhone"
+  | "plasticChairs"
+  | "plasticTableSet"
+  | "superCub"
+  | "fatBoyCruiser"
+  | "hondaCg125"
+  | "parkedBikesUnattributed"
   | "chapter1Voices"
   | "coreArchitecture";
 
@@ -101,6 +107,54 @@ export const GAME_CREDITS: CreditGroup[] = [
         sourceUrl: "", // No source line is shown for this item.
         license: "Free to use (owner statement, 2026-11-12)",
         notes: "Handheld phone model used for phone calls. Optimized copy with the wallpaper removed and no visible brand marks.",
+      },
+      {
+        id: "plasticChairs",
+        name: "Vietnamese Plastic Chair (low stool and tall chair)",
+        creator: "Kiisaku (https://sketchfab.com/kiisaku)",
+        sourceUrl: "https://sketchfab.com/3d-models/vietnamese-plastic-chair-25c585737c014827bfa3b56c2b680581",
+        license: "Creative Commons Attribution (CC-BY 4.0)",
+        notes: "Low stools and the tall chair on the neighborhood street. Simplified and converted to Meshopt + WebP. Tall chair: https://sketchfab.com/3d-models/vietnamese-plastic-chair-efa69b6b78cc48248f758aec21369447",
+      },
+      {
+        id: "plasticTableSet",
+        name: "table chair plastic - bàn ghế nhựa Việt Nam",
+        creator: "minchou19 (https://sketchfab.com/minchou19)",
+        sourceUrl: "https://sketchfab.com/3d-models/table-chair-plastic-ban-ghe-nhua-viet-nam-8216465bc93142f89f7cd38446be6432",
+        license: "Creative Commons Attribution (CC-BY 4.0)",
+        notes: "Table-and-stools sets in front of the neighborhood cafes and pho shops. Simplified and converted to Meshopt.",
+      },
+      {
+        id: "superCub",
+        name: "Honda Super cub",
+        creator: "Aleksandr Sagidullin (https://sketchfab.com/jintrim3)",
+        sourceUrl: "https://sketchfab.com/3d-models/honda-super-cub-9ce554228fc746c89f6d02b995f43c41",
+        license: "Creative Commons Attribution (CC-BY 4.0)",
+        notes: "Parked bike on the neighborhood street. Simplified and converted to Meshopt + WebP.",
+      },
+      {
+        id: "fatBoyCruiser",
+        name: "Motorcycle (Harley Davidson Fat Boy inspired)",
+        creator: "christianchristian (https://sketchfab.com/chriisjvr)",
+        sourceUrl: "https://sketchfab.com/3d-models/motorcycle-harley-davidson-fat-boy-inspired-4e7dc9622b3b457793fadeed4b5b2ff0",
+        license: "Creative Commons Attribution (CC-BY 4.0)",
+        notes: "Parked bike on the neighborhood street. Simplified and converted to Meshopt + WebP.",
+      },
+      {
+        id: "hondaCg125",
+        name: "Motorbike - Honda CG 125",
+        creator: "LazyAstronaut3D (https://sketchfab.com/LazyAstronaut)",
+        sourceUrl: "https://sketchfab.com/3d-models/motorbike-honda-cg-125-88a3e4989054480f9485cc658419de47",
+        license: "Sketchfab Standard License",
+        notes: "Parked bike on the neighborhood street. Simplified and converted to Meshopt + WebP; the source file is not redistributed.",
+      },
+      {
+        id: "parkedBikesUnattributed",
+        name: "Scooter and custom bobber (parked bikes)",
+        creator: "not stated",
+        sourceUrl: "",
+        license: "Not stated (owner-supplied, to be confirmed)",
+        notes: "Two parked bike models supplied without author or license information. The scooter's brand logo and license plate were removed.",
       },
     ],
   },

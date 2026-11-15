@@ -7,6 +7,8 @@ const STREET_AMBIENT_URL = '/assets/audio/menu_ambient.mp3';
 /** Recorded rain bed and thunder clap (owner-supplied). */
 const RAIN_URL = '/audio/rain.mp3';
 const THUNDER_URL = '/audio/thunder.mp3';
+/** Recorded scooter horn (owner-supplied): a short double beep. */
+const HORN_URL = '/audio/horn.mp3';
 /** Recorded footsteps (owner-supplied): one dry step, and a looping walk on a wet street. */
 const FOOTSTEP_URL = '/audio/footstep.mp3';
 const RAIN_WALK_URL = '/audio/rainWalking.mp3';
@@ -71,6 +73,7 @@ export class AudioSys implements Sfx {
       .then((buf) => { if (this.ac !== ac) return; const s = ac.createBufferSource(); s.buffer = buf; s.loop = true; s.connect(rainG); s.start(0, Math.random() * Math.max(0, buf.duration - 1)); })
       .catch((err) => console.warn('[khupho] rain sound failed to load', err));
     load(THUNDER_URL).then((buf) => { if (this.ac === ac) this.thunderBuf = buf; }).catch((err) => console.warn('[khupho] thunder sound failed to load', err));
+    load(HORN_URL).then((buf) => { if (this.ac === ac) this.hornBuf = buf; }).catch((err) => console.warn('[khupho] horn sound failed to load', err));
     load(FOOTSTEP_URL).then((buf) => { if (this.ac === ac) this.stepBuf = buf; }).catch((err) => console.warn('[khupho] footstep sound failed to load', err));
     // Wet walking: one looping source whose gain follows the player's movement and whose rate
     // rises while running. Player footsteps are not muffled, so it goes straight to master.
@@ -82,6 +85,7 @@ export class AudioSys implements Sfx {
   }
   private thunderBuf: AudioBuffer | null = null;
   private stepBuf: AudioBuffer | null = null;
+  private hornBuf: AudioBuffer | null = null;
   private wetSrc: AudioBufferSourceNode | null = null;
   private wetGain: GainNode | null = null;
   /** True while outdoors in rain: steps come from the wet loop instead of single steps. */
@@ -159,7 +163,22 @@ export class AudioSys implements Sfx {
     g.gain.setTargetAtTime(on ? (running ? 0.85 : 0.6) : 0, t, on ? 0.06 : 0.12);
     s.playbackRate.setTargetAtTime(running ? RAIN_RUN_RATE : RAIN_WALK_RATE, t, 0.15);
   }
-  horn(pos: THREE.Vector3) { const n = performance.now(); if (n - this.lastHorn > 6000) { this.lastHorn = n; this.play('horn', pos); } }
+  /**
+   * One honk at `pos` from the recorded horn (synthesized beeps until it has loaded). Callers pace
+   * their honks; this only keeps two honks from starting within 0.3 s of each other.
+   */
+  horn(pos: THREE.Vector3) {
+    const n = performance.now();
+    if (n - this.lastHorn < 300 || !this.ac || this.muted) return;
+    this.lastHorn = n;
+    const buf = this.hornBuf;
+    if (!buf) { this.play('horn', pos); return; }
+    const ac = this.ac, s = ac.createBufferSource(); s.buffer = buf; s.playbackRate.value = 0.97 + Math.random() * 0.06;
+    const g = ac.createGain(); g.gain.value = 0.9;
+    const p = ac.createPanner(); p.panningModel = 'equalpower'; p.distanceModel = 'inverse'; p.refDistance = 2.5; p.rolloffFactor = 1.3;
+    if (p.positionX) { p.positionX.value = pos.x; p.positionY.value = pos.y + 1; p.positionZ.value = pos.z; }
+    s.connect(g); g.connect(p); p.connect(this.outBus); s.start();
+  }
 
   loop(id: string, kind: string, pos: THREE.Vector3 | null, on: boolean) {
     if (!this.ac) return;
