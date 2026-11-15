@@ -91,7 +91,7 @@ export const DECISIONS_VI: NarrativeOverlay = {
   "debrief/analysis/pressureBuilt":
     "Alex dùng sự gấp gáp, quyền uy và một mã hồ sơ để cuộc gọi nghe như chính thức. Mỗi câu trả lời thêm áp lực và khiến bạn khó dừng lại kiểm tra hơn. Mục tiêu là lấy được một mã trước khi bạn kịp xác minh bất cứ điều gì.",
   "debrief/analysis/whyWarningLooked":
-    "Thông báo trên máy tính xách tay đến ngay sau khi bạn từ chối người gọi đầu tiên, và nó đồng tình với bạn. Điều đó khiến nó giống như bằng chứng rằng bạn đã chọn đúng. Nó cũng đưa ra thông tin liên hệ riêng, và người gọi thứ ba dùng cùng mã hồ sơ NG-4471-X. Những thứ khớp với nhau không độc lập nếu chúng đến từ một nguồn.",
+    "Thông báo trên máy tính xách tay đến ngay sau khi bạn từ chối người gọi đầu tiên, và nó đồng tình với bạn. Điều đó khiến nó giống như bằng chứng rằng bạn đã chọn đúng. Nó cũng đưa ra thông tin liên hệ riêng, và nó nêu cùng mã hồ sơ NG-4471-X. Những thứ khớp với nhau không độc lập nếu chúng đến từ một nguồn.",
   "debrief/analysis/thirdCallerNote":
     "Người gọi thứ ba lặp lại cùng mã hồ sơ và cùng liên hệ với thông báo. Đó không phải là bằng chứng độc lập. Chỉ cuộc gọi bạn tự gọi đến liên hệ ngân hàng đã lưu mới đến từ một kênh có từ trước khi nỗi lo xuất hiện.",
   "debrief/analysis/trapNotes/none":

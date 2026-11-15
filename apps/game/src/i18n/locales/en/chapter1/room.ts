@@ -98,6 +98,8 @@ const room = {
     },
     hud: {
       hintPanelLabel: "Hint for the current objective",
+      mouseKeyHint: "Use the mouse",
+      mouseLockedHint: "Press Ctrl to use the mouse.",
     },
     call: {
       toolsLabel: "Call tools",

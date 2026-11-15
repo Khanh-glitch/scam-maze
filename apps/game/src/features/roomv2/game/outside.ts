@@ -1,4 +1,5 @@
 import type { LaptopFrame, PhoneMode } from './screens';
+import type { ScreenCornersPx, ScreenDeviceId } from './screenProjection';
 
 /** Props a story host can listen to. Every other prop keeps the room's own behavior. */
 export const ROOM_PROP_IDS = ['phone', 'laptop', 'note', 'receipts', 'calendar', 'photo', 'mug', 'door'] as const;
@@ -41,6 +42,12 @@ export interface RoomStoryCommands {
   closeInspect(): void;
   /** Shows (true) or hides (false) the cursor while a host overlay is open. `Engine` already has it. */
   setCursorMode?(on: boolean): void;
+  /**
+   * Follows the projected screen of the laptop or the phone while its inspect pose is reached. The listener gets the
+   * four viewport corners in CSS pixels (top-left, top-right, bottom-right, bottom-left) whenever they change, or
+   * null when the screen is not visible. null as device stops watching. Optional: hosts fall back to a flat panel.
+   */
+  watchScreen?(device: ScreenDeviceId | null, listener?: (corners: ScreenCornersPx | null) => void): void;
 }
 
 /**

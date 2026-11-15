@@ -32,6 +32,8 @@ const debriefForensic = {
       heading: "Clues you did not find",
       none: "You found every clue.",
       missedLabel: "Missed",
+      summary_one: "Show {{number}} missed clue",
+      summary_other: "Show {{number}} missed clues",
     },
     habit: {
       heading: "The habit to keep",
