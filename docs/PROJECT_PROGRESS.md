@@ -211,6 +211,18 @@ Resolved:
 
 ## Task History
 
+### 2026-11-15 — Parked bikes clear of doors, penguin bins, model residents
+
+- **Objective:** owner feedback on `/khupho`: parked bikes block front doors, sit on the seated customers and stick into the grocery goods; bike kinds come in clusters; the green bins should be penguins; the people at home should use the street NPC models with their own outfit colors.
+- **Completed:**
+  - `neighborhood.ts`: new `parkingSpot()` picks a spot along each house front clear of the front door (or the yard gate), the bin and the grocery's goods; bikes moved out to z 4.7 (was 4.9). No parked bike in front of the cafes and pho shops (table set and customers) or the repair shop (it has its own bike). The random draws are unchanged, so the rest of the street keeps its layout.
+  - `furniture.ts`: parked bike kinds come from a shuffled bag of `BIKE_MIX` (`resetBikeMix()` per build) instead of a position hash, which grouped one kind together. New procedural `penguinBin` replaces the green cylinder bins, facing the street.
+  - `people.ts`: `Resident` can be a street NPC model (women, men and elder pools, outfit colors from `mulberry32(31337)`); sit, eat and desk poses use `sitHigh`, lying turns the model onto its back, other poses stand idle. Models are drawn within 16 m or while the camera is in the house. Procedural people remain the fallback.
+- **Files modified:** `apps/game/src/features/khupho/world/{neighborhood,furniture,people}.ts`, `docs/PROJECT_PROGRESS.md`.
+- **Validation:** `pnpm typecheck`, `pnpm build`, `npx vitest --run src/features/khupho src/features/prologue src/app src/config` (40 tests) passed. Headless SwiftShader screenshots: grocery front (bike between the fridge and the goods, penguin bin), single-story house (bike beside the gate), living room at 20:42 (model resident on the sofa).
+- **Not verified:** FPS on a real GPU with the extra models; the lying pose in bed; cooking and washing poses up close (they use the idle clip).
+- **Follow-up:** owner review.
+
 ### 2026-11-15 — Fix cut-apart parked bikes; noodle shop table set; model shop staff
 
 - **Objective:** the owner reported parked bikes sunk into the ground, asked for the table set in the noodle shop, and asked for shop staff back using the 3D NPC models.

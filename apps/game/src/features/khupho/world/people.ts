@@ -151,16 +151,31 @@ const SHOP: Slot[] = [[6, 11.8, 'shop'], [11.8, 12.8, 'eat1'], [12.8, 15.8, 'sho
 const ELDER: Slot[] = [[5, 6.5, 'pray'], [6.5, 9, 'tv'], [9, 12, 'lounge'], [12, 13, 'eat2'], [13, 15, 'bed'], [15, 17, 'lounge'], [17, 19, 'tv'], [19, 21, 'pray'], [21, 24, 'bed'], [0, 5, 'bed']];
 const pickSlot = (s: Slot[], h: number) => (s.find((x) => h >= x[0] && h < x[1]) ?? s[0])[2];
 
+/** A resident drawn as a street NPC model is shown only within this distance (m), or while the camera is in its house. */
+const RESIDENT_MODEL_DISTANCE = 16;
+/** Walking speed (m/s) of residents moving between their spots. */
+const RESIDENT_SPEED = 1.15;
+/** Model clip for a resident pose: chairs, sofas and desks use the counter-stool sit; everything else stands. */
+const residentRole = (name: string): 'walk' | 'sitHigh' | 'idle' =>
+  name === 'walk' ? 'walk' : name === 'sit' || name === 'eat' || name === 'work' ? 'sitHigh' : 'idle';
+
 class Resident {
-  p: Person; cur = ''; spot: House['spots'][string] | null = null; route: { x: number; z: number }[] = []; ph = 0;
+  /** The procedural person, or null when the resident is a street NPC model (`a`). */
+  p: Person | null = null;
+  a: HumanActor | null = null;
+  /** What the schedule moves and turns: the procedural person's group, or a group holding the model. */
+  g: THREE.Object3D;
+  cur = ''; spot: House['spots'][string] | null = null; route: { x: number; z: number }[] = []; ph = 0;
   hidden = false; poseName = 'stand'; spotDev = '';
   h: House;
   sched: Slot[];
   ctx: Ctx;
-  constructor(h: House, sched: Slot[], ctx: Ctx, r: () => number, o: { female?: boolean; kid?: boolean; elder?: boolean } = {}) { this.h = h; this.sched = sched; this.ctx = ctx;
-    this.p = makePerson(r, o); ctx.root.add(this.p.g); this.p.g.visible = false; this.hidden = true;
+  constructor(h: House, sched: Slot[], ctx: Ctx, r: () => number, o: { female?: boolean; kid?: boolean; elder?: boolean } = {}, actor: HumanActor | null = null) { this.h = h; this.sched = sched; this.ctx = ctx;
+    if (actor) { this.a = actor; this.g = new THREE.Group(); this.g.add(actor.object); }
+    else { this.p = makePerson(r, o); this.g = this.p.g; }
+    ctx.root.add(this.g); this.g.visible = false; this.hidden = true;
   }
-  localNow() { const l = this.h.toLocal(this.p.g.position.x, this.p.g.position.z); return { x: l.x, z: l.z, k: clamp(Math.round((this.p.g.position.y - 0.35) / 3.3), 0, this.h.n) }; }
+  localNow() { const l = this.h.toLocal(this.g.position.x, this.g.position.z); return { x: l.x, z: l.z, k: clamp(Math.round((this.g.position.y - 0.35) / 3.3), 0, this.h.n) }; }
   setDev(on: boolean) { const d = this.spotDev && this.h.devices[this.spotDev]; if (d && d.on !== on) d.set(on); }
   begin(act: string, near: boolean) {
     this.setDev(false); this.spotDev = '';
@@ -174,27 +189,35 @@ class Resident {
     const s = h.spots[act] ?? h.spots['lounge'] ?? h.spots['tv']; this.cur = act;
     if (!s) return;
     let pts: { x: number; z: number }[];
-    if (this.hidden) { this.p.g.visible = true; this.hidden = false; const w = h.wp(h.doorX, 0.2, -1.3); this.p.g.position.set(w.x, 0.15, w.z); pts = h.route(0, 0, 0, s.k, s.x, s.z, true); }
+    if (this.hidden) { this.g.visible = true; this.hidden = false; const w = h.wp(h.doorX, 0.2, -1.3); this.g.position.set(w.x, 0.15, w.z); pts = h.route(0, 0, 0, s.k, s.x, s.z, true); }
     else { const l = this.localNow(); pts = h.route(l.k, l.x, l.z, s.k, s.x, s.z); }
     this.route = pts.map((q) => { const w = h.wp(q.x, 0, q.z); return { x: w.x, z: w.z }; }); this.spot = s; this.poseName = 'walk';
     if (!near) this.arrive();
   }
-  finishOut() { this.p.g.visible = false; this.hidden = true; this.route = []; }
+  finishOut() { this.g.visible = false; this.hidden = true; this.route = []; }
   arrive() {
     const s = this.spot; if (!s) return; const h = this.h, w = h.wp(s.x, 0, s.z);
-    this.route = []; this.p.g.position.set(w.x, h.F(s.k) + (s.y ?? 0) + (s.pose === 'lie' ? 0.12 : 0), w.z);
-    this.p.g.rotation.y = s.yaw + h.rot; this.poseName = s.pose; this.p.g.visible = true; this.hidden = false;
+    this.route = []; this.g.position.set(w.x, h.F(s.k) + (s.y ?? 0) + (s.pose === 'lie' ? 0.12 : 0), w.z);
+    this.g.rotation.y = s.yaw + h.rot; this.poseName = s.pose; this.g.visible = true; this.hidden = false;
     this.spotDev = s.device ?? ''; if (this.spotDev) { const d = h.devices[this.spotDev]; if (d && !d.on) d.set(true); }
+  }
+  /** Plays the model clip for the current pose; lying turns the model onto its back along the bed. */
+  private poseModel(a: HumanActor, dt: number, dist: number) {
+    const lie = this.poseName === 'lie', role = residentRole(this.poseName), o = a.object;
+    if (lie && o.rotation.x === 0) { o.rotation.set(-Math.PI / 2, Math.PI, 0, 'YXZ'); o.position.set(0, 0, -0.8); }
+    else if (!lie && o.rotation.x !== 0) { o.rotation.set(0, 0, 0, 'XYZ'); o.position.set(0, 0, 0); }
+    a.play(role, { timeScale: role === 'walk' && a.walkSpeed > 0 ? RESIDENT_SPEED / a.walkSpeed : 1 });
+    a.update(dt, dist);
   }
   update(dt: number, t: number, hour: number, player: THREE.Vector3) {
     const act = pickSlot(this.sched, hour);
-    const dist = this.hidden ? 99 : this.p.g.position.distanceTo(player);
+    const dist = this.hidden ? 99 : this.g.position.distanceTo(player);
     if (act !== this.cur && !this.route.length) this.begin(act, dist < 22 || this.h.contains(player.x, player.z));
     if (this.hidden) return;
-    const g = this.p.g;
+    const g = this.g;
     if (this.route.length) {
       const n = this.route[0], dx = n.x - g.position.x, dz = n.z - g.position.z, d = Math.hypot(dx, dz);
-      const sp = 1.15;
+      const sp = RESIDENT_SPEED;
       if (d < 0.12) { this.route.shift(); if (!this.route.length) { if (this.cur === 'out') this.finishOut(); else this.arrive(); } }
       else {
         const want = Math.atan2(dx, dz); let dy = want - g.rotation.y; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
@@ -204,7 +227,13 @@ class Resident {
         this.ph += st * 5.2; this.poseName = 'walk';
       }
     }
-    pose(this.p, this.poseName, t, this.ph, this.poseName === 'walk' ? 1 : 0);
+    if (this.hidden) return;
+    if (this.a) {
+      // Models cost more than the procedural people: drawn only near the camera or with it in the house.
+      const show = dist < RESIDENT_MODEL_DISTANCE || this.h.contains(player.x, player.z);
+      g.visible = show;
+      if (show) this.poseModel(this.a, dt, dist);
+    } else if (this.p) pose(this.p, this.poseName, t, this.ph, this.poseName === 'walk' ? 1 : 0);
   }
 }
 
@@ -510,6 +539,11 @@ class ShopStaff {
   }
 }
 
+/** Street NPC models used for the people living in the houses, in turn. */
+const RESIDENT_WOMEN: HumanModelId[] = ['npcAlice', 'npcLinMei', 'npcSofia', 'npcFreya'];
+const RESIDENT_MEN: HumanModelId[] = ['npcAlan', 'npcArthur', 'npcArchetype', 'npcNapole', 'npcYoshida', 'npcBlackGuy'];
+const RESIDENT_ELDERS: HumanModelId[] = ['npcNguoiGia'];
+
 /** Street NPC models used as shop staff, in turn. */
 const STAFF_MODELS: HumanModelId[] = ['npcYoshida', 'npcAlice', 'npcLinMei', 'npcArthur', 'npcSofia', 'npcAlan', 'npcNapole', 'npcFreya', 'npcArchetype'];
 
@@ -612,6 +646,8 @@ export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vect
   // Outfits for model people come from their own random stream (see below); staff draw from it too.
   const staffRng = mulberry32(777);
   let staffN = 0;
+  const residentRng = mulberry32(31337);
+  let womanN = 0, manN = 0, elderN = 0;
   houses.filter((h) => !h.spec.lite).forEach((h, i) => {
     const shop = ['grocery', 'cafe', 'pho', 'repair', 'hair'].includes(h.spec.ground);
     if (shop && humans) {
@@ -634,7 +670,15 @@ export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vect
     }
     // Shops keep only the shopkeeper inside (owner: too many people in the shops).
     const list: Slot[][] = shop ? [SHOP] : i % 3 === 0 ? [MOM, DAD, KID] : i % 3 === 1 ? [MOM, ELDER] : [ELDER, DAD, MOM];
-    list.forEach((s, j) => residents.push(new Resident(h, s, ctx, r, { female: j === 0, kid: s === KID, elder: s === ELDER })));
+    list.forEach((s, j) => {
+      const o = { female: j === 0, kid: s === KID, elder: s === ELDER };
+      // Residents are street NPC models with their own outfit colors (owner); procedural people without models.
+      const pool = o.elder ? RESIDENT_ELDERS : o.female ? RESIDENT_WOMEN : RESIDENT_MEN;
+      const n = o.elder ? elderN++ : o.female ? womanN++ : manN++;
+      const actor = humans?.spawn(pool[n % pool.length], { top: pick(residentRng, OUTFIT_TOP), bottom: pick(residentRng, OUTFIT_BOTTOM), shoes: pick(residentRng, OUTFIT_SHOES) }) ?? null;
+      const usable = actor && actor.can('walk') && actor.can('sitHigh') ? actor : null;
+      residents.push(new Resident(h, s, ctx, r, o, usable));
+    });
   });
   residents.forEach((res) => { const act = pickSlot(res.sched, ctx.env.hour); res.cur = ''; res.begin(act, false); });
   const V = (x: number, z: number) => new THREE.Vector3(x, 0.15, z);
@@ -711,7 +755,7 @@ export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vect
       occ.clear();
       for (const rs of residents) {
         if (rs.hidden) continue;
-        const rm = rs.h.roomAtWorld(rs.p.g.position.x, rs.p.g.position.y + 1, rs.p.g.position.z);
+        const rm = rs.h.roomAtWorld(rs.g.position.x, rs.g.position.y + 1, rs.g.position.z);
         if (rm) occ.set(rm, (occ.get(rm) ?? 0) + 1);
       }
       const dark = ctx.env.sun < 0.62;
