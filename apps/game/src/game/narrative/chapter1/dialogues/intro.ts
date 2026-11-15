@@ -31,6 +31,14 @@ const nodes: Record<string, DialogueNode> = {
 };
 
 export const INTRO_SEQUENCE = ["intro.1", "intro.2", "intro.3"] as const;
+/**
+ * How long (ms) the text of each intro line takes to appear, per locale, in INTRO_SEQUENCE order
+ * (owner, 2026-11-15: the text should run at the speed of the voice).
+ */
+export const INTRO_TYPING_MS: Readonly<Record<"en" | "vi", readonly number[]>> = {
+  en: [8000, 7000, 8000],
+  vi: [5000, 6000, 6000],
+};
 
 export const INTRO_DIALOGUE: DialogueGraph = {
   id: "dlg.intro",
