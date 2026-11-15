@@ -225,6 +225,17 @@ Resolved:
 
 ## Task History
 
+### 2026-11-15 — Remove the deprecated positioning stub
+
+- **Objective:** Remove a Markdown file that nothing uses.
+- **Completed work:** Deleted `docs/positioning.md`, a stub marked `DEPRECATED` that only pointed to `docs/product/PRODUCT_POSITIONING.md`. The one link to it in `PRODUCT_POSITIONING.md` is now plain text that says the file was removed.
+- **Files:** deleted `docs/positioning.md`; modified `docs/product/PRODUCT_POSITIONING.md` and this file.
+- **Validation commands executed:** `git grep` for `positioning.md` across tracked files (one reference, now plain text). No build or test run, because only Markdown changed.
+- **Build and test results:** not run (documentation only).
+- **Unresolved issues and known limitations:** `docs/gameplay/FIRST_PERSON_ARMS_ANIMATIONS.md` has no references, and `docs/gameplay/CHAPTER_01_THE_URGENT_CALL.md` describes the parked street chapter. Both were left in place on purpose.
+- **Deviations from the documented architecture:** none.
+- **Follow-up tasks:** decide whether to remove the two documents above.
+
 ### 2026-11-17 — Laptop and phone-records UI on the 3D device screens
 
 - Objective: owner request (approach A). The laptop and phone-records overlays should look like they are on the laptop display and phone display in the 3D view, not in a floating dialog.

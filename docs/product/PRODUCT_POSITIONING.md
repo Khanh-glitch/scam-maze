@@ -7,7 +7,7 @@
 > **Status labels:** `IMPLEMENTED`, `PLANNED`, `PROPOSED`, `PENDING`, `DEPRECATED`, as defined in
 > [OVERVIEW.md](../architecture/OVERVIEW.md#1-status-legend).
 >
-> Supersedes the product definition in [`docs/positioning.md`](../positioning.md) (v1.0, 7 Nov 2026)
+> Supersedes the product definition in `docs/positioning.md` (v1.0, 7 Nov 2026; removed, see git history)
 > and the "safe simulated Internet" framing in sections 0, 3.4 and 3.5 of the
 > [master plan](../../SCAMMAZE_KIROWEEN_2026_FULL_PLAN.md). Audience, evidence and writing rules
 > from v1.0 are carried over in sections 4, 3.2 and 13.6.
