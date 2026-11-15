@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import * as T from './textures';
 import { rbox, mesh, lathe, tube, wallPiece, drapedCloth, drapeOverBar, curtain, pillow, paper, worldUV } from './geo';
 import { LaptopScreen, PhoneScreen } from './screens';
+import { laptopHitBox } from './storyInteract';
 
 export const ROOM = { x0: -2.6, x1: 2.6, z0: -2.1, z1: 2.1, h: 2.65 };
 export const WIN = { x0: -1.75, x1: 0.35, y0: 0.95, y1: 2.3, depth: 0.22 };
@@ -11,6 +12,8 @@ export type Collider = [number, number, number, number];
 export interface Apartment {
   colliders: Collider[];
   hits: THREE.Object3D[];
+  /** Invisible raycast-only box around the laptop (story mode); null otherwise. */
+  laptopHitProxy: THREE.Mesh | null;
   lights: {
     ceilingSpot: THREE.SpotLight; ceilingFill: THREE.PointLight; deskSpot: THREE.SpotLight; deskFill: THREE.PointLight;
     bedLamp: THREE.PointLight; kitchen: THREE.SpotLight; phone: THREE.PointLight; laptop: THREE.PointLight;
@@ -22,6 +25,9 @@ export interface Apartment {
   phoneScreenMat: THREE.MeshBasicMaterial;
   laptopScreen: LaptopScreen;
   laptopScreenMat: THREE.MeshBasicMaterial;
+  /** The planes that carry the laptop and phone screen textures (story mode projects their corners). */
+  laptopScreenMesh: THREE.Mesh;
+  phoneScreenMesh: THREE.Mesh;
   phoneScreen: PhoneScreen;
   steam: THREE.Points;
   fridgeDoor: THREE.Group;
@@ -38,7 +44,12 @@ function tag(o: THREE.Object3D, id: string, hits: THREE.Object3D[]) {
   hits.push(o);
 }
 
-export function buildApartment(scene: THREE.Scene, cityTexHook: (panes: THREE.Mesh[]) => void): Apartment {
+export interface ApartmentOptions {
+  /** Story mode: add an invisible, larger hit box around the laptop. */
+  wideLaptopHit?: boolean;
+}
+
+export function buildApartment(scene: THREE.Scene, cityTexHook: (panes: THREE.Mesh[]) => void, opts: ApartmentOptions = {}): Apartment {
   const root = new THREE.Group();
   scene.add(root);
   const hits: THREE.Object3D[] = [];
@@ -236,9 +247,20 @@ export function buildApartment(scene: THREE.Scene, cityTexHook: (panes: THREE.Me
   const laptopScreen = new LaptopScreen();
   const laptopScreenMat = new THREE.MeshBasicMaterial({ map: laptopScreen.tex, color: 0x000000 });
   mesh(new THREE.PlaneGeometry(lw - 0.012, ld - 0.016), new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.2 }), 0, ld / 2, 0.0004, lid, false);
-  mesh(new THREE.PlaneGeometry(lw - 0.026, (lw - 0.026) * 0.625), laptopScreenMat, 0, ld / 2 + 0.003, 0.0008, lid, false);
+  const laptopScreenMesh = mesh(new THREE.PlaneGeometry(lw - 0.026, (lw - 0.026) * 0.625), laptopScreenMat, 0, ld / 2 + 0.003, 0.0008, lid, false);
   // power LED
   mesh(new THREE.BoxGeometry(0.004, 0.001, 0.002), powerLed, 0.13, 0.008, ld / 2 + 0.0005, laptop, false);
+  // Story mode only: an invisible, larger hit box so the laptop is easy to aim at. It is never drawn
+  // (`visible = false`; the raycaster ignores visibility) and the engine disposes it.
+  let laptopHitProxy: THREE.Mesh | null = null;
+  if (opts.wideLaptopHit) {
+    const box = laptopHitBox(lw, ld, 0.23, 0.06);
+    laptopHitProxy = new THREE.Mesh(new THREE.BoxGeometry(box.width, box.height, box.depth), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+    laptopHitProxy.position.set(0, box.centerY, 0);
+    laptopHitProxy.visible = false;
+    laptopHitProxy.userData.hitProxy = true;
+    laptop.add(laptopHitProxy);
+  }
   tag(laptop, 'laptop', hits);
   const laptopLight = new THREE.PointLight(0x9fb4ff, 0, 1.6, 2);
   laptopLight.position.set(-1.62, DY + 0.3, -1.25);
@@ -956,10 +978,10 @@ export function buildApartment(scene: THREE.Scene, cityTexHook: (panes: THREE.Me
   root.add(mist);
 
   return {
-    colliders, hits, updaters, points,
+    colliders, hits, updaters, points, laptopHitProxy,
     lights: { ceilingSpot, ceilingFill, deskSpot, deskFill, bedLamp, kitchen: kitchenLight, phone: phoneLight, laptop: laptopLight },
     emissives: { ceiling: ceilingShade, desk: deskBulb, bed: bedShade, kitchen: kitchenStrip, powerLed, acLed },
-    glassPanes, rightSash, phone, phoneScreenMat, laptopScreen, laptopScreenMat, phoneScreen, steam,
+    glassPanes, rightSash, phone, phoneScreenMat, laptopScreen, laptopScreenMat, laptopScreenMesh, phoneScreenMesh: scr, phoneScreen, steam,
     fridgeDoor: fdoor, fridgeCollider, fridge: { point: frPoint, spot: frSpot, led: fridgeLed, mist }, chair, clockHands,
   };
 }
