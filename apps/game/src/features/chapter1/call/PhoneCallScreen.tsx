@@ -12,20 +12,18 @@ import React from "react";
 import type { ReactNode, Ref } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  BatteryFull,
   Phone,
   PhoneIncoming,
   PhoneOff,
   RotateCcw,
-  Signal,
   Speaker,
   User,
-  Wifi,
   Volume2,
   VolumeX,
 } from "lucide-react";
 import { usePrefersReducedMotion } from "../../../components/ui/usePrefersReducedMotion";
 import { UI } from "../theme";
+import { PhoneStatusBar } from "./PhoneStatusBar";
 import { formatCallDuration } from "./callTimer";
 import type { PhoneCallView } from "./callDialogueView";
 
@@ -166,7 +164,7 @@ export const PhoneCallScreen: React.FC<PhoneCallScreenProps> = ({
     <section
       aria-label={t("phone.callPresentation.screenLabel")}
       data-testid={ringing ? "incoming-call-screen" : "call-screen"}
-      className={`relative flex h-full w-full flex-col overflow-hidden px-4 pb-6 pt-[9%] text-center text-[#f7f5ff] ${groupGap}`}
+      className={`relative flex h-full w-full flex-col overflow-hidden rounded-[13.7%/6.3%] px-4 pb-6 pt-[9%] text-center text-[#f7f5ff] ${groupGap}`}
       style={{ background: "linear-gradient(180deg, #1d1a33 0%, #0e0c18 100%)" }}
     >
       {vibrating ? <style>{VIBRATE_KEYFRAMES}</style> : null}
@@ -177,19 +175,7 @@ export const PhoneCallScreen: React.FC<PhoneCallScreenProps> = ({
         className="pointer-events-none absolute left-1/2 top-[1.25%] h-[4.2%] w-[31%] -translate-x-1/2 rounded-full bg-black"
       />
 
-      {/* Status bar: clock on the left of the island, signal, Wi-Fi and battery on the right. Static values. */}
-      <div
-        aria-hidden="true"
-        data-testid="phone-status-bar"
-        className="pointer-events-none absolute inset-x-0 top-[1.25%] flex h-[4.2%] items-center justify-between px-[9%] text-sm font-semibold leading-none text-[#f7f5ff]"
-      >
-        <span className="tabular-nums">9:41</span>
-        <span className="flex items-center gap-1">
-          <Signal className="h-3.5 w-3.5" />
-          <Wifi className="h-3.5 w-3.5" />
-          <BatteryFull className="h-4 w-4" />
-        </span>
-      </div>
+      <PhoneStatusBar />
 
       {ringing ? (
         <>
