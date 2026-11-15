@@ -1,6 +1,6 @@
 # SCAMMAZE architecture overview
 
-> **Last reviewed:** 11 Nov 2026 · **Scope:** current implementation and target architecture
+> **Last reviewed:** 11 Nov 2026 (Chapter 1 flow, Room v2 host, core and save sections updated 16 Nov 2026) · **Scope:** current implementation and target architecture
 > **Sources of truth:** the repository on `main`; the canonical product definition
 > [`docs/product/PRODUCT_POSITIONING.md`](../product/PRODUCT_POSITIONING.md) (owner decision of
 > 8 Nov 2026: first-person 3D narrative game); the master plan
@@ -40,12 +40,12 @@ Verified on `feat/chapter-01-playable` (11 Nov 2026):
 | Game Application | Located in `apps/game`: React 19, TypeScript, Vite 8, **Three.js r174**, **React Three Fiber v9**, **Drei v10**, Tailwind CSS v4. Implements the cinematic first-person 3D street scene serving as the game's Main Menu. |
 | 3D Environment & Assets | Binary glTF models verified from `Kiroween/Asset3D/`: `low_poly_city_asset_pack.glb` (Calipo, CC-BY 4.0) and `low_poly_cars_pack.glb` (matisosanimation, CC-BY 4.0). Renders modular buildings (B1–B5, corner, shopfront, hospital), road asphalt with dashed lines, streetlights with warm point lights, low-poly trees, and parked cars along curbs. |
 | Camera & Controls | First-person eye-level camera (`y ≈ 2.05m`) facing down the street towards an atmospheric vanishing point. Smooth breathing idle motion and pointer parallax lerping. Configurable FOV (60°–85°). |
-| Menu UI & Modals | Interactive UI overlay over 3D Canvas: `NEW GAME` (opens the Prologue modal, whose "Begin Chapter 1" action starts chapter loading), `CONTINUE` (enabled only when the local save names a known chapter and, for a version 2 save, its progress replays through the chapter core; `app/continueAvailability.ts`), `SETTINGS` (real-time graphics quality, FOV, sound toggle, master volume with `localStorage` persistence), `CREDITS` (verified third-party asset licenses), and WebGL fallback detector. |
-| Loading screens | Startup screen for the menu scene and a chapter loading pipeline with byte-measured progress, asset verification, error recovery and fade transitions. Loading ends in the playable Chapter 1 page (`ChapterOnePage`); a chapter with `gameplayAvailable: false` still ends on the "in development" screen. See [section 4.2.1](#421-chapter-loading-implemented). |
-| Chapter 1 "The Urgent Call" | Playable from start to debrief on the menu street scene (`features/chapter1/`): first-person movement, in-world interactables with a focus probe, a scam phone call and three other dialogues, evidence journal, objectives, a final decision, three outcome groups (verified, risky, uncertain) with variants, and a debrief. Play time and frame rate have not been measured. Story and content: [`docs/gameplay/CHAPTER_01_THE_URGENT_CALL.md`](../gameplay/CHAPTER_01_THE_URGENT_CALL.md). |
-| Game core (deterministic) | `game/narrative/`: pure TypeScript reducer `chapterReducer(state, action, scenario)` with dialogue engine, evidence, objectives, outcome and debrief modules; Chapter 1 content in `game/narrative/chapter1/`; hand-written scenario validation (`validateScenario.ts`); a framework-free `ChapterStore` read through `useSyncExternalStore`; a pure `localize.ts` for display-only translated copies of the scenario. No React, Three.js, Zustand, Dexie or i18n imports. See [section 4.3](#43-deterministic-core-narrative-engine-and-scam-intelligence-engine-implemented-for-chapter-1). |
-| In-game phone | 2D React overlay in `features/chapter1/phone/`: home screen, call history, messages and a fictional bank app. Phone calls (ringing and active) are shown on a 3D phone in the chapter canvas, with a DOM device screen (avatar, name, number, status, timer and controls only), caller text in a separate subtitle overlay and a separate choice panel, and fall back to a 2D phone screen when the 3D phone cannot be shown (`features/chapter1/call/`, see [section 4.2](#42-game-client-implemented-for-the-menu-and-chapter-1-later-chapters-planned)). Phone actions are dispatched to the core as Core_Actions. |
-| Local saves (format v2) | `game/saves/saveGame.ts` behind the `SaveGameSource` interface, stored in `localStorage` (key `scammaze_save_v2`). A save holds the accepted Core_Actions (at most 1000), a checkpoint ID and the player pose. Restore replays the actions through the core (`game/saves/chapterProgress.ts`) and rejects saves that do not replay. Version 1 saves are migrated to a chapter-start checkpoint. Checkpoints are written by `features/chapter1/useCheckpointSaver.ts`. |
+| Menu UI & Modals | Interactive UI overlay over 3D Canvas: `NEW GAME` (opens the Prologue modal, whose "Begin Chapter 1" action starts chapter loading), `CONTINUE` (enabled only when the local save names a known chapter and its version 3 progress replays through the chapter core; an older save format is reported as incompatible; `app/continueAvailability.ts`), `SETTINGS` (real-time graphics quality, FOV, sound toggle, master volume with `localStorage` persistence), `CREDITS` (verified third-party asset licenses), and WebGL fallback detector. |
+| Loading screens | Startup screen for the menu scene and a chapter loading pipeline with byte-measured progress, asset verification, error recovery and fade transitions. For a new game, loading ends in the neighborhood prologue and then Room v2; for a saved game it ends in `RoomChapterPage` (see [section 4.2.3](#423-chapter-1-flow-and-room-v2-host-implemented)); a chapter with `gameplayAvailable: false` still ends on the "in development" screen. See [section 4.2.1](#421-chapter-loading-implemented). |
+| Chapter 1 "The Urgent Call" (narrative subtitle "The False Victory") | Rebuilt as a double-deception story in the player's apartment (Room v2), reached through the neighborhood prologue and house no. 59: a fake bank-security call, a laptop notification that looks like the fix, evidence and provenance, deductions by combining evidence, a third caller, five decisions and four endings (plus a case-report variant), then a forensic debrief. `IMPLEMENTED` and covered by automated tests on branch `feat/chapter-01-double-deception` (not merged); play time, pacing, real GPU rendering and real audio have not been checked by a person. The earlier street chapter is `DEPRECATED` and parked under `src/legacy/urgent-call-street/`. See [section 4.2.3](#423-chapter-1-flow-and-room-v2-host-implemented). Spec: `.kiro/specs/chapter-01-double-deception/`. |
+| Game core (deterministic) | `game/narrative/`: pure TypeScript reducer `chapterReducer(state, action, scenario)` with dialogue engine, evidence, deduction, beat, objective, outcome and debrief modules (16 Core_Action kinds); Chapter 1 content in `game/narrative/chapter1/`; hand-written scenario validation (`validateScenario.ts`); a framework-free `ChapterStore` read through `useSyncExternalStore`; a pure `localize.ts` for display-only translated copies of the scenario. No React, Three.js, Zustand, Dexie or i18n imports. See [section 4.3](#43-deterministic-core-narrative-engine-and-scam-intelligence-engine-implemented-for-chapter-1). |
+| In-game phone and laptop | 2D React overlay in `features/chapter1/phone/`: home screen, call history, messages and voicemail (the phone records overlay). The fictional bank app and the security notification are on the laptop overlay (`features/chapter1/room/laptop/`). Phone calls (ringing and active) are shown on a 3D phone in the chapter canvas, with a DOM device screen (avatar, name, number, status, timer and controls only), caller text in a separate subtitle overlay and a separate choice panel, and fall back to a 2D phone screen when the 3D phone cannot be shown (`features/chapter1/call/`, see [section 4.2](#42-game-client-implemented-for-the-menu-and-chapter-1-later-chapters-planned)). Phone actions are dispatched to the core as Core_Actions. |
+| Local saves (format v3) | `game/saves/saveGame.ts` behind the `SaveGameSource` interface, stored in `localStorage` (key `scammaze_save_v3`, with a `contentVersion`). A save holds the accepted Core_Actions (at most 1000), a checkpoint ID and the player pose. Restore replays the actions through the core (`game/saves/chapterProgress.ts`) and rejects saves that do not replay. Saves of format v1 and v2 are reported as incompatible; they are neither migrated nor deleted. Checkpoints are written by `features/chapter1/useCheckpointSaver.ts`. |
 | Game localization (English, Vietnamese) | `apps/game/src/i18n/`: i18next 27.1.1 and react-i18next 18.0.1 with bundled dictionaries, English as default and fallback, Vietnamese as second locale. The choice is stored in `GameSettings.language` (`localStorage` key `scammaze_settings_v1`) and `<html lang>` follows it. Chapter 1 narrative text is translated through a display-only overlay; the chapter core, its state and saves do not depend on the language. The landing app stays English-only. See [section 4.2.2](#422-localization-implemented). |
 | Shared Contracts | `packages/shared-types`: pure TypeScript definitions for scene IDs, graphics quality, game settings (including `language: GameLocale`), and scenario metadata. |
 | Quality Gates | Root `pnpm typecheck`, `pnpm test` (Vitest + Testing Library in `apps/game`) and `pnpm build`. On 11 Nov 2026, `pnpm test` reported 48 test files and 392 tests passed. Property tests use a seeded generator in `apps/game/src/test/` (no fast-check dependency). No lint script exists. |
@@ -232,6 +232,15 @@ live on an **in-game smartphone** inside the 3D world. Full definition:
 
 Components inside the game client (paths relative to `apps/game/src/`):
 
+> **Update, 16 Nov 2026.** The bullets below that name `ChapterOnePage`, `ChapterOneCanvas`,
+> `InteractableProps`, `InteractionProbe` or the street (the 3D world runtime, the controls
+> `enabled` flag, "Chapter page and UI" and the second-WebGL-context follow-up) describe the
+> street chapter. That chapter is `DEPRECATED`: it is parked under
+> `src/legacy/urgent-call-street/`, excluded from `tsc` and Vitest, and not maintained. The
+> current Chapter 1 host is Room v2 with a chapter layer
+> ([section 4.2.3](#423-chapter-1-flow-and-room-v2-host-implemented)). The call UI, voice layer
+> and phone overlay components in `features/chapter1/` are reused by the new layer.
+
 - **3D world runtime** (Three.js + React Three Fiber + Drei, Rapier proposed for physics; see
   section 3.1).
   - `IMPLEMENTED`: first-person movement and arms reused from `features/player/`
@@ -247,7 +256,8 @@ Components inside the game client (paths relative to `apps/game/src/`):
     not leak into the world or fire on resume.
   - `PLANNED`: NPC characters, area-based loading, the apartment, physics.
 - **In-game smartphone UI** (`IMPLEMENTED` for Chapter 1): 2D React overlay `PhoneOverlay` in
-  `features/chapter1/phone/` (home, call history, messages, bank). Phone calls are not shown in
+  `features/chapter1/phone/` (home, call history, messages, voicemail; the bank app moved to the
+  laptop overlay in the rebuild). Phone calls are not shown in
   this overlay; they use the call UI below. Phone actions are sent to the core as Core_Actions;
   the phone does not change state itself. An in-world surface for the other phone apps is
   `PLANNED`.
@@ -357,7 +367,7 @@ Components inside the game client (paths relative to `apps/game/src/`):
     generated audio are not verified; the owner must check them before a public release. Only one
     male Vietnamese voice is used. No new service was added, so there is no cost change (see
     [cost estimation](../finops/COST_ESTIMATION.md)).
-- **Chapter page and UI** (`IMPLEMENTED`): `features/chapter1/ChapterOnePage.tsx` owns the
+- **Chapter page and UI of the street chapter** (`DEPRECATED`, parked; the current host is section 4.2.3): `features/chapter1/ChapterOnePage.tsx` (now under `legacy/urgent-call-street/`) owns the
   chapter store (created from the initial state, or from the state the loader already rebuilt
   during `validating-save`), computes the controls `enabled` flag, writes checkpoints (`useCheckpointSaver.ts`),
   triggers calls (`useCallTriggers.ts`) and renders the canvas plus the 2D UI: title card, HUD
@@ -371,8 +381,9 @@ Components inside the game client (paths relative to `apps/game/src/`):
   the event log and evidence state; `features/chapter1/debrief/DebriefScreen.tsx` shows it.
   Replay of alternative branches is `PLANNED`.
 
-Open follow-up (`PLANNED`): while Chapter 1 is open, the menu canvas stays mounted with
-`frameloop="never"` and `ChapterOneCanvas` creates a second WebGL context. The memory and
+Open follow-up (`PLANNED`; written for the parked street chapter, and the same question now
+applies to the room page): while a chapter is open, the menu canvas stays mounted with
+`frameloop="never"` and the chapter creates a second WebGL context. The memory and
 start-up cost of that second context has not been measured; measure it on an integrated-GPU
 laptop and decide whether to unmount the menu canvas or share one canvas.
 
@@ -398,7 +409,7 @@ Flow. New game: `checking-device → loading-assets → initializing-state → r
 any saved action is rejected, loading fails with an invalid-save error, otherwise the rebuilt
 state and clamped player pose go into the session (`session.restored`). After `ready`, the
 screen fades out and `App` switches to the chapter. For a chapter with `gameplayAvailable: true`
-(Chapter 1) that is `features/chapter1/ChapterOnePage.tsx`; otherwise it is the "in development"
+(Chapter 1) that is the prologue (new game) or `features/chapter1/room/RoomChapterPage.tsx` (saved game or `?skip-prologue`); otherwise it is the "in development"
 screen `features/chapter/ChapterPlaceholder.tsx`. The menu canvas keeps its scene but stops
 rendering (`frameloop="never"`) while covered (see the second-WebGL-context follow-up in
 section 4.2).
@@ -504,33 +515,64 @@ Settings and document language (`IMPLEMENTED`):
 
 Adding a language: see the "Adding a language" section of [CONTRIBUTING.md](../../CONTRIBUTING.md#adding-a-language).
 
+#### 4.2.3 Chapter 1 flow and Room v2 host (`IMPLEMENTED`)
+
+Verified by automated tests on branch `feat/chapter-01-double-deception` (160 test files, 1453
+tests, `pnpm typecheck` and `pnpm build` passed at the task 14 checkpoint). Not checked on a real
+GPU, with real speakers, on real devices or by a human player.
+
+Flow: main menu, chapter loading, neighborhood prologue (`features/prologue/ProloguePage.tsx`,
+`/khupho` world), house no. 59, the player's room (Room v2, `features/roomv2/`) with the chapter
+layer, then the forensic debrief. Saved games and `?skip-prologue` go straight to
+`features/chapter1/room/RoomChapterPage.tsx`, which embeds `RoomV2Page` and the same layer. The
+routes `/roomv2`, `/khupho`, `/testmove`, `/ueh`, `/hue` and `/mientay` are unchanged.
+
+| Part | Files (`apps/game/src/`) | Role |
+|---|---|---|
+| Story_Port | `features/roomv2/game/outside.ts` (`RoomStoryPort`, `RoomStoryCommands`) | The engine reports prop interactions and inspection phases to an external story host and accepts presentation commands (phone mode, ringing). With a port set, the room's own phone-call timeline is off. |
+| Bridge | `features/chapter1/room/roomStoryBridge.ts` | Pure TypeScript adapter between the engine port and the layer; neutral defaults before attach and after detach. |
+| Chapter layer | `features/chapter1/room/RoomChapterLayer.tsx`, `RoomCallLayer.tsx`, `RoomEndingLayer.tsx`, `RoomPhoneModelLayer.tsx`, `roomPresentation.ts`, `useNarrationPlayback.ts` | Owns the chapter store, the overlay stack (call, phone, laptop, journal, decision, ending, debrief, pause), calls that ring from state, narration, and a polite live region. Escape closes one overlay at a time and never closes a call, the ending or the debrief. |
+| Laptop overlay | `features/chapter1/room/laptop/` | Notification, bank app, compare view and Review Security page. Sends `DEVICE_ACTION` and `COMBINE_EVIDENCE` to the core; has no inputs, forms or links. |
+| Phone records | `features/chapter1/phone/PhoneOverlay.tsx` (call history, messages, voicemail) | Opens call details that can reveal evidence. |
+| Journal | `features/chapter1/journal/` | Evidence list, combination of 2 to 3 items, related deductions and hints. |
+| 3D phone | `RoomPhoneModelLayer.tsx` (own small canvas, optional) with `features/chapter1/call/` | Falls back to the 2D phone screen when WebGL, the model or the context is unavailable. `RoomChapterPage` takes its `modelAllowed` default from a WebGL probe. |
+| Debrief | `features/chapter1/debrief/DebriefScreen.tsx`, `game/narrative/debrief.ts` | Forensic debrief with a timeline, trust analysis and Replay (clears the save and restarts the chapter). |
+| Voice | `game/voice/`, `apps/game/public/audio/chapter01/{en,vi}` | 88 generated clips (44 per language). Voice never changes state. |
+
+The chapter layer reads state through selectors and writes only Core_Actions through the store.
+The Room v2 engine holds no story state. The aftermath phone and laptop text is shown on the
+ending screen; it is not pushed to the engine's laptop frame.
+
 ### 4.3 Deterministic core: narrative engine and scam intelligence engine (`IMPLEMENTED` for Chapter 1)
 
-**What exists (`IMPLEMENTED`, verified 11 Nov 2026)**, in `apps/game/src/game/narrative/`:
+**What exists (`IMPLEMENTED`, verified 11 Nov 2026; extended and re-verified by tests 16 Nov 2026)**, in `apps/game/src/game/narrative/`:
 
 | Part | Files | Role |
 |---|---|---|
 | Types | `types.ts` | `CoreAction` union, `ChapterState` (status, call and conversation state, evidence, claims, objectives, pressure, event log `events`), `ScenarioDefinition` |
 | Reducer | `reducer.ts` | `chapterReducer(state, action, scenario) → ActionResult` (`accepted`, next state, rejection reason); `createInitialState()`; `isCoreAction()` guard for untrusted input. Accepted actions are appended to the event log |
 | Rule modules | `conditions.ts`, `dialogueEngine.ts`, `evidence.ts`, `objectives.ts`, `outcome.ts`, `debrief.ts`, `selectors.ts` | Condition checks, dialogue graph traversal, evidence discovery and claim status, objective progress, ending selection, debrief view, read-only selectors |
-| Chapter 1 content | `chapter1/` (`scenario.ts`, `claims.ts`, `evidence.ts`, `interactables.ts`, `objectives.ts`, `phone.ts`, `decisions.ts`, `endings.ts`, `debrief.ts`, `dialogues/`) | Authored data only; fictional names and reserved domains |
-| Scenario validation | `validateScenario.ts` | Hand-written checks of the scenario data for broken references and unreachable dialogue; returns error strings and is run by tests |
+| Double-deception modules | `deductions.ts`, `beats.ts`, plus `DEVICE_ACTION` and `COMBINE_EVIDENCE` handling in `reducer.ts` | `CoreAction` now has 16 kinds. A deduction is recorded by combining 2 to 3 evidence items (order does not matter) and may add flags or set a claim to `inconclusive`, never to `contradicted`. Device actions open laptop and phone records and can reveal evidence. Beats are state-triggered effects that settle within a pass limit. |
+| Chapter 1 content | `chapter1/` (`scenario.ts`, `ids.ts`, `sources.ts`, `claims.ts`, `evidence.ts`, `deductions.ts`, `deviceActions.ts`, `beats.ts`, `acts.ts`, `interactables.ts`, `objectives.ts`, `phone.ts`, `decisions.ts`, `endings.ts`, `debrief.ts`, `dialogues/`) | Authored data only; fictional names and reserved domains. Which calls ring, when objectives complete, what a decision does and which ending applies are data (`ringWhen`, `completeWhen`, decision effects, `selectWhen`), not reducer code. Each incoming call rings at most once. 12 evidence items, 3 deductions, 12 device actions, 3 beats, 5 decisions, 4 endings. |
+| Scenario validation | `validateScenario.ts`, `reachability.ts` | Hand-written checks of the scenario data: references (including sources, deductions, device actions, beats and ring rules), deduction inputs, evidence that is discoverable only after a deduction that needs it, a call that can never ring, objectives that can never complete, decisions without a harmless option, endings not total over decisions, and unreachable nodes. Playback-only narration graphs are exempt from the dialogue-shape rules. `analyzeReachability` explores states and reports unreachable outcomes, nodes and options, and soft locks; on the shipped data it reports all 4 endings reachable, nothing unreachable and no soft lock (checked by tests). Both are run by tests |
 | Store | `store.ts` | `createChapterStore(initial)`: `getState`, `dispatch`, `subscribe`, `replace`. Notifies listeners only when an action is accepted. React reads it with `useSyncExternalStore` (`features/chapter1/useChapterState.ts`) |
 
-Save format v2 (`game/saves/`, `IMPLEMENTED`):
+Save format v3 (`game/saves/`, `IMPLEMENTED`; replaces v2, which is described by the older text below where it still says v2):
 
 - `saveGame.ts` defines the `SaveGameSource` interface (`read`, `write`, `clear`) and the
-  `localStorage` implementation. Key `scammaze_save_v2`; the envelope holds `chapterId`,
-  `sceneId`, `savedAt` and `progress` (`checkpointId`, accepted Core_Actions up to 1000,
-  `playerPose`). Parsing rebuilds the save from known fields and rejects unknown actions. No
+  `localStorage` implementation. Key `scammaze_save_v3`; the envelope holds `formatVersion: 3`,
+  `contentVersion` (`ch1-double-deception-1`), `chapterId`, `sceneId`, `savedAt` and `progress`
+  (`checkpointId`, accepted Core_Actions up to 1000, `playerPose`). A save with an older
+  `formatVersion` or another `contentVersion` is reported as `incompatible`; the old v1 and v2
+  keys are only used to detect an old save, which is not migrated and not deleted. The menu and
+  the chapter show a message for it in English and Vietnamese. Parsing rebuilds the save from known fields and rejects unknown actions. No
   names, free text or device identifiers are stored.
 - **Replay validation** (`chapterProgress.ts`): `restoreProgress` replays the saved actions from
   `createInitialState()` through `chapterReducer`. If any action is rejected, the save is invalid,
   Continue stays disabled and loading reports an invalid-save error. The player pose is clamped to
   the play area. `encodeProgress` writes only accepted actions.
-- **v1 migration**: a version 1 save (`scammaze_save_v1`, chapter and scene only) is converted to
-  a v2 checkpoint at the chapter start (`checkpointId: "start"`, no actions), written to the v2
-  key, and the v1 key is removed when the write succeeds.
+- **v1 migration** (`DEPRECATED`): the earlier conversion of a version 1 save to a v2 checkpoint
+  belonged to the street chapter. Under v3 a v1 or v2 save is `incompatible` and left untouched.
 - Blocked storage or a failed write does not stop gameplay; the chapter shows a save-failure
   notice.
 - **Lenient restore** (`IMPLEMENTED`, unit-tested in `chapterProgress.test.ts`; the Chapter 1
