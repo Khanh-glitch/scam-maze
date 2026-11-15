@@ -1,4 +1,3 @@
-// Re-enabled in task 10.5 once the scenario is assembled (all tests in this file are skipped until then).
 // Feature: game-3d-phone-call-ui, Property 4: Fallback parity
 // Feature: game-phone-call-ui-redesign, Property 5: Presentation equivalence across modes
 //
@@ -188,7 +187,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe.skip("CallPresentation fallback parity", () => {
+describe("CallPresentation fallback parity", () => {
   it(
     "keeps the screen, its text, its buttons, focus and dispatched actions the same in every mode",
     () => {

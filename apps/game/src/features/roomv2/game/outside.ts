@@ -39,6 +39,8 @@ export interface RoomStoryCommands {
   setMood(mood: 'calm' | 'quiet' | 'tense'): void;
   /** Leaves the inspect pose even when `canLeaveInspect` says no. */
   closeInspect(): void;
+  /** Shows (true) or hides (false) the cursor while a host overlay is open. `Engine` already has it. */
+  setCursorMode?(on: boolean): void;
 }
 
 /**

@@ -12,6 +12,7 @@ const debriefForensic = {
         evidence: "Evidence",
         deduction: "Connection",
         decision: "Decision",
+        verification: "Check",
       },
     },
     analysis: {
@@ -25,10 +26,12 @@ const debriefForensic = {
       trap: "The trap you entered",
       trapNone: "You did not enter the trap.",
       verifyNext: "What to verify next time",
+      pressureLevel: "Pressure reached: {{number}} of 3",
     },
     cluesMissed: {
       heading: "Clues you did not find",
       none: "You found every clue.",
+      missedLabel: "Missed",
     },
     habit: {
       heading: "The habit to keep",
@@ -38,6 +41,16 @@ const debriefForensic = {
       heading: "Your evidence",
       count_one: "{{number}} piece of evidence",
       count_other: "{{number}} pieces of evidence",
+    },
+    caseReport: {
+      heading: "Case report",
+    },
+    ending: {
+      phone: "On your phone",
+      laptop: "On your laptop",
+      evidence: "What you had",
+      narration: "Narration",
+      next: "Next line",
     },
     simulation: "Everything in this chapter was a simulation.",
     continue: "Continue",

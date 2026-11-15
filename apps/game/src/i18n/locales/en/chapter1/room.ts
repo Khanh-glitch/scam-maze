@@ -91,6 +91,19 @@ const room = {
       overlayOpen: "An overlay is open. Press Escape to close it.",
       callActive: "A call is in progress.",
     },
+    announce: {
+      notification: "A new security alert reached your laptop.",
+      evidence: "New evidence recorded: {{title}}",
+      deduction: "Deduction recorded: {{statement}}",
+    },
+    hud: {
+      hintPanelLabel: "Hint for the current objective",
+    },
+    call: {
+      toolsLabel: "Call tools",
+      notes: "Notes",
+      notesLabel: "Open your notes. The call keeps going.",
+    },
   },
 };
 export default room;

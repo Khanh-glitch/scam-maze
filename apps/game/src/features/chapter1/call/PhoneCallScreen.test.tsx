@@ -1,5 +1,3 @@
-// @ts-nocheck -- uses the old street-chapter IDs; rewritten when the scenario is assembled (spec chapter-01-double-deception, task 2.1 placeholder).
-// Re-enabled in task 10.5 once the scenario is assembled (all tests in this file are skipped until then).
 // PhoneCallScreen unit tests (task 5.1). Requirements 1.1 to 1.6, 2.1, 2.5 and 3.10.
 //
 // The views are built from the real Chapter 1 display scenario (English source and the `vi`
@@ -18,7 +16,7 @@ import type { PhoneCallView } from "./callDialogueView";
 
 const LOCALES: readonly GameLocale[] = ["en", "vi"];
 const PHONE_TEXT = { en: enPhone.phone, vi: viPhone.phone } as const;
-const CALL_ID: CallId = "call.scam-1";
+const CALL_ID: CallId = "call.alex";
 const FORBIDDEN_WORDS = ["safe", "verified", "trusted", "an toàn"];
 const EMOJI = /\p{Extended_Pictographic}/u;
 
@@ -103,7 +101,7 @@ function expectCommonRules(root: HTMLElement, locale: GameLocale): void {
   }
 }
 
-describe.skip("PhoneCallScreen", () => {
+describe("PhoneCallScreen", () => {
   for (const locale of LOCALES) {
     const text = PHONE_TEXT[locale];
 
