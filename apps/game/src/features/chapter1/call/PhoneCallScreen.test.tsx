@@ -109,7 +109,11 @@ describe("PhoneCallScreen", () => {
       expect(bar.getAttribute("aria-hidden")).toBe("true");
       expect(bar.className).toContain("pointer-events-none");
       expect(screen.getByTestId("phone-status-time").textContent).toMatch(/^\d{2}:\d{2}$/);
-      expect(bar.querySelectorAll("svg")).toHaveLength(3);
+      expect(Array.from(bar.querySelectorAll("img")).map((i) => i.getAttribute("src"))).toEqual([
+        "/assets/ui/statusBar/Mobile%20Signal.png",
+        "/assets/ui/statusBar/Wifi.png",
+        "/assets/ui/statusBar/Battery.png",
+      ]);
       unmount();
     }
   });

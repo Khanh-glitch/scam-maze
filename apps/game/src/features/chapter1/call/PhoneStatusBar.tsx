@@ -1,47 +1,27 @@
 // Decorative iPhone-style status bar of the call screen: the in-game clock on the left, the
-// Dynamic Island gap in the middle, and signal, Wi-Fi and battery on the right. DOM and inline SVG
-// only. The clock reads the same in-game time as the wall clock of the room (`gameClock`).
+// Dynamic Island gap in the middle, and signal, Wi-Fi and battery images on the right. DOM only. The clock reads the same in-game time as the wall clock of the room (`gameClock`).
 import React, { useEffect, useState } from "react";
 import { gameClockText } from "../../../game/clock/gameClock";
 
-/** Fixed battery level shown in the pill. */
-const BATTERY_LEVEL = 76;
-
 export type StatusBarTone = "dark" | "light";
 
-/** `dark` = white glyphs for a dark screen (the call screen); `light` = black glyphs for a light one. */
-const TONES: Record<StatusBarTone, { ink: string; track: string; label: string }> = {
-  dark: { ink: "#ffffff", track: "rgba(255,255,255,0.35)", label: "#000000" },
-  light: { ink: "#000000", track: "rgba(0,0,0,0.35)", label: "#ffffff" },
+/**
+ * Owner-supplied icon art (PNG at 3x). `dark` = white glyphs for a dark screen (the call screen,
+ * folder `statusBar`); `light` = dark glyphs for a light screen (folder `StatusBarLight`). The
+ * battery art has the level (76) drawn in, so the level is fixed. The clock is live text instead
+ * of `Time.png`, because it must follow the in-game time.
+ */
+const TONES: Record<StatusBarTone, { dir: string; ink: string }> = {
+  dark: { dir: "/assets/ui/statusBar", ink: "#ffffff" },
+  light: { dir: "/assets/ui/StatusBarLight", ink: "#000000" },
 };
 
-const SignalIcon: React.FC<{ ink: string }> = ({ ink }) => (
-  <svg viewBox="0 0 18 12" className="h-3 w-[18px]" fill={ink} aria-hidden="true">
-    <rect x="0" y="8" width="3" height="4" rx="0.9" />
-    <rect x="5" y="5.5" width="3" height="6.5" rx="0.9" />
-    <rect x="10" y="3" width="3" height="9" rx="0.9" />
-    <rect x="15" y="0" width="3" height="12" rx="0.9" />
-  </svg>
-);
-
-const WifiIcon: React.FC<{ ink: string }> = ({ ink }) => (
-  <svg viewBox="0 0 17 12" className="h-3 w-[17px]" fill="none" stroke={ink} strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
-    <path d="M1.2 4.2a10 10 0 0 1 14.6 0" />
-    <path d="M3.9 7a6.1 6.1 0 0 1 9.2 0" />
-    <circle cx="8.5" cy="10.1" r="1.2" fill={ink} stroke="none" />
-  </svg>
-);
-
-const BatteryIcon: React.FC<{ ink: string; track: string; label: string; level: number }> = ({ ink, track, label, level }) => (
-  <svg viewBox="0 0 27 13" className="h-[13px] w-[27px]" aria-hidden="true">
-    <rect x="0" y="0" width="24" height="13" rx="4" fill={track} />
-    <rect x="0" y="0" width={(24 * level) / 100} height="13" rx="4" fill={ink} />
-    <rect x="25" y="4.2" width="1.8" height="4.6" rx="0.9" fill={track} />
-    <text x="12" y="10.2" textAnchor="middle" fontSize="9.5" fontWeight="700" fill={label} fontFamily="system-ui, sans-serif">
-      {level}
-    </text>
-  </svg>
-);
+/** Icon size in CSS px: the art is 3x, so 1/3 of its pixel size. */
+const ICONS = [
+  { file: "Mobile Signal.png", w: 17, h: 11 },
+  { file: "Wifi.png", w: 16, h: 11 },
+  { file: "Battery.png", w: 24, h: 13 },
+] as const;
 
 export const PhoneStatusBar: React.FC<{ tone?: StatusBarTone }> = ({ tone = "dark" }) => {
   const [time, setTime] = useState(gameClockText);
@@ -63,9 +43,17 @@ export const PhoneStatusBar: React.FC<{ tone?: StatusBarTone }> = ({ tone = "dar
       </span>
       <span />
       <span className="flex items-center justify-center gap-1.5">
-        <SignalIcon ink={c.ink} />
-        <WifiIcon ink={c.ink} />
-        <BatteryIcon ink={c.ink} track={c.track} label={c.label} level={BATTERY_LEVEL} />
+        {ICONS.map((icon) => (
+          <img
+            key={icon.file}
+            src={`${c.dir}/${encodeURIComponent(icon.file)}`}
+            alt=""
+            width={icon.w}
+            height={icon.h}
+            draggable={false}
+            style={{ width: icon.w, height: icon.h }}
+          />
+        ))}
       </span>
     </div>
   );

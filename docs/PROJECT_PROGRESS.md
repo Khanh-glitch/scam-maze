@@ -224,6 +224,10 @@ Resolved:
   the reduced-stress hint) are listed in `ACCESSIBILITY.md`.
 
 ## Task History
+### 2026-11-15 — Status bar uses the owner's icon art
+- **Objective:** Replace my drawn SVG icons with the owner's PNGs in `apps/game/public/assets/ui/statusBar` (white, for dark screens) and `StatusBarLight` (dark, for light screens).
+- **Completed:** `PhoneStatusBar.tsx` shows `Mobile Signal.png`, `Wifi.png` and `Battery.png` from the folder chosen by `tone` (`dark` is used by the call screen). `Time.png` is not used: the clock stays live text from `gameClock`. Test updated.
+- **Validation:** `tsc` and `vitest run` (1521 tests) passed. Not verified: the look on the 3D phone. The battery art has 76 baked in, so the level is fixed.
 ### 2026-11-15 — Phone status bar: in-game clock, iOS-style icons, rounded screen corners
 - **Objective:** Owner feedback on the call screen: the top corners were square, the clock must match the game time, and the signal, Wi-Fi and battery icons did not look like an iPhone's.
 - **Completed:** (1) `game/clock/gameClock.ts` (pure): the room starts at 23:08; the room engine reports elapsed seconds each frame (`updateDevices`), and the phone formats the same value as HH:MM, so it matches the wall clock. (2) `call/PhoneStatusBar.tsx`: clock, Dynamic Island gap and icons in a 3-column grid; signal bars, Wi-Fi arcs and a battery pill with the level number (76) drawn as inline SVG; `tone` prop `dark` (white glyphs, used) or `light` (black glyphs, not used yet). (3) `PhoneCallScreen` section is clipped with `rounded-[13.7%/6.3%]` (iPhone 17 Pro screen radius, about 55 pt on 402 x 874 pt).
