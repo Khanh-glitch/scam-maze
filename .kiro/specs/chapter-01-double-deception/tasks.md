@@ -366,10 +366,10 @@ Resolved assumptions (recorded in the design):
     - Add the `docs/PROJECT_PROGRESS.md` entry (newest first) with the nine items of AGENTS.md section 6: date and title, objective, completed work, files created, modified, moved or deleted, validation commands executed, exact build and test results from task 14, unresolved issues and limitations (human playtest, pacing and the 18 to 22 minute duration, real GPU, real speakers, real devices, 3D phone overlay on a real GPU, clip quality: not executed), deviations (parked street chapter, save v3, Act II title), and follow-ups. Update "Project status", "In progress" and "Completed" only for what was verified.
     - Update `docs/architecture/OVERVIEW.md` (flow, Room v2 as chapter host, Story_Port), `.kiro/steering/architecture.md` and `.kiro/steering/gameplay-rules.md` (16 actions, data-driven rules, deductions, new invariants, save v3), and `ACCESSIBILITY.md` (laptop and phone overlays, live regions). Do not create a separate audit file: the audit stays in `design.md`.
     - _Requirements: 24.1, 24.2, 24.4, 24.5_
-  - [-] 15.2 Commit the documentation and the spec
+  - [x] 15.2 Commit the documentation and the spec
     - Stage `docs/PROJECT_PROGRESS.md`, `docs/architecture/OVERVIEW.md`, `ACCESSIBILITY.md`, `.kiro/steering/architecture.md`, `.kiro/steering/gameplay-rules.md` and `.kiro/specs/chapter-01-double-deception/*` by name. Commit `docs(game): record the double-deception chapter rebuild` with the trailer.
     - _Requirements: 24.1, 24.3_
-  - [~] 15.3 Push without force
+  - [-] 15.3 Push without force
     - Run `git push -u origin feat/chapter-01-double-deception` with no force option. Do not merge and do not open a merge action. Report the commit hashes and the real results of task 14.
     - _Requirements: 24.3, 24.6_
 
