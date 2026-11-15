@@ -33,6 +33,8 @@ const debriefForensic: LocaleShape<typeof en> = {
       heading: "Những manh mối bạn chưa tìm thấy",
       none: "Bạn đã tìm thấy mọi manh mối.",
       missedLabel: "Đã bỏ lỡ",
+      summary_one: "Xem {{number}} manh mối đã bỏ lỡ",
+      summary_other: "Xem {{number}} manh mối đã bỏ lỡ",
     },
     habit: {
       heading: "Thói quen nên giữ",

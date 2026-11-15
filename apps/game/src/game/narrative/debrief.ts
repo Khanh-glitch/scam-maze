@@ -14,6 +14,9 @@ import type { DebriefTimelineKind } from "@scammaze/shared-types";
 import { BEAT_TAG_PREFIX } from "./beats";
 import type { ChapterState, CoreAction, DebriefTrap, ScenarioDefinition } from "./types";
 
+/** The call of the third caller (the recovery procedure). */
+const THIRD_CALLER_ID = "call.recovery";
+
 export interface DebriefView {
   outcome: {
     id: OutcomeId;
@@ -56,7 +59,13 @@ export interface DebriefAnalysis {
   unverifiedSignals: Array<{ id: WarningSignId; label: string }>;
   /** The third caller never gives independent evidence. */
   thirdCallerIndependent: false;
-  thirdCallerNote: string;
+  /**
+   * True when the player answered the third caller (a call record with status `answered` or
+   * `ended`). A declined or never-rung call is not an encounter, so the debrief says nothing about it.
+   */
+  thirdCallerEncountered: boolean;
+  /** Authored note about the third caller, or `null` when the player never talked to that caller. */
+  thirdCallerNote: string | null;
   trapEntered: DebriefTrap;
   trapNote: string;
   verifyNextTime: string[];
@@ -144,6 +153,9 @@ export function buildDebrief(
   const secondTrap = state.flags.money_moved === true || state.flags.second_caller_trusted === true;
   const trapEntered: DebriefTrap = firstTrap && secondTrap ? "both" : firstTrap ? "first" : secondTrap ? "second" : "none";
   const content = scenario.debrief.analysis;
+  const thirdCallerEncountered = state.call.log.some(
+    (record) => record.callId === THIRD_CALLER_ID && (record.status === "answered" || record.status === "ended"),
+  );
 
   return {
     outcome: {
@@ -164,7 +176,8 @@ export function buildDebrief(
       whyWarningLooked: content.whyWarningLooked,
       unverifiedSignals: warningSignsNoticed,
       thirdCallerIndependent: false,
-      thirdCallerNote: content.thirdCallerNote,
+      thirdCallerEncountered,
+      thirdCallerNote: thirdCallerEncountered ? content.thirdCallerNote : null,
       trapEntered,
       trapNote: content.trapNotes[trapEntered],
       verifyNextTime: [...content.verifyNextTime],

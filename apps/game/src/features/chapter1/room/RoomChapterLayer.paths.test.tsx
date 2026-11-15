@@ -144,21 +144,16 @@ describe("path 1: signature path to false-victory", () => {
 });
 
 describe("path 2: verify independently to break-the-chain", () => {
-  it("inspects the origin, reads the statement, calls the saved contact and verifies", () => {
+  it("reads the statement, calls the saved contact and verifies", () => {
     const rig = setupLayer();
     declineAlex(rig);
 
-    openProp(rig, "laptop");
-    fireEvent.click(screen.getByRole("button", { name: LAPTOP.notification.details }));
-    fireEvent.click(screen.getByRole("button", { name: LAPTOP.notificationDetails.inspect }));
-    expect(rig.store().getState().flags.notification_origin_inspected).toBe(true);
-    leaveProp(rig, "laptop");
-
-    // The paper statement (E03) is read at the receipts prop.
+    // The paper statement (E03) is read at the receipts prop. It is one counted item, so the
+    // third call does not ring yet and the player can still call the saved contact first.
     act(() => rig.bridge.onProp("receipts", "interact"));
     expect(rig.store().getState().interacted).toContain("obj.receipts");
     expect(rig.store().getState().discovered).toContain("ev.official-contact-paper");
-
+    expect(rig.store().getState().call.status).not.toBe("ringing");
     // The saved contact is called from the call history on the phone.
     openProp(rig, "phone");
     const phone = screen.getByRole("dialog", { name: PHONE.overlay.name });
@@ -178,6 +173,7 @@ describe("path 2: verify independently to break-the-chain", () => {
     expect(rig.store().getState().flags.official_channel_verified).toBe(true);
 
     // The official call is over, so the third caller rings. Answer it and hang up.
+
     answerRingingCall(rig, "call.recovery");
     expectCallLayout();
     fireEvent.click(screen.getByTestId("call-screen-hang-up"));

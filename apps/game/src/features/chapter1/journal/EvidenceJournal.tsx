@@ -126,7 +126,7 @@ export const EvidenceJournal: React.FC<EvidenceJournalProps> = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby="evidence-journal-heading"
-        className={`${UI.panel} flex max-h-[90vh] max-w-2xl flex-col gap-4`}
+        className={`${UI.panel} flex max-h-[calc(100dvh-2rem)] max-w-2xl flex-col gap-4`}
       >
         <h2
           id="evidence-journal-heading"

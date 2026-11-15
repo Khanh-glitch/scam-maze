@@ -146,7 +146,7 @@ describe("DebriefScreen", () => {
     const analysis = within(screenEl).getByTestId("debrief-analysis");
     expect(within(analysis).getByText(view.analysis.pressureBuilt)).toBeTruthy();
     expect(within(analysis).getByText(view.analysis.whyWarningLooked)).toBeTruthy();
-    expect(within(analysis).getByText(view.analysis.thirdCallerNote)).toBeTruthy();
+    expect(within(analysis).getByText(view.analysis.thirdCallerNote as string)).toBeTruthy();
     expect(within(analysis).getByText(view.analysis.trapNote)).toBeTruthy();
     expect(within(analysis).getByText(EN_F.analysis.thirdCallerNotIndependent)).toBeTruthy();
     for (const line of view.analysis.verifyNextTime) expect(within(analysis).getByText(line)).toBeTruthy();
@@ -159,6 +159,12 @@ describe("DebriefScreen", () => {
     expect(view.cluesMissed.length).toBeGreaterThan(0);
 
     const missed = sectionOf(screenEl, EN.cluesMissed);
+    // The missed clues sit in a closed disclosure whose summary shows the count.
+    const details = within(missed).getByTestId("debrief-clues-missed-details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(within(missed).getByTestId("debrief-clues-missed-summary").textContent).toBe(
+      EN_F.cluesMissed.summary_other.replace("{{number}}", String(view.cluesMissed.length)),
+    );
     const missedItems = within(missed).getAllByRole("listitem");
     expect(missedItems).toHaveLength(view.cluesMissed.length);
     view.cluesMissed.forEach((clue, index) => {
@@ -176,6 +182,46 @@ describe("DebriefScreen", () => {
     const foundIds = new Set(view.evidenceFound.map((item) => item.id));
     for (const clue of view.cluesMissed) expect(foundIds.has(clue.id)).toBe(false);
     expect(within(found).queryByTestId("clue-missed-label")).toBeNull();
+  });
+
+  it("reads the Missed badge and the clue title as one phrase (P2-7)", () => {
+    const view = viewOf(reachEndingD());
+    const { screenEl } = renderDebrief(view);
+    const first = within(screenEl).getAllByTestId("clue-missed-label")[0].parentElement as HTMLElement;
+    expect(first.textContent).toBe(`${EN_F.cluesMissed.missedLabel}: ${view.cluesMissed[0].title}`);
+  });
+
+  it("shows one outcome paragraph and no separate key-decisions list (P2-5)", () => {
+    for (const run of [reachEndingA(), reachEndingB(), reachEndingC(), reachEndingD()]) {
+      const view = viewOf(run);
+      const { screenEl } = renderDebrief(view);
+      const outcome = sectionOf(screenEl, EN.outcome);
+      expect(within(outcome).getAllByText(/./, { selector: "p" })).toHaveLength(1);
+      expect(within(outcome).getByTestId("debrief-outcome-text").textContent).toBe(view.outcome.summary);
+      expect(within(screenEl).queryByRole("heading", { name: EN.decisions })).toBeNull();
+      // Every timeline sentence appears once on the screen.
+      for (const entry of view.timeline) {
+        const count = (screenEl.textContent ?? "").split(entry.text).length - 1;
+        const sameText = view.timeline.filter((other) => other.text === entry.text).length;
+        expect(count, entry.text).toBe(sameText);
+      }
+      document.body.innerHTML = "";
+    }
+  });
+
+  it("talks about the third caller only when the player answered that call (P2-6)", () => {
+    const answered = renderDebrief(viewOf(reachEndingA()));
+    expect(within(answered.screenEl).getByTestId("debrief-third-caller")).toBeTruthy();
+    document.body.innerHTML = "";
+
+    const declined = viewOf(reachEndingD());
+    expect(declined.analysis.thirdCallerEncountered).toBe(false);
+    const { screenEl } = renderDebrief(declined);
+    expect(within(screenEl).queryByTestId("debrief-third-caller")).toBeNull();
+    const analysis = within(screenEl).getByTestId("debrief-analysis");
+    expect(analysis.textContent).not.toContain(EN_F.analysis.thirdCallerNotIndependent);
+    expect(analysis.textContent).not.toContain(EN_F.analysis.thirdCaller);
+    expect(analysis.textContent).not.toMatch(/third caller/i);
   });
 
   it("shows the case report only in the secret variant", () => {

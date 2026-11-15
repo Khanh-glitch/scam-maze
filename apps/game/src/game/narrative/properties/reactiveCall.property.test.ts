@@ -1,7 +1,7 @@
 // Feature: chapter-01-double-deception, Property 10: Third call gating and reactive start
 //
 // `call.recovery` may ring if and only if Alex's call is closed, no call or conversation is active,
-// no decision or outcome exists, it has not rung, and one of its five authored `ringWhen`
+// no decision or outcome exists, it has not rung, and one of its six authored `ringWhen`
 // alternatives holds. When it is answered, the start node is the first match of the authored
 // priority list (verified, confronted, inspected, followed, blank), computed here from the state
 // without reading the scenario's `startNodeWhen`. Validates: Requirements 9.1, 9.2, 9.9, 12.6.
@@ -93,12 +93,13 @@ const alexClosed = (s: ChapterState): boolean =>
 
 const recoveryRung = (s: ChapterState): boolean => s.call.log.some((r) => r.callId === "call.recovery");
 
-/** The five authored `ringWhen` alternatives, written out again (Alex closed is part of each). */
+/** The six authored `ringWhen` alternatives, written out again (Alex closed is part of each). */
 function alternativeHolds(s: ChapterState): boolean {
   const early = EARLY_EVIDENCE.filter((id) => (s.discovered as string[]).includes(id)).length;
   return (
     s.flags.review_security_opened === true ||
     s.flags.notification_dismissed === true ||
+    (s.flags.notification_handled === true && early >= 2) ||
     s.flags.official_channel_verified === true ||
     early >= 3 ||
     (s.claims as Record<string, string>)["claim.claims-independent"] === "inconclusive"
@@ -233,7 +234,7 @@ describe("Property 10: Third call gating and reactive start", () => {
     // Feature: chapter-01-double-deception, Property 10: Third call gating and reactive start
     const calls = CHAPTER_1_SCENARIO.calls["call.recovery"];
     expect(calls.direction).toBe("incoming");
-    expect(calls.ringWhen.length, "five authored ringWhen alternatives").toBe(5);
+    expect(calls.ringWhen.length, "six authored ringWhen alternatives").toBe(6);
 
     const failures: string[] = [];
     const covered = new Set<StartKey>();
