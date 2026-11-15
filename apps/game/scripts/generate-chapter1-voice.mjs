@@ -6,6 +6,8 @@
 //   pnpm --filter @scammaze/game voice:chapter1 -- --locale vi     one locale
 //   pnpm --filter @scammaze/game voice:chapter1 -- --only a,b --force
 //   pnpm --filter @scammaze/game voice:chapter1 -- --dry-run       list jobs, write nothing
+//   pnpm --filter @scammaze/game voice:chapter1 -- --prune         also delete clips (MP3 and WAV) no job needs
+//   pnpm --filter @scammaze/game voice:chapter1 -- --prune --dry-run   list what would be deleted, delete nothing
 //   pnpm --filter @scammaze/game voice:script                      print the spoken lines, write nothing
 //   pnpm --filter @scammaze/game voice:report [-- --strict]        counts and missing clips
 //
@@ -14,7 +16,7 @@
 // that this script wrote). Anything else is written as `missing`.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -24,6 +26,7 @@ const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const MANIFEST_PATH = path.join(APP_ROOT, "src", "game", "voice", "chapter1.manifest.ts");
 const CACHE_DIR = path.join(APP_ROOT, ".voice-cache");
 const WORKER_PATH = path.join(APP_ROOT, "scripts", "generate-chapter1-voice.ps1");
+const CLIP_DIR = path.join(APP_ROOT, "public", "audio", "chapter01");
 
 const MAX_CLIP_BYTES = 150 * 1024;
 const MIN_CLIP_MS = 500;
@@ -42,6 +45,7 @@ function parseArgs(argv) {
     only: null,
     force: false,
     dryRun: false,
+    prune: false,
     printScript: false,
     report: false,
     strict: false,
@@ -60,6 +64,7 @@ function parseArgs(argv) {
     else if (arg.startsWith("--only=")) options.only = arg.slice(7);
     else if (arg === "--force") options.force = true;
     else if (arg === "--dry-run") options.dryRun = true;
+    else if (arg === "--prune") options.prune = true;
     else if (arg === "--print-script") options.printScript = true;
     else if (arg === "--report") options.report = true;
     else if (arg === "--strict") options.strict = true;
@@ -189,7 +194,7 @@ async function main() {
     const load = (file) => server.ssrLoadModule(file);
     const { CHAPTER_1_SCENARIO } = await load("/src/game/narrative/chapter1/scenario.ts");
     const { CHAPTER_1_NARRATIVE_VI } = await load("/src/i18n/narrative/chapter1.vi.ts");
-    const { buildVoiceJobs, listUntranslatedSpokenLines, CHAPTER1_VOICE_CAST } = await load(
+    const { buildVoiceJobs, listUntranslatedSpokenLines, computeChapterContentVersion, CHAPTER1_VOICE_CAST } = await load(
       "/src/game/voice/buildVoiceJobs.ts",
     );
     const { renderManifest, parseManifestSource } = await load("/src/game/voice/renderManifest.ts");
@@ -199,6 +204,7 @@ async function main() {
     const { VOICE_MANIFEST_SCHEMA_VERSION } = await load("/src/game/voice/manifestTypes.ts");
 
     const overlays = { vi: CHAPTER_1_NARRATIVE_VI };
+    const chapterContentVersion = computeChapterContentVersion(CHAPTER_1_SCENARIO);
     const allJobs = buildVoiceJobs(CHAPTER_1_SCENARIO, overlays, CHAPTER1_VOICE_CAST);
 
     // One slot per Spoken_Node and locale. `job` is absent when the locale has no text.
@@ -269,6 +275,14 @@ async function main() {
       else toRun.push(job);
     }
 
+    // ---- installed voices and stale clips -----------------------------------------------------
+    // A job whose voice is not installed is reported and left missing. No other voice is used.
+    const installed = listInstalledVoices();
+    const voiceMissing = (job) => installed !== null && !installed.some((v) => v.name === job.voice && v.language === (job.locale === "vi" ? "vi-VN" : "en-US"));
+    const noVoice = toRun.filter(voiceMissing);
+    const runnable = toRun.filter((job) => !voiceMissing(job));
+    const stale = options.prune ? findStaleFiles(slots, options.locale) : [];
+
     // ---- --dry-run ---------------------------------------------------------------------------
     if (options.dryRun) {
       console.log(`Dry run. Nothing is written and no speech is generated.`);
@@ -276,6 +290,14 @@ async function main() {
         `Jobs in scope: ${scopedJobs.length}. Up to date (skipped): ${fresh.size}. Jobs to run: ${toRun.length}.`,
       );
       console.log(`Jobs to run by locale: ${JSON.stringify(countBy(toRun, (job) => job.locale))}`);
+      console.log(`Chapter content version: ${chapterContentVersion}`);
+      if (installed === null) console.log("Installed voices: could not be listed (not Windows or worker failed).");
+      else console.log(`Installed voices: ${installed.map((v) => `${v.name} (${v.language})`).join(", ")}`);
+      reportNoVoice(noVoice);
+      if (options.prune) {
+        console.log(`Prune: ${stale.length} stale file(s) would be removed.`);
+        for (const file of stale) console.log(`  remove ${toPosix(path.relative(APP_ROOT, file))}`);
+      }
       for (const job of toRun) {
         console.log(`  [${job.locale}] ${job.clipId}  ${job.voice}, rate ${job.rate}, pitch ${job.pitch} -> ${job.outMp3}`);
       }
@@ -300,6 +322,7 @@ async function main() {
         manifest = {
           schemaVersion: VOICE_MANIFEST_SCHEMA_VERSION,
           chapterId: "chapter-1",
+          chapterContentVersion,
           clips: [...slots.entries()].map(([, slot]) => missingEntry(slot, CHAPTER1_VOICE_CAST)),
         };
       }
@@ -307,9 +330,22 @@ async function main() {
     }
 
     // ---- generate ---------------------------------------------------------------------------
+    if (options.prune) {
+      for (const file of stale) rmSync(file, { force: true });
+      console.log(`Pruned ${stale.length} stale file(s).`);
+    }
+    reportNoVoice(noVoice);
     const results = new Map();
-    if (toRun.length > 0) {
-      for (const result of runWorker(toRun)) results.set(slotKey(result.clipId, result.locale), result);
+    for (const job of noVoice) {
+      results.set(slotKey(job.clipId, job.locale), {
+        clipId: job.clipId,
+        locale: job.locale,
+        ok: false,
+        error: `The voice "${job.voice}" is not installed for ${job.locale}.`,
+      });
+    }
+    if (runnable.length > 0) {
+      for (const result of runWorker(runnable)) results.set(slotKey(result.clipId, result.locale), result);
     }
 
     const failedReasons = new Map();
@@ -338,7 +374,12 @@ async function main() {
       entries.push(stillGood(previous, job) ? previous : missingEntry(slot, CHAPTER1_VOICE_CAST));
     }
 
-    const manifest = { schemaVersion: VOICE_MANIFEST_SCHEMA_VERSION, chapterId: "chapter-1", clips: entries };
+    const manifest = {
+      schemaVersion: VOICE_MANIFEST_SCHEMA_VERSION,
+      chapterId: "chapter-1",
+      chapterContentVersion,
+      clips: entries,
+    };
     mkdirSync(path.dirname(MANIFEST_PATH), { recursive: true });
     writeFileSync(MANIFEST_PATH, renderManifest(manifest), "utf8");
     console.log(`\nManifest written: ${toPosix(path.relative(APP_ROOT, MANIFEST_PATH))}`);
@@ -354,6 +395,35 @@ async function main() {
     return printReport(buildVoiceReport(manifest, lineTextFor), options.strict);
 
     // ---- local functions that need the loaded modules --------------------------------------
+    function reportNoVoice(jobs) {
+      if (jobs.length === 0) return;
+      const names = [...new Set(jobs.map((job) => `${job.voice} (${job.locale})`))];
+      console.log(`Missing voices: ${names.join(", ")}. ${jobs.length} job(s) cannot run and stay missing.`);
+    }
+
+    /** Generated MP3 and WAV files (dotted clip IDs) that no current job writes. Respects --locale; ignores --only. */
+    function findStaleFiles(allSlots, onlyLocale) {
+      const wanted = new Set();
+      for (const [key, slot] of allSlots) if (slot.job !== undefined) wanted.add(key);
+      const found = [];
+      const scan = (dir, ext, locale) => {
+        if (!existsSync(dir)) return;
+        for (const name of readdirSync(dir)) {
+          if (!name.endsWith(ext)) continue;
+          // Generated clip IDs are dotted node IDs. Hand-supplied files such as
+          // chapter1_voice1start_en.mp3 have no dot and are never pruned.
+          if (!name.slice(0, -ext.length).includes(".")) continue;
+          if (!wanted.has(slotKey(name.slice(0, -ext.length), locale))) found.push(path.join(dir, name));
+        }
+      };
+      for (const locale of LOCALES) {
+        if (onlyLocale !== null && onlyLocale !== locale) continue;
+        scan(path.join(CLIP_DIR, locale), ".mp3", locale);
+        scan(path.join(CACHE_DIR, locale), ".wav", locale);
+      }
+      return found;
+    }
+
     function missingEntry(slot, cast) {
       const job = slot.job;
       const info = slot.untranslated;
@@ -422,6 +492,22 @@ async function main() {
     }
   } finally {
     await server.close();
+  }
+}
+
+/** Installed voices as `{ name, language }`, or null when they cannot be listed. */
+function listInstalledVoices() {
+  if (process.platform !== "win32") return null;
+  const run = spawnSync(
+    "powershell.exe",
+    ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", WORKER_PATH, "-ListVoices"],
+    { cwd: APP_ROOT, encoding: "utf8", maxBuffer: 8 * 1024 * 1024 },
+  );
+  try {
+    const parsed = JSON.parse(run.stdout);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
   }
 }
 
