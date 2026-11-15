@@ -27,7 +27,33 @@ function spec(o: Partial<HouseSpec> & { W: number; floors: number }): HouseSpec 
   return r;
 }
 
+/** Distance (m) of parked bikes from the street axis: the sidewalk runs from 3.6 to 6.0. */
+const PARK_Z = 4.7;
+/** Half the width (m) a parked bike needs along the house front, with a little room. */
+const PARK_HALF = 0.42;
+
+/**
+ * Where along a house front (meters from its left end, seen from the street) a parked bike fits
+ * clear of the front door, the bin and the grocery's goods; null when nothing is free. `jitter`
+ * (0-1) varies the spot between houses.
+ */
+function parkingSpot(h: House, south: boolean, bin: boolean, jitter: number): number | null {
+  const W = h.W, shop = ['grocery', 'hair'].includes(h.spec.ground);
+  const blocked: [number, number][] = [];
+  // The front door sits 0.45-1.6 m from the house's own left edge, which is the street's right end on the north side.
+  // Houses with a front yard open onto the street through a gate in the middle of the fence instead.
+  if (h.yardD > 0) blocked.push([W / 2 - 0.8, W / 2 + 0.8]);
+  else if (!shop) blocked.push(south ? [0.3, 1.75] : [W - 1.75, W - 0.3]);
+  if (bin) blocked.push([W - 0.7, W]);
+  if (h.spec.ground === 'grocery') blocked.push([0.3, 1.9], [W - 0.9, W]);
+  const free = (u: number) => u - PARK_HALF >= 0.15 && u + PARK_HALF <= W - 0.15 && blocked.every(([a, b]) => u + PARK_HALF <= a || u - PARK_HALF >= b);
+  const spots: number[] = [];
+  for (let u = 0.5; u <= W - 0.5; u += 0.1) if (free(u)) spots.push(u);
+  return spots.length ? spots[Math.min(spots.length - 1, Math.floor(jitter * spots.length))] : null;
+}
+
 export function buildNeighborhood(ctx: Ctx) {
+  F.resetBikeMix();
   const NB = new Builder();
   const r = mulberry32(2024);
   // ---------------- ground, street, sidewalks ----------------
@@ -216,16 +242,15 @@ export function buildNeighborhood(ctx: Ctx) {
   // parked motorbikes & seating in front of the houses
   const cols = ['#c92f2a', '#2a5aa0', '#222222', '#e8e6e0', '#3a7a4a', '#d8a92a', '#7a2a2a'];
   for (const h of placed.filter((q) => !q.spec.lite && (q.rot === 0 || Math.abs(q.rot - Math.PI) < 0.01))) {
-    const south = h.rot === 0, sgn = south ? 1 : -1, z = sgn * 4.9;
+    const south = h.rot === 0, sgn = south ? 1 : -1;
     const x0 = south ? h.ox : h.ox - h.W;
     const shops = ['grocery', 'cafe', 'pho', 'repair', 'hair'].includes(h.spec.ground);
     const nb = shops ? 1 + Math.floor(r() * 2) : Math.floor(r() * 3);
-    // At most one parked bike per house now (owner: fewer, model bikes). The random draws stay the
+    // At most one parked bike per house (owner: fewer, model bikes). The random draws stay the
     // same so the rest of the street keeps its layout.
-    for (let i = 0; i < nb; i++) {
-      const bx = x0 + 0.8 + i * 1.0 + r() * 0.3, bz = z + sgn * (h.yardD > 0 ? 0 : r() * 0.2), bc = cols[Math.floor(r() * cols.length)];
-      if (i === 0) F.motorbike(NB, bx, 0.15, bz, south ? Math.PI : 0, bc);
-    }
+    let jitter = 0;
+    for (let i = 0; i < nb; i++) { const j = r(); if (h.yardD <= 0) r(); r(); if (i === 0) jitter = j; }
+    const bin = r() < 0.5;
     if (h.spec.ground === 'cafe' || h.spec.ground === 'pho') {
       const cx = x0 + h.W / 2;
       // One table-and-stools set in front of each cafe and pho shop, close to the shop so people can pass.
@@ -233,8 +258,14 @@ export function buildNeighborhood(ctx: Ctx) {
     }
     if (h.spec.ground === 'repair') { for (let i = 0; i < 4; i++) NB.cyl(x0 + 0.5, 0.15 + i * 0.2, sgn * 5.35, 0.3, 0.2, 'r:#1a1a1a', 14); F.motorbike(NB, x0 + 2.2, 0.15, sgn * 4.6, south ? Math.PI * 0.8 : Math.PI * 1.8, '#3a3a3e'); }
     if (h.spec.ground === 'grocery') { NB.box(x0 + h.W - 0.8, 0.15, sgn * 5.0 - 0.4, 0.8, 0.9, 0.8, 'g:#e8ecee'); NB.col(x0 + h.W - 0.8, 0.15, sgn * 5.0 - 0.4, 0.8, 0.9, 0.8); for (let i = 0; i < 5; i++) NB.cyl(x0 + 0.5 + i * 0.3, 0.15, sgn * 5.4, 0.12, 0.7, ['g:#2f6fc0', 'g:#d6362a', 'g:#2f9a52', 'g:#f2c230', 'g:#e87a2a'][i], 8); }
-    // bins
-    if (r() < 0.5) { NB.cyl(x0 + h.W - 0.4, 0.15, sgn * 3.95, 0.25, 0.75, 'g:#2f6a45', 12); NB.col(x0 + h.W - 0.65, 0.15, sgn * 3.95 - 0.25, 0.5, 0.75, 0.5); }
+    // Penguin bins by the curb, facing the street (owner: the bins are penguins).
+    if (bin) F.penguinBin(NB, x0 + h.W - 0.35, 0.15, sgn * 3.95, south ? Math.PI : 0);
+    // Parked bike: out toward the curb and clear of the front door, the bin and the shop's own things.
+    // Cafes and pho shops have their table set and customers in front, the repair shop its own bike.
+    if (nb > 0 && !['cafe', 'pho', 'repair'].includes(h.spec.ground)) {
+      const bx = parkingSpot(h, south, bin, jitter);
+      if (bx !== null) F.motorbike(NB, x0 + bx, 0.15, sgn * PARK_Z, south ? Math.PI : 0, cols[Math.floor(jitter * cols.length)]);
+    }
   }
   // alley props
   for (let z = 8; z < 40; z += 2.7) {
