@@ -302,6 +302,18 @@ This entry replaces the partial per-task entries (3.7, 10.3, 12.4) that were wri
    - The Speaker toggle is a per-call override, as in the phone UI redesign.
 10. **Follow-ups:** human playtest and pacing tuning; native-speaker review of the Vietnamese text; consider more distinct voices; engine-level tests for the story port; open the pull request (the documentation is committed and the branch is pushed without force).
 
+### 2026-11-15 — New room intro narration; controls and Continue only on the last line
+
+- **Objective:** the owner rewrote the room intro narration (`intro.1` to `intro.3`) and supplied new voice clips; the on-screen text must match. The controls list and the Continue button of the intro overlay (street prologue and room) should appear only with the last line.
+- **Completed:**
+  - `dialogues/intro.ts` and `chapter1.vi/intro.ts`: the owner's en/vi text.
+  - `chapter1.manifest.ts`: the six `intro.*` entries take the owner's MP3s (hash, bytes, duration from the files; `voiceNote` and `credit` say "Supplied by the project owner"); `chapterContentVersion` 7d508ad7 (was b1b15925), so saves made before this change are reported as incompatible (design of save v3).
+  - `generate-chapter1-voice.mjs`: clips marked as owner-supplied are kept while their text is current, so a Windows run does not replace them with a local voice (`--dry-run`: 88 up to date, 0 to run).
+  - `ChapterIntroOverlay.tsx`: controls and Continue show (and are focusable) only on the last line; resume mode, with one line, shows them at once. This replaces the 2026-11-17 P2-8 behavior. Tests updated.
+- **Files modified:** `apps/game/src/game/narrative/chapter1/dialogues/intro.ts`, `apps/game/src/i18n/narrative/chapter1.vi/intro.ts`, `apps/game/src/game/voice/chapter1.manifest.ts`, `apps/game/scripts/generate-chapter1-voice.mjs`, `apps/game/src/features/chapter1/intro/ChapterIntroOverlay{,.test}.tsx`, the six `apps/game/public/audio/chapter01/{en,vi}/intro.*.mp3` (owner's files), `docs/PROJECT_PROGRESS.md`.
+- **Validation:** `pnpm typecheck`, `pnpm build`, `npx vitest --run` (168 files, 1511 tests), `voice:report` (88 present).
+- **Not verified:** that the owner's clips say exactly the new text; the overlay in a real browser. The owner's tone notes (gentle, relieved, calm, warm) are not scenario tones; the nodes keep `reassuring`. The manifest `origin` stays `tts-generated` (the schema has no "supplied" value; how the clips were made is not recorded).
+
 ### 2026-11-15 — Street bins use the owner's penguin bin model
 
 - **Objective:** the owner pointed out that a penguin bin model already exists (`Prop_TrashBin` in `street-props.optimized.glb`, beside the banh mi cart); the street bins should use it instead of the procedural penguin.
