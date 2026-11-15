@@ -156,9 +156,15 @@ export const PhoneCallScreen: React.FC<PhoneCallScreenProps> = ({
     <section
       aria-label={t("phone.callPresentation.screenLabel")}
       data-testid={ringing ? "incoming-call-screen" : "call-screen"}
-      className={`flex h-full w-full flex-col overflow-hidden px-4 py-5 text-center text-[#f7f5ff] ${groupGap}`}
+      className={`relative flex h-full w-full flex-col overflow-hidden px-4 py-5 text-center text-[#f7f5ff] ${groupGap}`}
     >
       {vibrating ? <style>{VIBRATE_KEYFRAMES}</style> : null}
+      {/* Dynamic Island: a black pill at the top of the glass (iPhone 17 Pro: 126 x 37 pt on a 402 x 874 pt screen). */}
+      <div
+        aria-hidden="true"
+        data-testid="dynamic-island"
+        className="pointer-events-none absolute left-1/2 top-[1.25%] h-[4.2%] w-[31%] -translate-x-1/2 rounded-full bg-black"
+      />
 
       {ringing ? (
         <>

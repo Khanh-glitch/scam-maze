@@ -94,7 +94,8 @@ describe("ProloguePage chapter layer", () => {
     expect(harness.roomStory).toBeInstanceOf(RoomStoryBridge);
     expect(harness.layer?.bridge).toBe(harness.roomStory);
     expect(harness.layer?.session).toMatchObject({ chapterId: "chapter-1", sceneId: "apartment" });
-    expect(harness.layer?.modelAllowed).toBe(false);
+    // The page no longer forces the 2D call screen: the layer decides from the WebGL probe (3D phone, 2D fallback).
+    expect(harness.layer?.modelAllowed).toBeUndefined();
     await waitFor(() => expect(harness.layer?.engineReady).toBe(true));
     // The room engine's commands are published on the bridge for the layer.
     expect((harness.roomStory as RoomStoryBridge).commands).not.toBeNull();
