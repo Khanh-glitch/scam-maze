@@ -1,6 +1,6 @@
 // Unit tests for the dialogue engine on the double-deception graphs (dlg.alex, dlg.recovery,
 // dlg.official-line): start nodes, gated options, the harmful options, the pressure cap and the
-// fallback option. Re-enabled in task 7.4 of spec chapter-01-double-deception.
+// fallback option.
 
 import { describe, expect, it } from "vitest";
 

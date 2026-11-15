@@ -9,7 +9,15 @@ import {
   type FakePreviewPort,
 } from "../../test/fakeAudioPort";
 import { createLcg, pick, randomInt } from "../../test/seededRandom";
-import { DIALOGUE_GRAPH_IDS, SPEAKER_IDS, TONE_IDS } from "../narrative/chapter1/ids";
+import {
+  DIALOGUE_GRAPH_IDS,
+  SPEAKER_IDS,
+  TONE_IDS,
+  type DialogueGraphId,
+  type SpeakerId,
+  type Tone,
+} from "../narrative/chapter1/ids";
+import { CHAPTER_1_SCENARIO } from "../narrative/chapter1/scenario";
 import type { StopReason } from "./audioPort";
 import type { VoiceClipEntry, VoiceManifest } from "./manifestTypes";
 import { VOICE_MANIFEST_SCHEMA_VERSION } from "./manifestTypes";
@@ -446,4 +454,279 @@ describe("voice dialogue player properties", () => {
     },
     PROPERTY_TIMEOUT_MS,
   );
+});
+
+// ---- Property 15: the real Chapter 1 graphs ----
+
+interface SpokenNode {
+  readonly graphId: DialogueGraphId;
+  readonly nodeId: string;
+  readonly speakerId: SpeakerId;
+  readonly tone: Tone;
+  readonly channel: "phone" | "face-to-face";
+  readonly url: string;
+}
+
+const P15_GRAPHS: readonly DialogueGraphId[] = [
+  "dlg.alex",
+  "dlg.recovery",
+  "dlg.official-line",
+  "dlg.intro",
+  "dlg.aftermath",
+];
+
+/** Every non-player node of the call graphs plus the narration graphs. */
+function collectSpokenNodes(): SpokenNode[] {
+  const nodes: SpokenNode[] = [];
+  for (const graphId of P15_GRAPHS) {
+    const graph = CHAPTER_1_SCENARIO.dialogues[graphId];
+    for (const node of Object.values(graph.nodes)) {
+      if (node.speaker === "player") continue;
+      nodes.push({
+        graphId,
+        nodeId: node.id,
+        speakerId: node.speakerId ?? graph.persona.speakerId,
+        tone: node.tone ?? "professional",
+        channel: graph.channel,
+        url: `${CHAPTER1_VOICE_BASE}/en/${graphId}.${node.id}.mp3`,
+      });
+    }
+  }
+  return nodes;
+}
+
+const P15_NODES = collectSpokenNodes();
+
+function p15Target(n: SpokenNode, pauseBeforeMs: number): VoiceTarget {
+  return {
+    key: `${n.graphId}:${n.nodeId}`,
+    graphId: n.graphId,
+    nodeId: n.nodeId,
+    speakerId: n.speakerId,
+    tone: n.tone,
+    channel: n.channel,
+    lineText: `line ${n.nodeId}`,
+    pauseBeforeMs,
+  };
+}
+
+describe("voice playback over the Chapter 1 graphs", () => {
+  // Feature: chapter-01-double-deception, Property 15: Voice playback never overlaps and always cleans up
+  it(
+    "never overlaps, stops on node change and hang-up, replays only the current node, mutes without stopping and disposes cleanly",
+    async () => {
+      expect(P15_NODES.some((n) => n.graphId === "dlg.alex")).toBe(true);
+      expect(P15_NODES.some((n) => n.graphId === "dlg.recovery")).toBe(true);
+      expect(P15_NODES.some((n) => n.graphId === "dlg.official-line")).toBe(true);
+      expect(P15_NODES.some((n) => n.speakerId === "spk.narrator")).toBe(true);
+
+      const base = (CORE_PROPERTY_SEED ^ 0x15f00d15) >>> 0;
+      let totalStarts = 0;
+      let totalMissing = 0;
+      let totalMutes = 0;
+      let totalReplays = 0;
+      let totalHangUps = 0;
+
+      for (let run = 0; run < CORE_PROPERTY_RUNS; run += 1) {
+        const seed = caseSeed(base, run);
+        const next = createLcg(seed);
+        const withClip = new Set<string>(P15_NODES.filter(() => next() < 0.7).map((n) => n.url));
+        const port = createFakeAudioPort({ autoLoad: true });
+        for (const n of P15_NODES) port.setDuration(n.url, randomInt(next, 200, 3000));
+        const clips: VoiceClipEntry[] = P15_NODES.filter((n) => withClip.has(n.url)).map((n) => ({
+          clipId: `${n.graphId}.${n.nodeId}`,
+          nodeId: n.nodeId,
+          graphId: n.graphId,
+          speakerId: n.speakerId,
+          locale: "en",
+          status: "present",
+          sources: [{ src: n.url, type: "audio/mpeg" }],
+          tone: n.tone,
+          voiceNote: "test",
+          origin: "tts-generated",
+          credit: "test",
+          sourceTextHash: "00000000",
+        }));
+        const player = createVoiceDialoguePlayer({
+          manifest: { schemaVersion: VOICE_MANIFEST_SCHEMA_VERSION, chapterId: "chapter-1", clips },
+          port,
+          preview: null,
+          now: port.clock.now,
+          setTimer: port.clock.setTimer,
+          clearTimer: port.clock.clearTimer,
+          log: () => undefined,
+        });
+        player.configure({
+          locale: "en",
+          soundEnabled: true,
+          masterVolume: 1,
+          voiceVolume: 1,
+          phoneFilter: true,
+          englishVoiceFallback: false,
+          devPreview: false,
+        });
+
+        const log: string[] = [];
+        const check = (condition: boolean, message: string): void => {
+          if (condition) return;
+          throw new Error(
+            `seed=${seed} case=${run} failed after ${log.length} commands: ${message}\ncommands:\n${log
+              .map((c, i) => `  ${i + 1}. ${c}`)
+              .join("\n")}`,
+          );
+        };
+        const settle = async (): Promise<void> => {
+          await flush();
+          port.clock.advance(700);
+          await flush();
+        };
+
+        let current: SpokenNode | null = null;
+        let active = false; // a line was shown or replayed and has neither been stopped nor ended
+        let muted = false;
+        const steps = randomInt(next, 8, 40);
+
+        for (let step = 0; step < steps; step += 1) {
+          const roll = next();
+          const startsBefore = port.playbacks.length;
+          if (roll < 0.35) {
+            const n = pick(next, P15_NODES);
+            log.push(`show(${n.graphId}:${n.nodeId}, clip=${withClip.has(n.url)})`);
+            player.show(p15Target(n, next() < 0.4 ? 0 : randomInt(next, 0, 600)));
+            current = n;
+            active = true;
+            check(port.liveHandles === 0, "the previous clip was still live right after a node change");
+          } else if (roll < 0.5) {
+            log.push("hang-up");
+            player.stop("hang-up");
+            active = false;
+            totalHangUps += 1;
+            check(port.liveHandles === 0, "a clip was live right after hang-up");
+            check(port.timers === 0, "a timer was pending right after hang-up");
+            check(player.getSnapshot().phase === "idle", "phase is not idle right after hang-up");
+          } else if (roll < 0.65) {
+            log.push("replay");
+            player.replay();
+            totalReplays += 1;
+            if (current) {
+              active = true;
+              muted = false;
+              check(player.getSnapshot().targetKey === `${current.graphId}:${current.nodeId}`, "replay targets another node");
+            }
+            check(port.liveHandles === 0, "the previous clip was still live right after replay");
+          } else if (roll < 0.8) {
+            const m = next() < 0.5;
+            log.push(`setMuted(${m})`);
+            const live = port.liveHandles;
+            const phase = player.getSnapshot().phase;
+            player.setMuted(m);
+            muted = m;
+            totalMutes += 1;
+            check(port.liveHandles === live, "mute changed the number of live clips");
+            check(player.getSnapshot().phase === phase, "mute changed the playback phase");
+            check(player.getSnapshot().muted === m, "snapshot muted flag is wrong");
+            const lastLive = port.playbacks.filter((p) => p.live);
+            for (const p of lastLive) check(p.gain === (m ? 0 : 1), `gain is ${p.gain} after setMuted(${m})`);
+          } else if (roll < 0.9) {
+            const live = port.playbacks.filter((p) => p.live);
+            log.push(live.length > 0 ? `fireEnded(${live[0].id})` : "fireEnded(none)");
+            if (live.length > 0) {
+              port.fireEnded(live[0].id);
+              active = false;
+            }
+          } else {
+            log.push("settle");
+          }
+
+          if (next() < 0.75 || roll >= 0.9) {
+            await settle();
+            const snap = player.getSnapshot();
+            if (active && current) {
+              const key = `${current.graphId}:${current.nodeId}`;
+              check(snap.targetKey === key, `snapshot targets ${snap.targetKey}, expected ${key}`);
+              if (withClip.has(current.url)) {
+                const last = port.last();
+                check(snap.phase === "playing", `phase is ${snap.phase}, expected playing`);
+                check(port.liveHandles === 1, `${port.liveHandles} live clips, expected 1`);
+                check(last?.clip.id === current.url, `playing ${last?.clip.id}, expected ${current.url}`);
+                check(last?.gain === (muted ? 0 : 1), "playing gain does not match the mute state");
+                check(snap.audible === !muted, "audible flag does not match the mute state");
+              } else {
+                check(snap.phase === "unavailable" && snap.reason === "missing", `missing clip gave ${snap.phase}/${snap.reason}`);
+                check(!snap.audible && port.liveHandles === 0, "audio exists for a missing clip");
+                check(port.playbacks.length === startsBefore, "a missing clip started playback");
+                totalMissing += 1;
+              }
+            }
+          }
+          check(port.liveHandles <= 1, `${port.liveHandles} live clips at once`);
+          check(port.maxConcurrentPlaybacks <= 1, `maxConcurrentPlaybacks=${port.maxConcurrentPlaybacks}`);
+          check(port.concurrencyLog.every((c) => c <= 1), "concurrency log exceeds 1");
+        }
+
+        totalStarts += port.playbacks.length;
+        // Replay restarts exactly the current node: every started clip belongs to a node that was shown.
+        player.dispose();
+        check(port.liveHandles === 0, "a clip is live after dispose");
+        check(port.timers === 0, "a timer is pending after dispose");
+        check(port.listeners === 0, "a listener is attached after dispose");
+        check(port.disposed, "the port was not disposed");
+        const started = port.playbacks.length;
+        player.show(p15Target(pick(next, P15_NODES), 0));
+        await settle();
+        check(port.playbacks.length === started, "a clip started after dispose");
+      }
+
+      expect(totalStarts).toBeGreaterThan(200);
+      expect(totalMissing).toBeGreaterThan(20);
+      expect(totalMutes).toBeGreaterThan(100);
+      expect(totalReplays).toBeGreaterThan(50);
+      expect(totalHangUps).toBeGreaterThan(50);
+    },
+    PROPERTY_TIMEOUT_MS,
+  );
+
+  // Feature: chapter-01-double-deception, Property 15: Voice playback never overlaps and always cleans up
+  it("replay starts a new clip of the current node only and one new playback per replay", async () => {
+    const node = P15_NODES.find((n) => n.graphId === "dlg.official-line");
+    if (!node) throw new Error("dlg.official-line has no spoken node");
+    const other = P15_NODES.find((n) => n.graphId === "dlg.alex");
+    if (!other) throw new Error("dlg.alex has no spoken node");
+    const port = createFakeAudioPort({ autoLoad: true });
+    const clips: VoiceClipEntry[] = [node, other].map((n) => ({
+      clipId: `${n.graphId}.${n.nodeId}`,
+      nodeId: n.nodeId,
+      graphId: n.graphId,
+      speakerId: n.speakerId,
+      locale: "en",
+      status: "present",
+      sources: [{ src: n.url, type: "audio/mpeg" }],
+      tone: n.tone,
+      voiceNote: "test",
+      origin: "tts-generated",
+      credit: "test",
+      sourceTextHash: "00000000",
+    }));
+    const player = createVoiceDialoguePlayer({
+      manifest: { schemaVersion: VOICE_MANIFEST_SCHEMA_VERSION, chapterId: "chapter-1", clips },
+      port,
+      preview: null,
+      now: port.clock.now,
+      setTimer: port.clock.setTimer,
+      clearTimer: port.clock.clearTimer,
+      log: () => undefined,
+    });
+    player.show(p15Target(other, 0));
+    port.clock.advance(0);
+    await flush();
+    player.show(p15Target(node, 0));
+    port.clock.advance(0);
+    await flush();
+    player.replay();
+    port.clock.advance(0);
+    await flush();
+    expect(port.playbacks.map((p) => p.clip.id)).toEqual([other.url, node.url, node.url]);
+    expect(port.maxConcurrentPlaybacks).toBe(1);
+    player.dispose();
+  });
 });

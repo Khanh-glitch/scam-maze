@@ -83,7 +83,7 @@ describe("Chapter 1 data lint", () => {
     if (existsSync(join(base, "chapter1.vi.ts"))) files.push(join(base, "chapter1.vi.ts"));
     const dir = join(base, "chapter1.vi");
     if (existsSync(dir)) {
-      for (const name of readdirSync(dir)) if (name.endsWith(".ts")) files.push(join(dir, name));
+      for (const name of readdirSync(dir)) if (name.endsWith(".ts") && !/\.test\.tsx?$/.test(name)) files.push(join(dir, name));
     }
     expect(files.length).toBeGreaterThan(0);
     const failures: string[] = [];

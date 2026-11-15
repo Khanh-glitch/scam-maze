@@ -1,31 +1,29 @@
-// Vietnamese Chapter 1 narrative overlay, phone part (game-i18n-en-vi, task 6.6).
-// Keys: `phone/messages/*`, `phone/contacts/*/name` and `phone/bankApp/*`.
-// Missing keys fall back to English.
+// Vietnamese Chapter 1 narrative overlay, phone part (spec chapter-01-double-deception, task 11.4).
+// Keys: `phone/messages/*`, `phone/contacts/*` and `phone/bankApp/*`. Phone numbers, the case ID and
+// the reserved domain stay unchanged. Contact keys use the phone number.
 
 import type { NarrativeOverlay } from "../../../game/narrative/localize";
 
 export const PHONE_VI: NarrativeOverlay = {
-  "phone/messages/msg.sms-alert/from": "Northgate Bank",
-  "phone/messages/msg.sms-alert/body":
-    "Northgate Bank: Tài khoản có số đuôi 9284 đã bị tạm khóa do có hoạt động bất thường ở nước ngoài. Hãy xác minh danh tính trong vòng 15 phút tại northgate-secure-verify.invalid để tránh bị khóa vĩnh viễn.",
-  "phone/messages/msg.otp-sms/from": "Northgate Bank",
-  "phone/messages/msg.otp-sms/body":
-    "Northgate Bank: Đây là mã xác thực một lần để duyệt đăng nhập trên thiết bị mới. Mã hết hạn sau 5 phút. Không chia sẻ mã này với bất kỳ ai, kể cả nhân viên ngân hàng.",
-  "phone/messages/msg.case-sms/from": "Northgate Bank",
-  "phone/messages/msg.case-sms/body":
-    "Northgate Bank: Mã tham chiếu hồ sơ NG-0417. Hồ sơ của bạn đang được mở. Hãy xem hồ sơ tại northgate-case-review.invalid và chuẩn bị sẵn mã tham chiếu này cho cán bộ phụ trách hồ sơ.",
-  "phone/contacts/+000 555 0177/name": "Bộ phận Hồ sơ Northgate",
-  "calls/call.followup/displayName": "Bộ phận Hồ sơ Northgate",
-  "phone/contacts/+000 555 0142/name": "Bộ phận Bảo mật Northgate Bank",
-  "phone/contacts/+000 555 0100/name": "Chăm sóc khách hàng Northgate Bank",
-  "phone/bankApp/title": "Northgate Bank",
-  "phone/bankApp/screens/bank.account/title": "Tài khoản của bạn",
-  "phone/bankApp/screens/bank.account/body":
-    "Tài khoản có số đuôi 9284 đang hoạt động bình thường. Tài khoản của bạn không có cảnh báo nào.",
-  "phone/bankApp/screens/bank.activity/title": "Hoạt động gần đây",
-  "phone/bankApp/screens/bank.activity/body":
-    "Không có giao dịch chuyển tiền nào đang chờ xử lý. Hoạt động gần nhất của bạn là một lần thanh toán bằng thẻ tại cửa hàng ở góc phố hôm qua.",
-  "phone/bankApp/screens/bank.help/title": "Trợ giúp và liên hệ",
-  "phone/bankApp/screens/bank.help/body":
-    "Gọi bộ phận chăm sóc khách hàng theo số +000 555 0100 hoặc truy cập northgate.example. Northgate Bank sẽ không bao giờ hỏi mã xác thực một lần của bạn hoặc yêu cầu bạn chuyển tiền sang tài khoản khác.",
+  "phone/messages/msg.alex-voicemail/from": "Thư thoại từ người gọi lạ",
+  "phone/messages/msg.alex-voicemail/body":
+    "Nội dung thư thoại: “Xin chào, tôi là Alex ở bộ phận an ninh của Northgate Bank. Hồ sơ của anh/chị là NG-4471-X. Có người đã thử dùng tài khoản của anh/chị. Xin gọi lại cho tôi sớm theo số +000 0100 2200. Chúng tôi sẽ gửi cho anh/chị một mã để xác nhận đúng là anh/chị. Xin đừng bỏ qua tin nhắn này.”",
+  "phone/messages/msg.alex-summary/from": "Tóm tắt cuộc gọi",
+  "phone/messages/msg.alex-summary/body":
+    "Tóm tắt cuộc gọi, do điện thoại của bạn ghi lại. Người gọi nói tên là Alex, ở bộ phận an ninh của Northgate Bank. Người gọi đưa mã hồ sơ NG-4471-X. Người gọi yêu cầu một mã gửi đến điện thoại của bạn. Người gọi nói một nhóm xử lý sự cố sẽ gọi cho bạn sau.",
+
+  "phone/contacts/+000 0100 0800/name": "Northgate Bank (đã lưu)",
+
+  "phone/bankApp/title": "Northgate Mobile",
+  "phone/bankApp/screens/home/title": "Trang chủ",
+  "phone/bankApp/screens/home/body":
+    "Chào mừng bạn trở lại.\nTài khoản thanh toán: số dư hiển thị ở trang tài khoản.\nMở mục Hoạt động để xem các khoản thanh toán gần đây.\nMở mục Liên hệ để xem ngân hàng liên lạc với bạn bằng cách nào.",
+  "phone/bankApp/screens/activity/title": "Hoạt động",
+  "phone/bankApp/screens/activity/body":
+    "Hoạt động gần đây\nCửa hàng tạp hóa: 18.40\nThẻ đi lại: 30.00\nĐăng ký nghe nhạc: 9.99\nKhông có khoản thanh toán nào bị đánh dấu. Không có thông báo bảo mật nào đang mở trên tài khoản này.",
+  "phone/bankApp/screens/contacts/title": "Liên hệ",
+  "phone/bankApp/screens/contacts/body":
+    "Liên hệ với chúng tôi\nĐường dây khách hàng: +000 0100 0800\nTrang web: northgate-bank.example\nNgân hàng cho biết sẽ không bao giờ yêu cầu bạn đọc mã xác thực một lần hay chuyển tiền sang tài khoản khác.",
+  "phone/bankApp/screens/messages/title": "Tin nhắn",
+  "phone/bankApp/screens/messages/body": "Bạn không có tin nhắn bảo mật nào.",
 };

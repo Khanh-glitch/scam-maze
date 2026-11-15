@@ -1,112 +1,115 @@
-// Vietnamese Chapter 1 narrative overlay, decisions part (game-i18n-en-vi, task 6.7).
-// Keys: `decisions/*`, `endings/*` and `debrief/*`. Missing keys fall back to English.
+// Vietnamese Chapter 1 narrative overlay, decisions and debrief part (spec chapter-01-double-deception,
+// task 11.4). Keys: `decisions/*` and `debrief/*` (including `debrief/analysis/*`).
+// The debrief is read after the outcome, so it may name the deception plainly. It stays calm and
+// never blames the player. Case ID, phone numbers and the bank name stay unchanged.
 
 import type { NarrativeOverlay } from "../../../game/narrative/localize";
 
 export const DECISIONS_VI: NarrativeOverlay = {
-  "decisions/follow-request/label": "Gọi lại số đó và làm theo yêu cầu của người gọi",
-  "decisions/follow-request/unavailableHint": "Lựa chọn này sẽ mở sau khi cuộc gọi đầu tiên kết thúc.",
-  "decisions/verify-independently/label": "Báo cáo cuộc gọi và chặn số điện thoại",
-  "decisions/verify-independently/unavailableHint": "Hãy gọi cho Northgate qua số chính thức trước.",
-  "decisions/verify-independently/preStep/label": "Gọi cho Northgate qua số chính thức",
+  "decisions/follow-recovery/label": "Làm theo các bước khôi phục của người gọi thứ ba",
+  "decisions/follow-recovery/unavailableHint": "Bạn chưa nghe các bước khôi phục.",
+  "decisions/follow-both/label": "Làm theo yêu cầu của cả hai người gọi",
+  "decisions/follow-both/unavailableHint":
+    "Bạn cần nghe yêu cầu của người gọi đầu tiên và các bước khôi phục trước.",
+  "decisions/refuse-and-stop/label": "Từ chối và dừng lại ở đây",
+  "decisions/refuse-and-stop/unavailableHint": "",
+  "decisions/verify-independently/label": "Kiểm tra bằng số bạn đã lưu từ trước hôm nay",
+  "decisions/verify-independently/unavailableHint":
+    "Hãy gọi vào số đã lưu từ trước hôm nay trước, rồi quay lại lựa chọn này.",
+  "decisions/verify-independently/preStep/label": "Gọi số in trên sao kê của bạn",
   "decisions/verify-independently/preStep/unavailableHint":
-    "Bạn cần số điện thoại chính thức của ngân hàng. Bạn có thể tìm số đó ở đâu?",
-  "decisions/stop-and-wait/label": "Chặn số điện thoại và tạm để đó",
-  "decisions/stop-and-wait/unavailableHint": "Lựa chọn này sẽ mở sau khi cuộc gọi đầu tiên kết thúc.",
-
-  "endings/verified/title": "Đã kiểm tra qua một kênh đáng tin cậy",
-  "endings/verified/simulationLabel": "Mô phỏng: không có điều gì thật sự xảy ra.",
-  "endings/verified/variants/verified.reported/text":
-    "Bạn đã kiểm tra qua số chính thức của Northgate Bank. Northgate xác nhận rằng họ không hề gọi cho bạn. Bạn đã chặn số điện thoại và báo cáo số đó. Tài khoản mô phỏng của bạn vẫn hoạt động bình thường.",
-  "endings/investigator/title": "Đã kiểm tra, báo cáo và ghi lại bằng chứng",
-  "endings/investigator/simulationLabel": "Mô phỏng: không có điều gì thật sự xảy ra.",
-  "endings/investigator/variants/investigator.report/text":
-    "Bạn đã kiểm tra câu chuyện qua những kênh mà bạn vốn đã tin cậy, gom các bằng chứng lại với nhau và gửi báo cáo. Northgate đã có thông tin chi tiết về cuộc gọi và có thể cảnh báo các khách hàng khác. Tài khoản mô phỏng của bạn vẫn hoạt động bình thường.",
-  "endings/risky/title": "Đã làm theo yêu cầu của người gọi",
-  "endings/risky/simulationLabel": "Mô phỏng: không có điều gì thật sự xảy ra.",
-  "endings/risky/variants/risky.money-moved/text":
-    "Số dư tiết kiệm mô phỏng của bạn giờ là 0. “Tài khoản tạm giữ được bảo vệ” thực ra thuộc về người gọi.",
-  "endings/risky/variants/risky.code-shared-locked/text":
-    "Người gọi đã dùng mã của bạn để đăng nhập vào tài khoản mô phỏng của bạn. Northgate đã khóa tài khoản sau khi bạn gọi cho họ, nhưng tài khoản đã bị người khác truy cập.",
-  "endings/risky/variants/risky.code-shared/text":
-    "Người gọi đã dùng mã của bạn để đăng nhập vào tài khoản mô phỏng của bạn. Tài khoản đã bị người khác truy cập, và Northgate vẫn chưa biết vì chưa ai báo cho họ.",
-  "endings/uncertain/title": "Đã dừng lại, nhưng chưa xác nhận",
-  "endings/uncertain/simulationLabel": "Mô phỏng: không có điều gì thật sự xảy ra.",
-  "endings/uncertain/variants/uncertain.stopped/text":
-    "Bạn đã chặn được rủi ro trước mắt, nhưng bạn chưa kiểm tra với Northgate. Nếu cảnh báo đó là thật, bạn sẽ không biết. Lần sau, hãy xác nhận qua số điện thoại ghi trên thẻ của bạn.",
+    "Hãy tìm số liên hệ in trên sao kê hoặc lưu trong ứng dụng ngân hàng của bạn trước.",
+  "decisions/report-deception/label": "Báo cáo chuỗi lừa dối có liên kết với nhau",
+  "decisions/report-deception/unavailableHint":
+    "Hãy nối người gọi đầu tiên với thông báo trong ghi chú của bạn trước khi báo cáo.",
 
   "debrief/mechanism":
-    "Đây là một vụ lừa đảo mạo danh. Một tin nhắn đưa ra hạn chót rất gấp và dẫn bạn đến một địa chỉ web trông giống trang thật. Sau đó, một người gọi đến và giả làm nhân viên bộ phận bảo mật của Northgate Bank. Người gọi dùng một vài thông tin cá nhân để nghe có vẻ thật, xin mã xác thực một lần (OTP) mà ngân hàng vừa gửi, rồi yêu cầu bạn chuyển tiền tiết kiệm sang một “tài khoản tạm giữ được bảo vệ”. Tài khoản đó thuộc về người gọi. Mỗi bước đều thêm áp lực để bạn không có thời gian kiểm tra.",
+    "Đây là một kế hoạch gồm hai phần. Người gọi đầu tiên nhận là của ngân hàng, dùng sự gấp gáp và yêu cầu một mã. Sau đó, một thông báo trên máy tính xách tay, rồi một người gọi thứ ba, đưa ra quy trình khôi phục cho cùng mã hồ sơ NG-4471-X. Cuộc gọi đầu tiên tạo ra vấn đề, còn các lớp sau bán lời giải. Cả ba đều đến từ một nguồn chưa được xác minh.",
   "debrief/saferAlternatives/0":
-    "Hãy kết thúc cuộc gọi và tự liên hệ với ngân hàng qua số điện thoại ghi trên thẻ, trên thư của ngân hàng hoặc trong ứng dụng của ngân hàng.",
+    "Hãy kết thúc cuộc gọi, rồi tự liên hệ với ngân hàng bằng một số bạn đã lưu từ trước cuộc gọi, như số trên sao kê hoặc trong ứng dụng ngân hàng của bạn.",
   "debrief/saferAlternatives/1":
-    "Đừng bao giờ đọc mã xác thực một lần cho bất kỳ ai. Ngân hàng thật không hỏi mã này.",
+    "Không bao giờ đọc mã cho người gọi, kể cả khi họ biết mã hồ sơ hoặc nói rằng mã đó để bảo vệ bạn.",
   "debrief/saferAlternatives/2":
-    "Đừng chuyển tiền chỉ vì người gọi bảo bạn làm vậy để bảo vệ số tiền. Ngân hàng thật không yêu cầu điều này.",
+    "Hãy đối xử với một cảnh báo đồng tình với nỗi nghi ngờ của bạn như mọi lời khẳng định khác. Hãy hỏi nó đến từ đâu và bạn có kiểm tra được mà không dùng thông tin liên hệ nó đưa không.",
   "debrief/saferAlternatives/3":
-    "Đừng dùng đường link hoặc số điện thoại trong một tin nhắn bất ngờ. Hãy tự gõ địa chỉ trang web chính thức của ngân hàng hoặc mở ứng dụng mà bạn đã có sẵn.",
+    "Khi hai tin nhắn dùng cùng một mã hồ sơ hoặc cùng một số liên hệ, hãy tính chúng là một nguồn, không phải hai lần xác nhận.",
   "debrief/saferAlternatives/4":
-    "Hãy bình tĩnh và nói chuyện với một người bạn tin tưởng. Bị hối thúc phải hành động nhanh là một dấu hiệu cảnh báo.",
-  "debrief/saferAlternatives/5": "Hãy báo cáo cuộc gọi cho ngân hàng của bạn và chặn số điện thoại đó.",
-  "debrief/outcomeSummaries/verified":
-    "Bạn đã kiểm tra câu chuyện của người gọi qua một kênh mà bạn vốn đã tin cậy. Northgate xác nhận rằng họ không gọi cho bạn, nên yêu cầu đó là lừa đảo và bạn không mất gì.",
-  "debrief/outcomeSummaries/investigator":
-    "Bạn đã kiểm tra câu chuyện của người gọi qua một kênh mà bạn vốn đã tin cậy, gom các bằng chứng lại với nhau và báo cáo cuộc gọi. Northgate xác nhận rằng họ không gọi cho bạn, nên yêu cầu đó là lừa đảo và bạn không mất gì. Những báo cáo như của bạn giúp ngân hàng cảnh báo các khách hàng khác.",
-  "debrief/outcomeSummaries/risky":
-    "Lần này, áp lực từ người gọi đã có tác dụng. Điều này xảy ra với cả nhiều người rất cẩn thận, vì kiểu lừa đảo này được dựng lên để tạo cảm giác gấp gáp và có thật. Các bước dưới đây cho thấy những lúc bạn có thể dừng lại và kiểm tra trong lần sau.",
-  "debrief/outcomeSummaries/uncertain":
-    "Đây là một kết quả chưa trọn vẹn, không phải thất bại. Bạn đã dừng yêu cầu của người gọi, nhờ đó chặn được rủi ro trước mắt. Bạn chưa xác nhận với Northgate, nên bạn chưa biết cảnh báo đó có phải là thật hay không. Lần sau, hãy gọi vào số ghi trên thẻ của bạn để biết rõ.",
-  "debrief/decisionNotes/asked-for-proof":
-    "Bạn đã yêu cầu người gọi chứng minh họ là nhân viên ngân hàng. Người gọi chỉ đưa ra một vài thông tin cá nhân, mà những thông tin này có thể đến từ dữ liệu bị rò rỉ.",
-  "debrief/decisionNotes/challenged-number":
-    "Bạn đã nhận ra số của người gọi không phải là số ghi trên thẻ của bạn. Người gọi đã có sẵn một lời giải thích, điều này rất thường gặp trong kiểu lừa đảo này.",
-  "debrief/decisionNotes/asked-why-code":
-    "Bạn đã hỏi vì sao người gọi cần mã của bạn. Người gọi nói đó là bước kiểm tra bảo mật bình thường và hối thúc bạn làm nhanh.",
-  "debrief/decisionNotes/shared-code":
-    "Bạn đã đọc mã xác thực một lần cho người gọi. Tin nhắn chứa mã có ghi rằng không bao giờ được chia sẻ mã, nhưng người gọi đã khiến yêu cầu đó có vẻ gấp và bình thường.",
-  "debrief/decisionNotes/said-stop":
-    "Bạn đã nói với người gọi rằng có điều gì đó không ổn. Người gọi liền khiến bạn cảm thấy có lỗi để giữ bạn tiếp tục nghe máy.",
-  "debrief/decisionNotes/moved-money":
-    "Bạn đã chuyển tiền theo yêu cầu của người gọi. “Tài khoản tạm giữ được bảo vệ” thực ra thuộc về người gọi.",
+    "Nếu người gọi yêu cầu bạn chuyển tiền, cài ứng dụng hoặc giữ kín cuộc gọi, hãy dừng lại. Những yêu cầu đó là lý do để kiểm tra, không phải lý do để vội.",
+
+  "debrief/outcomeSummaries/false-victory":
+    "Bạn đã từ chối cuộc gọi đầu tiên rồi tin lớp thứ hai. Lời cảnh báo trông như một sự xác nhận, nhưng nó chưa được kiểm tra qua một kênh do chính bạn chọn.",
+  "debrief/outcomeSummaries/perfect-chain":
+    "Cả hai lớp đã phối hợp với nhau trong mô phỏng. Mã và các bước khôi phục đến từ cùng một kế hoạch, khiến mỗi phần trông đáng tin.",
+  "debrief/outcomeSummaries/break-the-chain":
+    "Bạn đã kiểm tra qua một liên hệ đã lưu từ trước hôm nay, và điều đó phá vỡ chuỗi. Ngân hàng xác nhận họ không biết gì về hồ sơ, thông báo hay quy trình khôi phục nào.",
+  "debrief/outcomeSummaries/unfinished-case":
+    "Bạn đã dừng lại và không làm theo người gọi nào. Đó là một lựa chọn hợp lý. Các lời khẳng định vẫn chưa được kiểm tra, vì bạn chưa gọi cho số ngân hàng đã lưu.",
+
   "debrief/decisionNotes/hung-up":
-    "Bạn đã kết thúc cuộc gọi. Việc này chặn được áp lực từ người gọi và cho bạn thời gian suy nghĩ.",
-  "debrief/decisionNotes/hung-up-to-verify":
-    "Bạn đã kết thúc cuộc gọi để tự kiểm tra với Northgate. Đây là một bước rất tốt, vì chính bạn chọn kênh liên lạc chứ không để người gọi chọn.",
-  "debrief/decisionNotes/hung-up-on-callback":
-    "Khi người gọi gọi lại, bạn lại kết thúc cuộc gọi. Gọi lại để ép mạnh hơn cũng là một phần của cùng một kiểu lừa đảo.",
-  "debrief/decisionNotes/talked-to-sam":
-    "Bạn đã nói chuyện với Sam ở cửa hàng góc phố. Nói chuyện với người bạn tin tưởng giúp bạn có thêm thời gian và thường cho thấy câu chuyện đó là một kiểu lừa đảo đã được biết đến.",
-  "debrief/decisionNotes/reported-to-bank":
-    "Bạn đã gọi cho Northgate qua số chính thức và báo cho họ về cuộc gọi.",
-  "debrief/decisionNotes/told-bank-about-code":
-    "Bạn đã báo cho Northgate rằng bạn đã chia sẻ mã. Báo cho ngân hàng sớm giúp họ khóa tài khoản và hạn chế thiệt hại.",
-  "debrief/decisionNotes/blocked-number": "Bạn đã chặn số của người gọi sau khi nói chuyện với Northgate.",
-  "debrief/decisionNotes/asked-for-details":
-    "Bạn đã hỏi người gọi các chi tiết về cảnh báo. Câu trả lời vẫn mơ hồ hoặc thay đổi, điều này thường gặp khi người gọi đang đọc theo một kịch bản.",
-  "debrief/decisionNotes/asked-for-time":
-    "Bạn đã hỏi cảnh báo bắt đầu từ lúc nào. Một người gọi không nhìn thấy tài khoản thật của bạn thường không trả lời rõ được.",
-  "debrief/decisionNotes/cited-bank-app":
-    "Bạn đã chỉ ra rằng ứng dụng của ngân hàng không hiển thị cảnh báo nào. Ứng dụng là một kênh bạn vốn đã tin cậy, nên đây là nơi tốt để kiểm tra.",
-  "debrief/decisionNotes/cited-otp-warning":
-    "Bạn đã nhắc rằng tin nhắn chứa mã có ghi không bao giờ được chia sẻ mã. Nhắc lại chính quy tắc của ngân hàng là một cách rõ ràng để từ chối.",
-  "debrief/decisionNotes/challenged-link":
-    "Bạn đã hỏi về địa chỉ web trong tin nhắn. Một địa chỉ trông giống trang thật mà bạn không tự chọn là một dấu hiệu cảnh báo.",
-  "debrief/decisionNotes/noticed-isolation":
-    "Bạn đã nhận ra người gọi yêu cầu giữ kín cuộc gọi. Ngân hàng thật không bảo bạn giấu cuộc gọi với những người bạn tin tưởng.",
-  "debrief/decisionNotes/challenged-story":
-    "Bạn đã nhận ra câu chuyện của người gọi thay đổi. Những chi tiết đổi khác từ phút này sang phút khác là một dấu hiệu cảnh báo.",
-  "debrief/decisionNotes/told-caller-bank-said-no":
-    "Bạn đã nói với người gọi rằng Northgate cho biết họ không gọi cho bạn. Một người gọi nói thật sẽ hoan nghênh việc kiểm tra, chứ không tranh cãi.",
-  "debrief/decisionNotes/reported-details":
-    "Bạn đã cung cấp cho Northgate các chi tiết của cuộc gọi, gồm các số điện thoại và những gì người gọi yêu cầu. Thông tin đầy đủ giúp ngân hàng cảnh báo các khách hàng khác.",
-  "debrief/decisionNotes/reported-basic":
-    "Bạn đã báo cáo cuộc gọi cho Northgate. Lần sau, bạn có thể thêm các số điện thoại và những yêu cầu cụ thể để ngân hàng có thêm thông tin.",
-  "debrief/decisionNotes/hung-up-on-followup":
-    "Bạn đã kết thúc cuộc gọi tiếp theo. Một cuộc gọi thứ hai từ số mới, đề nghị giúp giải quyết vấn đề, là một phần của cùng một kiểu lừa đảo.",
-  "debrief/decisionNotes/chose-follow-request":
-    "Bạn đã quyết định gọi lại số đó và làm theo yêu cầu của người gọi. Câu chuyện của người gọi được dựng lên để khiến việc này có vẻ là điều đúng đắn.",
-  "debrief/decisionNotes/chose-verify-independently":
-    "Bạn đã quyết định báo cáo cuộc gọi và chặn số điện thoại sau khi Northgate xác nhận rằng họ không gọi cho bạn.",
-  "debrief/decisionNotes/chose-stop-and-wait":
-    "Bạn đã quyết định chặn số điện thoại và tạm để đó. Việc này dừng được yêu cầu, nhưng bạn chưa xác nhận với Northgate.",
+    "Bạn đã kết thúc một cuộc gọi. Bạn luôn có thể làm vậy. Kết thúc cuộc gọi rồi kiểm tra qua một số bạn tin tưởng là bước then chốt.",
+  "debrief/decisionNotes/opened-alex-record":
+    "Bạn đã mở bản ghi cuộc gọi của Alex. Nó cho thấy mã hồ sơ và điều Alex yêu cầu, để bạn so với các tin nhắn sau.",
+  "debrief/decisionNotes/opened-call-details":
+    "Bạn đã mở chi tiết cuộc gọi. Số hiển thị là số của chính bạn, điều mà một cuộc gọi thật của ngân hàng thường không làm. Chi tiết này cần cân nhắc: một điều lạ chỉ là gợi ý, chưa phải bằng chứng.",
+  "debrief/decisionNotes/opened-notification":
+    "Bạn đã mở thông báo. Nó khớp với phản ứng đầu tiên của bạn, nên bạn thấy nó đáng tin. Nó chưa được đối chiếu với bất cứ điều gì bạn đã biết.",
+  "debrief/decisionNotes/dismissed-notification":
+    "Bạn đã bỏ qua thông báo mà không làm theo. Nó vẫn nằm trong lịch sử, nên bạn vẫn có thể xem lại sau.",
+  "debrief/decisionNotes/inspected-origin":
+    "Bạn đã xem ai gửi thông báo. Người gửi, tên ứng dụng (NG Secure Helper) và số liên hệ không khớp với thứ gì bạn đã lưu. Kiểm tra nguồn gốc là thói quen tốt trước khi làm theo một cảnh báo.",
+  "debrief/decisionNotes/opened-bank-app":
+    "Bạn đã mở ứng dụng ngân hàng do chính bạn cài. Đó là nơi tốt hơn để xem so với một đường link hay liên hệ nằm trong tin nhắn, nhưng riêng ứng dụng thì không xác nhận được lời người gọi nói.",
+  "debrief/decisionNotes/checked-account-activity":
+    "Bạn đã xem hoạt động tài khoản. Không có khoản thanh toán nào bị đánh dấu, và điều đó chưa giải quyết được câu hỏi. Chỉ ngân hàng mới xác nhận được có hồ sơ hay không.",
+  "debrief/decisionNotes/checked-saved-contacts":
+    "Bạn đã mở các liên hệ đã lưu trong ứng dụng ngân hàng. Số chính thức ở đó (+000 0100 0800) được lưu từ trước hôm nay, nên đây là kênh bạn có thể tin để kiểm tra một lời khẳng định.",
+  "debrief/decisionNotes/compared-case-ref":
+    "Bạn đã so mã hồ sơ trong bản ghi của Alex với thông báo. Cả hai dùng NG-4471-X. Hai nguồn dùng chung một mã định danh có thể có cùng một tác giả.",
+  "debrief/decisionNotes/compared-contacts":
+    "Bạn đã so liên hệ trong thông báo với hồ sơ bạn đã lưu. Các số không khớp, đây là dấu hiệu thông báo không đến từ ngân hàng của bạn.",
+  "debrief/decisionNotes/opened-review-security":
+    "Bạn đã mở trang Xem xét bảo mật từ thông báo. Đây là một phần của lớp thứ hai, và là nơi quy trình khôi phục bắt đầu.",
+  "debrief/decisionNotes/opened-recovery-details":
+    "Bạn đã mở chi tiết cuộc gọi thứ ba. Số này khớp với liên hệ trong thông báo, nên người gọi thứ ba không phải là một người làm chứng riêng.",
+  "debrief/decisionNotes/linked-same-source":
+    "Bạn đã nối người gọi đầu tiên với thông báo. Họ dùng cùng một mã hồ sơ, nên họ không độc lập với nhau.",
+  "debrief/decisionNotes/notification-not-from-bank":
+    "Bạn đã phát hiện thông báo không khớp với hồ sơ ngân hàng bạn đã lưu. Thông tin liên hệ của nó không đến từ ngân hàng của bạn.",
+  "debrief/decisionNotes/third-caller-linked":
+    "Bạn đã nối người gọi thứ ba với cùng một nguồn. Một người gọi lặp lại cùng mã hồ sơ không cho bạn thêm bằng chứng mới.",
+  "debrief/decisionNotes/decided-follow-recovery":
+    "Bạn đã làm theo các bước khôi phục của người gọi thứ ba. Các bước đó đến từ cùng nguồn đã đưa ra cảnh báo, nên chúng chưa được kiểm tra.",
+  "debrief/decisionNotes/decided-follow-both":
+    "Bạn đã làm theo yêu cầu của cả hai người gọi. Mỗi yêu cầu khiến yêu cầu kia trông thuyết phục hơn, đó là cách một kế hoạch hai phần giữ vững.",
+  "debrief/decisionNotes/decided-refuse-and-stop":
+    "Bạn đã từ chối cả hai người gọi và dừng lại. Điều đó giữ bạn tránh xa kế hoạch, và gọi một số bạn đã lưu từ trước cũng sẽ cho bạn biết điều gì là thật.",
+  "debrief/decisionNotes/decided-verify-independently":
+    "Bạn đã kiểm tra bằng một số lưu từ trước hôm nay. Đó là bước có tác dụng: nó không phụ thuộc vào bất cứ điều gì những người gọi hay thông báo đã nói với bạn.",
+  "debrief/decisionNotes/decided-report-deception":
+    "Bạn đã báo cáo chuỗi lừa dối có liên kết với nhau. Chỉ ra các lời khẳng định liên quan với nhau như thế nào là hữu ích, và báo cáo cho ngân hàng qua một kênh bạn đã tin từ trước cũng vậy.",
+
+  "debrief/analysis/pressureBuilt":
+    "Alex dùng sự gấp gáp, quyền uy và một mã hồ sơ để cuộc gọi nghe như chính thức. Mỗi câu trả lời thêm áp lực và khiến bạn khó dừng lại kiểm tra hơn. Mục tiêu là lấy được một mã trước khi bạn kịp xác minh bất cứ điều gì.",
+  "debrief/analysis/whyWarningLooked":
+    "Thông báo trên máy tính xách tay đến ngay sau khi bạn từ chối người gọi đầu tiên, và nó đồng tình với bạn. Điều đó khiến nó giống như bằng chứng rằng bạn đã chọn đúng. Nó cũng đưa ra thông tin liên hệ riêng, và người gọi thứ ba dùng cùng mã hồ sơ NG-4471-X. Những thứ khớp với nhau không độc lập nếu chúng đến từ một nguồn.",
+  "debrief/analysis/thirdCallerNote":
+    "Người gọi thứ ba lặp lại cùng mã hồ sơ và cùng liên hệ với thông báo. Đó không phải là bằng chứng độc lập. Chỉ cuộc gọi bạn tự gọi đến liên hệ ngân hàng đã lưu mới đến từ một kênh có từ trước khi nỗi lo xuất hiện.",
+  "debrief/analysis/trapNotes/none":
+    "Bạn đã không rơi vào cái bẫy nào. Bạn không đọc mã và không làm theo các bước khôi phục.",
+  "debrief/analysis/trapNotes/first":
+    "Bạn đã đọc mã trong cuộc gọi đầu tiên. Đó là cái bẫy của lớp thứ nhất, và một cuộc kiểm tra với ngân hàng sau đó vẫn có thể hạn chế những gì xảy ra tiếp theo.",
+  "debrief/analysis/trapNotes/second":
+    "Bạn đã làm theo lớp thứ hai. Lớp này được dựng cho những người vừa từ chối cuộc gọi đầu tiên, vì lúc đó họ đã bớt đề phòng.",
+  "debrief/analysis/trapNotes/both":
+    "Bạn đã đi vào cả hai lớp. Cuộc gọi đầu tiên tạo ra vấn đề và lớp thứ hai bán lời giải, đúng như cách kế hoạch được thiết kế để vận hành.",
+  "debrief/analysis/verifyNextTime/0":
+    "Hãy dừng lại, rồi kết thúc cuộc gọi hoặc đóng tin nhắn. Đừng dùng thông tin liên hệ mà nó đưa cho bạn.",
+  "debrief/analysis/verifyNextTime/1":
+    "Hãy tìm một liên hệ bạn đã lưu từ trước hôm nay: số trên sao kê, mặt sau thẻ hoặc ứng dụng ngân hàng của chính bạn.",
+  "debrief/analysis/verifyNextTime/2":
+    "Hãy hỏi thẳng ngân hàng xem hồ sơ, thông báo hoặc quy trình đó có tồn tại không.",
+  "debrief/analysis/verifyNextTime/3":
+    "Hãy tính các tin nhắn dùng chung một mã hồ sơ hoặc một số liên hệ là một nguồn.",
+  "debrief/analysis/verifyNextTime/4":
+    "Không bao giờ đọc mã hay chấp thuận một phiên điều khiển từ xa cho người đã liên hệ với bạn trước.",
 };

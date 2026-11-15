@@ -1,4 +1,3 @@
-// Re-enabled in task 11.6 once the scenario is assembled (all tests in this file are skipped until then).
 import { describe, expect, it } from "vitest";
 
 import { TONE_IDS } from "../narrative/chapter1/ids";
@@ -43,7 +42,7 @@ function tensionTarget(level: number, reducedStress: boolean, callActive: boolea
 }
 
 // Feature: chapter-01-voice-narrative, Property 19: The mix plan stays inside its caps
-describe.skip("mix plan caps", () => {
+describe("mix plan caps", () => {
   it(
     "keeps tension, ringtone, click and ambience gains within the cap and the pause within bounds",
     () => {
