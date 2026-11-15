@@ -13,6 +13,7 @@ const menu = {
   continueReasons: {
     none: "No saved game found.",
     invalid: "Your saved game could not be read. Start a new game instead.",
+    incompatible: "This save is from an older version of the chapter and can't be continued. Start a new game to play the updated chapter.",
   },
 };
 

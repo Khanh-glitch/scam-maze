@@ -1,12 +1,10 @@
-// @ts-nocheck -- uses the old street-chapter IDs; rewritten when the scenario is assembled (spec chapter-01-double-deception, task 2.1 placeholder).
-// Re-enabled in task 12.2 once the scenario is assembled (all tests in this file are skipped until then).
 import { describe, expect, it } from "vitest";
 import { CHAPTER_1_SCENARIO } from "../narrative/chapter1/scenario";
+import { reachEndingA, reachEndingB, reachEndingC, reachEndingD } from "../../test/chapterRuns";
 import { chapterReducer, createInitialState } from "../narrative/reducer";
 import type { ChapterState, CoreAction } from "../narrative/types";
-import { STREET_PLAY_BOUNDS } from "../scenes/MainMenuScene/streetPlayArea";
 import { encodeProgress, RESTORE_REASONS, restoreProgress } from "./chapterProgress";
-import { SAVE_MAX_ACTIONS, START_CHECKPOINT_ID, type ChapterProgressV2 } from "./saveGame";
+import { SAVE_MAX_ACTIONS, START_CHECKPOINT_ID, type ChapterProgressV3 } from "./saveGame";
 
 const IN_BOUNDS: [number, number, number] = [188.6, -92.7, -88.89];
 
@@ -29,7 +27,7 @@ function replay(actions: readonly CoreAction[]): ChapterState {
   return state;
 }
 
-function progress(overrides: Partial<ChapterProgressV2> = {}): ChapterProgressV2 {
+function progress(overrides: Partial<ChapterProgressV3> = {}): ChapterProgressV3 {
   return {
     checkpointId: START_CHECKPOINT_ID,
     actions: acceptedActions(3),
@@ -38,20 +36,20 @@ function progress(overrides: Partial<ChapterProgressV2> = {}): ChapterProgressV2
   };
 }
 
-describe.skip("encodeProgress", () => {
+describe("encodeProgress", () => {
   it("stores the accepted actions from the Event_Log and the checkpoint ID", () => {
     const actions = acceptedActions(3);
     const encoded = encodeProgress(replay(actions), { position: IN_BOUNDS, yaw: 0.5 }, "obj.test");
     expect(encoded).toEqual({ checkpointId: "obj.test", actions, playerPose: { position: IN_BOUNDS, yaw: 0.5 } });
   });
 
-  it("clamps an out-of-bounds pose and stores a non-finite pose as null", () => {
+  it("stores a non-finite pose as null and does not clamp a finite one", () => {
     const state = replay(acceptedActions(1));
     const far = encodeProgress(state, { position: [1000, -500, -1000], yaw: 0 }, "start");
-    expect(far?.playerPose?.position).toEqual([STREET_PLAY_BOUNDS.maxX, STREET_PLAY_BOUNDS.groundY, STREET_PLAY_BOUNDS.minZ]);
+    expect(far?.playerPose).toEqual({ position: [1000, -500, -1000], yaw: 0 });
     expect(encodeProgress(state, { position: [Number.NaN, 0, 0], yaw: 0 }, "start")?.playerPose).toBeNull();
+    expect(encodeProgress(state, null, "start")?.playerPose).toBeNull();
   });
-
   it("accepts exactly the cap and returns null above it", () => {
     expect(encodeProgress(replay(acceptedActions(SAVE_MAX_ACTIONS)), null, "start")?.actions).toHaveLength(
       SAVE_MAX_ACTIONS,
@@ -60,7 +58,7 @@ describe.skip("encodeProgress", () => {
   });
 });
 
-describe.skip("encodeProgress shape", () => {
+describe("encodeProgress shape", () => {
   it("has exactly checkpointId, actions and playerPose (no audio, duration, caption or locale)", () => {
     const encoded = encodeProgress(replay(acceptedActions(3)), { position: IN_BOUNDS, yaw: 0 }, "start");
     expect(Object.keys(encoded ?? {}).sort()).toEqual(["actions", "checkpointId", "playerPose"]);
@@ -69,94 +67,15 @@ describe.skip("encodeProgress shape", () => {
   });
 });
 
-const opt = (optionId: string): CoreAction => ({ type: "SELECT_DIALOGUE_OPTION", optionId });
-const START: CoreAction = { type: "START_CHAPTER" };
-const ANSWER: CoreAction = { type: "ANSWER_CALL" };
-const END_CALL: CoreAction = { type: "END_CALL" };
-const OPEN_PHONE: CoreAction = { type: "OPEN_PHONE" };
-const CLOSE_PHONE: CoreAction = { type: "CLOSE_PHONE" };
-const FINISH: CoreAction = { type: "FINISH_CHAPTER" };
-
-/** Frozen copies of the four action logs in `playthroughs.test.ts`. Do not edit when content changes. */
-const FROZEN_LOGS: ReadonlyArray<readonly [string, readonly CoreAction[]]> = [
-  [
-    "verified",
-    [
-      START,
-      { type: "INTERACT_OBJECT", objectId: "obj.wallet" },
-      { type: "RING_CALL", callId: "call.scam-1", reason: "first-interaction" },
-      ANSWER,
-      opt("opt.scam.open.ask-proof"),
-      opt("opt.scam.knows.challenge"),
-      opt("opt.scam.challenged.call-card"),
-      OPEN_PHONE,
-      { type: "INSPECT_EVIDENCE", evidenceId: "ev.caller-number" },
-      { type: "VERIFY_CLAIM", claimId: "claim.account-suspended", method: "bank-app" },
-      CLOSE_PHONE,
-      { type: "VERIFY_CLAIM", claimId: "claim.caller-identity", method: "official-line" },
-      opt("opt.official.greeting.wait"),
-      opt("opt.official.agent.report"),
-      opt("opt.official.confirm.block"),
-      { type: "MAKE_DECISION", decision: "verify-independently" },
-      FINISH,
-    ],
-  ],
-  [
-    "risky: money moved",
-    [
-      START,
-      { type: "RING_CALL", callId: "call.scam-1", reason: "exploration-timer" },
-      ANSWER,
-      opt("opt.scam.open.yes-what"),
-      OPEN_PHONE,
-      { type: "INSPECT_EVIDENCE", evidenceId: "ev.otp-sms" },
-      opt("opt.scam.code.read-code"),
-      opt("opt.scam.move.move-money"),
-      FINISH,
-    ],
-  ],
-  [
-    "risky: code shared then reported",
-    [
-      START,
-      { type: "INTERACT_OBJECT", objectId: "obj.mailbox" },
-      { type: "RING_CALL", callId: "call.scam-1", reason: "first-interaction" },
-      ANSWER,
-      opt("opt.scam.open.yes-what"),
-      OPEN_PHONE,
-      { type: "INSPECT_EVIDENCE", evidenceId: "ev.otp-sms" },
-      opt("opt.scam.code.read-code"),
-      opt("opt.scam.move.stop"),
-      opt("opt.scam.guilt.hang-up"),
-      { type: "VERIFY_CLAIM", claimId: "claim.caller-identity", method: "official-line" },
-      opt("opt.official.greeting.wait"),
-      opt("opt.official.agent.report"),
-      opt("opt.official.confirm.code-shared"),
-      opt("opt.official.locked.block"),
-      { type: "MAKE_DECISION", decision: "verify-independently" },
-      FINISH,
-    ],
-  ],
-  [
-    "uncertain",
-    [
-      START,
-      { type: "RING_CALL", callId: "call.scam-1", reason: "exploration-timer" },
-      END_CALL,
-      { type: "RING_CALL", callId: "call.scam-1", reason: "re-ring" },
-      ANSWER,
-      END_CALL,
-      OPEN_PHONE,
-      { type: "INSPECT_EVIDENCE", evidenceId: "ev.caller-number" },
-      CLOSE_PHONE,
-      { type: "MAKE_DECISION", decision: "stop-and-wait" },
-      FINISH,
-    ],
-  ],
+/** One accepted log per ending of the current scenario. */
+const ENDING_LOGS: ReadonlyArray<readonly [string, readonly CoreAction[]]> = [
+  ["ending A", reachEndingA().actions],
+  ["ending B", reachEndingB().actions],
+  ["ending C", reachEndingC().actions],
+  ["ending D", reachEndingD().actions],
 ];
-
-describe.skip("restoreProgress (lenient)", () => {
-  const lenient = (p: ChapterProgressV2) => restoreProgress(p, CHAPTER_1_SCENARIO, { lenient: true });
+describe("restoreProgress (lenient)", () => {
+  const lenient = (p: ChapterProgressV3) => restoreProgress(p, CHAPTER_1_SCENARIO, { lenient: true });
 
   it("returns the accepted prefix with trimmed true and acceptedActions", () => {
     // START_CHAPTER, OPEN_PHONE, then a second OPEN_PHONE (rejected) and one more action after it.
@@ -194,14 +113,14 @@ describe.skip("restoreProgress (lenient)", () => {
     });
   });
 
-  it.each(FROZEN_LOGS)("restores the frozen %s playthrough log with trimmed false", (_name, actions) => {
+  it.each(ENDING_LOGS)("restores the %s playthrough log with trimmed false", (_name, actions) => {
     const result = lenient(progress({ actions: [...actions], playerPose: null }));
     expect(result).toMatchObject({ ok: true, trimmed: false, acceptedActions: actions.length });
     expect(result.ok && result.state.status).toBe("finished");
   });
 });
 
-describe.skip("restoreProgress", () => {
+describe("restoreProgress", () => {
   it("replays valid progress to the same state", () => {
     const result = restoreProgress(progress(), CHAPTER_1_SCENARIO);
     expect(result).toEqual({ ok: true, state: replay(acceptedActions(3)), pose: { position: IN_BOUNDS, yaw: 1 } });
@@ -220,14 +139,11 @@ describe.skip("restoreProgress", () => {
     expect(restoreProgress(progress({ playerPose }))).toEqual({ ok: false, reason: RESTORE_REASONS.invalidPose });
   });
 
-  it("clamps an out-of-bounds pose to the Play_Area", () => {
-    const result = restoreProgress(progress({ playerPose: { position: [0, -1000, 500], yaw: 2 } }));
-    expect(result.ok && result.pose).toEqual({
-      position: [STREET_PLAY_BOUNDS.minX, STREET_PLAY_BOUNDS.groundY, STREET_PLAY_BOUNDS.maxZ],
-      yaw: 2,
-    });
+  it("returns an out-of-bounds finite pose unchanged (no clamping)", () => {
+    const pose = { position: [0, -1000, 500] as [number, number, number], yaw: 2 };
+    const result = restoreProgress(progress({ playerPose: pose }));
+    expect(result.ok && result.pose).toEqual(pose);
   });
-
   it("accepts exactly the cap and rejects progress above it", () => {
     expect(restoreProgress(progress({ actions: acceptedActions(SAVE_MAX_ACTIONS) })).ok).toBe(true);
     expect(restoreProgress(progress({ actions: acceptedActions(SAVE_MAX_ACTIONS + 1) }))).toEqual({
