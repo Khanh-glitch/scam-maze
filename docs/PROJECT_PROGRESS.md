@@ -302,6 +302,26 @@ This entry replaces the partial per-task entries (3.7, 10.3, 12.4) that were wri
    - The Speaker toggle is a per-call override, as in the phone UI redesign.
 10. **Follow-ups:** human playtest and pacing tuning; native-speaker review of the Vietnamese text; consider more distinct voices; engine-level tests for the story port; open the pull request (the documentation is committed and the branch is pushed without force).
 
+### 2026-11-15 — Street bins use the owner's penguin bin model
+
+- **Objective:** the owner pointed out that a penguin bin model already exists (`Prop_TrashBin` in `street-props.optimized.glb`, beside the banh mi cart); the street bins should use it instead of the procedural penguin.
+- **Completed:** `streetFurniture.ts` gets a `trash-bin` kind that takes a node from a shared file (`source`), scaled to 1.05 m and turned from +X to +Z; `furniture.ts` `penguinBin` draws it (instanced) with a collider and keeps the procedural penguin as the fallback. Also merged `origin/main` into the branch (`docs/PROJECT_PROGRESS.md` conflict: both sets of entries kept, newest first).
+- **Files modified:** `apps/game/src/features/khupho/world/{streetFurniture,furniture}.ts`, `docs/PROJECT_PROGRESS.md`.
+- **Validation:** after the merge, `pnpm typecheck`, `pnpm build` and `npx vitest --run` (168 files, 1509 tests) passed. After the bin change: `pnpm typecheck`, `pnpm build`, khupho/prologue/app/config tests. A headless screenshot of the grocery front shows the model facing the street; 7 bins placed.
+- **Not verified:** real-GPU look and FPS.
+
+### 2026-11-15 — Parked bikes clear of doors, penguin bins, model residents
+
+- **Objective:** owner feedback on `/khupho`: parked bikes block front doors, sit on the seated customers and stick into the grocery goods; bike kinds come in clusters; the green bins should be penguins; the people at home should use the street NPC models with their own outfit colors.
+- **Completed:**
+  - `neighborhood.ts`: new `parkingSpot()` picks a spot along each house front clear of the front door (or the yard gate), the bin and the grocery's goods; bikes moved out to z 4.7 (was 4.9). No parked bike in front of the cafes and pho shops (table set and customers) or the repair shop (it has its own bike). The random draws are unchanged, so the rest of the street keeps its layout.
+  - `furniture.ts`: parked bike kinds come from a shuffled bag of `BIKE_MIX` (`resetBikeMix()` per build) instead of a position hash, which grouped one kind together. New procedural `penguinBin` replaces the green cylinder bins, facing the street.
+  - `people.ts`: `Resident` can be a street NPC model (women, men and elder pools, outfit colors from `mulberry32(31337)`); sit, eat and desk poses use `sitHigh`, lying turns the model onto its back, other poses stand idle. Models are drawn within 16 m or while the camera is in the house. Procedural people remain the fallback.
+- **Files modified:** `apps/game/src/features/khupho/world/{neighborhood,furniture,people}.ts`, `docs/PROJECT_PROGRESS.md`.
+- **Validation:** `pnpm typecheck`, `pnpm build`, `npx vitest --run src/features/khupho src/features/prologue src/app src/config` (40 tests) passed. Headless SwiftShader screenshots: grocery front (bike between the fridge and the goods, penguin bin), single-story house (bike beside the gate), living room at 20:42 (model resident on the sofa).
+- **Not verified:** FPS on a real GPU with the extra models; the lying pose in bed; cooking and washing poses up close (they use the idle clip).
+- **Follow-up:** owner review.
+
 ### 2026-11-15 — Fix cut-apart parked bikes; noodle shop table set; model shop staff
 
 - **Objective:** the owner reported parked bikes sunk into the ground, asked for the table set in the noodle shop, and asked for shop staff back using the 3D NPC models.
