@@ -224,6 +224,12 @@ Resolved:
   the reduced-stress hint) are listed in `ACCESSIBILITY.md`.
 
 ## Task History
+### 2026-11-15 — Prologue route: the street no longer plays inside the room (heard over the ringtone)
+- **Objective:** Owner report: the background sound kept playing while the room phone rang.
+- **Cause:** `ProloguePage` re-applied the sound setting to both worlds in an effect keyed on `roomBuilt`. When the player goes home before the room is built, the room's `onReady` shows the room at once (`street.suspend()` mutes the street) and then sets `roomBuilt`, so the effect ran next and unmuted the street. The street (traffic recording, rain, thunder) then played through the whole room scene, including the ring. The room's own ambience was already silenced during the ring (entry below).
+- **Fix:** the effect mutes the street while `stage === "room"`. Test in `ProloguePage.room.test.tsx` (fails before the fix, passes after).
+- **Checked:** headless Chrome on the `/?skip-prologue` route, with a script that tracks the Web Audio graph: during the ring only the ringtone has a non-zero path gain (2.2); menu music, menu ambient, rain, city bed and clock are at 0.
+- **Validation:** `tsc` and `vitest run` pass. Not verified by ear, and the full prologue walk (street to room) was not run in a browser.
 ### 2026-11-15 — Active call screen: avatar no longer touches the Dynamic Island
 - **Cause:** the screen's top padding was `pt-[9%]` (percent of width, about 9% of 66.8 mm); the island ends at about 5.5% of the 144.9 mm height, which is about 12% of the width, so the avatar of the active screen started under the island.
 - **Fix:** `pt-[15%]` in `PhoneCallScreen.tsx`. `vitest run src/features/chapter1` (406 tests) and `tsc` pass. Not verified on the phone model (no screenshot).

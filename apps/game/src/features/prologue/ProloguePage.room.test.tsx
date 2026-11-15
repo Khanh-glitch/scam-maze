@@ -12,13 +12,14 @@ const harness = vi.hoisted(() => ({
   roomStory: null as unknown,
   layer: null as null | { bridge: unknown; session: ChapterSession; engineReady?: boolean; modelAllowed?: boolean },
   layerMounts: 0,
+  streetMuted: [] as boolean[],
 }));
 
 vi.mock("../khupho/KhuphoStoryWorld", () => ({
   KhuphoStoryWorld: (props: { onReady: (engine: unknown) => void }) => {
     React.useEffect(() => {
       props.onReady({
-        audio: { setMuted: () => undefined, setDuck: () => undefined },
+        audio: { setMuted: (m: boolean) => void harness.streetMuted.push(m), setDuck: () => undefined },
         begin: () => undefined,
         suspend: () => undefined,
         resume: () => undefined,
@@ -101,6 +102,25 @@ describe("ProloguePage chapter layer", () => {
     expect((harness.roomStory as RoomStoryBridge).commands).not.toBeNull();
   });
 
+  it("keeps the street silent once the player is in the room", async () => {
+    harness.streetMuted = [];
+    render(
+      <ProloguePage
+        settings={DEFAULT_SETTINGS}
+        onUpdateSettings={() => undefined}
+        onBackToMenu={() => undefined}
+        revealed
+        session={SESSION}
+      />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Stub begin walk" }));
+    act(() => {
+      fireEvent.keyDown(window, { code: "KeyH", key: "h" });
+    });
+    await waitFor(() => expect(screen.getByTestId("chapter-layer-stub")).toBeTruthy(), { timeout: 4000 });
+    // The room is built after the player went home; the sound effect that runs then must not unmute the street.
+    expect(harness.streetMuted.at(-1)).toBe(true);
+  });
   it("does not mount the layer without a session", async () => {
     harness.layer = null;
     render(<ProloguePage settings={DEFAULT_SETTINGS} onUpdateSettings={() => undefined} onBackToMenu={() => undefined} revealed />);
