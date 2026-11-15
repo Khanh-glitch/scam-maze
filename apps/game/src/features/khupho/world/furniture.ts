@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Builder } from './builder';
+import { mulberry32 } from './util';
 import { hasProp, propSize, STOOL_LOW_HEIGHT, type PropKind } from './streetFurniture';
 
 const PI = Math.PI;
@@ -306,11 +307,26 @@ export function mirrorWall(b: Builder, x: number, y: number, z: number, yaw: num
 /** motorbike (xe máy): eased tank/seat/cowls, spoked-looking wheels with tyre + rim + hub, chrome exhaust & mirrors */
 /** Parked bike variants, weighted toward the scooters and step-throughs common on Vietnamese streets. */
 const BIKE_MIX: PropKind[] = ['bike-pcx', 'bike-supercub', 'bike-pcx', 'bike-cg125', 'bike-supercub', 'bike-pcx', 'bike-cg125', 'bike-supercub', 'bike-bobber', 'bike-fatboy'];
+/**
+ * Parked bikes draw their model from a shuffled copy of BIKE_MIX, refilled when empty, so every
+ * stretch of street gets the whole mix (picking by position grouped one kind together).
+ */
+const bikeBag: PropKind[] = [];
+let bikeRng = mulberry32(5150);
+/** Restarts the parked bike order; called when the neighborhood is built, so every build looks the same. */
+export function resetBikeMix() { bikeBag.length = 0; bikeRng = mulberry32(5150); }
+function nextBike(models: PropKind[]): PropKind {
+  if (!bikeBag.length) {
+    bikeBag.push(...models);
+    for (let i = bikeBag.length - 1; i > 0; i--) { const j = Math.floor(bikeRng() * (i + 1)); [bikeBag[i], bikeBag[j]] = [bikeBag[j], bikeBag[i]]; }
+  }
+  return bikeBag.pop()!;
+}
 export function motorbike(b: Builder, x: number, y: number, z: number, yaw: number, color = '#c92f2a', stand = true) {
   // Parked bikes use one of the bike models; riding bikes (stand = false) stay procedural.
   const models = stand ? BIKE_MIX.filter(hasProp) : [];
   if (models.length) {
-    const kind: PropKind = models[spot(x, z) % models.length];
+    const kind: PropKind = nextBike(models);
     const sz = propSize(kind)!;
     cl(b, x, y, z, yaw, () => { b.prop(kind, 0, 0, 0); b.col(-sz.x / 2, 0, -sz.z / 2, sz.x, Math.min(1.1, sz.y), sz.z); });
     return;
@@ -351,5 +367,34 @@ export function motorbike(b: Builder, x: number, y: number, z: number, yaw: numb
     b.geo(chrome, new THREE.CylinderGeometry(0.042, 0.042, 0.02, 12), 0.13, 0.2, -0.61, Math.PI / 2, 0, 0);
     b.contact(0, 0, 0.6, 1.9, y);
     if (stand) b.col(-0.22, 0, -0.85, 0.44, 1.0, 1.7);
+  });
+}
+
+/**
+ * Penguin trash bin (thùng rác chim cánh cụt), front = +z. Fallback when the model did not
+ * load: black body, white belly with the dark opening for the rubbish, orange beak and feet.
+ */
+export function penguinBin(b: Builder, x: number, y: number, z: number, yaw: number) {
+  // The owner's penguin bin model when it loaded; the procedural one below otherwise.
+  if (hasProp('trash-bin')) {
+    const sz = propSize('trash-bin')!;
+    cl(b, x, y, z, yaw, () => { b.prop('trash-bin', 0, 0, 0); b.col(-sz.x / 2, 0, -sz.z / 2, sz.x, sz.y, sz.z); });
+    return;
+  }
+  cl(b, x, y, z, yaw, () => {
+    const black = 'g:#1c1f24', white = 'g:#f1f0ea', orange = 'g:#e8891e';
+    const shaped = (g: THREE.BufferGeometry, sx: number, sy: number, sz: number) => { g.scale(sx, sy, sz); return g; };
+    b.lathe(black, [[0.2, 0], [0.26, 0.08], [0.29, 0.32], [0.27, 0.56], [0.21, 0.7], [0.13, 0.76], [0, 0.78]], 0, 0, 0, 18);
+    b.geo(black, new THREE.SphereGeometry(0.15, 16, 12), 0, 0.84, 0);
+    b.geo(white, shaped(new THREE.SphereGeometry(0.25, 18, 14), 0.92, 1.35, 0.62), 0, 0.37, 0.17);
+    b.geo('r:#0d0d0e', shaped(new THREE.SphereGeometry(0.14, 16, 10), 0.72, 0.5, 0.3), 0, 0.5, 0.29);
+    for (const s of [-1, 1]) {
+      b.geo(white, new THREE.SphereGeometry(0.04, 10, 8), s * 0.06, 0.89, 0.11);
+      b.geo('r:#101010', new THREE.SphereGeometry(0.02, 8, 6), s * 0.06, 0.89, 0.145);
+      b.geo(black, shaped(new THREE.SphereGeometry(0.1, 10, 8), 0.4, 2.2, 1), s * 0.29, 0.42, 0, 0, 0, s * 0.22);
+      b.geo(orange, shaped(new THREE.SphereGeometry(0.07, 10, 6), 1, 0.35, 1.5), s * 0.1, 0.02, 0.17);
+    }
+    b.geo(orange, new THREE.ConeGeometry(0.045, 0.12, 10), 0, 0.83, 0.18, Math.PI / 2, 0, 0);
+    b.col(-0.3, 0, -0.3, 0.6, 0.98, 0.6);
   });
 }
