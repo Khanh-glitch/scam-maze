@@ -32,6 +32,10 @@ const MientayPage = lazy(() => import("../features/mientay").then((module) => ({
 const ProloguePage = lazy(() => import("../features/prologue").then((module) => ({ default: module.ProloguePage })));
 const KhuphoPage = lazy(() => import("../features/khupho").then((module) => ({ default: module.KhuphoPage })));
 const RoomV2Page = lazy(() => import("../features/roomv2").then((module) => ({ default: module.RoomV2Page })));
+// The rebuilt Chapter 1 page (saved games and ?skip-prologue) is the room plus the chapter layer.
+const RoomChapterPage = lazy(() =>
+  import("../features/chapter1/room/RoomChapterPage").then((module) => ({ default: module.RoomChapterPage })),
+);
 
 /** `window.localStorage` itself can throw (for example when storage is blocked). */
 function getBrowserStorage(): Storage | undefined {
@@ -202,8 +206,9 @@ export const App: React.FC = () => {
   const ambientFadedInRef = useRef<boolean>(false);
   // Menu music is faded out on chapter screens; the street ambient keeps playing.
   const onMenuScreen = screen.kind === "menu";
-  // The prologue world plays the same street recording itself (muffled indoors), so the menu's copy fades out.
-  const inPrologue = screen.kind === "prologue";
+  // The prologue and the chapter room play their own sound (the street recording, muffled indoors),
+  // so the menu's copy fades out.
+  const inPrologue = screen.kind === "prologue" || screen.kind === "chapter";
   const onMenuScreenRef = useRef(onMenuScreen);
   onMenuScreenRef.current = onMenuScreen;
 
@@ -586,6 +591,8 @@ export const App: React.FC = () => {
               onBackToMenu={handleReturnToMenu}
               revealed={screen.kind === "prologue"}
               onBuildProgress={setPrologueBuild}
+              session={screen.kind === "prologue" ? screen.session : undefined}
+              saveSource={saveSource}
             />
           </Suspense>
         </div>
@@ -600,14 +607,24 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/*
-        Chapter 1 is being rebuilt (spec chapter-01-double-deception). Until task 12.4 wires the
-        new chapter page, every chapter ends at the placeholder. The old street page is parked
-        under src/legacy/urgent-call-street.
-      */}
-      {screen.kind === "chapter" && (
-        <ChapterPlaceholder session={screen.session} onBackToMenu={handleReturnToMenu} />
-      )}
+      {/* Saved games and ?skip-prologue: the apartment with the chapter layer. Chapters without gameplay keep the placeholder. */}
+      {screen.kind === "chapter" &&
+        (getChapter(screen.session.chapterId)?.gameplayAvailable ? (
+          <div key="chapter" className="absolute inset-0 z-40">
+            <Suspense fallback={<div className="h-full w-full bg-black" aria-busy="true" />}>
+              <RoomChapterPage
+                session={screen.session}
+                settings={settings}
+                onUpdateSettings={handleUpdateSettings}
+                onHoverSound={playHoverSound}
+                onReturnToMenu={handleReturnToMenu}
+                saveSource={saveSource}
+              />
+            </Suspense>
+          </div>
+        ) : (
+          <ChapterPlaceholder session={screen.session} onBackToMenu={handleReturnToMenu} />
+        ))}
       {/* Startup screen for the menu's own 3D scene */}
       {showLoading && (
         <MenuStartupLoading

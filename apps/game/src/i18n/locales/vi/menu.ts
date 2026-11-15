@@ -14,6 +14,7 @@ const menu: LocaleShape<typeof en> = {
   continueReasons: {
     none: "Không tìm thấy bản lưu nào.",
     invalid: "Không đọc được bản lưu của bạn. Hãy bắt đầu trò chơi mới.",
+    incompatible: "Bản lưu này thuộc một phiên bản cũ của chương nên không thể chơi tiếp. Hãy bắt đầu trò chơi mới để chơi chương đã cập nhật.",
   },
 };
 

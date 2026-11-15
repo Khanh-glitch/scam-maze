@@ -3,7 +3,7 @@ import { createChapterLoader, type ChapterLoadSnapshot } from "./chapterLoader";
 import { createFakeFetch, createTestDeps, makeGlb, makePng, TEST_CHAPTER } from "../../test/fakeAssets";
 import type { CoreAction } from "../narrative/types";
 import { restoreProgress } from "../saves/chapterProgress";
-import type { SavedGameV2 } from "../saves/saveGame";
+import { SAVE_CONTENT_VERSION, type SavedGameV3 } from "../saves/saveGame";
 
 const NEW_GAME = { kind: "new-game", chapterId: TEST_CHAPTER.id } as const;
 const [MODEL, TEXTURE] = TEST_CHAPTER.assets;
@@ -331,7 +331,14 @@ describe("createChapterLoader", () => {
   describe("continue", () => {
     const validSave = {
       status: "valid",
-      save: { formatVersion: 1, chapterId: TEST_CHAPTER.id, sceneId: "street", savedAt: "2026-11-10T08:00:00.000Z" },
+      save: {
+        formatVersion: 3,
+        contentVersion: SAVE_CONTENT_VERSION,
+        chapterId: TEST_CHAPTER.id,
+        sceneId: "street",
+        savedAt: "2026-11-10T08:00:00.000Z",
+        progress: { checkpointId: "start", actions: [] as CoreAction[], playerPose: null },
+      },
     } as const;
 
     it("fails clearly when there is no save", async () => {
@@ -378,12 +385,12 @@ describe("createChapterLoader", () => {
       expect(loader.getSnapshot().session).toBeNull();
     });
 
-    describe("with version 2 progress", () => {
+    describe("with version 3 progress", () => {
       const actions: CoreAction[] = [{ type: "START_CHAPTER" }, { type: "OPEN_PHONE" }];
-      const v2Save = (progress: SavedGameV2["progress"]) =>
+      const v3Save = (progress: SavedGameV3["progress"]) =>
         ({
           status: "valid",
-          save: { ...validSave.save, formatVersion: 2, progress },
+          save: { ...validSave.save, progress },
         }) as const;
 
       function serveAssets() {
@@ -395,8 +402,8 @@ describe("createChapterLoader", () => {
 
       it("replays valid progress into a ready session with the restored state", async () => {
         const fake = serveAssets();
-        const progress = { checkpointId: "start", actions, playerPose: { position: [0, -200, 0], yaw: 1 } } as SavedGameV2["progress"];
-        const loader = createChapterLoader({ kind: "continue" }, createTestDeps(fake.fetchImpl, { save: v2Save(progress) }));
+        const progress = { checkpointId: "start", actions, playerPose: { position: [0, -200, 0], yaw: 1 } } as SavedGameV3["progress"];
+        const loader = createChapterLoader({ kind: "continue" }, createTestDeps(fake.fetchImpl, { save: v3Save(progress) }));
         loader.start();
         await waitForStage(loader, "ready");
 
@@ -406,9 +413,9 @@ describe("createChapterLoader", () => {
         expect(session).toMatchObject({ origin: "saved-game", progress });
         expect(session?.restored?.state).toEqual(expected.state);
         expect(session?.restored?.state.events.map((entry) => entry.action)).toEqual(actions);
-        // The pose is clamped to the Play_Area.
+        // The pose is restored as saved (no clamping).
         expect(session?.restored?.pose).toEqual(expected.pose);
-        expect(session?.restored?.pose?.position).not.toEqual([0, -200, 0]);
+        expect(session?.restored?.pose?.position).toEqual([0, -200, 0]);
       });
 
       it("trims a rejected action and restores the accepted prefix with saveTrimmed", async () => {
@@ -417,8 +424,8 @@ describe("createChapterLoader", () => {
           checkpointId: "start",
           actions: [...actions, { type: "OPEN_PHONE" }],
           playerPose: null,
-        } as SavedGameV2["progress"];
-        const loader = createChapterLoader({ kind: "continue" }, createTestDeps(fake.fetchImpl, { save: v2Save(progress) }));
+        } as SavedGameV3["progress"];
+        const loader = createChapterLoader({ kind: "continue" }, createTestDeps(fake.fetchImpl, { save: v3Save(progress) }));
         loader.start();
         await waitForStage(loader, "ready");
 
@@ -433,8 +440,8 @@ describe("createChapterLoader", () => {
 
       it("does not set saveTrimmed for a fully accepted log", async () => {
         const fake = serveAssets();
-        const progress = { checkpointId: "start", actions, playerPose: null } as SavedGameV2["progress"];
-        const loader = createChapterLoader({ kind: "continue" }, createTestDeps(fake.fetchImpl, { save: v2Save(progress) }));
+        const progress = { checkpointId: "start", actions, playerPose: null } as SavedGameV3["progress"];
+        const loader = createChapterLoader({ kind: "continue" }, createTestDeps(fake.fetchImpl, { save: v3Save(progress) }));
         loader.start();
         await waitForStage(loader, "ready");
         expect(loader.getSnapshot().session?.saveTrimmed).toBeUndefined();
@@ -446,8 +453,8 @@ describe("createChapterLoader", () => {
           checkpointId: "start",
           actions: [{ type: "OPEN_PHONE" }],
           playerPose: { position: [0, -200, 0], yaw: 1 },
-        } as SavedGameV2["progress"];
-        const loader = createChapterLoader({ kind: "continue" }, createTestDeps(fake.fetchImpl, { save: v2Save(progress) }));
+        } as SavedGameV3["progress"];
+        const loader = createChapterLoader({ kind: "continue" }, createTestDeps(fake.fetchImpl, { save: v3Save(progress) }));
         loader.start();
         await waitForStage(loader, "ready");
         const snapshot = loader.getSnapshot();
@@ -463,9 +470,9 @@ describe("createChapterLoader", () => {
           "more than 1000 actions",
           { checkpointId: "start", actions: Array.from({ length: 1001 }, () => ({ type: "OPEN_PHONE" })), playerPose: null },
         ],
-      ] as Array<[string, SavedGameV2["progress"]]>)("fails with invalid-save for damaged progress (%s)", async (_label, progress) => {
+      ] as Array<[string, SavedGameV3["progress"]]>)("fails with invalid-save for damaged progress (%s)", async (_label, progress) => {
         const fake = serveAssets();
-        const loader = createChapterLoader({ kind: "continue" }, createTestDeps(fake.fetchImpl, { save: v2Save(progress) }));
+        const loader = createChapterLoader({ kind: "continue" }, createTestDeps(fake.fetchImpl, { save: v3Save(progress) }));
         loader.start();
         await waitForStage(loader, "error");
         expect(loader.getSnapshot().error).toMatchObject({ code: "invalid-save", retryable: false });

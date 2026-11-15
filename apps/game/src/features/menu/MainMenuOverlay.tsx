@@ -11,7 +11,7 @@ export type ContinueAvailability =
   | {
       available: false;
       /** Selects the translated reason `menu:continueReasons.<reasonCode>`. */
-      reasonCode: "none" | "invalid";
+      reasonCode: "none" | "invalid" | "incompatible";
       /** English source text of the reason. */
       reason: string;
     };

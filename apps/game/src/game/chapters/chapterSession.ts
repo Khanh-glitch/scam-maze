@@ -2,7 +2,7 @@ import type { SceneId } from "@scammaze/shared-types";
 import type { ChapterDefinition } from "./chapterRegistry";
 import type { ChapterState, ScenarioDefinition } from "../narrative/types";
 import { restoreProgress } from "../saves/chapterProgress";
-import type { ChapterProgressV2, SavedGame, SavedPlayerPose } from "../saves/saveGame";
+import type { ChapterProgressV3, SavedGame, SavedPlayerPose } from "../saves/saveGame";
 
 /** Chapter_State and player pose rebuilt by replaying a saved Checkpoint. */
 export interface RestoredChapterProgress {
@@ -17,8 +17,8 @@ export interface ChapterSession {
   chapterNumber: number;
   sceneId: SceneId;
   origin: "new-game" | "saved-game";
-  /** Saved Checkpoint progress, copied from a version 2 save (design, "Saves"). */
-  progress?: ChapterProgressV2;
+  /** Saved Checkpoint progress, copied from a version 3 save (design, "Saves"). */
+  progress?: ChapterProgressV3;
   /**
    * Result of replaying `progress` through the chapter core. The loader sets it after the replay
    * succeeds, so the Chapter_Page can start from it without replaying again.
