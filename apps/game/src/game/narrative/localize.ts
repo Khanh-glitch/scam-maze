@@ -14,6 +14,7 @@ import type {
   DialogueGraph,
   EndingDef,
   EvidenceItem,
+  NpcDef,
   PhoneContent,
   ScenarioDefinition,
 } from "./types";
@@ -127,7 +128,16 @@ function walkEnding(ending: EndingDef, text: TextVisitor): EndingDef {
     ...variant,
     text: text(`${base}/variants/${variant.id}/text`, variant.text),
   }));
-  return { ...ending, title, simulationLabel, variants };
+  const a = ending.aftermath;
+  const aftermath = {
+    ...a,
+    consequence: text(`${base}/aftermath/consequence`, a.consequence),
+    phone: text(`${base}/aftermath/phone`, a.phone),
+    laptop: text(`${base}/aftermath/laptop`, a.laptop),
+    evidenceSummary: text(`${base}/aftermath/evidenceSummary`, a.evidenceSummary),
+    caseReport: text(`${base}/aftermath/caseReport`, a.caseReport),
+  };
+  return { ...ending, title, simulationLabel, variants, aftermath };
 }
 
 function walkDebrief(debrief: DebriefContent, text: TextVisitor): DebriefContent {
@@ -141,6 +151,17 @@ function walkDebrief(debrief: DebriefContent, text: TextVisitor): DebriefContent
       text(`debrief/outcomeSummaries/${outcomeId}`, summary),
     ),
     decisionNotes: mapRecord(debrief.decisionNotes, (note, tag) => text(`debrief/decisionNotes/${tag}`, note)),
+    analysis: {
+      pressureBuilt: text("debrief/analysis/pressureBuilt", debrief.analysis.pressureBuilt),
+      whyWarningLooked: text("debrief/analysis/whyWarningLooked", debrief.analysis.whyWarningLooked),
+      thirdCallerNote: text("debrief/analysis/thirdCallerNote", debrief.analysis.thirdCallerNote),
+      trapNotes: mapRecord(debrief.analysis.trapNotes, (note, trap) =>
+        text(`debrief/analysis/trapNotes/${trap}`, note),
+      ),
+      verifyNextTime: debrief.analysis.verifyNextTime.map((item, index) =>
+        text(`debrief/analysis/verifyNextTime/${index}`, item),
+      ),
+    },
   };
 }
 
@@ -153,6 +174,7 @@ function walkScenario(scenario: ScenarioDefinition, text: TextVisitor): Scenario
     objectives: mapRecord(scenario.objectives, (objective, id) => ({
       ...objective,
       text: text(`objectives/${id}/text`, objective.text),
+      ...(objective.hint !== undefined ? { hint: text(`objectives/${id}/hint`, objective.hint) } : {}),
     })),
     interactables: mapRecord(scenario.interactables, (interactable, id) => ({
       ...interactable,
@@ -175,12 +197,25 @@ function walkScenario(scenario: ScenarioDefinition, text: TextVisitor): Scenario
       ...call,
       displayName: text(`calls/${id}/displayName`, call.displayName),
     })),
-    npcs: mapRecord(scenario.npcs, (npc, id) => ({ ...npc, name: text(`npcs/${id}/name`, npc.name) })),
+    npcs: mapRecord(scenario.npcs as Record<string, NpcDef>, (npc, id) => ({ ...npc, name: text(`npcs/${id}/name`, npc.name) })),
     dialogues: mapRecord(scenario.dialogues, (graph) => walkDialogue(graph, text)),
     phone: walkPhone(scenario.phone, text),
     decisions: mapRecord(scenario.decisions, (decision) => walkDecision(decision, text)),
     endings: mapRecord(scenario.endings, (ending) => walkEnding(ending, text)),
     debrief: walkDebrief(scenario.debrief, text),
+    sources: mapRecord(scenario.sources, (source, id) => ({
+      ...source,
+      label: text(`sources/${id}/label`, source.label),
+      claimedOrigin: text(`sources/${id}/claimedOrigin`, source.claimedOrigin),
+    })),
+    deductions: mapRecord(scenario.deductions, (deduction, id) => ({
+      ...deduction,
+      statement: text(`deductions/${id}/statement`, deduction.statement),
+    })),
+    deviceActions: mapRecord(scenario.deviceActions, (action, id) => ({
+      ...action,
+      label: text(`deviceActions/${id}/label`, action.label),
+    })),
     acts: scenario.acts.map((act) => ({ ...act, title: text(`acts/${act.id}/title`, act.title) })),
   };
 }

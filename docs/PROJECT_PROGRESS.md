@@ -35,6 +35,13 @@
     subtitle overlay outside the phone.
     `pnpm test` (121 files, 1107 tests), `pnpm typecheck` and `pnpm build` pass. No manual visual
     check was run.
+  - Chapter 1 "The False Victory" (double deception) in Room v2 (spec
+    `chapter-01-double-deception`), on branch `feat/chapter-01-double-deception` (from `main` @
+    `37eeedd`, not merged, not pushed): replaces the street chapter, which is parked under
+    `apps/game/src/legacy/urgent-call-street/`. At the task 14 checkpoint `pnpm test` (160 files,
+    1453 tests), `pnpm typecheck` and `pnpm build` passed and `voice:report` showed 88 clips
+    present. Not playtested by a human, not rendered on a real GPU, not heard on real speakers,
+    and the Vietnamese text has no native-speaker review.
   - Shared contracts (`packages/shared-types`): pure TypeScript types.
 - **Current milestone:** Phase B — 3D Vertical Slice & Narrative Foundation.
 - **Architecture status:** pnpm monorepo structure `IMPLEMENTED`. 3D rendering pipeline `IMPLEMENTED`.
@@ -43,12 +50,13 @@
 - **Deployment status:** Landing page on GitHub Pages (<https://teehihi.github.io/scam-maze/>). Game client build ready for independent Vercel project deployment.
 - **AWS budget:** $200 promotional credits, 3-month evaluation, estimate $28.68
   ([cost estimation](finops/COST_ESTIMATION.md)); no actual spend yet.
-- **Last updated:** 2026-11-14 (Shared World Engine stages 1 through 3b recorded)
+- **Last updated:** 2026-11-16 (Chapter 1 double-deception rebuild recorded)
 
 ## Completed
 
 Verified against merged pull requests on GitHub and local workspace builds.
 
+- [x] **Chapter 1 "The False Victory" (double deception) rebuilt in Room v2 (branch `feat/chapter-01-double-deception`, not merged, not pushed):** deterministic core extended (16 Core_Action kinds, deductions, device actions, beats, data-driven ringing, objectives and endings), new scenario with 4 endings, laptop and phone-records overlays, forensic debrief, save format v3, 88 voice clips and a Vietnamese overlay. Verified by `pnpm test` (160 files, 1453 tests), `pnpm typecheck`, `pnpm build` and `voice:report` (88 present, 0 missing). Not verified: human playtest and pacing, real GPU, real speakers, real devices, browser flows. See the task history entry of 2026-11-16.
 - [x] **Chapter 1 "The Urgent Call" playable vertical slice (branch `feat/chapter-01-playable`, not merged):** Deterministic narrative core (reducer, selectors, dialogue engine, scenario validator), versioned save v2 with replay validation, Chapter 1 street canvas with interactable props, smartphone (calls, messages, call history, bank app), face-to-face dialogue, evidence journal, decisions, three ending groups (`verified`, `risky`, `uncertain`), debrief, checkpoints and pause menu. Verified by `pnpm test` (48 files, 392 tests); not verified in a browser. See the task history entry of 2026-11-11.
 - [x] **Lexus GX 550 Vehicle Interaction, Solid Collider Box & First-Person Driving System (`/testmove`):** Added an oriented bounding box (OBB) collider for the gold Lexus GX 550 SUV preventing walking through the vehicle. Integrated proximity detection to the driver door with an animated `[E] Lên xe Lexus GX 550 (Lái xe)` interaction badge. Built driver seat cockpit POV camera with lowered sitting height, free head look around the cabin, procedural 3D steering wheel with driver hands and forearms gripping and turning with `A`/`D`, deterministic driving physics (acceleration up to 63 km/h, braking, reverse, handbrake slide, suspension pitch/roll, road curb clamping), zero-latency procedural Web Audio V8 engine rumble synthesis, digital speedometer (km/h) with gear indicator (`[D]`, `[R]`, `[P]`), and `E` key exit when stopped.
 - [x] **Cinematic chapter loading screen (branch `feat/game-cinematic-loading-screen`, not merged):** Real loading pipeline for New Game / Continue with byte-measured progress, asset verification, stall watchdog, error recovery, fade transitions and reduced-motion support. Startup menu loading rewritten without fabricated progress. First automated tests (Vitest, 103 tests after the 2026-11-10 startup loading percentage task). Startup screen shows a byte-measured percentage of the street GLB. Loading screens are opaque from the first frame and stay up for a minimum display time (1.5 s chapter, 1.2 s startup). At the time, loading ended on an honest "in development" screen; on branch `feat/chapter-01-playable` it now opens the Chapter 1 page.
@@ -77,6 +85,12 @@ Verified against merged pull requests on GitHub and local workspace builds.
 
 ## In Progress
 
+- [ ] Chapter 1 double-deception rebuild (spec `chapter-01-double-deception`, branch
+      `feat/chapter-01-double-deception`). Code, tests and voice are committed in 10 commits and
+      pass the task 14 checkpoint. Documentation is written but not committed (task 15.2); push
+      and pull request pending (task 15.3). Open: human playtest (pacing, the 18 to 22 minute
+      target, soft locks), real GPU check of Room v2 and the 3D phone overlay, real-speaker
+      check of the clips, native-speaker review of the Vietnamese overlay, browser flows.
 - [ ] Game localization, English and Vietnamese (spec `game-i18n-en-vi`, branch
       `feat/game-i18n-en-vi`). Code, translations and tests are committed in 9 commits (the
       cross-cutting tests of task 10.3 in `5b1c785`, with the two test-file type fixes).
@@ -210,6 +224,65 @@ Resolved:
   the reduced-stress hint) are listed in `ACCESSIBILITY.md`.
 
 ## Task History
+
+### 2026-11-16 — Chapter 1 "The False Victory" (double deception) rebuilt in Room v2 (spec `chapter-01-double-deception`, tasks 1 to 15.1)
+
+This entry replaces the partial per-task entries (3.7, 10.3, 12.4) that were written earlier on this branch. Branch `feat/chapter-01-double-deception`, created from `main` @ `37eeedd`, not merged, not pushed. The documentation commit (task 15.2) and the push (task 15.3) are still to come.
+
+1. **Date and title:** 2026-11-16, Chapter 1 "The False Victory" (double deception) in Room v2.
+2. **Objective:** rebuild Chapter 1 as a psychological mystery. The player rejects an obvious first scam (a fake bank-security call), then meets a second layer that is disguised as the fix for the first. The story is told in the player's apartment (Room v2) instead of on the street, and all story state stays in the deterministic core.
+3. **Completed work (each point verified by tests unless marked otherwise in item 7):**
+   - **Flow:** menu, loading, neighborhood prologue, house no. 59, the Room v2 chapter layer, debrief. The old street chapter (with the neighbor Sam) is parked under `apps/game/src/legacy/urgent-call-street/`; it is excluded from `tsc` and Vitest and is not maintained.
+   - **Core (`game/narrative/`):** 16 Core_Action kinds (the 14 old ones plus `DEVICE_ACTION` and `COMBINE_EVIDENCE`). Ringing calls, objectives, decision effects and endings are data in the scenario, not code. 3 deductions, 12 device actions, 3 beats. Each incoming call rings at most once (a fix found by the Property 4 and acts tests). Validator clean, all 4 endings reachable, no soft lock (`validateScenario`, `analyzeReachability`). Task 3.7 extended both tools to sources, deductions, device actions, beats, ring rules, `callClosed`, `deductionRecorded` and `decisionIs` conditions, and gave the reachability report `unreachableOutcomes`.
+   - **Content:** fictional Northgate Bank, Alex (first caller), Morgan (Case Response Desk, the third caller), the official line and a narrator. Evidence E01 to E11 (E03 has a paper and an app variant, so 12 items). Endings: A `false-victory`, B `perfect-chain`, C `break-the-chain` (with a `case-report` variant), D `unfinished-case`. Five decisions, including `report-deception`. Act II has the player-facing title "The Reassuring Choice".
+   - **UI:** laptop overlay (notification, bank app, compare view, Review Security page); phone records overlay; journal with evidence combination and hints; `RoomChapterLayer`, `RoomCallLayer`, `RoomEndingLayer`; optional 3D phone canvas with the 2D fallback; forensic debrief with a timeline and Replay.
+   - **Room v2 as host:** `RoomStoryPort` (engine side, `features/roomv2/game/outside.ts`) and `RoomStoryBridge` (`features/chapter1/room/roomStoryBridge.ts`) let the layer drive the apartment. `/roomv2`, `/khupho`, `/testmove`, `/ueh`, `/hue` and `/mientay` are unchanged.
+   - **Saves v3:** key `scammaze_save_v3` with a `contentVersion`. Old v1 and v2 saves are reported as incompatible; they are neither migrated nor deleted.
+   - **Voice:** 88 TTS clips (44 en, 44 vi), all present according to `voice:report`. The 108 clips of the old chapter were removed. The installed voices are David, Zira, Mark and An, so several speakers share a voice and are told apart by rate and pitch.
+   - **Vietnamese overlay:** 367 entries, written by the AI agents without native-speaker review.
+   - **Review:** `qa-security-reviewer` found no high or medium findings and one low finding (debrief wording about a saved number), fixed in `246804f`.
+4. **Commits** (`git log --oneline main..HEAD`, oldest first; the documentation commit of task 15.2 is not made yet):
+   - `f33dfe8` chore(game): park the street chapter for the double-deception rebuild
+   - `ce5f128` feat(core): add deductions, device actions and data-driven rules for the double-deception chapter
+   - `eb4fc67` feat(roomv2): add a story port so the chapter core can drive the apartment
+   - `766b0d5` feat(chapter1): add the laptop overlay, phone records and evidence combination UI
+   - `c4ae578` feat(chapter1): author the double-deception scenario and its tests
+   - `9a2dcd6` feat(game): save format v3 and the room chapter flow
+   - `dc3d5dc` feat(chapter1): add the room chapter layer with call, voice and decision wiring
+   - `6516402` feat(i18n): add the Vietnamese overlay and voice clips for the double-deception chapter
+   - `6dbb7fa` test(chapter1): cover early exits, audio cleanup, save restart and AI-off completion
+   - `246804f` fix(chapter1): avoid vouching for a number in debrief text
+5. **Files** (`git diff --name-status -M main..HEAD`: 458 files, 25,789 insertions, 8,520 deletions):
+   - Created: `features/chapter1/room/**` (28 new files, among them `RoomChapterPage`, `RoomChapterLayer`, `RoomCallLayer`, `RoomEndingLayer`, `RoomPhoneModelLayer`, `roomStoryBridge`, `roomPresentation`, `useNarrationPlayback` and `room/laptop/*`); 2 new journal files (`EvidenceJournal.test.tsx`, `relatedDeductions.ts`); `phone/VoicemailApp.tsx`; `features/prologue/ProloguePage.room.test.tsx`; `features/roomv2/RoomV2Page.test.tsx`; in `game/narrative/`: `beats.ts`, `deductions.ts`, `selectors.test.ts`, `debrief.test.ts` and the beats and deductions tests (6 new files) and 17 new files in `game/narrative/chapter1/` (sources, claims, deviceActions, beats, deductions, acts, tests); 7 new property tests (combine, combineOrder, deductionEffects, exits, harmCausality, reactiveCall, reducer); `game/saves/saveGame.v3.property.test.ts`; 11 new Vietnamese overlay parts in `i18n/narrative/chapter1.vi/`; new en and vi locale files; 88 voice clips under `apps/game/public/audio/chapter01/{en,vi}`.
+   - Modified: the story port in `features/roomv2/game/{outside,engine,audio,screens}.ts` and `RoomV2Page.tsx`; `game/narrative/**` (reducer, selectors, conditions, validator, reachability, outcome, debrief, types, store and the Chapter 1 data), `game/saves/**`, `game/voice/**`, `game/chapters/**`, `game/content/**`, `game/loading/**`, `app/App.tsx` and its tests, `features/prologue/**`, `features/roomv2/**`, `features/chapter1/{call,debrief,decision,ending,intro,journal,phone}`, `features/menu`, `i18n/locales/{en,vi}`, `i18n/narrative/chapter1.vi.ts`, `apps/game/scripts` (voice scripts), `packages/shared-types/src`, test helpers in `src/test`.
+   - Moved: 25 files renamed into `apps/game/src/legacy/urgent-call-street/` (20 under `features`, 5 under `narrative`), plus 16 more narrative files added there as the parked copy.
+   - Deleted: 108 old voice clips (54 en, 54 vi), the old phone component `features/chapter1/phone/BankApp.tsx`, 3 old property tests (`determinism`, `dispatch`, `store`), 2 old Vietnamese overlay files.
+   - Docs in this task (uncommitted until task 15.2): `docs/PROJECT_PROGRESS.md`, `docs/architecture/OVERVIEW.md`, `.kiro/steering/architecture.md`, `.kiro/steering/gameplay-rules.md`, `.kiro/steering/product.md`, `ACCESSIBILITY.md`, and the spec folder `.kiro/specs/chapter-01-double-deception/`. The Phase 0 audit stays in the spec's `design.md`; there is no separate audit file.
+6. **Validation commands executed** (task 14 checkpoint, each on its own, in this order): `pnpm test`, `pnpm typecheck`, `pnpm build`, `pnpm --filter @scammaze/game voice:report`; and `git log --oneline main..HEAD`, `git diff --shortstat main..HEAD`, `git status --short` for this entry. The documentation task changed only Markdown files, so `pnpm typecheck` was not run again for it.
+7. **Build and test results (task 14):**
+   - `pnpm test`: 160 files, 1453 tests passed, 0 skipped, about 110 s.
+   - `pnpm typecheck`: exit 0.
+   - `pnpm build`: exit 0, about 47 s, no chunk-size warning.
+   - `voice:report`: 88 clips present, 0 missing.
+   - **Not executed:** a human playtest (pacing, the 18 to 22 minute target, soft locks found by a person); real GPU rendering of Room v2 and of the 3D phone overlay; real speakers and clip quality; real devices; browser flows (the dev server was not running during the review); a native-speaker review of the Vietnamese text.
+8. **Unresolved issues and limitations:**
+   - Everything listed under "Not executed" above. The chapter has not been playtested and must not be called playtested.
+   - The engine changes (Room v2 story port) have no engine-level tests; the bridge and the layer are tested with stubs.
+   - Escape and overlay handling were verified only in jsdom. Keyboard Tab order was tested from the DOM order, not with real key presses.
+   - The game has no AI setting, so "AI off" is the only mode; the AI-off test completes every ending with `fetch` stubbed to throw.
+   - `RoomChapterPage` takes its `modelAllowed` default from a WebGL probe.
+   - Only four installed TTS voices exist, so several speakers sound alike.
+9. **Deviations from the documented architecture and design:**
+   - The street chapter is parked, not deleted, and is not maintained.
+   - Save format v3 replaces v2 for this chapter, without migration.
+   - Act II is titled "The Reassuring Choice" for the player.
+   - The decision id is `report-deception`, not `report-connected`.
+   - The recovery dialogue graph has 15 nodes instead of about 26 (the depth limit of the validator).
+   - Narration graphs are sequences of terminal nodes played by the presentation layer; the validator exempts playback-only graphs.
+   - Ending C is selected by `official_channel_verified` whatever the decision (requirement 10.7).
+   - Aftermath phone and laptop text is shown in the ending screen and is not pushed to the engine's laptop frame.
+   - The Speaker toggle is a per-call override, as in the phone UI redesign.
+10. **Follow-ups:** human playtest and pacing tuning; native-speaker review of the Vietnamese text; consider more distinct voices; engine-level tests for the story port; open the pull request (the documentation is committed and the branch is pushed without force).
 
 ### 2026-11-15 — Fix cut-apart parked bikes; noodle shop table set; model shop staff
 

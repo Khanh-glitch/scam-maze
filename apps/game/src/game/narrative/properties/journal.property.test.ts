@@ -1,3 +1,4 @@
+// Feature: chapter-01-double-deception, journal shows only discovered evidence (Requirements 4.5, 7.6)
 import { describe, expect, it } from "vitest";
 import {
   CORE_PROPERTY_RUNS,

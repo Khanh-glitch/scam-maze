@@ -1,88 +1,102 @@
-// Chapter 1 "The Urgent Call": debrief text.
-// Describes what the scammer did and what the player can do next time, without blaming the
-// player (Requirement 14.6). The `uncertain` summary is a partial result, not a failure
-// (Requirement 13.12).
-// Pure TypeScript data. See design.md, "Debrief builder", and Requirements 14.3, 14.6.
-//
-// `decisionNotes` has one entry for every debrief tag used in Scenario_Data: the dialogue option
-// and end-node tags, and the decision tags in `decisions.ts`.
+// Chapter 1 "The Urgent Call: The False Victory": debrief text.
+// Every statement is derived by the debrief builder from this data and the event log. Nothing here
+// calls a number, message, caller, website or notification "safe": the lesson is that a source is
+// worth trusting only after it is checked through a channel the player set up earlier.
+// Pure TypeScript data. Fictional names, numbers and domains only.
 
 import type { DebriefContent } from "../types";
+import { CASE_REFERENCE, NOTIFICATION_APP, OFFICIAL_NUMBER } from "./sources";
 
 export const CHAPTER_1_DEBRIEF: DebriefContent = {
-  mechanism:
-    "This was an impersonation scam. A text created a short deadline and sent you to a look-alike web address. Then a caller pretended to be from Northgate Bank security. The caller used a few personal details to sound real, asked for the one-time code the bank had just sent, and then asked you to move your savings to a \"protected holding account\". The account belonged to the caller. Each step added pressure so that there was no time to check.",
+  mechanism: `This was a two-part plan. The first caller claimed to be from the bank, used urgency, and asked for a code. A laptop notification, then a third caller, offered a recovery procedure for the same case reference, ${CASE_REFERENCE}. The first call created the problem and the later layers sold the fix. All three came from one unverified source.`,
+
   saferAlternatives: [
-    "End the call and contact the bank yourself on the number on your card, on a bank letter or in the bank's app.",
-    "Never read a one-time code to anyone. A real bank does not ask for it.",
-    "Do not move money because a caller asks you to protect it. A real bank does not ask this.",
-    "Do not use links or numbers from an unexpected message. Type the bank's official website yourself or open the app you already have.",
-    "Take your time and talk to someone you trust. Pressure to act quickly is a warning sign.",
-    "Report the call to your bank and block the number.",
+    "End the call, then contact the bank yourself with a number you saved before the call, such as the one on your statement or in your bank app.",
+    "Never read a code to a caller, even when the caller knows a case ID or says the code is for your protection.",
+    "Treat a warning that agrees with your doubt like any other claim. Ask where it came from and whether you can check it without using the contact details it gave you.",
+    "When two messages share the same case ID or contact number, count them as one source, not as two confirmations.",
+    "If a caller asks you to move money, install an app or keep the call private, stop. Those requests are a reason to check, not a reason to hurry.",
   ],
+
   outcomeSummaries: {
-    verified:
-      "You checked the caller's story through a channel you already trusted. Northgate confirmed that they did not call you, so the request was a scam and nothing was lost.",
-    investigator:
-      "You checked the caller's story through a channel you already trusted, kept the evidence together and reported the call. Northgate confirmed that they did not call you, so the request was a scam and nothing was lost. Reports like yours help the bank warn other customers.",
-    risky:
-      "The caller's pressure worked this time. That happens to many careful people, because the scam is built to feel urgent and real. The steps below show where you could stop and check next time.",
-    uncertain:
-      "This is a partial result, not a failure. You stopped the caller's request, which ended the immediate risk. You did not confirm with Northgate, so you did not learn whether the alert was real. Next time, call the number on your card to find out.",
+    "false-victory":
+      "You rejected the first call and then trusted the second layer. The warning looked like confirmation, but it had not been checked through a channel you chose yourself.",
+    "perfect-chain":
+      "Both layers worked together in the simulation. The code and the recovery steps came from one plan that made each part look believable.",
+    "break-the-chain":
+      "You checked through a contact saved before today, and that broke the chain. The bank confirmed it knew nothing about the case, the notification or a recovery procedure.",
+    "unfinished-case":
+      "You stopped and did not follow either caller. That is a valid choice. The claims stayed unchecked, because you did not call the saved bank contact.",
   },
+
   decisionNotes: {
-    "asked-for-proof":
-      "You asked the caller to prove they were from the bank. The caller only used a few personal details, and those can come from leaked data.",
-    "challenged-number":
-      "You noticed that the caller's number was not the one on your card. The caller had an excuse ready, which is common in this scam.",
-    "asked-why-code":
-      "You asked why the caller needed your code. The caller called it a normal security check and pushed you to hurry.",
-    "shared-code":
-      "You read the one-time code to the caller. The message with the code said never to share it, but the caller made the request feel urgent and normal.",
-    "said-stop":
-      "You told the caller that something did not feel right. The caller then used guilt to keep you on the line.",
-    "moved-money":
-      "You moved the money as the caller asked. The \"protected holding account\" belonged to the caller.",
+    // Device actions.
+    "opened-alex-record":
+      "You opened the record of Alex's call. It shows the case ID and what Alex asked for, which you can compare with later messages.",
+    "opened-call-details":
+      "You opened the call details. The caller ID showed your own number, which a real bank call would not normally do. It needs thought: one odd detail is a hint, not proof.",
+    "opened-notification":
+      "You opened the notification. It agreed with your first reaction, which is why it felt trustworthy. It had not yet been checked against anything you already knew.",
+    "dismissed-notification":
+      "You dismissed the notification without acting on it. It stayed in the history, so you could still look at it later.",
+    "inspected-origin": `You looked at who sent the notification. The sender, the app name (${NOTIFICATION_APP}) and the contact number did not match anything you had saved. Checking the origin is a good habit before you act on a warning.`,
+    "opened-bank-app":
+      "You opened the bank app you installed yourself. That is a better place to look than a link or contact in a message, but the app on its own cannot confirm what a caller said.",
+    "checked-account-activity":
+      "You checked the account activity. It showed no flagged payment, which did not settle the question. Only the bank can confirm whether a case exists.",
+    "checked-saved-contacts": `You opened the saved contacts in the bank app. The official number there (${OFFICIAL_NUMBER}) was saved before today, so you can compare it with what the caller says.`,
+    "compared-case-ref": `You compared the case reference in Alex's record with the notification. Both used ${CASE_REFERENCE}. Two sources that share one identifier may have one author.`,
+    "compared-contacts":
+      "You compared the contact in the notification with your saved records. The numbers did not match, which is a sign the notification did not come from your bank.",
+    "opened-review-security":
+      "You opened the Review Security page from the notification. It is part of the second layer, and it is where the recovery procedure begins.",
+    "opened-recovery-details":
+      "You opened the details of the third call. The number matched the contact inside the notification, so the third caller was not a separate witness.",
+
+    // Deductions.
+    "linked-same-source":
+      "You linked the first caller and the notification. They used the same case reference, so they are not independent of each other.",
+    "notification-not-from-bank":
+      "You found that the notification does not match your saved bank records. Its contact details did not come from your bank.",
+    "third-caller-linked":
+      "You linked the third caller to the same source. A caller who repeats the same case reference gives you no new evidence.",
+
+    // Reducer tags.
     "hung-up":
-      "You ended the call. This stopped the caller's pressure and gave you time to think.",
-    "hung-up-to-verify":
-      "You ended the call so you could check with Northgate yourself. This is a strong step, because you chose the channel instead of the caller.",
-    "hung-up-on-callback":
-      "When the caller called back, you ended the call again. Calling back to push harder is part of the same pattern.",
-    "talked-to-sam":
-      "You talked to Sam at the corner shop. Talking to someone you trust gives you time and often shows that the story is a known pattern.",
-    "reported-to-bank":
-      "You called Northgate on the official number and told them about the call.",
-    "told-bank-about-code":
-      "You told Northgate that you had shared the code. Telling the bank quickly lets them lock the account and limit the harm.",
-    "blocked-number": "You blocked the caller's number after speaking to Northgate.",
-    "asked-for-details":
-      "You asked the caller for details about the alert. The answers stayed vague or changed, which is common when a caller is following a script.",
-    "asked-for-time":
-      "You asked when the alert started. A caller who is not looking at your real account often cannot give a clear answer.",
-    "cited-bank-app":
-      "You pointed out that the bank's app shows no alert. The app is a channel you already trust, so it is a good place to check.",
-    "cited-otp-warning":
-      "You pointed out that the code message says never to share the code. Repeating the bank's own rule is a clear way to push back.",
-    "challenged-link":
-      "You asked about the web address in the text. A look-alike address that you did not choose is a warning sign.",
-    "noticed-isolation":
-      "You noticed that the caller asked you to keep the call secret. A real bank does not ask you to hide a call from people you trust.",
-    "challenged-story":
-      "You noticed that the caller's story changed. Details that shift from one minute to the next are a warning sign.",
-    "told-caller-bank-said-no":
-      "You told the caller that Northgate said it did not call you. A caller who is telling the truth would welcome the check, not argue with it.",
-    "reported-details":
-      "You gave Northgate the details of the call, including the numbers and what was asked. Full details help the bank warn other customers.",
-    "reported-basic":
-      "You reported the call to Northgate. Next time, you can add the numbers and the exact requests so the bank has more to work with.",
-    "hung-up-on-followup":
-      "You ended the follow-up call. A second call from a new number that offers to fix the problem is part of the same pattern.",
-    "chose-follow-request":
-      "You decided to call the number back and do what the caller asked. The caller's story was built to make this feel like the right thing to do.",
-    "chose-verify-independently":
-      "You decided to report the call and block the number after Northgate confirmed they had not called you.",
-    "chose-stop-and-wait":
-      "You decided to block the number and leave it for now. This stopped the request, but you did not confirm with Northgate.",
+      "You ended a call. You can always do that. Ending a call and then checking through a number you already had saved is the key step.",
+
+    // Final decisions.
+    "decided-follow-recovery":
+      "You followed the recovery steps from the third caller. The steps came from the same source that raised the warning, so they had not been checked.",
+    "decided-follow-both":
+      "You did what both callers asked. Each request made the other look more convincing, which is how a two-part plan holds together.",
+    "decided-refuse-and-stop":
+      "You refused both callers and stopped. That keeps you away from the plan, and calling a number you saved earlier would also tell you what was real.",
+    "decided-verify-independently":
+      "You checked with a number saved before today. That is the step that works: it does not depend on anything the callers or the notification told you.",
+    "decided-report-deception":
+      "You reported the connected deception. Showing how the claims link together is useful, and so is a report to the bank through a channel you already trust.",
+  },
+
+  analysis: {
+    pressureBuilt:
+      "Alex used urgency, authority and a case ID to make the call feel official. Each reply added pressure and made it harder to stop and check. The goal was a code, given before you could verify anything.",
+    whyWarningLooked: `The laptop notification arrived right after you refused the first caller, and it agreed with you. That made it feel like proof that you chose well. It also gave you contact details of its own, and the third caller used the same case reference, ${CASE_REFERENCE}. Things that agree with each other are not independent if they come from one source.`,
+    thirdCallerNote:
+      "The third caller repeated the same case reference and the same contact as the notification. That is not independent evidence. Only the call you made to the saved bank contact came from a channel that existed before the scare.",
+    trapNotes: {
+      none: "You did not enter either trap. You did not share a code and you did not follow the recovery steps.",
+      first: "You shared the code in the first call. That was the trap of the first layer, and a later check with the bank could still limit what followed.",
+      second:
+        "You followed the second layer. It was designed for people who had just refused the first call, because their guard was already down.",
+      both: "You entered both layers. The first call created the problem and the second sold the fix, which is the way the plan was designed to work.",
+    },
+    verifyNextTime: [
+      "Stop and end the call or close the message. Do not use the contact details it gave you.",
+      "Find a contact you saved before today: the number on your statement, the back of your card, or your own bank app.",
+      "Ask the bank directly whether the case, the notification or the procedure exists.",
+      "Count messages that share one case ID or contact number as one source.",
+      "Never share a code or approve a remote session for someone who contacted you first.",
+    ],
   },
 };

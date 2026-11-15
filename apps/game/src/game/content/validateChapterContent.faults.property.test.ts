@@ -1,12 +1,11 @@
 // Property test for the Chapter 1 content validator (V5, V6, V7) with injected faults.
 // The real generated manifest does not exist yet, so a valid scenario, overlay and manifest are
-// built here from the real scenario and overlay, and one fault is injected per case.
+// built here from the real scenario text, and one fault is injected per case.
 
 import { describe, expect, it } from "vitest";
 import type { GameLocale } from "@scammaze/shared-types";
 
 import { CHAPTER1_VOICE_BASE } from "../../config/assetPaths";
-import { CHAPTER_1_NARRATIVE_VI } from "../../i18n/narrative/chapter1.vi";
 import { caseSeed, CORE_PROPERTY_RUNS } from "../../test/chapterRuns";
 import { createLcg, pick, randomInt } from "../../test/seededRandom";
 import { CHAPTER_1_SCENARIO } from "../narrative/chapter1/scenario";
@@ -55,7 +54,14 @@ interface Fault {
 /** Builds a valid, fully consistent set of inputs. Mixes present and missing clips. */
 function buildValidInputs(next: () => number): Inputs {
   const scenario = structuredClone(CHAPTER_1_SCENARIO);
-  const overlay: Record<string, string> = { ...CHAPTER_1_NARRATIVE_VI };
+  // Test overlay built from the scenario text, so this property does not depend on the real Vietnamese
+  // overlay (task 11.2) or on the generated manifest (voice task).
+  const overlay: Record<string, string> = {};
+  for (const graph of Object.values(scenario.dialogues)) {
+    for (const node of Object.values(graph.nodes)) {
+      if (isSpokenNode(node)) overlay[overlayLineKey(graph.id, node.lineId)] = `[vi] ${graph.lines[node.lineId]}`;
+    }
+  }
   const jobs = buildVoiceJobs(scenario, { vi: overlay });
   const offset = randomInt(next, 0, 3);
   const files = new Map<string, ClipFileInfo>();
@@ -212,7 +218,7 @@ const FAULTS: readonly Fault[] = [
     needs: "any",
     inject(_inputs, target) {
       target.clip.speakerId =
-        target.clip.speakerId === "spk.sam" ? "spk.alex" : "spk.sam";
+        target.clip.speakerId === "spk.narrator" ? "spk.alex" : "spk.narrator";
       return target.nodeId;
     },
   },
@@ -222,7 +228,7 @@ const FAULTS: readonly Fault[] = [
     needs: "any",
     inject(_inputs, target) {
       target.clip.graphId =
-        target.clip.graphId === "dlg.shopkeeper" ? "dlg.scam-call" : "dlg.shopkeeper";
+        target.clip.graphId === "dlg.intro" ? "dlg.alex" : "dlg.intro";
       return target.nodeId;
     },
   },

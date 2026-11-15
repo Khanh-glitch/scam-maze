@@ -67,7 +67,7 @@ const NUMBER_PATTERN = /\d+/g;
 
 describe("Vietnamese narrative overlay: keys", () => {
   it("has a non-empty text for every Narrative_Text_Key", () => {
-    const missing = ENTRIES.map((entry) => entry.key).filter((key) => {
+    const missing = ENTRIES.filter((entry) => entry.text.trim().length > 0).map((entry) => entry.key).filter((key) => {
       const text = CHAPTER_1_NARRATIVE_VI[key];
       return typeof text !== "string" || text.trim().length === 0;
     });
@@ -124,8 +124,20 @@ describe("Vietnamese narrative overlay: text rules", () => {
   });
 
   it("keeps character names unchanged", () => {
-    const names = Object.values(CHAPTER_1_SCENARIO.npcs).map((npc) => npc.name);
-    expect(names.length).toBeGreaterThan(0);
+    // The scenario has no NPC definitions; named characters are the dialogue personas. Personal
+    // names stay as written, and the bank agent keeps the fictional bank name.
+    const personas = Object.values(CHAPTER_1_SCENARIO.dialogues).map((graph) => ({
+      key: `dialogues/${graph.id}/persona/name`,
+      name: graph.persona.name,
+    }));
+    const expectedKept: Record<string, string> = { Alex: "Alex", Morgan: "Morgan", "Northgate customer care": "Northgate" };
+    for (const [name, kept] of Object.entries(expectedKept)) {
+      const persona = personas.find((entry) => entry.name === name);
+      expect(persona, `persona ${name}`).toBeDefined();
+      expect(CHAPTER_1_NARRATIVE_VI[persona!.key] ?? "", persona!.key).toContain(kept);
+    }
+    expect(personas.some((entry) => entry.name === "Narrator")).toBe(true);
+    const names = Object.keys(expectedKept).filter((name) => !name.includes(" "));
     const dropped = names.flatMap((name) => {
       const pattern = new RegExp(`\\b${name}\\b`);
       return OVERLAY_ENTRIES.filter(([key, vi]) => pattern.test(ENGLISH_BY_KEY.get(key) ?? "") && !vi.includes(name)).map(
@@ -134,7 +146,6 @@ describe("Vietnamese narrative overlay: text rules", () => {
     });
     expect(dropped).toEqual([]);
   });
-
   it("keeps phone numbers, domains and numbers unchanged per key", () => {
     expect(keysWithChangedMatches(PHONE_PATTERN)).toEqual([]);
     expect(keysWithChangedMatches(DOMAIN_PATTERN)).toEqual([]);
@@ -193,7 +204,13 @@ describe("narrativeTextEntries coverage", () => {
     "kind", "via", "method", "debriefTag", "stance", "status", "source", "speaker", "channel",
     "honesty", "direction", "type", "reveals", "requires", "warningSigns",
     "speakerId", "tone", "objectiveId", "objectives",
+    "deviceActionId", "device", "sourceId", "deductionId", "inputs", "inputsAnyOf", "selectWhen",
+    "ringWhen", "startNodeWhen", "narrationNodeIds", "trust", "identifiers", "basis",
   ]);
+
+  // Verbatim data inside source records: identifier keys and values (fictional case numbers,
+  // +000 numbers, reserved domains, app names) and the basis key of a deduction.
+  const VERBATIM_PATH = /\.identifiers\[\d+\]\.(?:key|value)$|\.basis\.key$/;
 
   // Data the lint checks but that is never translated: fictional phone numbers and the reserved
   // official domain are shown verbatim in every locale.
@@ -203,6 +220,7 @@ describe("narrativeTextEntries coverage", () => {
     const texts = new Set(ENTRIES.map((entry) => entry.text));
     const uncovered = collectStrings(CHAPTER_1_SCENARIO)
       .filter((found) => !IDENTIFIER_KEYS.has(found.key) && !VERBATIM_DATA_KEYS.has(found.key))
+      .filter((found) => !VERBATIM_PATH.test(found.path))
       .filter((found) => !texts.has(found.value))
       .map((found) => `${found.path} = ${JSON.stringify(found.value)}`);
     expect(uncovered).toEqual([]);

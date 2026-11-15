@@ -14,10 +14,13 @@ import {
   Footprints,
   Home,
   Info,
+  FileText,
   Lightbulb,
+  ListOrdered,
   RotateCcw,
   Search,
   Workflow,
+  Scale,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { DebriefView } from "../../../game/narrative/debrief";
@@ -25,6 +28,8 @@ import { UI } from "../theme";
 
 export interface DebriefScreenProps {
   view: DebriefView;
+  /** Case report text of the ending. Shown only when the secret `case-report` variant applies. */
+  caseReport?: string;
   onReplay: () => void;
   onReturnToMenu: () => void;
 }
@@ -66,8 +71,15 @@ const DebriefSection: React.FC<SectionProps> = ({ id, title, icon: Icon, childre
 
 const EmptyNote: React.FC<{ text: string }> = ({ text }) => <p className={UI.body}>{text}</p>;
 
-export const DebriefScreen: React.FC<DebriefScreenProps> = ({ view, onReplay, onReturnToMenu }) => {
+/** The secret case report belongs to the `case-report` consequence variant only. */
+export function outcomeHasCaseReport(view: DebriefView): boolean {
+  return view.outcome.consequence?.id === "case-report";
+}
+
+export const DebriefScreen: React.FC<DebriefScreenProps> = ({ view, caseReport, onReplay, onReturnToMenu }) => {
   const { t } = useTranslation("chapter1");
+  const text = t as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const showCaseReport = outcomeHasCaseReport(view) && caseReport !== undefined && caseReport !== "";
   const headingRef = useRef<HTMLHeadingElement>(null);
   const { outcome } = view;
 
@@ -124,6 +136,75 @@ export const DebriefScreen: React.FC<DebriefScreenProps> = ({ view, onReplay, on
           )}
         </DebriefSection>
 
+        <DebriefSection id="debrief-timeline" title={text("debriefForensic.timeline.heading")} icon={ListOrdered}>
+          {view.timeline.length === 0 ? (
+            <EmptyNote text={text("debriefForensic.timeline.empty")} />
+          ) : (
+            <ol className="space-y-2" data-testid="debrief-timeline">
+              {view.timeline.map((entry, index) => (
+                <li
+                  key={entry.seq}
+                  data-kind={entry.kind}
+                  data-seq={entry.seq}
+                  className={`${UI.card} space-y-1 text-sm leading-relaxed`}
+                >
+                  <span className={UI.label}>{text(`debriefForensic.timeline.kind.${entry.kind}`)}</span>
+                  <span className="block">
+                    {text("debriefForensic.timeline.row", {
+                      number: index + 1,
+                      text: entry.text !== "" ? entry.text : text(`debriefForensic.timeline.kind.${entry.kind}`),
+                    })}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </DebriefSection>
+
+        <DebriefSection id="debrief-analysis" title={text("debriefForensic.analysis.heading")} icon={Scale}>
+          <div className="space-y-4" data-testid="debrief-analysis">
+            <div className="space-y-1">
+              <h4 className="text-sm font-semibold">{text("debriefForensic.analysis.pressure")}</h4>
+              <p className={UI.body}>{view.analysis.pressureBuilt}</p>
+              <p className={UI.body}>
+                {text("debriefForensic.analysis.pressureLevel", { number: view.analysis.pressureLevel })}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-sm font-semibold">{text("debriefForensic.analysis.trust")}</h4>
+              <p className={UI.body}>{view.analysis.whyWarningLooked}</p>
+            </div>
+            {view.analysis.unverifiedSignals.length > 0 && (
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold">{text("debriefForensic.analysis.unverified")}</h4>
+                <ul className="list-disc space-y-1 pl-5 text-sm text-[#a9a4c4] marker:text-[#b9a5f5]">
+                  {view.analysis.unverifiedSignals.map((sign) => (
+                    <li key={sign.id}>{sign.label}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="space-y-1">
+              <h4 className="text-sm font-semibold">{text("debriefForensic.analysis.thirdCaller")}</h4>
+              <p className={UI.body}>{text("debriefForensic.analysis.thirdCallerNotIndependent")}</p>
+              <p className={UI.body}>{view.analysis.thirdCallerNote}</p>
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-sm font-semibold">{text("debriefForensic.analysis.trap")}</h4>
+              <p className={UI.body}>{view.analysis.trapNote}</p>
+            </div>
+            {view.analysis.verifyNextTime.length > 0 && (
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold">{text("debriefForensic.analysis.verifyNext")}</h4>
+                <ul className="list-disc space-y-1 pl-5 text-sm text-[#a9a4c4] marker:text-[#b9a5f5]">
+                  {view.analysis.verifyNextTime.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </DebriefSection>
         <DebriefSection id="debrief-evidence" title={t("debrief.evidenceFound")} icon={Search}>
           {view.evidenceFound.length === 0 ? (
             <EmptyNote text={t("debrief.evidenceFoundEmpty")} />
@@ -159,7 +240,12 @@ export const DebriefScreen: React.FC<DebriefScreenProps> = ({ view, onReplay, on
             <ul className="space-y-2">
               {view.cluesMissed.map((clue) => (
                 <li key={clue.id} className={`${UI.card} space-y-1`}>
-                  <p className="text-sm font-semibold">{clue.title}</p>
+                  <p className="text-sm font-semibold">
+                    <span className={`mr-2 ${UI.label}`} data-testid="clue-missed-label">
+                      {text("debriefForensic.cluesMissed.missedLabel")}
+                    </span>
+                    {clue.title}
+                  </p>
                   <p className={UI.body}>{clue.hint}</p>
                 </li>
               ))}
@@ -167,6 +253,13 @@ export const DebriefScreen: React.FC<DebriefScreenProps> = ({ view, onReplay, on
           )}
         </DebriefSection>
 
+        {showCaseReport && (
+          <DebriefSection id="debrief-case-report" title={text("debriefForensic.caseReport.heading")} icon={FileText}>
+            <p className={`${UI.card} text-sm leading-relaxed`} data-testid="debrief-case-report">
+              {caseReport}
+            </p>
+          </DebriefSection>
+        )}
         <DebriefSection id="debrief-mechanism" title={t("debrief.mechanism")} icon={Workflow}>
           <p className={UI.body}>{view.mechanism}</p>
         </DebriefSection>

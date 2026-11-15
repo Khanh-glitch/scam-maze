@@ -1,53 +1,47 @@
-// Chapter 1 "The Urgent Call": the six acts, as derived data.
-// The current act is a pure selector (`selectCurrentAct`): the last act whose `enterWhen` holds.
-// Each act's `exitWhen` equals the next act's `enterWhen`. Acts 4 and 5 can be entered in either
-// order, and the player can decide before Act 4, so Act 4 may never appear.
-// Each objective belongs to exactly one act.
-// Pure TypeScript data: no React, Three.js, i18n or audio imports. See design.md, "Acts".
+// Chapter 1 acts (design.md, "Narrative graph"). Acts are monotonic and derived from state by
+// `selectCurrentAct`. Each `exitWhen` equals the next act's `enterWhen` (validator rule V1).
 
-import type { ActDef } from "../types";
+import type { ActDef, Condition } from "../types";
+
+const ALEX_CLOSED: Condition[] = [{ kind: "callClosed", callId: "call.alex" }];
+const NOTIFICATION_HANDLED: Condition[] = [{ kind: "flag", flag: "notification_handled" }];
+const RECOVERY_RANG: Condition[] = [{ kind: "callRang", callId: "call.recovery" }];
+const RECOVERY_CLOSED: Condition[] = [{ kind: "callClosed", callId: "call.recovery" }];
 
 export const CHAPTER_1_ACTS: ActDef[] = [
   {
     id: "act.1",
-    title: "An ordinary morning",
+    title: "The Obvious Trap",
     enterWhen: [],
-    exitWhen: [{ kind: "flag", flag: "scam1_rang" }],
-    objectives: ["obj.look-around"],
+    exitWhen: ALEX_CLOSED,
+    objectives: ["obj.answer-or-decline"],
   },
   {
     id: "act.2",
-    title: "The first call",
-    enterWhen: [{ kind: "flag", flag: "scam1_rang" }],
-    exitWhen: [{ kind: "callEnded", callId: "call.scam-1" }],
-    objectives: ["obj.answer-call"],
+    title: "The Reassuring Choice",
+    enterWhen: ALEX_CLOSED,
+    exitWhen: NOTIFICATION_HANDLED,
+    objectives: ["obj.check-laptop"],
   },
   {
     id: "act.3",
-    title: "Investigation",
-    enterWhen: [{ kind: "callEnded", callId: "call.scam-1" }],
-    exitWhen: [{ kind: "callRang", callId: "call.callback" }],
-    objectives: ["obj.check-claims", "obj.call-bank"],
+    title: "The Contradiction",
+    enterWhen: NOTIFICATION_HANDLED,
+    exitWhen: RECOVERY_RANG,
+    objectives: ["obj.investigate"],
   },
   {
     id: "act.4",
-    title: "Escalating pressure",
-    enterWhen: [{ kind: "callRang", callId: "call.callback" }],
-    exitWhen: [{ kind: "objectiveCompleted", objectiveId: "obj.call-bank" }],
-    objectives: ["obj.hold-firm"],
+    title: "The Third Voice",
+    enterWhen: RECOVERY_RANG,
+    exitWhen: RECOVERY_CLOSED,
+    objectives: ["obj.answer-recovery"],
   },
   {
     id: "act.5",
-    title: "The decision",
-    enterWhen: [{ kind: "objectiveCompleted", objectiveId: "obj.call-bank" }],
-    exitWhen: [{ kind: "outcomeSet" }],
-    objectives: ["obj.decide", "obj.file-report"],
-  },
-  {
-    id: "act.6",
-    title: "Aftermath",
-    enterWhen: [{ kind: "outcomeSet" }],
+    title: "The False Victory",
+    enterWhen: RECOVERY_CLOSED,
     exitWhen: [],
-    objectives: ["obj.review"],
+    objectives: ["obj.decide", "obj.review"],
   },
 ];

@@ -1,234 +1,150 @@
-// Unit tests for the objective manager: the objective order through a full run, and phone
-// neutrality (Requirements 6.1-6.9, 18.1).
+// Unit tests for the data-driven objective manager (spec chapter-01-double-deception, task 3.4).
+// States are crafted from the fixture scenario; the full reducer rewrite is task 3.3.
 
 import { describe, expect, it } from "vitest";
 
-import { CHAPTER_1_SCENARIO } from "./chapter1/scenario";
-import type { ObjectiveId } from "./chapter1/ids";
+import { FIXTURE_SCENARIO, fixtureState, withEvidence, withFlags } from "../../test/fixtureScenario";
+import type { CallRecord, ChapterState, CoreAction, ScenarioDefinition } from "./types";
 import {
   canCompleteObjective,
-  claimRelatedEvidenceCount,
+  OBJECTIVE_CONDITION_NOT_MET,
   OBJECTIVE_NEUTRAL_ACTIONS,
   runObjectiveManager,
 } from "./objectives";
-import { chapterReducer, createInitialState } from "./reducer";
-import type { ChapterState, CoreAction } from "./types";
 
-function play(state: ChapterState, actions: readonly CoreAction[]): ChapterState {
-  let current = state;
-  for (const action of actions) {
-    const result = chapterReducer(current, action);
-    if (!result.accepted) throw new Error(`Rejected ${JSON.stringify(action)}: ${result.reason}`);
-    current = result.state;
-  }
-  return current;
+const START: CoreAction = { type: "START_CHAPTER" };
+const OPEN_PHONE: CoreAction = { type: "OPEN_PHONE" };
+const S = FIXTURE_SCENARIO;
+
+function record(callId: CallRecord["callId"], status: CallRecord["status"]): CallRecord {
+  return { callId, direction: "incoming", displayName: "Caller", number: "+000 0100 2200", status, ringCount: 1 };
 }
 
-/** Objective changes per event, as "+id" for activation and "-id" for completion. */
-function objectiveTimeline(state: ChapterState): string[][] {
-  return state.events.map((entry) => [
-    ...entry.derived.objectivesActivated.map((id) => `+${id}`),
-    ...entry.derived.objectivesCompleted.map((id) => `-${id}`),
-  ]);
+function withCall(state: ChapterState, callId: CallRecord["callId"], status: CallRecord["status"]): ChapterState {
+  return { ...state, call: { ...state.call, log: [...state.call.log, record(callId, status)] } };
 }
 
-const option = (optionId: string): CoreAction => ({ type: "SELECT_DIALOGUE_OPTION", optionId });
+/** Runs the manager as the reducer does and returns the result for `next`. */
+function step(prev: ChapterState, next: ChapterState, action: CoreAction = START, scenario = S) {
+  return runObjectiveManager(prev, next, action, scenario);
+}
 
-describe("objective order", () => {
-  it("follows what the player did through a verified run", () => {
-    const actions: CoreAction[] = [
-      { type: "START_CHAPTER" },
-      { type: "INTERACT_OBJECT", objectId: "obj.wallet" },
-      { type: "RING_CALL", callId: "call.scam-1", reason: "first-interaction" },
-      { type: "ANSWER_CALL" },
-      option("opt.scam.open.verify"),
-      { type: "INTERACT_OBJECT", objectId: "obj.shop-poster" },
-      { type: "VERIFY_CLAIM", claimId: "claim.caller-identity", method: "official-line" },
-      option("opt.official.greeting.wait"),
-      option("opt.official.agent.report"),
-      option("opt.official.confirm.block"),
-      { type: "MAKE_DECISION", decision: "verify-independently" },
-      { type: "FINISH_CHAPTER" },
-    ];
-    const state = play(createInitialState(), actions);
-
-    expect(objectiveTimeline(state)).toEqual([
-      ["+obj.look-around"],
-      ["-obj.look-around"],
-      ["+obj.answer-call"],
-      ["-obj.answer-call"],
-      ["+obj.check-claims", "+obj.decide", "+obj.call-bank"],
-      ["-obj.check-claims"],
-      [],
-      [],
-      ["+obj.file-report", "-obj.call-bank"],
-      [],
-      ["+obj.review", "-obj.decide"],
-      ["-obj.review"],
-    ]);
-    expect(state.objectives.active).toEqual(["obj.file-report"]);
-    expect(state.objectives.completed).toEqual([
-      "obj.look-around",
-      "obj.answer-call",
-      "obj.check-claims",
-      "obj.decide",
-      "obj.review",
-      "obj.call-bank",
-    ]);
+describe("activateWhen and completeWhen from Scenario_Data", () => {
+  it("activates an objective with no activation conditions on the first accepted action", () => {
+    const state = fixtureState();
+    const result = step(state, state);
+    expect(result.activated).toEqual(["obj.answer-or-decline"]);
+    expect(result.completed).toEqual([]);
+    expect(result.state.objectives.active).toEqual(["obj.answer-or-decline"]);
   });
 
-  it("activates the ringing objective on RING_CALL even before any interaction", () => {
-    const state = play(createInitialState(), [
-      { type: "START_CHAPTER" },
-      { type: "RING_CALL", callId: "call.scam-1", reason: "exploration-timer" },
-    ]);
-    expect(state.objectives.active).toEqual(["obj.look-around", "obj.answer-call"]);
+  it("completes an objective when its conditions hold and activates the next one", () => {
+    const first = step(fixtureState(), fixtureState()).state;
+    const closed = withCall(first, "call.alex", "declined");
+    const result = step(first, closed, { type: "END_CALL" });
+    expect(result.completed).toEqual(["obj.answer-or-decline"]);
+    expect(result.activated).toEqual(["obj.check-laptop"]);
+    expect(result.state.objectives).toEqual({
+      active: ["obj.check-laptop"],
+      completed: ["obj.answer-or-decline"],
+    });
   });
 
-  it("does not activate the check and decide objectives when the call is only declined", () => {
-    const state = play(createInitialState(), [
-      { type: "START_CHAPTER" },
-      { type: "RING_CALL", callId: "call.scam-1", reason: "exploration-timer" },
-      { type: "END_CALL" },
-    ]);
-    expect(state.objectives.active).toEqual(["obj.look-around", "obj.answer-call"]);
+  it("can activate and complete in the same step, in OBJECTIVE_IDS order", () => {
+    const next = withFlags(withCall(fixtureState(), "call.alex", "ended"), ["notification_handled"]);
+    const result = step(fixtureState(), next, { type: "END_CALL" });
+    expect(result.activated).toEqual(["obj.answer-or-decline", "obj.check-laptop", "obj.investigate"]);
+    expect(result.completed).toEqual(["obj.answer-or-decline", "obj.check-laptop"]);
+    expect(result.state.objectives.active).toEqual(["obj.investigate"]);
   });
 
-  it("completes the check objective with two claim-related items, not counting the urgent text", () => {
-    const afterCall = play(createInitialState(), [
-      { type: "START_CHAPTER" },
-      { type: "INSPECT_EVIDENCE", evidenceId: "ev.sms-alert" },
-      { type: "RING_CALL", callId: "call.scam-1", reason: "exploration-timer" },
-      { type: "ANSWER_CALL" },
-      option("opt.scam.open.verify"),
-      { type: "INSPECT_EVIDENCE", evidenceId: "ev.caller-number" },
-    ]);
-    expect(claimRelatedEvidenceCount(afterCall, CHAPTER_1_SCENARIO)).toBe(1);
-    expect(afterCall.objectives.active).toContain("obj.check-claims");
-
-    const checked = play(afterCall, [{ type: "INTERACT_OBJECT", objectId: "obj.notice-board" }]);
-    expect(claimRelatedEvidenceCount(checked, CHAPTER_1_SCENARIO)).toBe(2);
-    expect(checked.objectives.completed).toContain("obj.check-claims");
+  it("completes on a deduction and on evidence-derived state", () => {
+    const base = step(fixtureState(), withFlags(fixtureState(), ["notification_handled"])).state;
+    expect(base.objectives.active).toContain("obj.investigate");
+    const recorded: ChapterState = { ...base, deductions: ["ded.same-source"] };
+    const result = step(base, recorded, { type: "COMBINE_EVIDENCE", evidenceIds: [] } as unknown as CoreAction);
+    expect(result.completed).toContain("obj.investigate");
   });
 
-  it("activates and completes the decision objective when money moves inside the call", () => {
-    const state = play(createInitialState(), [
-      { type: "START_CHAPTER" },
-      { type: "RING_CALL", callId: "call.scam-1", reason: "exploration-timer" },
-      { type: "ANSWER_CALL" },
-      option("opt.scam.open.yes-what"),
-      option("opt.scam.code.read-code"),
-      option("opt.scam.move.move-money"),
-    ]);
-    expect(state.objectives.completed).toContain("obj.decide");
-    expect(state.objectives.active).toContain("obj.review");
+  it("lets objectiveCompleted see a completion made earlier in the same step", () => {
+    const base = fixtureState({ decision: "refuse-and-stop", outcome: "break-the-chain", status: "ended" });
+    const prepared = withCall(withCall(base, "call.alex", "ended"), "call.recovery", "ended");
+    const result = step(base, prepared, { type: "MAKE_DECISION", decision: "refuse-and-stop" });
+    expect(result.completed).toContain("obj.decide");
+    expect(result.completed).toContain("obj.review");
+    expect(result.completed.indexOf("obj.decide")).toBeLessThan(result.completed.indexOf("obj.review"));
+  });
+
+  it("never activates an objective twice or completes an inactive one", () => {
+    const once = step(fixtureState(), fixtureState()).state;
+    const again = step(once, once);
+    expect(again.activated).toEqual([]);
+    expect(again.state).toBe(once);
+
+    const done: ChapterState = { ...once, objectives: { active: [], completed: ["obj.answer-or-decline"] } };
+    const closed = withCall(done, "call.alex", "ended");
+    expect(step(done, closed).completed).not.toContain("obj.answer-or-decline");
+  });
+
+  it("never completes an objective whose completeWhen is empty", () => {
+    const scenario: ScenarioDefinition = {
+      ...S,
+      objectives: {
+        ...S.objectives,
+        "obj.answer-or-decline": { ...S.objectives["obj.answer-or-decline"], completeWhen: [] },
+      },
+    };
+    const result = step(fixtureState(), fixtureState(), START, scenario);
+    expect(result.activated).toContain("obj.answer-or-decline");
+    expect(result.completed).not.toContain("obj.answer-or-decline");
+  });
+
+  it("does not mutate its inputs", () => {
+    const prev = fixtureState();
+    const next = withCall(prev, "call.alex", "ended");
+    const frozenObjectives = JSON.stringify(next.objectives);
+    step(prev, next, { type: "END_CALL" });
+    expect(JSON.stringify(next.objectives)).toBe(frozenObjectives);
   });
 });
 
-describe("phone neutrality (Requirement 6.9)", () => {
+describe("phone neutrality", () => {
   it("lists only OPEN_PHONE and CLOSE_PHONE as neutral actions", () => {
     expect([...OBJECTIVE_NEUTRAL_ACTIONS].sort()).toEqual(["CLOSE_PHONE", "OPEN_PHONE"]);
   });
 
-  it("never changes objectives on OPEN_PHONE or CLOSE_PHONE in play", () => {
-    let state = play(createInitialState(), [
-      { type: "START_CHAPTER" },
-      { type: "INTERACT_OBJECT", objectId: "obj.wallet" },
-    ]);
-    for (const action of [{ type: "OPEN_PHONE" }, { type: "CLOSE_PHONE" }] as CoreAction[]) {
-      const result = chapterReducer(state, action);
-      expect(result.accepted).toBe(true);
-      expect(result.state.objectives).toBe(state.objectives);
-      expect(result.state.events.at(-1)?.derived.objectivesActivated).toEqual([]);
-      expect(result.state.events.at(-1)?.derived.objectivesCompleted).toEqual([]);
-      state = result.state;
-    }
-  });
-
-  it("ignores phone actions even when another objective predicate would hold", () => {
-    // Crafted pair: `next` has an interaction, which would complete "Look around your street."
-    const prev = play(createInitialState(), [{ type: "START_CHAPTER" }]);
-    const next: ChapterState = { ...prev, interacted: ["obj.wallet"] };
-    for (const action of [{ type: "OPEN_PHONE" }, { type: "CLOSE_PHONE" }] as CoreAction[]) {
-      const result = runObjectiveManager(prev, next, action, CHAPTER_1_SCENARIO);
+  it("changes nothing on a neutral action even when a predicate would hold", () => {
+    const prev = fixtureState();
+    const next = withCall(prev, "call.alex", "ended");
+    for (const action of [OPEN_PHONE, { type: "CLOSE_PHONE" } as CoreAction]) {
+      const result = step(prev, next, action);
       expect(result.state).toBe(next);
       expect(result.activated).toEqual([]);
       expect(result.completed).toEqual([]);
     }
-    const counted = runObjectiveManager(prev, next, { type: "INTERACT_OBJECT", objectId: "obj.wallet" });
-    expect(counted.completed).toEqual(["obj.look-around"]);
+    expect(step(prev, next, { type: "END_CALL" }).completed).toEqual(["obj.answer-or-decline"]);
   });
 });
 
 describe("canCompleteObjective", () => {
-  it("requires the objective to be active", () => {
-    const state = play(createInitialState(), [{ type: "START_CHAPTER" }]);
-    const crafted: ChapterState = { ...state, interacted: ["obj.wallet"] };
-    expect(canCompleteObjective(crafted, "obj.look-around")).toBe(true);
-    const inactive: ObjectiveId[] = ["obj.answer-call", "obj.check-claims", "obj.decide", "obj.review"];
-    for (const id of inactive) expect(canCompleteObjective(crafted, id)).toBe(false);
-  });
-});
+  it("requires the objective to be active and its conditions to hold", () => {
+    const active = step(fixtureState(), fixtureState()).state;
+    expect(canCompleteObjective(active, "obj.answer-or-decline", S)).toBe(false);
 
-describe("call-bank, hold-firm and file-report objectives", () => {
-  const afterVerifyCall = (): ChapterState =>
-    play(createInitialState(), [
-      { type: "START_CHAPTER" },
-      { type: "RING_CALL", callId: "call.scam-1", reason: "exploration-timer" },
-      { type: "ANSWER_CALL" },
-      option("opt.scam.open.verify"),
-    ]);
+    const closed = withCall(active, "call.alex", "ended");
+    expect(canCompleteObjective(closed, "obj.answer-or-decline", S)).toBe(true);
 
-  it("activates call-bank when the scam call ends after being answered, not when only declined", () => {
-    expect(afterVerifyCall().objectives.active).toContain("obj.call-bank");
-    const declined = play(createInitialState(), [
-      { type: "START_CHAPTER" },
-      { type: "RING_CALL", callId: "call.scam-1", reason: "exploration-timer" },
-      { type: "END_CALL" },
-    ]);
-    expect(declined.objectives.active).not.toContain("obj.call-bank");
+    const notActive: ChapterState = { ...closed, objectives: { active: [], completed: [] } };
+    expect(canCompleteObjective(notActive, "obj.answer-or-decline", S)).toBe(false);
   });
 
-  it("completes call-bank only when the official confirmation is discovered", () => {
-    const state = afterVerifyCall();
-    expect(canCompleteObjective(state, "obj.call-bank")).toBe(false);
-    const confirmed: ChapterState = { ...state, discovered: [...state.discovered, "ev.official-confirmation"] };
-    expect(canCompleteObjective(confirmed, "obj.call-bank")).toBe(true);
+  it("is false for an active objective that has no definition", () => {
+    const state = withEvidence(fixtureState({ objectives: { active: ["obj.review"], completed: [] } }), []);
+    const scenario = { ...S, objectives: {} } as unknown as ScenarioDefinition;
+    expect(canCompleteObjective(state, "obj.review", scenario)).toBe(false);
   });
 
-  it("activates hold-firm when the callback has a log record and completes it when the call is closed", () => {
-    const before = afterVerifyCall();
-    expect(before.objectives.active).not.toContain("obj.hold-firm");
-    const ringing = play(before, [{ type: "RING_CALL", callId: "call.callback", reason: "callback" }]);
-    expect(ringing.objectives.active).toContain("obj.hold-firm");
-    expect(canCompleteObjective(ringing, "obj.hold-firm")).toBe(false);
-    const closed = play(ringing, [{ type: "END_CALL" }]);
-    expect(closed.objectives.completed).toContain("obj.hold-firm");
-    expect(closed.objectives.active).not.toContain("obj.hold-firm");
-  });
-
-  it("does not complete hold-firm after a code was shared or money moved", () => {
-    const ringing = play(afterVerifyCall(), [{ type: "RING_CALL", callId: "call.callback", reason: "callback" }]);
-    const closedLog = ringing.call.log.map((record) =>
-      record.callId === "call.callback" ? { ...record, status: "ended" as const } : record,
-    );
-    const closedState: ChapterState = { ...ringing, call: { ...ringing.call, current: null, log: closedLog } };
-    expect(canCompleteObjective(closedState, "obj.hold-firm")).toBe(true);
-    for (const flag of ["code_shared", "money_moved"] as const) {
-      const risky: ChapterState = { ...closedState, flags: { ...closedState.flags, [flag]: true } };
-      expect(canCompleteObjective(risky, "obj.hold-firm")).toBe(false);
-    }
-  });
-
-  it("activates file-report with the official confirmation and completes it with the report_filed flag", () => {
-    const base = afterVerifyCall();
-    expect(base.objectives.active).not.toContain("obj.file-report");
-    const prev = base;
-    const next: ChapterState = { ...base, discovered: [...base.discovered, "ev.official-confirmation"] };
-    const activated = runObjectiveManager(prev, next, { type: "INSPECT_EVIDENCE", evidenceId: "ev.official-confirmation" });
-    expect(activated.activated).toContain("obj.file-report");
-    expect(canCompleteObjective(activated.state, "obj.file-report")).toBe(false);
-    const filed: ChapterState = { ...activated.state, flags: { ...activated.state.flags, report_filed: true } };
-    expect(canCompleteObjective(filed, "obj.file-report")).toBe(true);
+  it("exposes the rejection reason", () => {
+    expect(OBJECTIVE_CONDITION_NOT_MET).toBe("Objective condition not met.");
   });
 });

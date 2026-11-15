@@ -41,7 +41,17 @@ export interface VoiceCastEntry {
 
 export type VoiceCast = Readonly<Record<SpeakerId, VoiceCastEntry>>;
 
-/** Voice cast of design section 10 (PROPOSED; pitch effects are unverified). */
+/**
+ * Voice cast of the Chapter 1 rewrite (spec chapter-01-double-deception, design voice section).
+ * Installed Windows voices checked on the authoring machine: en-US David, Zira, Mark and vi-VN An.
+ * - spk.alex: David (en), An (vi). Phone filter on.
+ * - spk.recovery: Mark at a lower pitch (en), An at pitch 0.8 (vi). Phone filter on.
+ * - spk.northgate-agent: Zira (en), An at pitch 1.2 (vi). Phone filter on.
+ * - spk.narrator: Mark at normal pitch (en), An at pitch 0.9 and a slower rate (vi). No phone filter.
+ * Only three English voices and one Vietnamese voice exist, so some speakers share a voice and
+ * differ by rate, pitch and the phone filter. Pitch effects are unverified. When a voice is not
+ * installed on the machine, the generator reports the clips as missing; it never substitutes.
+ */
 export const CHAPTER1_VOICE_CAST: VoiceCast = {
   "spk.alex": {
     phoneFilter: true,
@@ -50,7 +60,7 @@ export const CHAPTER1_VOICE_CAST: VoiceCast = {
       vi: { voice: "Microsoft An", rate: 1.0, pitch: 1.0 },
     },
   },
-  "spk.case-officer": {
+  "spk.recovery": {
     phoneFilter: true,
     locales: {
       en: { voice: "Microsoft Mark", rate: 0.95, pitch: 0.9 },
@@ -64,14 +74,40 @@ export const CHAPTER1_VOICE_CAST: VoiceCast = {
       vi: { voice: "Microsoft An", rate: 1.0, pitch: 1.2 },
     },
   },
-  "spk.sam": {
+  "spk.narrator": {
     phoneFilter: false,
     locales: {
       en: { voice: "Microsoft Mark", rate: 0.95, pitch: 1.0 },
-      vi: { voice: "Microsoft An", rate: 0.95, pitch: 0.9 },
+      vi: { voice: "Microsoft An", rate: 0.9, pitch: 0.9 },
     },
   },
 };
+
+/** Spoken_Nodes of the five Chapter 1 graphs, in graph order then node order. */
+export function listSpokenNodes(
+  scenario: ScenarioDefinition,
+): Array<{ graph: DialogueGraph; node: DialogueNode }> {
+  const result: Array<{ graph: DialogueGraph; node: DialogueNode }> = [];
+  for (const graph of Object.values(scenario.dialogues)) {
+    for (const node of Object.values(graph.nodes)) {
+      if (isSpokenNode(node)) result.push({ graph, node });
+    }
+  }
+  return result;
+}
+
+/**
+ * Content version of the voiced chapter: a hash of every spoken node (id, speaker, tone) and its
+ * English line. It changes when any voiced line, speaker or tone changes, so a manifest made from
+ * older content can be detected. Vietnamese text is tracked per clip by `sourceTextHash`.
+ */
+export function computeChapterContentVersion(scenario: ScenarioDefinition): string {
+  const parts = listSpokenNodes(scenario).map(({ graph, node }) => {
+    const speakerId = node.speakerId ?? graph.persona.speakerId;
+    return `${graph.id}|${node.id}|${speakerId}|${node.tone ?? ""}|${graph.lines[node.lineId] ?? ""}`;
+  });
+  return fnv1a32(parts.join("\n"));
+}
 
 /** Tone rate multipliers of design section 10. No other tone processing exists. */
 export const TONE_RATE_MULTIPLIER: Readonly<Record<Tone, number>> = {

@@ -1,24 +1,25 @@
-// Chapter 1 "The Urgent Call": the four Claims the caller makes.
-// Pure TypeScript data. See design.md, "Claims", and Requirement 12.1.
+// Chapter 1 "The Urgent Call: The False Victory": the four claims the player can weigh.
+// Statuses change only through deductions (inconclusive) or the independent official line
+// (contradicted). Pure TypeScript data.
 
 import type { Claim } from "../types";
 import type { ClaimId } from "./ids";
 
 export const CHAPTER_1_CLAIMS: Record<ClaimId, Claim> = {
-  "claim.caller-identity": {
-    id: "claim.caller-identity",
-    text: "The caller works for Northgate Bank.",
+  "claim.alex-identity": {
+    id: "claim.alex-identity",
+    text: "The first caller is Alex from Northgate Bank security.",
   },
-  "claim.account-suspended": {
-    id: "claim.account-suspended",
-    text: "Your account is suspended.",
+  "claim.notification-genuine": {
+    id: "claim.notification-genuine",
+    text: "The laptop notification comes from your bank.",
   },
-  "claim.code-needed": {
-    id: "claim.code-needed",
-    text: "The bank needs your one-time code to stop a transfer.",
+  "claim.recovery-needed": {
+    id: "claim.recovery-needed",
+    text: "Your account needs a recovery procedure right now.",
   },
-  "claim.protected-account": {
-    id: "claim.protected-account",
-    text: "Moving your money to a protected holding account protects it.",
+  "claim.claims-independent": {
+    id: "claim.claims-independent",
+    text: "The call and the notification confirm each other as separate sources.",
   },
 };

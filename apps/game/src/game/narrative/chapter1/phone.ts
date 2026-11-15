@@ -1,101 +1,137 @@
-// Chapter 1 "The Urgent Call": smartphone content and call definitions.
-// Domains and numbers are plain text; the Phone_UI must never render them as links
-// (Requirement 7.3). The one-time code itself is never written out.
-// Pure TypeScript data. See design.md, "Story", and Requirements 7.2, 16.2, 16.3.
+// Chapter 1 "The Urgent Call: The False Victory": calls, messages and phone content.
+// Numbers start with +000 and domains are reserved; they are shown as plain text, never links.
+// Pure TypeScript data.
 
-import type { CallDef, PhoneContent } from "../types";
-import type { CallId } from "./ids";
+import type { CallDef, Condition, PhoneContent } from "../types";
+import type { CallId, EvidenceId } from "./ids";
+import {
+  ALEX_CALLBACK_NUMBER,
+  CASE_REFERENCE,
+  NOTIFICATION_NUMBER,
+  OFFICIAL_DOMAIN,
+  OFFICIAL_NUMBER,
+  PLAYER_NUMBER,
+  SAVED_APP,
+} from "./sources";
 
-/** Number the scam caller uses (shown as "Northgate Bank Security"). */
-export const SCAM_CALLER_NUMBER = "+000 555 0142";
-/** Second number used by the follow-up call (shown as "Northgate Case Desk"). */
-export const FOLLOWUP_CALLER_NUMBER = "+000 555 0177";
-/** Official Northgate Bank number printed on the card and the letter. */
-export const OFFICIAL_BANK_NUMBER = "+000 555 0100";
-/** Official website printed on the letter. */
-export const OFFICIAL_BANK_WEBSITE = "northgate.example";
-/** Look-alike address in the urgent text. */
-export const LOOK_ALIKE_DOMAIN = "northgate-secure-verify.invalid";
+/** E01 to E06 (including the app variant of E03): three of them open the third call. */
+const EARLY_EVIDENCE: EvidenceId[] = [
+  "ev.caller-id-anomaly",
+  "ev.notification-metadata",
+  "ev.official-contact-paper",
+  "ev.official-contact-app",
+  "ev.account-activity",
+  "ev.shared-case-id",
+  "ev.note-app-origin",
+];
 
-export const CHAPTER_1_PHONE: PhoneContent = {
-  messages: {
-    "msg.sms-alert": {
-      id: "msg.sms-alert",
-      from: "Northgate Bank",
-      body: "Northgate Bank: Account ending 9284 is suspended due to unusual overseas activity. Confirm your identity within 15 minutes at northgate-secure-verify.invalid to avoid a permanent freeze.",
-      evidenceId: "ev.sms-alert",
-      deliveredAtStart: true,
-    },
-    "msg.otp-sms": {
-      id: "msg.otp-sms",
-      from: "Northgate Bank",
-      body: "Northgate Bank: Here is your one-time code to approve a sign-in on a new device. It expires in 5 minutes. Never share this code with anyone, including bank staff.",
-      evidenceId: "ev.otp-sms",
-      deliveredAtStart: false,
-    },
-    "msg.case-sms": {
-      id: "msg.case-sms",
-      from: "Northgate Bank",
-      body: "Northgate Bank: Case reference NG-0417. Your case is open. Review it at northgate-case-review.invalid and keep this reference ready for the case officer.",
-      evidenceId: "ev.case-sms",
-      deliveredAtStart: false,
-    },
-  },
-  contacts: [
-    { name: "Northgate Bank Security", number: SCAM_CALLER_NUMBER },
-    { name: "Northgate Case Desk", number: FOLLOWUP_CALLER_NUMBER },
-    { name: "Northgate Bank customer support", number: OFFICIAL_BANK_NUMBER },
-  ],
-  officialWebsite: OFFICIAL_BANK_WEBSITE,
-  bankApp: {
-    title: "Northgate Bank",
-    screens: [
-      {
-        id: "bank.account",
-        title: "Your account",
-        body: "Account ending 9284 is active. There are no alerts on your account.",
-      },
-      {
-        id: "bank.activity",
-        title: "Recent activity",
-        body: "There are no pending transfers. Your last activity was a card payment at the corner shop yesterday.",
-      },
-      {
-        id: "bank.help",
-        title: "Help and contact",
-        body: "Call customer support on +000 555 0100 or visit northgate.example. Northgate Bank will never ask for your one-time code or ask you to move money to another account.",
-      },
-    ],
-  },
-};
+const ALEX_CLOSED: Condition = { kind: "callClosed", callId: "call.alex" };
 
 export const CHAPTER_1_CALLS: Record<CallId, CallDef> = {
-  "call.scam-1": {
-    id: "call.scam-1",
+  "call.alex": {
+    id: "call.alex",
     direction: "incoming",
-    displayName: "Northgate Bank Security",
-    number: SCAM_CALLER_NUMBER,
-    graphId: "dlg.scam-call",
+    // The caller ID shows the player's own number, so the name stays neutral.
+    displayName: "Unknown caller",
+    number: PLAYER_NUMBER,
+    graphId: "dlg.alex",
+    ringWhen: [[]],
   },
-  "call.callback": {
-    id: "call.callback",
+  "call.recovery": {
+    id: "call.recovery",
     direction: "incoming",
-    displayName: "Northgate Bank Security",
-    number: SCAM_CALLER_NUMBER,
-    graphId: "dlg.callback",
-  },
-  "call.followup": {
-    id: "call.followup",
-    direction: "incoming",
-    displayName: "Northgate Case Desk",
-    number: FOLLOWUP_CALLER_NUMBER,
-    graphId: "dlg.followup",
+    displayName: "Case Response Desk",
+    number: NOTIFICATION_NUMBER,
+    graphId: "dlg.recovery",
+    ringWhen: [
+      [ALEX_CLOSED, { kind: "flag", flag: "review_security_opened" }],
+      [ALEX_CLOSED, { kind: "flag", flag: "notification_dismissed" }],
+      [ALEX_CLOSED, { kind: "flag", flag: "official_channel_verified" }],
+      [ALEX_CLOSED, { kind: "evidenceCountAtLeast", evidenceIds: EARLY_EVIDENCE, count: 3 }],
+      [ALEX_CLOSED, { kind: "claimStatus", claimId: "claim.claims-independent", status: "inconclusive" }],
+    ],
   },
   "call.official": {
     id: "call.official",
     direction: "outgoing",
-    displayName: "Northgate Bank customer support",
-    number: OFFICIAL_BANK_NUMBER,
+    displayName: "Northgate Bank (saved)",
+    number: OFFICIAL_NUMBER,
     graphId: "dlg.official-line",
+    ringWhen: [],
+  },
+};
+
+export const CHAPTER_1_PHONE: PhoneContent = {
+  messages: {
+    "msg.alex-voicemail": {
+      id: "msg.alex-voicemail",
+      from: "Voicemail from an unknown caller",
+      body: [
+        "Voicemail text:",
+        `"Hello, this is Alex from Northgate Bank security. Your case is ${CASE_REFERENCE}.`,
+        "Someone tried to use your account. Call me back soon on",
+        `${ALEX_CALLBACK_NUMBER}. We will send you a code to confirm it is you. Do not ignore this message."`,
+      ].join(" "),
+      evidenceId: "ev.alex-statement",
+      deliveredAtStart: false,
+    },
+    "msg.alex-summary": {
+      id: "msg.alex-summary",
+      from: "Call summary",
+      body: [
+        "Call summary, written by your phone.",
+        "The caller said he was Alex from Northgate Bank security.",
+        `He gave the case reference ${CASE_REFERENCE}.`,
+        "He asked for a code sent to your phone.",
+        "He said an incident team would call you back later.",
+      ].join(" "),
+      evidenceId: "ev.alex-statement",
+      deliveredAtStart: false,
+    },
+  },
+  contacts: [
+    { name: "Northgate Bank (saved)", number: OFFICIAL_NUMBER },
+  ],
+  officialWebsite: OFFICIAL_DOMAIN,
+  bankApp: {
+    title: SAVED_APP,
+    screens: [
+      {
+        id: "home",
+        title: "Home",
+        body: [
+          "Welcome back.",
+          "Checking account: balance shown on the account page.",
+          "Open Activity to see recent payments.",
+          "Open Contacts to see how the bank reaches you.",
+        ].join("\n"),
+      },
+      {
+        id: "activity",
+        title: "Activity",
+        body: [
+          "Recent activity",
+          "Grocery store: 18.40",
+          "Transit pass: 30.00",
+          "Music subscription: 9.99",
+          "No payment is flagged. No security notice is open on this account.",
+        ].join("\n"),
+      },
+      {
+        id: "contacts",
+        title: "Contacts",
+        body: [
+          "Contact us",
+          `Customer line: ${OFFICIAL_NUMBER}`,
+          `Website: ${OFFICIAL_DOMAIN}`,
+          "The bank says it will never ask you for a one-time code or ask you to move money to another account.",
+        ].join("\n"),
+      },
+      {
+        id: "messages",
+        title: "Messages",
+        body: "You have no security messages.",
+      },
+    ],
   },
 };

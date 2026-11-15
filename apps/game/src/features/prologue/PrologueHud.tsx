@@ -157,10 +157,12 @@ export interface ProloguePauseMenuProps {
   onOpenSettings: () => void;
   onReturnToMenu: () => void;
   onHoverSound?: () => void;
+  /** Text under the entries. Default: the prologue's "not saved yet" note. `null` hides it. */
+  note?: string | null;
 }
 
 /** Pause menu in the main menu's style. The prologue has no save yet, so leaving restarts the evening. */
-export const ProloguePauseMenu: React.FC<ProloguePauseMenuProps> = ({ onResume, onOpenSettings, onReturnToMenu, onHoverSound }) => {
+export const ProloguePauseMenu: React.FC<ProloguePauseMenuProps> = ({ onResume, onOpenSettings, onReturnToMenu, onHoverSound, note }) => {
   const { t } = useTranslation(["chapter1", "worlds"]);
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   // One highlighted entry, as on the main menu: it follows the pointer, focus and the arrow / W S keys.
@@ -230,7 +232,9 @@ export const ProloguePauseMenu: React.FC<ProloguePauseMenuProps> = ({ onResume, 
             );
           })}
         </ul>
-        <p className="mt-6 max-w-sm text-sm leading-relaxed text-zinc-400">{t("worlds:khupho.game.story.pauseNote")}</p>
+        {note !== null && (
+          <p className="mt-6 max-w-sm text-sm leading-relaxed text-zinc-400">{note ?? t("worlds:khupho.game.story.pauseNote")}</p>
+        )}
       </div>
     </div>
   );
