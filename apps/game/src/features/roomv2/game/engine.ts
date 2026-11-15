@@ -16,6 +16,7 @@ import { CharacterArmsViewmodel } from '../../player/runtime/CharacterArmsViewmo
 import { dropMaskCanvas, paintDropMask, canvas, toTex } from './textures';
 import { projectCornersToViewport, cornersChanged, type ScreenCornersPx, type ScreenDeviceId } from './screenProjection';
 import { pickHoverId, laptopInteractRoute, inspectDurationSec } from './storyInteract';
+import { setGameElapsedSeconds } from '../../../game/clock/gameClock';
 import { isRoomPropId, type RoomOptions, type RoomStoryCommands } from './outside';
 
 export type Caption = { text: string; voice?: boolean; id: number };
@@ -1129,6 +1130,7 @@ export class Engine implements RoomStoryCommands {
   updateDevices(dt: number) {
     const a = this.apt;
     const el = this.ui.started ? this.t - this.startT : 0;
+    setGameElapsedSeconds(el);
     const time = clock({ h: 23, m: 8 }, el);
     // laptop
     if (this.laptopWoken) this.laptopAwake = Math.min(1, this.laptopAwake + dt * 1.8);

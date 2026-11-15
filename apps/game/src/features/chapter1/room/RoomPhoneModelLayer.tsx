@@ -1,22 +1,25 @@
 /**
  * RoomPhoneModelLayer (task 10.4): an optional 3D phone for the call screen of the room chapter.
  *
- * A transparent React Three Fiber canvas (`frameloop="demand"`) that exists only while a call is
- * shown and the model is allowed. It renders the unchanged `PhoneModel3D`, which publishes the
+ * A transparent React Three Fiber canvas (`frameloop="demand"`) that is mounted as soon as the
+ * room is entered (when the model is allowed) and hidden until a call is shown. So the model is
+ * fetched, decoded, compiled and uploaded before the first ring, and the phone appears at once.
+ * It renders `PhoneModel3D`, which publishes the
  * projected screen rectangle to the `PhoneScreenSink`; `CallPresentation` follows that sink and
  * keeps its own 200 ms fallback to the 2D screen. The canvas draws no room, no light and no
  * post-processing, it is `aria-hidden` and has `pointer-events: none`, so the room and the HTML
  * overlays still receive input.
  *
- * Lifetime: R3F disposes the renderer when the canvas unmounts. The context-loss listeners are
+ * Lifetime: the canvas stays for the whole visit to the room (one extra WebGL context). R3F disposes the renderer when the canvas unmounts. The context-loss listeners are
  * removed in an effect cleanup, and `PhoneModel3D` disposes its own materials and publishes
  * `null` when it unmounts. This layer does not touch story state.
  *
- * Frames: with `frameloop="demand"` a frame is drawn on mount, on resize and when the model
- * finishes loading. While the phone rings, and during the entry slide, the driver asks for the
- * next frame, so the motion plays; otherwise the canvas is idle.
+ * Frames: with `frameloop="demand"` a frame is drawn on mount, on resize, when the model
+ * finishes loading (the hidden warm-up draw) and when a call opens. While the phone rings, and
+ * during the entry slide, the driver asks for the next frame, so the motion plays; otherwise the
+ * canvas is idle.
  */
-import React, { Suspense, useEffect, useState } from "react";
+import React, { Suspense, useEffect, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { CALL_PHONE_GLB } from "../../../config/assetPaths";
 import { probeWebGL2 } from "../../../game/loading/deviceCapabilities";
@@ -40,7 +43,7 @@ export function detectPhoneModelSupport(): boolean {
 }
 
 export interface RoomPhoneModelLayerProps {
-  /** True while a call is shown (ringing or active). The canvas exists only then. */
+  /** True while a call is shown (ringing or active). The canvas is visible only then. */
   active: boolean;
   /** Switch: false means the 2D screen is used and nothing is mounted. */
   modelAllowed: boolean;
@@ -53,12 +56,14 @@ export interface RoomPhoneModelLayerProps {
 }
 
 /** Requests the next frame only while the phone moves (ring, entry slide). */
-const FrameDriver: React.FC<{ ringing: boolean; reducedMotion: boolean; openedAt: number }> = ({
+const FrameDriver: React.FC<{ active: boolean; ringing: boolean; reducedMotion: boolean; openedAt: number }> = ({
+  active,
   ringing,
   reducedMotion,
   openedAt,
 }) => {
   useFrame((state) => {
+    if (!active) return;
     const entering = performance.now() - openedAt < ENTRY_FRAME_WINDOW_MS;
     if ((ringing && !reducedMotion) || entering) state.invalidate();
   });
@@ -88,14 +93,17 @@ const ContextWatcher: React.FC<{ onChange: (lost: boolean) => void }> = ({ onCha
   return null;
 };
 
-const PhoneCanvas: React.FC<Omit<RoomPhoneModelLayerProps, "active" | "modelAllowed">> = ({
+const PhoneCanvas: React.FC<Omit<RoomPhoneModelLayerProps, "modelAllowed">> = ({
+  active,
   ringing,
   screenSink,
   onModelError,
   onContextChange,
 }) => {
   const reducedMotion = useReducedMotion();
-  const [openedAt] = useState(() => performance.now());
+  // The moment the current call opened (a new value each time `active` changes).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const openedAt = useMemo(() => performance.now(), [active]);
 
   const handleError = (error: unknown) => {
     reportPhoneModelFailure(CALL_PHONE_GLB, error);
@@ -108,7 +116,13 @@ const PhoneCanvas: React.FC<Omit<RoomPhoneModelLayerProps, "active" | "modelAllo
   };
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-30" aria-hidden="true" data-testid="room-phone-model-layer">
+    <div
+      className="pointer-events-none fixed inset-0 z-30"
+      style={{ visibility: active ? "visible" : "hidden" }}
+      aria-hidden="true"
+      data-testid="room-phone-model-layer"
+      data-active={active ? "true" : "false"}
+    >
       <Canvas
         frameloop="demand"
         dpr={[1, 1.5]}
@@ -118,10 +132,10 @@ const PhoneCanvas: React.FC<Omit<RoomPhoneModelLayerProps, "active" | "modelAllo
         aria-hidden="true"
       >
         <ContextWatcher onChange={handleContext} />
-        <FrameDriver ringing={ringing} reducedMotion={reducedMotion} openedAt={openedAt} />
+        <FrameDriver active={active} ringing={ringing} reducedMotion={reducedMotion} openedAt={openedAt} />
         <PhoneModelBoundary onError={handleError}>
           <Suspense fallback={null}>
-            <PhoneModel3D ringing={ringing} reducedMotion={reducedMotion} openedAt={openedAt} screenSink={screenSink} />
+            <PhoneModel3D live={active} ringing={ringing} reducedMotion={reducedMotion} openedAt={openedAt} screenSink={screenSink} />
           </Suspense>
         </PhoneModelBoundary>
       </Canvas>
@@ -130,6 +144,6 @@ const PhoneCanvas: React.FC<Omit<RoomPhoneModelLayerProps, "active" | "modelAllo
 };
 
 export const RoomPhoneModelLayer: React.FC<RoomPhoneModelLayerProps> = ({ active, modelAllowed, ...rest }) => {
-  if (!active || !modelAllowed) return null;
-  return <PhoneCanvas {...rest} />;
+  if (!modelAllowed) return null;
+  return <PhoneCanvas active={active} {...rest} />;
 };

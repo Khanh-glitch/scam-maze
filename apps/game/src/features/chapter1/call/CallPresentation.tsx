@@ -89,6 +89,12 @@ function voiceNotice(snapshot: VoiceSnapshot): VoiceNotice {
 
 /** Time to wait for the first projected rectangle before showing the 2D fallback. */
 const PENDING_GRACE_MS = 200;
+/**
+ * The same wait when the 3D phone is already loaded and compiled (`screenSink.isWarm()`): the
+ * rectangle comes with its first frame, so a slow frame must not flash the 2D screen first. A
+ * model that fails or a lost context still falls back at once (`modelAllowed` turns false).
+ */
+const WARM_PENDING_GRACE_MS = 1500;
 
 const callSelector = (state: ChapterState) => state.call;
 
@@ -148,9 +154,9 @@ export const CallPresentation: React.FC<CallPresentationProps> = ({
     if (mode !== "pending") return undefined;
     const timer = window.setTimeout(() => {
       setMode((current) => (current === "pending" ? "fallback" : current));
-    }, PENDING_GRACE_MS);
+    }, screenSink.isWarm() ? WARM_PENDING_GRACE_MS : PENDING_GRACE_MS);
     return () => window.clearTimeout(timer);
-  }, [mode]);
+  }, [mode, screenSink]);
 
   // --- Derived view --------------------------------------------------------------------------
   const callDef = call.current !== null ? scenario.calls[call.current] : undefined;

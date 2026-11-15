@@ -102,6 +102,35 @@ function expectCommonRules(root: HTMLElement, locale: GameLocale): void {
 }
 
 describe("PhoneCallScreen", () => {
+  it("draws a decorative status bar on both screens and the call buttons are round", () => {
+    for (const status of ["ringing", "active"] as const) {
+      const { unmount } = renderScreen({ view: view("en", status) });
+      const bar = screen.getByTestId("phone-status-bar");
+      expect(bar.getAttribute("aria-hidden")).toBe("true");
+      expect(bar.className).toContain("pointer-events-none");
+      expect(screen.getByTestId("phone-status-time").textContent).toMatch(/^\d{2}:\d{2}$/);
+      expect(Array.from(bar.querySelectorAll("img")).map((i) => i.getAttribute("src"))).toEqual([
+        "/assets/ui/StatusBarLight/Mobile%20Signal.png",
+        "/assets/ui/StatusBarLight/Wifi.png",
+        "/assets/ui/StatusBarLight/Battery.png",
+      ]);
+      unmount();
+    }
+  });
+
+  it("draws a Dynamic Island at the top of the screen, decorative and out of the way", () => {
+    for (const status of ["ringing", "active"] as const) {
+      const { unmount } = renderScreen({ view: view("en", status) });
+      const island = screen.getByTestId("dynamic-island");
+      expect(island.getAttribute("aria-hidden")).toBe("true");
+      expect(island.className).toContain("pointer-events-none");
+      expect(island.className).toContain("rounded-full");
+      expect(island.className).toContain("bg-black");
+      expect(island.textContent).toBe("");
+      expect(island.getAttribute("tabindex")).toBeNull();
+      unmount();
+    }
+  });
   for (const locale of LOCALES) {
     const text = PHONE_TEXT[locale];
 

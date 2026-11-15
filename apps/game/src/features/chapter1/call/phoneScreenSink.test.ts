@@ -6,6 +6,14 @@ import { createPhoneScreenSink } from "./phoneScreenSink";
 const BASE: Rect = { left: 100, top: 50, width: 200, height: 400 };
 
 describe("createPhoneScreenSink", () => {
+  it("is cold until the 3D phone says it is loaded, and cold again after", () => {
+    const sink = createPhoneScreenSink();
+    expect(sink.isWarm()).toBe(false);
+    sink.setWarm(true);
+    expect(sink.isWarm()).toBe(true);
+    sink.setWarm(false);
+    expect(sink.isWarm()).toBe(false);
+  });
   it("forwards the first rectangle and stores a copy", () => {
     const sink = createPhoneScreenSink();
     const listener = vi.fn();

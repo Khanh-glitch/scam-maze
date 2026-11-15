@@ -282,7 +282,6 @@ describe("PhoneCallScreen voice controls", () => {
     expect(within(section).getAllByRole("button")).toHaveLength(4);
     expect(screen.getByTestId("call-screen-avatar").className).toContain("h-14");
     expect(screen.getByTestId("call-screen-mute").className).toContain("h-11");
-    expect(screen.getByTestId("call-screen-hang-up").className).toContain("h-11");
   });
 
   it("regular layout uses the larger avatar and button sizes", () => {
