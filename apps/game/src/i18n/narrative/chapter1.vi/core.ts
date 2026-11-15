@@ -19,10 +19,10 @@ export const CORE_VI: NarrativeOverlay = {
   "objectives/obj.answer-or-decline/text": "Xử lý cuộc gọi đến.",
   "objectives/obj.answer-or-decline/hint": "Điện thoại đang nằm trên bàn. Bạn quyết định có nghe máy hay không.",
   "objectives/obj.check-laptop/text": "Xem tin nhắn mới trên máy tính xách tay.",
-  "objectives/obj.check-laptop/hint": "Màn hình máy tính xách tay đã thay đổi sau cuộc gọi.",
+  "objectives/obj.check-laptop/hint": "Màn hình máy tính xách tay đã thay đổi sau cuộc gọi. Bạn cũng có thể nhìn quanh phòng.",
   "objectives/obj.investigate/text": "Tìm ra các tin nhắn và cuộc gọi thật sự đến từ đâu.",
   "objectives/obj.investigate/hint":
-    "Hãy xem máy tính xách tay, các giấy tờ trên bàn và những thứ bạn vẫn giữ trong phòng.",
+    "Hãy xem máy tính xách tay, các giấy tờ trên bàn và những thứ bạn vẫn giữ trong phòng. Có thể sẽ có thêm một cuộc gọi.",
   "objectives/obj.answer-recovery/text": "Xử lý cuộc gọi mới.",
   "objectives/obj.answer-recovery/hint": "Hãy nghe người gọi này nói gì, rồi so với những điều bạn đã tìm thấy.",
   "objectives/obj.decide/text": "Quyết định bạn sẽ làm gì với tài khoản của mình.",

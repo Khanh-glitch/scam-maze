@@ -89,8 +89,37 @@ describe("buildDebrief analysis", () => {
     expect(analysis?.thirdCallerIndependent).toBe(false);
     expect(analysis?.pressureBuilt).not.toBe("");
     expect(analysis?.whyWarningLooked).not.toBe("");
-    expect(analysis?.thirdCallerNote).not.toBe("");
+    expect(analysis?.thirdCallerNote ?? "").toBeDefined();
     expect(analysis?.verifyNextTime).toEqual(FIXTURE_SCENARIO.debrief.analysis.verifyNextTime);
+  });
+
+  describe("third caller (P2-6)", () => {
+    const withCall = (status: "answered" | "declined" | "missed" | "ended" | null) =>
+      buildDebrief(
+        ended(PATH_EVENTS, "unfinished-case", [], {
+          call: {
+            current: null,
+            status: "ended",
+            log:
+              status === null
+                ? []
+                : [{ callId: "call.recovery", direction: "incoming", displayName: "X", number: "+0001", status, ringCount: 1 }],
+          },
+        }),
+        FIXTURE_SCENARIO,
+      )?.analysis;
+
+    it.each(["answered", "ended"] as const)("includes the note when the call was %s", (status) => {
+      const analysis = withCall(status);
+      expect(analysis?.thirdCallerEncountered).toBe(true);
+      expect(analysis?.thirdCallerNote).toBe(FIXTURE_SCENARIO.debrief.analysis.thirdCallerNote);
+    });
+
+    it.each(["declined", "missed", null] as const)("has no note when the call was %s", (status) => {
+      const analysis = withCall(status);
+      expect(analysis?.thirdCallerEncountered).toBe(false);
+      expect(analysis?.thirdCallerNote).toBeNull();
+    });
   });
 
   it("reports pressure and signs of discovered evidence only", () => {

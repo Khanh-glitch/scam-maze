@@ -102,12 +102,22 @@ function debriefProblems(state: ChapterState): string[] {
   for (const [name, text] of Object.entries({
     pressureBuilt: view.analysis.pressureBuilt,
     whyWarningLooked: view.analysis.whyWarningLooked,
-    thirdCallerNote: view.analysis.thirdCallerNote,
     trapNote: view.analysis.trapNote,
   })) {
     check(text.trim() !== "", `analysis.${name} is empty`);
   }
   check(view.analysis.verifyNextTime.length > 0, "analysis.verifyNextTime is empty");
+
+  // The third caller is mentioned only when the player answered that call (P2-6).
+  const answeredThird = state.call.log.some(
+    (record) => record.callId === "call.recovery" && (record.status === "answered" || record.status === "ended"),
+  );
+  check(view.analysis.thirdCallerEncountered === answeredThird, `thirdCallerEncountered ${view.analysis.thirdCallerEncountered} != ${answeredThird}`);
+  if (answeredThird) {
+    check((view.analysis.thirdCallerNote ?? "").trim() !== "", "analysis.thirdCallerNote is empty after the third call");
+  } else {
+    check(view.analysis.thirdCallerNote === null, "analysis.thirdCallerNote is set without a third call");
+  }
   return problems;
 }
 

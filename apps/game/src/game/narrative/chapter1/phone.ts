@@ -45,7 +45,14 @@ export const CHAPTER_1_CALLS: Record<CallId, CallDef> = {
     graphId: "dlg.recovery",
     ringWhen: [
       [ALEX_CLOSED, { kind: "flag", flag: "review_security_opened" }],
+      // Dismissing the notification brings the third call at once. Merely opening it does not:
+      // the player must also have found two items (origin, receipts, saved contact, ...).
       [ALEX_CLOSED, { kind: "flag", flag: "notification_dismissed" }],
+      [
+        ALEX_CLOSED,
+        { kind: "flag", flag: "notification_handled" },
+        { kind: "evidenceCountAtLeast", evidenceIds: EARLY_EVIDENCE, count: 2 },
+      ],
       [ALEX_CLOSED, { kind: "flag", flag: "official_channel_verified" }],
       [ALEX_CLOSED, { kind: "evidenceCountAtLeast", evidenceIds: EARLY_EVIDENCE, count: 3 }],
       [ALEX_CLOSED, { kind: "claimStatus", claimId: "claim.claims-independent", status: "inconclusive" }],
