@@ -42,9 +42,9 @@ import { createChapterStore, type ChapterStore } from "../../../game/narrative/s
 import type { ChapterState, CoreAction, ScenarioDefinition } from "../../../game/narrative/types";
 import { createLocalStorageSaveSource, type SaveGameSource, type SavedPlayerPose } from "../../../game/saves/saveGame";
 import type { AudioPort } from "../../../game/voice/audioPort";
-import { voiceGain } from "../../../game/voice/mixPlan";
+import { effectivePauseMs, voiceGain } from "../../../game/voice/mixPlan";
 import { createWebAudioEngine, type WebAudioEngine } from "../../../game/voice/webAudioEngine";
-import { INTRO_SEQUENCE } from "../../../game/narrative/chapter1/dialogues/intro";
+import { INTRO_SEQUENCE, INTRO_TYPING_MS } from "../../../game/narrative/chapter1/dialogues/intro";
 import { formatNumber } from "../../../i18n/format";
 import { useDisplayScenario } from "../../../i18n/narrative";
 import { useGameLocale } from "../../../i18n/useGameLocale";
@@ -333,13 +333,18 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
     if (!Object.hasOwn(scenario.dialogues, "dlg.intro")) return undefined;
     const graph = scenario.dialogues["dlg.intro"];
     const lines: NarrationLine[] = [];
-    for (const nodeId of INTRO_SEQUENCE) {
-      if (!Object.hasOwn(graph.nodes, nodeId)) continue;
-      const lineId = graph.nodes[nodeId].lineId;
-      if (Object.hasOwn(graph.lines, lineId)) lines.push({ text: graph.lines[lineId], src: null });
-    }
+    // The voice plays through the narration player; the text is typed over the owner's timing for
+    // the locale, starting after the player's pause before the line.
+    const timing = INTRO_TYPING_MS[locale === "vi" ? "vi" : "en"];
+    INTRO_SEQUENCE.forEach((nodeId, i) => {
+      if (!Object.hasOwn(graph.nodes, nodeId)) return;
+      const node = graph.nodes[nodeId];
+      if (!Object.hasOwn(graph.lines, node.lineId)) return;
+      const delayMs = node.tone ? effectivePauseMs(node.tone, settings.reducedStress) : 0;
+      lines.push({ text: graph.lines[node.lineId], src: null, durationMs: timing[i], delayMs });
+    });
     return lines;
-  }, [scenario]);
+  }, [scenario, locale, settings.reducedStress]);
 
   const handleBegin = useCallback(() => {
     if (store.getState().status === "not-started") {
@@ -426,6 +431,13 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
     deps: narrationDeps,
   });
   const goToIntroLine = narration.goTo;
+  // The rain and the city are lowered under the intro narration so the voice stays on top (owner).
+  const introNarrating = introOpen && introMode === "begin" && engineReady && !callOpen;
+  useEffect(() => {
+    if (!engineReady) return undefined;
+    bridge.commands?.duckForVoice?.(introNarrating);
+    return () => bridge.commands?.duckForVoice?.(false);
+  }, [bridge, engineReady, introNarrating]);
 
   // --- Port cache (the bridge reads it on every hover frame) --------------------------------
   const cacheRef = useRef<PortCache>(EMPTY_CACHE);

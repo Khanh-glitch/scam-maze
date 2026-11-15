@@ -14,6 +14,9 @@
 // Honesty rule: a clip is written as `present` only when its MP3 file exists, passed the checks
 // below and was produced by this script in this run (or was verified again from a previous run
 // that this script wrote). Anything else is written as `missing`.
+//
+// The intro narration (`dlg.intro`, intro.1 to intro.3) is not generated here: the owner supplies
+// those files, and this script never touches them or their manifest entries (OWNER_GRAPHS).
 
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -34,6 +37,12 @@ const MAX_CLIP_MS = 25_000;
 const MAX_LOCALE_BYTES = 6 * 1024 * 1024;
 const DURATION_TOLERANCE_MS = 120;
 const CLIP_MIME = "audio/mpeg";
+/**
+ * Graphs whose clips the owner supplies as files (owner, 2026-11-15: the intro narration). This script
+ * never synthesizes, replaces, prunes or rewrites them, on any platform and even with --force: their
+ * manifest entries are copied unchanged and their files are left alone.
+ */
+const OWNER_GRAPHS = new Set(["dlg.intro"]);
 const LOCALES = ["en", "vi"];
 
 // ---------------------------------------------------------------------------------------------
@@ -226,12 +235,15 @@ async function main() {
     const inScope = (clipId, locale) =>
       (options.locale === null || options.locale === locale) &&
       (options.onlyIds === null || options.onlyIds.has(clipId));
-    const scopedJobs = allJobs.filter((job) => inScope(job.clipId, job.locale));
+    const ownerJob = (job) => OWNER_GRAPHS.has(job.graphId);
+    const scopedJobs = allJobs.filter((job) => inScope(job.clipId, job.locale) && (options.printScript || !ownerJob(job)));
 
     if (options.onlyIds !== null) {
       const known = new Set(allJobs.map((job) => job.clipId));
+      const owned = new Set(allJobs.filter(ownerJob).map((job) => job.clipId));
       for (const id of options.onlyIds) {
         if (!known.has(id)) fail(`--only: "${id}" is not a Spoken_Node with voice text.`);
+        if (owned.has(id) && !options.printScript) fail(`--only: "${id}" is an owner-supplied clip; this script does not generate it.`);
       }
     }
 
@@ -356,6 +368,12 @@ async function main() {
         continue;
       }
       const job = slot.job;
+      // Owner-supplied clips: the previous entry is kept exactly as it is.
+      if (ownerJob(job)) {
+        const previous = existingByKey.get(key);
+        entries.push(previous ?? missingEntry(slot, CHAPTER1_VOICE_CAST));
+        continue;
+      }
       if (fresh.has(key)) {
         entries.push(existingByKey.get(key));
         continue;

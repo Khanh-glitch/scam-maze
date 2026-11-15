@@ -224,6 +224,63 @@ Resolved:
   the reduced-stress hint) are listed in `ACCESSIBILITY.md`.
 
 ## Task History
+### 2026-11-15 — Prologue route: the street no longer plays inside the room (heard over the ringtone)
+- **Objective:** Owner report: the background sound kept playing while the room phone rang.
+- **Cause:** `ProloguePage` re-applied the sound setting to both worlds in an effect keyed on `roomBuilt`. When the player goes home before the room is built, the room's `onReady` shows the room at once (`street.suspend()` mutes the street) and then sets `roomBuilt`, so the effect ran next and unmuted the street. The street (traffic recording, rain, thunder) then played through the whole room scene, including the ring. The room's own ambience was already silenced during the ring (entry below).
+- **Fix:** the effect mutes the street while `stage === "room"`. Test in `ProloguePage.room.test.tsx` (fails before the fix, passes after).
+- **Checked:** headless Chrome on the `/?skip-prologue` route, with a script that tracks the Web Audio graph: during the ring only the ringtone has a non-zero path gain (2.2); menu music, menu ambient, rain, city bed and clock are at 0.
+- **Validation:** `tsc` and `vitest run` pass. Not verified by ear, and the full prologue walk (street to room) was not run in a browser.
+### 2026-11-15 — Active call screen: avatar no longer touches the Dynamic Island
+- **Cause:** the screen's top padding was `pt-[9%]` (percent of width, about 9% of 66.8 mm); the island ends at about 5.5% of the 144.9 mm height, which is about 12% of the width, so the avatar of the active screen started under the island.
+- **Fix:** `pt-[15%]` in `PhoneCallScreen.tsx`. `vitest run src/features/chapter1` (406 tests) and `tsc` pass. Not verified on the phone model (no screenshot).
+- **Open:** the owner's screenshot showed the three status bar icons as broken-image placeholders. Not reproduced: the PNGs under `public/assets/ui/StatusBarLight` return 200 and render in headless Chrome.
+### 2026-11-15 — Call buttons: no focus ring; status bar uses the StatusBarLight icons only
+- **Objective:** Owner feedback: Accept takes focus when the call rings and showed a purple rectangle; use the `StatusBarLight` icons and delete the `statusBar` folder.
+- **Completed:** the call buttons no longer draw a focus outline (Accept still takes focus, so Enter or Space still answers). `PhoneStatusBar` uses `/assets/ui/StatusBarLight/*` and loses the `tone` prop; `public/assets/ui/statusBar` (with `Time.png`) is deleted.
+- **Validation:** `tsc` and `vitest run` (1521 tests) passed. Known limitation: with no ring, keyboard users get no visual cue of the focused call button.
+### 2026-11-15 — Status bar uses the owner's icon art
+- **Objective:** Replace my drawn SVG icons with the owner's PNGs in `apps/game/public/assets/ui/statusBar` (white, for dark screens) and `StatusBarLight` (dark, for light screens).
+- **Completed:** `PhoneStatusBar.tsx` shows `Mobile Signal.png`, `Wifi.png` and `Battery.png` from the folder chosen by `tone` (`dark` is used by the call screen). `Time.png` is not used: the clock stays live text from `gameClock`. Test updated.
+- **Validation:** `tsc` and `vitest run` (1521 tests) passed. Not verified: the look on the 3D phone. The battery art has 76 baked in, so the level is fixed.
+### 2026-11-15 — Phone status bar: in-game clock, iOS-style icons, rounded screen corners
+- **Objective:** Owner feedback on the call screen: the top corners were square, the clock must match the game time, and the signal, Wi-Fi and battery icons did not look like an iPhone's.
+- **Completed:** (1) `game/clock/gameClock.ts` (pure): the room starts at 23:08; the room engine reports elapsed seconds each frame (`updateDevices`), and the phone formats the same value as HH:MM, so it matches the wall clock. (2) `call/PhoneStatusBar.tsx`: clock, Dynamic Island gap and icons in a 3-column grid; signal bars, Wi-Fi arcs and a battery pill with the level number (76) drawn as inline SVG; `tone` prop `dark` (white glyphs, used) or `light` (black glyphs, not used yet). (3) `PhoneCallScreen` section is clipped with `rounded-[13.7%/6.3%]` (iPhone 17 Pro screen radius, about 55 pt on 402 x 874 pt).
+- **Files:** `game/clock/gameClock.ts` and test, `features/roomv2/game/engine.ts`, `features/chapter1/call/PhoneStatusBar.tsx`, `PhoneCallScreen.tsx` and its test, this file.
+- **Validation:** `tsc -p tsconfig.app.json --noEmit` and `vitest run` (1521 tests) passed.
+- **Not verified:** the look on the 3D phone and in 2D (no screenshot). The icons are my own SVG drawings, because the owner's reference images could not be read from the chat as files. Outside the room (no engine running) the clock shows 23:08. The battery level is fixed.
+### 2026-11-15 — Call screen redesign (status bar, round buttons) and room sound silenced during the ringtone
+- **Objective:** Owner requests: silence the background while the ringtone plays; redesign the call screen with a phone status bar, round Accept and Decline buttons, and a redesigned active-call screen.
+- **Completed:** (1) `roomv2/game/audio.ts`: `ring(on)` sets a `ringDuck` factor (0 while ringing, 1 after) that is multiplied into `applyDuck`, so rain, city and clock go silent during the ring and fade back when it stops. (2) `PhoneCallScreen.tsx`: dark gradient background, decorative status bar (static 9:41, signal, Wi-Fi, battery) beside the Dynamic Island, Decline and Accept as 64 px round discs with the label under them (label inside the button, so the accessible name is unchanged), the active screen ends with a round red End call button. Test ids are unchanged. (3) Tests: status bar test added; the `h-11` assertion for End call was removed because that button is now a round disc.
+- **Files:** `apps/game/src/features/roomv2/game/audio.ts`, `apps/game/src/features/chapter1/call/PhoneCallScreen.tsx`, `PhoneCallScreen.test.tsx`, `PhoneCallScreen.controls.test.tsx`, this file.
+- **Validation:** `tsc -p tsconfig.app.json --noEmit` and `vitest run` (1518 tests before the new test was added) passed.
+- **Not verified:** the look of the new screen on the 3D phone and in 2D (no screenshot taken), the ring duck by ear, and the Accept/Decline path with a real mouse. The ring duck has no automated test (Web Audio). The status bar clock is fixed text, not the real time.
+
+### 2026-11-15 — Chapter 1 intro narration: re-recorded clips, typed text over the voice, ambience ducked (committed on request)
+- **Objective:** Owner work from a parallel session, committed as it stood on the owner's request ("commit everything"). This entry only describes the diff; it was not written or listened to by the agent that committed it.
+- **Contents:** the six intro clips (`public/audio/chapter01/{en,vi}/intro.{1,2,3}.mp3`) are re-recorded and the voice manifest and generator script follow; the intro text is typed over the owner's timing per locale (`INTRO_TYPING_MS`, with the player's pause before each line); the room's rain, city and clock are lowered under the intro narration (`duckForVoice`, level 0.25) and restored after; the intro overlay, `useIntroNarration` and their tests follow. `.kiro/steering/visual-quality.md` gets a one-line profiling-path correction.
+- **Validation:** the full `pnpm typecheck`, `pnpm build` and `vitest run` (1518 tests) pass with it included. Not verified: how the new clips sound, the typing against the voice by ear, the duck level.
+
+### 2026-11-15 — Chapter 1 calls show the 3D iPhone 17 Pro at once, with a Dynamic Island
+- **Objective:** Owner requests: the call phone should be the 17 Pro model, not the flat 2D screen; it must appear at once (it appeared late); it needs a Dynamic Island; the model must load as soon as the player enters the room.
+- **Cause:** `RoomChapterPage` and `ProloguePage` passed `modelAllowed={false}` to `RoomChapterLayer`, the shipped default of the chapter spec (2D first, the 3D overlay as a separate task). The 3D layer (`RoomPhoneModelLayer` + `PhoneModel3D`, `call-phone.optimized.glb`) was already in the repo. Once on, its canvas was mounted only when a call rang, so every call waited for the model fetch and decode, a new WebGL context and shader compilation.
+- **Completed:** (1) Removed both `modelAllowed={false}` props: the layer decides from the WebGL2 probe and still falls back to 2D when the model fails or the context is lost. (2) The phone canvas is now mounted when the room is entered and hidden (`visibility: hidden`) until a call opens; `PhoneModel3D` has a `live` prop: while false it only loads, compiles and uploads (one hidden draw), publishes nothing, and drops a stale rectangle; when a call opens it restarts its entry slide and draws at once. (3) `PhoneScreenSink` gained `setWarm/isWarm`; a warm phone makes `CallPresentation` wait 1.5 s (not 200 ms) for the first frame, so the 2D screen no longer flashes before the 3D one. A failure or context loss still falls back at once. (4) `PhoneCallScreen` draws a Dynamic Island (black pill, 31% x 4.2% of the screen, 1.25% from the top, `aria-hidden`, no pointer events). Two tests that pinned `modelAllowed === false` now expect `undefined`; tests added for the hidden-but-mounted layer, the island, the warm sink and the warm wait.
+- **Model:** `call-phone.optimized.glb` (2.1 MB) is built by `scripts/optimize-call-phone.cjs` from `assets-src/props/phone/iphone-17-pro.glb`, the iPhone 17 Pro (screen 66.8 x 144.9 mm). `Asset3D/phone-17-pro-max/source/Phone 17 Pro Max Simple.glb` is the Pro Max and is byte-identical to `assets-src/props/phone/phone-17-pro-max.glb`; it is not used.
+- **Files:** `chapter1/room/{RoomChapterPage,RoomPhoneModelLayer}.tsx` (+ test), `prologue/ProloguePage.tsx`, `chapter1/call/{PhoneModel3D,PhoneCallScreen,CallPresentation}.tsx`, `chapter1/call/phoneScreenSink.ts`, tests (`PhoneCallScreen`, `phoneScreenSink`, new `callPresentation.warm`, `App.chapter`, `ProloguePage.room`), this file.
+- **Validation:** `pnpm typecheck`, `pnpm build`, `vitest run` (170 files, 1518 tests) pass. Headless Chrome (SwiftShader, no real frame rates) through New Game with `?skip-prologue`: the hidden phone canvas is mounted at room entry, before any call; when the call rings the host goes `pending` -> `model` with no `fallback` step (before: `pending` -> `fallback` at +203 ms -> `model` at +549 ms); the Dynamic Island shows on the glass (screenshot checked). The remaining ~560 ms in that run is two software-rendered frames; a real GPU was not measured.
+- **Not verified:** pressing Accept or Decline on the 3D phone, the active-call screen, the prologue path, frame rate and the extra WebGL context on a real GPU (open question Q3 of the chapter spec), and the delay on a real device.
+
+### 2026-11-15 — Room intro text timed to the voice; ambience lowered under it; intro left out of the voice script
+
+- **Objective:** owner feedback on the room intro: the text ran ahead of the voice (wanted: en 8, 7, 8 s and vi 5, 6, 6 s for `intro.1` to `intro.3`); the voice was quieter than the background; the voice script must never touch the owner's intro files.
+- **Completed:**
+  - Cause of the fast text: in the room the intro voice plays through the narration player, and the overlay got lines without a clip (`src: null`), so it typed at the text-only speed (38 characters per second).
+  - `dialogues/intro.ts`: `INTRO_TYPING_MS` with the owner's timings per locale. `useIntroNarration.ts`: `NarrationLine` takes optional `durationMs` (text spread evenly over it) and `delayMs` (wait before typing). `RoomChapterLayer.tsx` passes the timing and the narration player's pause before the line (`effectivePauseMs`, 450 ms for `reassuring`).
+  - Room ambience: `AudioEngine.duckForVoice` lowers the rain, the city and the clock to 0.25 (about -12 dB) while the intro narration plays, combined with the story mood duck; exposed as the optional `RoomStoryCommands.duckForVoice`. The menu music is already faded out in the room, so the background heard there is this ambience.
+  - `generate-chapter1-voice.mjs`: `dlg.intro` is owner-supplied (`OWNER_GRAPHS`). The script no longer synthesizes, replaces or prunes those clips on any platform, even with `--force`; their manifest entries are copied unchanged; `--only intro.*` stops with an error. Replaces the earlier `voiceNote` check.
+  - Incident: the owner's intro MP3s were overwritten on disk when the working folder was switched to a branch made from `main` before PR #45 (the switch was not made by the agent and the script did not run). They were restored from `6f56dab`; `main` now has them (PR #45).
+- **Files modified:** `apps/game/scripts/generate-chapter1-voice.mjs`, `apps/game/src/game/narrative/chapter1/dialogues/intro.ts`, `apps/game/src/features/chapter1/intro/useIntroNarration{.ts,.test.ts}` (test new), `apps/game/src/features/chapter1/room/RoomChapterLayer.tsx`, `apps/game/src/features/roomv2/game/{audio,engine,outside}.ts`, `docs/PROJECT_PROGRESS.md`.
+- **Validation:** `voice:chapter1 --dry-run --force --prune` lists 82 jobs and no intro clip, `--only intro.1` is refused, the intro MP3 checksums did not change, `voice:report` 88 present. Typecheck, build and tests: see the commit report.
+- **Not verified:** the timing and the levels by ear in a browser.
 
 ### 2026-11-15 — Remove the deprecated positioning stub
 
@@ -312,6 +369,38 @@ This entry replaces the partial per-task entries (3.7, 10.3, 12.4) that were wri
    - Aftermath phone and laptop text is shown in the ending screen and is not pushed to the engine's laptop frame.
    - The Speaker toggle is a per-call override, as in the phone UI redesign.
 10. **Follow-ups:** human playtest and pacing tuning; native-speaker review of the Vietnamese text; consider more distinct voices; engine-level tests for the story port; open the pull request (the documentation is committed and the branch is pushed without force).
+
+### 2026-11-15 — New room intro narration; controls and Continue only on the last line
+
+- **Objective:** the owner rewrote the room intro narration (`intro.1` to `intro.3`) and supplied new voice clips; the on-screen text must match. The controls list and the Continue button of the intro overlay (street prologue and room) should appear only with the last line.
+- **Completed:**
+  - `dialogues/intro.ts` and `chapter1.vi/intro.ts`: the owner's en/vi text.
+  - `chapter1.manifest.ts`: the six `intro.*` entries take the owner's MP3s (hash, bytes, duration from the files; `voiceNote` and `credit` say "Supplied by the project owner"); `chapterContentVersion` 7d508ad7 (was b1b15925), so saves made before this change are reported as incompatible (design of save v3).
+  - `generate-chapter1-voice.mjs`: clips marked as owner-supplied are kept while their text is current, so a Windows run does not replace them with a local voice (`--dry-run`: 88 up to date, 0 to run).
+  - `ChapterIntroOverlay.tsx`: controls and Continue show (and are focusable) only on the last line; resume mode, with one line, shows them at once. This replaces the 2026-11-17 P2-8 behavior. Tests updated.
+- **Files modified:** `apps/game/src/game/narrative/chapter1/dialogues/intro.ts`, `apps/game/src/i18n/narrative/chapter1.vi/intro.ts`, `apps/game/src/game/voice/chapter1.manifest.ts`, `apps/game/scripts/generate-chapter1-voice.mjs`, `apps/game/src/features/chapter1/intro/ChapterIntroOverlay{,.test}.tsx`, the six `apps/game/public/audio/chapter01/{en,vi}/intro.*.mp3` (owner's files), `docs/PROJECT_PROGRESS.md`.
+- **Validation:** `pnpm typecheck`, `pnpm build`, `npx vitest --run` (168 files, 1511 tests), `voice:report` (88 present).
+- **Not verified:** that the owner's clips say exactly the new text; the overlay in a real browser. The owner's tone notes (gentle, relieved, calm, warm) are not scenario tones; the nodes keep `reassuring`. The manifest `origin` stays `tts-generated` (the schema has no "supplied" value; how the clips were made is not recorded).
+
+### 2026-11-15 — Street bins use the owner's penguin bin model
+
+- **Objective:** the owner pointed out that a penguin bin model already exists (`Prop_TrashBin` in `street-props.optimized.glb`, beside the banh mi cart); the street bins should use it instead of the procedural penguin.
+- **Completed:** `streetFurniture.ts` gets a `trash-bin` kind that takes a node from a shared file (`source`), scaled to 1.05 m and turned from +X to +Z; `furniture.ts` `penguinBin` draws it (instanced) with a collider and keeps the procedural penguin as the fallback. Also merged `origin/main` into the branch (`docs/PROJECT_PROGRESS.md` conflict: both sets of entries kept, newest first).
+- **Files modified:** `apps/game/src/features/khupho/world/{streetFurniture,furniture}.ts`, `docs/PROJECT_PROGRESS.md`.
+- **Validation:** after the merge, `pnpm typecheck`, `pnpm build` and `npx vitest --run` (168 files, 1509 tests) passed. After the bin change: `pnpm typecheck`, `pnpm build`, khupho/prologue/app/config tests. A headless screenshot of the grocery front shows the model facing the street; 7 bins placed.
+- **Not verified:** real-GPU look and FPS.
+
+### 2026-11-15 — Parked bikes clear of doors, penguin bins, model residents
+
+- **Objective:** owner feedback on `/khupho`: parked bikes block front doors, sit on the seated customers and stick into the grocery goods; bike kinds come in clusters; the green bins should be penguins; the people at home should use the street NPC models with their own outfit colors.
+- **Completed:**
+  - `neighborhood.ts`: new `parkingSpot()` picks a spot along each house front clear of the front door (or the yard gate), the bin and the grocery's goods; bikes moved out to z 4.7 (was 4.9). No parked bike in front of the cafes and pho shops (table set and customers) or the repair shop (it has its own bike). The random draws are unchanged, so the rest of the street keeps its layout.
+  - `furniture.ts`: parked bike kinds come from a shuffled bag of `BIKE_MIX` (`resetBikeMix()` per build) instead of a position hash, which grouped one kind together. New procedural `penguinBin` replaces the green cylinder bins, facing the street.
+  - `people.ts`: `Resident` can be a street NPC model (women, men and elder pools, outfit colors from `mulberry32(31337)`); sit, eat and desk poses use `sitHigh`, lying turns the model onto its back, other poses stand idle. Models are drawn within 16 m or while the camera is in the house. Procedural people remain the fallback.
+- **Files modified:** `apps/game/src/features/khupho/world/{neighborhood,furniture,people}.ts`, `docs/PROJECT_PROGRESS.md`.
+- **Validation:** `pnpm typecheck`, `pnpm build`, `npx vitest --run src/features/khupho src/features/prologue src/app src/config` (40 tests) passed. Headless SwiftShader screenshots: grocery front (bike between the fridge and the goods, penguin bin), single-story house (bike beside the gate), living room at 20:42 (model resident on the sofa).
+- **Not verified:** FPS on a real GPU with the extra models; the lying pose in bed; cooking and washing poses up close (they use the idle clip).
+- **Follow-up:** owner review.
 
 ### 2026-11-15 — Fix cut-apart parked bikes; noodle shop table set; model shop staff
 
