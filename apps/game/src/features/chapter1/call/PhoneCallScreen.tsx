@@ -165,7 +165,7 @@ export const PhoneCallScreen: React.FC<PhoneCallScreenProps> = ({
     <section
       aria-label={t("phone.callPresentation.screenLabel")}
       data-testid={ringing ? "incoming-call-screen" : "call-screen"}
-      className={`relative flex h-full w-full flex-col overflow-hidden rounded-[13.7%/6.3%] px-4 pb-6 pt-[9%] text-center text-[#f7f5ff] ${groupGap}`}
+      className={`relative flex h-full w-full flex-col overflow-hidden rounded-[13.7%/6.3%] px-4 pb-6 pt-[15%] text-center text-[#f7f5ff] ${groupGap}`}
       style={{ background: "linear-gradient(180deg, #1d1a33 0%, #0e0c18 100%)" }}
     >
       {vibrating ? <style>{VIBRATE_KEYFRAMES}</style> : null}

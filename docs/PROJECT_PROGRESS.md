@@ -224,6 +224,10 @@ Resolved:
   the reduced-stress hint) are listed in `ACCESSIBILITY.md`.
 
 ## Task History
+### 2026-11-15 — Active call screen: avatar no longer touches the Dynamic Island
+- **Cause:** the screen's top padding was `pt-[9%]` (percent of width, about 9% of 66.8 mm); the island ends at about 5.5% of the 144.9 mm height, which is about 12% of the width, so the avatar of the active screen started under the island.
+- **Fix:** `pt-[15%]` in `PhoneCallScreen.tsx`. `vitest run src/features/chapter1` (406 tests) and `tsc` pass. Not verified on the phone model (no screenshot).
+- **Open:** the owner's screenshot showed the three status bar icons as broken-image placeholders. Not reproduced: the PNGs under `public/assets/ui/StatusBarLight` return 200 and render in headless Chrome.
 ### 2026-11-15 — Call buttons: no focus ring; status bar uses the StatusBarLight icons only
 - **Objective:** Owner feedback: Accept takes focus when the call rings and showed a purple rectangle; use the `StatusBarLight` icons and delete the `statusBar` folder.
 - **Completed:** the call buttons no longer draw a focus outline (Accept still takes focus, so Enter or Space still answers). `PhoneStatusBar` uses `/assets/ui/StatusBarLight/*` and loses the `tone` prop; `public/assets/ui/statusBar` (with `Time.png`) is deleted.
