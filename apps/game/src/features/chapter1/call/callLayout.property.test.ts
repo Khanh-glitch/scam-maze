@@ -6,6 +6,7 @@ import {
   NARROW_BREAKPOINT,
   NARROW_SUBTITLE_MAX_HEIGHT,
   rectsIntersectArea,
+  SUBTITLE_MAX_HEIGHT,
   SCREEN_ASPECT,
   SCREEN_HEIGHT_M,
   SCREEN_WIDTH_M,
@@ -102,7 +103,9 @@ describe("callLayout properties", () => {
       expect(screen.width, label).toBeGreaterThanOrEqual(MIN_SCREEN_WIDTH);
 
       if (viewport.width >= NARROW_BREAKPOINT) {
-        expect(choice.top, label).toBeGreaterThanOrEqual(viewport.height / 2 - EPSILON);
+        // The cards may start high (22 percent of the height or lower), never above the margin.
+        expect(choice.top, label).toBeGreaterThanOrEqual(WIDE_MARGIN - EPSILON);
+        expect(choice.top, label).toBeLessThanOrEqual(0.22 * viewport.height + 1);
       } else {
         expect(choice.top, label).toBeGreaterThanOrEqual(screen.top + screen.height - EPSILON);
         expect(choice.top + choice.height, label).toBeGreaterThanOrEqual(
@@ -140,14 +143,71 @@ describe("callLayout properties", () => {
         expect(subtitle.top, label).toBeGreaterThanOrEqual(screen.top + screen.height - EPSILON);
         expect(subtitleBottom, label).toBeLessThanOrEqual(choice.top + EPSILON);
       } else {
-        // Left column, directly above the choice: same left edge, bottom within one margin.
-        expect(subtitle.left, label).toBeGreaterThanOrEqual(choice.left - EPSILON);
-        expect(subtitle.left + subtitle.width, label).toBeLessThanOrEqual(choice.left + choice.width + EPSILON);
-        expect(subtitleBottom, label).toBeLessThanOrEqual(choice.top + EPSILON);
-        expect(choice.top - subtitleBottom, label).toBeLessThanOrEqual(WIDE_MARGIN + EPSILON);
+        // Bottom-left: left edge at 6 percent of the width, width up to 42 percent (cap 520 px),
+        // anchored near the bottom, below the response cards and left of the phone.
+        // Ends 56 px above the bottom edge, clear of the Ctrl/Esc footer strip.
+        expect(subtitleBottom, label).toBeLessThanOrEqual(viewport.height - 52 + EPSILON);
+        expect(subtitleBottom, label).toBeCloseTo(viewport.height - 56, 3);
+        expect(subtitle.top, label).toBeGreaterThanOrEqual(choice.top + choice.height - EPSILON);
+        expect(subtitle.left + subtitle.width, label).toBeLessThanOrEqual(screen.left - WIDE_MARGIN + EPSILON);
+        expect(subtitle.left, label).toBeCloseTo(Math.max(WIDE_MARGIN, Math.round(0.06 * viewport.width)), 3);
+        expect(subtitle.width, label).toBeLessThanOrEqual(520 + EPSILON);
+        expect(subtitle.width, label).toBeLessThanOrEqual(Math.max(280, 0.42 * viewport.width) + EPSILON);
+        expect(subtitle.height, label).toBeLessThanOrEqual(SUBTITLE_MAX_HEIGHT + EPSILON);
       }
     }
     expect([...kinds].sort()).toEqual(["narrow", "wide"]);
+  }, PROPERTY_TIMEOUT_MS);
+
+  it("wide layout frames the phone right of center, large, with the room and the choices to its left", () => {
+    const seed = 0xc17e0a11;
+    const next = createLcg(seed);
+    for (let index = 0; index < RUNS; index += 1) {
+      const viewport: Viewport = {
+        width: randomInt(next, NARROW_BREAKPOINT, MAX_WIDTH),
+        height: randomInt(next, MIN_HEIGHT, MAX_HEIGHT),
+      };
+      const layout = computeCallLayout(viewport);
+      const { screen, choice } = layout;
+      const label = `seed ${seed.toString(16)} case ${index}, viewport ${JSON.stringify(viewport)}, layout ${JSON.stringify(layout)}`;
+      expect(layout.kind, label).toBe("wide");
+      // Right of center, with a margin on the right.
+      expect(screen.left + screen.width / 2, label).toBeGreaterThanOrEqual(viewport.width / 2 - EPSILON);
+      if (viewport.width >= 900) expect(screen.left, label).toBeGreaterThanOrEqual(viewport.width / 2 - EPSILON);
+      expect(viewport.width - (screen.left + screen.width), label).toBeGreaterThanOrEqual(WIDE_MARGIN - EPSILON);
+      // Large: 82 percent of the height unless the width or the 720 px cap limits it.
+      const inset = Math.max(WIDE_MARGIN, Math.round(0.06 * viewport.width));
+      const widthCap = (viewport.width - 2 * inset - WIDE_MARGIN - 280) / SCREEN_ASPECT;
+      expect(screen.height, label).toBeGreaterThanOrEqual(Math.min(0.82 * viewport.height, 720, widthCap) - 1);
+      // Choices stay in the left column, in the lower half, and keep a minimum width.
+      expect(choice.left + choice.width, label).toBeLessThanOrEqual(screen.left - WIDE_MARGIN + EPSILON);
+      expect(choice.width, label).toBeGreaterThanOrEqual(280 - EPSILON);
+      expect(choice.width, label).toBeLessThanOrEqual(420 + EPSILON);
+      // Left edge at 6 percent of the width.
+      expect(choice.left, label).toBeCloseTo(inset, 3);
+    }
+  }, PROPERTY_TIMEOUT_MS);
+
+  it("wide layout: the choice region fits 4 compact cards when the height is at least 600, and never meets the subtitle or the phone", () => {
+    const seed = 0x4ca2d5;
+    const next = createLcg(seed);
+    for (let index = 0; index < RUNS; index += 1) {
+      const viewport: Viewport = {
+        width: randomInt(next, NARROW_BREAKPOINT, MAX_WIDTH),
+        height: randomInt(next, 600, MAX_HEIGHT),
+      };
+      const layout = computeCallLayout(viewport);
+      const { choice, subtitle, screen } = layout;
+      const label = `seed ${seed.toString(16)} case ${index}, viewport ${JSON.stringify(viewport)}, layout ${JSON.stringify(layout)}`;
+      // 4 cards of 44 px, 3 gaps of 6 px and 8 px of list padding.
+      expect(choice.height, label).toBeGreaterThanOrEqual(4 * 44 + 3 * 6 + 8);
+      expect(rectsIntersectArea(choice, subtitle), label).toBe(0);
+      expect(rectsIntersectArea(choice, screen), label).toBe(0);
+      expect(choice.top + choice.height, label).toBeLessThanOrEqual(subtitle.top + EPSILON);
+      // Two full subtitle lines plus the pill fit in the region.
+      expect(subtitle.height, label).toBeGreaterThanOrEqual(Math.min(84, viewport.height / 2 - 2 * WIDE_MARGIN));
+      expect(subtitle.top + subtitle.height, label).toBeLessThanOrEqual(viewport.height - 52 + EPSILON);
+    }
   }, PROPERTY_TIMEOUT_MS);
 
   // Feature: game-3d-phone-call-ui, Property 6: Pose and projection round trip

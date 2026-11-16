@@ -14,8 +14,11 @@ import { applyLocale } from "../../../i18n";
 import { getDisplayScenario } from "../../../i18n/narrative";
 import enStory from "../../../i18n/locales/en/chapter1/story";
 import viStory from "../../../i18n/locales/vi/chapter1/story";
-import { UI } from "../theme";
-import { PlayerChoiceOverlay } from "./PlayerChoiceOverlay";
+import enRoom from "../../../i18n/locales/en/chapter1/room";
+import viRoom from "../../../i18n/locales/vi/chapter1/room";
+import { CINE } from "../theme";
+import { choiceIconKind } from "./choiceIcon";
+import { CHOICE_CARD_CLASS, PlayerChoiceOverlay } from "./PlayerChoiceOverlay";
 
 const STORY = { en: enStory, vi: viStory } as const;
 const LOCALES: readonly GameLocale[] = ["en", "vi"];
@@ -157,21 +160,16 @@ describe.each(LOCALES)("PlayerChoiceOverlay (%s)", (locale) => {
 
     const buttons = within(overlay).getAllByRole("button");
     for (const button of buttons) {
-      expect(button.className).toBe(UI.choiceOption);
+      expect(button.className).toBe(CHOICE_CARD_CLASS);
       expect(button.className).toContain("whitespace-normal");
       expect(button.className).toContain("break-words");
-      const text = button.querySelector("span:last-child");
+      const text = button.querySelector("span.flex-1");
       expect(text?.className).toContain("whitespace-normal");
       expect(text?.className).toContain("break-words");
     }
-    // State classes of the shared token (hover, pressed, keyboard focus, disabled).
-    for (const token of [
-      "hover:bg-[#26233a]",
-      "active:bg-[#2f2a48]",
-      "focus-visible:outline-2",
-      "disabled:text-[#a9a4c4]",
-    ]) {
-      expect(UI.choiceOption).toContain(token);
+    // State classes of the card (keyboard focus, disabled).
+    for (const token of ["focus-visible:outline-2", "disabled:text-[#a9a4c4]"]) {
+      expect(CHOICE_CARD_CLASS).toContain(token);
     }
     // No truncation or ellipsis anywhere in the overlay.
     for (const element of [overlay, ...Array.from(overlay.querySelectorAll("*"))]) {
@@ -179,21 +177,26 @@ describe.each(LOCALES)("PlayerChoiceOverlay (%s)", (locale) => {
       expect(className).not.toMatch(/\b(truncate|text-ellipsis|line-clamp-\S+|whitespace-nowrap)\b/);
     }
     expect(overlay.style.overflowX).toBe("hidden");
-    expect(overlay.style.overflowY).toBe("auto");
+    // The root clips; the list inside is the scroller (so the hang-up can be pinned in it).
+    expect(overlay.style.overflowY).toBe("hidden");
+    expect((within(overlay).getByRole("list") as HTMLElement).style.overflowY).toBe("auto");
   });
 
   it("calls onSelectOption once with the option ID on click, Enter and Space (Req 4.1)", () => {
     setLocale();
     const view = viewFor(SCAM_OPEN, scenario);
-    const onSelectOption = vi.fn();
-    const { overlay } = renderOverlay({ view, onSelectOption });
-    const buttons = within(overlay).getAllByRole("button");
     const first = view.options[0];
     const last = view.options[view.options.length - 1];
 
-    fireEvent.click(buttons[0]);
-    expect(onSelectOption).toHaveBeenCalledTimes(1);
-    expect(onSelectOption).toHaveBeenLastCalledWith(first.id);
+    // Each pick hides the cards, so every activation gets its own mount.
+    {
+      const onSelectOption = vi.fn();
+      const { overlay, unmount } = renderOverlay({ view, onSelectOption });
+      fireEvent.click(within(overlay).getAllByRole("button")[0]);
+      expect(onSelectOption).toHaveBeenCalledTimes(1);
+      expect(onSelectOption).toHaveBeenLastCalledWith(first.id);
+      unmount();
+    }
 
     // Enter and Space use the native button activation: no key handler cancels it or selects on
     // its own. jsdom does not synthesize the activation click, so dispatch it as the browser would.
@@ -201,7 +204,9 @@ describe.each(LOCALES)("PlayerChoiceOverlay (%s)", (locale) => {
       { key: "Enter", code: "Enter" },
       { key: " ", code: "Space" },
     ]) {
-      onSelectOption.mockClear();
+      const onSelectOption = vi.fn();
+      const { overlay, unmount } = renderOverlay({ view, onSelectOption });
+      const buttons = within(overlay).getAllByRole("button");
       const target = buttons[buttons.length - 1];
       target.focus();
       expect(document.activeElement).toBe(target);
@@ -211,7 +216,93 @@ describe.each(LOCALES)("PlayerChoiceOverlay (%s)", (locale) => {
       fireEvent.click(target);
       expect(onSelectOption).toHaveBeenCalledTimes(1);
       expect(onSelectOption).toHaveBeenLastCalledWith(last.id);
+      unmount();
     }
+  });
+
+  it("selects with keys 1 to 3, moves with the arrow keys, and hides the cards after a pick", () => {
+    setLocale();
+    const view = viewFor(SCAM_OPEN, scenario);
+    expect(view.options.length).toBeGreaterThanOrEqual(2);
+    const onSelectOption = vi.fn();
+    const { overlay } = renderOverlay({ view, onSelectOption });
+
+    // The first card has focus and the selected highlight on open.
+    const buttons = within(overlay).getAllByRole("button");
+    expect(document.activeElement).toBe(buttons[0]);
+    expect(buttons[0].getAttribute("data-selected")).toBe("true");
+    // Arrow down moves focus and the highlight to the second card; arrow up wraps back.
+    fireEvent.keyDown(buttons[0], { key: "ArrowDown" });
+    expect(document.activeElement).toBe(buttons[1]);
+    expect(buttons[1].getAttribute("data-selected")).toBe("true");
+    expect(buttons[0].getAttribute("data-selected")).toBe("false");
+    fireEvent.keyDown(buttons[1], { key: "ArrowUp" });
+    expect(document.activeElement).toBe(buttons[0]);
+
+    // Number keys 1 to 3 pick the option at that position.
+    fireEvent.keyDown(window, { key: "2" });
+    expect(onSelectOption).toHaveBeenCalledTimes(1);
+    expect(onSelectOption).toHaveBeenLastCalledWith(view.options[1].id);
+
+    // The cards leave at once: no cards, no list, and a second key does nothing.
+    expect(within(overlay).queryAllByRole("button")).toHaveLength(0);
+    expect(within(overlay).queryByRole("list")).toBeNull();
+    fireEvent.keyDown(window, { key: "1" });
+    expect(onSelectOption).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the key-cap numbers 1 to N on the cards", () => {
+    setLocale();
+    const view = viewFor(SCAM_OPEN, scenario);
+    const { overlay } = renderOverlay({ view });
+    const buttons = within(overlay).getAllByRole("button");
+    buttons.forEach((button, index) => {
+      expect(button.querySelector("kbd")?.textContent).toBe(String(index + 1));
+    });
+  });
+
+  it("keeps every option reachable when the list overflows: a scrolling list, a hint, and the hang-up pinned", () => {
+    setLocale();
+    const base = viewFor(SCAM_OPEN, scenario);
+    const template = base.options[0];
+    const options = [
+      ...Array.from({ length: 5 }, (_, i) => ({ ...template, id: `x.extra-${i}`, text: `Reply ${i + 1}` })),
+      { ...template, id: "x.opt.hang-up", text: "Hang up" },
+    ];
+    // jsdom has no layout: report an overflowing list.
+    const scrollHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollHeight");
+    Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, get: () => 400 });
+    try {
+      const { overlay } = renderOverlay({ view: { ...base, options } });
+      const list = within(overlay).getByRole("list");
+      expect(list.getAttribute("data-scrolls")).toBe("true");
+      expect((list as HTMLElement).style.overflowY).toBe("auto");
+      expect(within(list).getAllByRole("button")).toHaveLength(6);
+      expect(within(overlay).getByTestId("choice-more").textContent).toBe(
+        locale === "en" ? enRoom.room.call.moreReplies : viRoom.room.call.moreReplies,
+      );
+      const pinned = list.querySelector('li[data-pinned="true"]') as HTMLElement | null;
+      expect(pinned).not.toBeNull();
+      expect(pinned?.style.position).toBe("sticky");
+      expect(pinned?.querySelector("button")?.getAttribute("data-testid")).toBe("dialogue-option-x.opt.hang-up");
+    } finally {
+      if (scrollHeight) Object.defineProperty(HTMLElement.prototype, "scrollHeight", scrollHeight);
+      else delete (HTMLElement.prototype as unknown as Record<string, unknown>).scrollHeight;
+    }
+  });
+
+  it("does not show the label as a visible row", () => {
+    setLocale();
+    const { overlay } = renderOverlay({ view: viewFor(SCAM_OPEN, scenario) });
+    expect(within(overlay).getByText(story.dialogue.optionsLabel).className).toContain("sr-only");
+  });
+
+  it("has no scroll hint when the list does not overflow", () => {
+    setLocale();
+    const view = viewFor(SCAM_OPEN, scenario);
+    const { overlay } = renderOverlay({ view: { ...view, options: view.options.slice(0, 3) } });
+    expect(within(overlay).queryByTestId("choice-more")).toBeNull();
+    expect(within(overlay).getByRole("list").getAttribute("data-scrolls")).toBe("false");
   });
 
   it("disables every option while paused and dispatches nothing (Req 4.7)", () => {
@@ -230,5 +321,60 @@ describe.each(LOCALES)("PlayerChoiceOverlay (%s)", (locale) => {
     expect(onSelectOption).not.toHaveBeenCalled();
     // No option takes focus while paused.
     expect(buttons).not.toContain(document.activeElement);
+  });
+});
+
+describe("PlayerChoiceOverlay icons and selection style (cinematic)", () => {
+  it("gives every card one icon whose kind comes from `choiceIconKind` of its option", () => {
+    applyLocale("en");
+    const view = viewFor(SCAM_OPEN, getDisplayScenario("en"));
+    const { overlay } = renderOverlay({ view });
+    const icons = within(overlay).getAllByTestId("choice-icon");
+    expect(icons).toHaveLength(view.options.length);
+    icons.forEach((icon, index) => {
+      expect(icon.getAttribute("aria-hidden")).toBe("true");
+      expect(icon.getAttribute("data-icon")).toBe(choiceIconKind(view.options[index]));
+      expect(icon.style.width).toBe(`${CINE.iconCirclePx}px`);
+      expect(icon.style.height).toBe(`${CINE.iconCirclePx}px`);
+    });
+  });
+
+  it("uses the same icons in English and Vietnamese", () => {
+    const kinds = (locale: GameLocale) => {
+      applyLocale(locale);
+      const view = viewFor(SCAM_OPEN, getDisplayScenario(locale));
+      const { overlay, unmount } = renderOverlay({ view });
+      const result = within(overlay).getAllByTestId("choice-icon").map((icon) => icon.getAttribute("data-icon"));
+      unmount();
+      return result;
+    };
+    expect(kinds("vi")).toEqual(kinds("en"));
+    applyLocale("en");
+  });
+
+  it("draws the selected card with a violet border and glow, the others darker with a hairline", () => {
+    applyLocale("en");
+    const view = viewFor(SCAM_OPEN, getDisplayScenario("en"));
+    const { overlay } = renderOverlay({ view });
+    const buttons = within(overlay).getAllByRole("button");
+    expect(buttons[0].getAttribute("data-selected")).toBe("true");
+    expect(buttons[0].style.boxShadow).toContain("118, 84, 214");
+    expect(buttons[0].style.borderColor).toContain("185, 165, 245");
+    expect(buttons[1].getAttribute("data-selected")).toBe("false");
+    expect(buttons[1].style.boxShadow === "" || buttons[1].style.boxShadow === "none").toBe(true);
+    expect(buttons[1].style.borderColor).toContain("255, 255, 255");
+    // Hover moves the selection style to the hovered card.
+    fireEvent.mouseEnter(buttons[1]);
+    expect(buttons[1].getAttribute("data-selected")).toBe("true");
+    expect(buttons[1].style.boxShadow).toContain("118, 84, 214");
+    expect(buttons[0].style.boxShadow === "" || buttons[0].style.boxShadow === "none").toBe(true);
+  });
+
+  it("anchors the cards to the bottom of the region (lower-left, above the subtitle)", () => {
+    applyLocale("en");
+    const view = viewFor(SCAM_OPEN, getDisplayScenario("en"));
+    const { overlay } = renderOverlay({ view });
+    expect(overlay.style.bottom).toContain(`${REGION.top + REGION.height}px`);
+    expect(overlay.style.top).toBe("");
   });
 });

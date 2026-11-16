@@ -49,6 +49,8 @@ const hud = {
   },
   objectives: {
     heading: "Objectives",
+    card: "Objective",
+    doneLabel: "Completed:",
     empty: "No active objectives",
   },
   toast: {
@@ -57,6 +59,8 @@ const hud = {
   },
   notice: {
     evidenceRecorded: "New evidence recorded:",
+    newEvidence: "New evidence",
+    addedToJournal: "Added to the Journal",
   },
   resume: {
     prompt: "Click to resume",

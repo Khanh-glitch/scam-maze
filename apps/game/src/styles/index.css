@@ -180,3 +180,8 @@ input, textarea, [contenteditable="true"] {
   from { opacity: 0; transform: translateY(6px); filter: blur(2px); }
   to { opacity: 1; transform: none; filter: none; }
 }
+/* The Ctrl / Esc footer strip steps aside while a call or its replies own the screen. The Chapter 1
+   layer sets `data-ui-mode` on its root; the footer is rendered by the host HUD. */
+:root:has([data-ui-mode="call"], [data-ui-mode="decision"]) [data-hud-footer-hints] {
+  display: none;
+}

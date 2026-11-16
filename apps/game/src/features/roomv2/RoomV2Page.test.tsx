@@ -31,7 +31,7 @@ import { RoomV2Page } from "./RoomV2Page";
 const settings = { graphicsQuality: "low" } as unknown as GameSettings;
 const story = { label: () => null } as unknown as RoomStoryPort;
 const baseUI = {
-  prompt: null, focus: false, captions: [], inspecting: null, locked: true,
+  prompt: null, anchor: null, focus: false, captions: [], inspecting: null, locked: true,
   fade: 0, ended: "answered", started: true, seated: false, cursorMode: false,
 };
 
