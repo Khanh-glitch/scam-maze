@@ -21,7 +21,9 @@
  * `FrontWheel`, `RearWheel`) and `BikeRider_LOD2` (child `Body`). Front is +Z, units as authored
  * (the bike is ~0.97 m long; the game scales it).
  *
- * Run from the workspace root: node apps/game/scripts/optimize-bike-rider.cjs
+ * Run from the workspace root: node apps/game/scripts/optimize-bike-rider.cjs [bike-rider|baothu]
+ * The `baothu` variant (the reckless rider) has the same 4 joints and the same output layout; it
+ * reads assets-src/vehicles/baothu/baothu_dream_animated.glb and writes baothu.optimized.glb.
  */
 
 const fs = require("fs");
@@ -31,8 +33,17 @@ const { ALL_EXTENSIONS } = require("@gltf-transform/extensions");
 const { prune, dedup, reorder, quantize, meshopt } = require("@gltf-transform/functions");
 const { MeshoptEncoder, MeshoptDecoder, MeshoptSimplifier } = require("meshoptimizer");
 
-const INPUT_PATH = path.resolve(__dirname, "../assets-src/vehicles/bike-rider/bike_rider_animated.glb");
-const OUTPUT_PATH = path.resolve(__dirname, "../public/assets/3d/optimized/bike-rider.optimized.glb");
+const VARIANTS = {
+  "bike-rider": { input: "../assets-src/vehicles/bike-rider/bike_rider_animated.glb", output: "../public/assets/3d/optimized/bike-rider.optimized.glb" },
+  baothu: { input: "../assets-src/vehicles/baothu/baothu_dream_animated.glb", output: "../public/assets/3d/optimized/baothu.optimized.glb" },
+};
+const VARIANT = process.argv[2] ?? "bike-rider";
+if (!VARIANTS[VARIANT]) {
+  console.error(`Unknown variant "${VARIANT}". Use one of: ${Object.keys(VARIANTS).join(", ")}`);
+  process.exit(1);
+}
+const INPUT_PATH = path.resolve(__dirname, VARIANTS[VARIANT].input);
+const OUTPUT_PATH = path.resolve(__dirname, VARIANTS[VARIANT].output);
 const MAX_OUTPUT_BYTES = 5_242_880;
 
 const PARTS = ["Chassis", "FrontWheel", "RearWheel", "Head"];
