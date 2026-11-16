@@ -24,7 +24,7 @@ import { mergeDevices, mergeHouseShells, mergeRigidParts } from './staticMerge';
 import { CharacterArmsViewmodel } from '../../player/runtime/CharacterArmsViewmodel';
 import { CharacterAssetCache } from '../../player/runtime/CharacterAssetCache';
 import { loadStreetProps, STORY_SPAWN, type PlacedProp } from './streetProps';
-import { loadBikeRider } from './bikeRider';
+import { loadBaoThu, loadBikeRider } from './bikeRider';
 import { HumanLibrary } from './humans';
 import { loadStreetFurniture, placeStreetFurniture } from './streetFurniture';
 import { findHome, inDoorway, HOME_FLOOR } from './home';
@@ -173,6 +173,7 @@ export class Engine {
       report('world'); await yieldFrame(); if (isCancelled()) return e;
       // The traffic model downloads while the neighborhood is built; without it the procedural bikes are used.
       const bikeRider = loadBikeRider().catch((err) => { console.warn('[khupho] bike rider failed to load', err); return null; });
+      const baothu = loadBaoThu().catch((err) => { console.warn('[khupho] reckless rider failed to load', err); return null; });
       // Character models (vendor, sidewalk walkers) load the same way; a model that fails falls back to a procedural person.
       const humans = HumanLibrary.load().catch((err) => { console.warn('[khupho] characters failed to load', err); return null; });
       // Stools, tables and parked bikes must be known before building: the builders record them instead of procedural ones.
@@ -182,7 +183,7 @@ export class Engine {
       e.home = findHome(e.houses);
       if (opts.story) e.player.teleport(STORY_SPAWN.x, STORY_SPAWN.z, STORY_SPAWN.yaw);
       report('life'); await yieldFrame(); if (isCancelled()) return e;
-      e.life = buildLife(e.ctx, e.houses, e.vehicles, e.audio, await bikeRider, await humans);
+      e.life = buildLife(e.ctx, e.houses, e.vehicles, e.audio, await bikeRider, await humans, await baothu);
       report('optimize'); await yieldFrame(); if (isCancelled()) return e;
       e.optimizeStatic();
       placeStreetFurniture(e.ctx.root);
