@@ -97,7 +97,7 @@ function renderedOptions(): RenderedOption[] {
   if (overlay === null) return [];
   return Array.from(overlay.querySelectorAll<HTMLButtonElement>("ol > li > button")).map((button) => {
     const testId = button.dataset.testid ?? "";
-    const label = button.querySelector("span:last-child");
+    const label = button.querySelector("span.flex-1");
     return {
       id: testId.replace(/^dialogue-option-/, ""),
       text: label?.textContent ?? "",

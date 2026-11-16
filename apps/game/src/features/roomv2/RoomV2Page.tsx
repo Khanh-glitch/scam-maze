@@ -24,12 +24,18 @@ interface RoomV2PageProps {
   story?: RoomStoryPort;
   /** Rendered inside the root, above the engine canvas and the room's own HUD (story HUD, dialogue, phone). */
   overlay?: React.ReactNode;
+  /**
+   * Story host: draws the interaction prompt next to the aimed prop (`anchor`, container pixels)
+   * instead of under the crosshair. Without it, or without an anchor, the crosshair prompt is used.
+   */
+  renderPrompt?: (prompt: string, anchor: { x: number; y: number }) => React.ReactNode;
 }
 
 type RoomQuality = "high" | "low";
 
 const INITIAL_UI: UIState = {
   prompt: null,
+  anchor: null,
   focus: false,
   captions: [],
   inspecting: null,
@@ -47,7 +53,7 @@ const SHADOW = { textShadow: "0 1px 6px rgba(0,0,0,.9)" } as const;
  * Prototype route `/roomv2`: the player's apartment, "After the Rain". It is a standalone engine
  * kept apart from the story chapters until it is integrated.
  */
-export const RoomV2Page: React.FC<RoomV2PageProps> = ({ settings, onBackToMenu, onReady, embedded = false, onUI, options, story, overlay }) => {
+export const RoomV2Page: React.FC<RoomV2PageProps> = ({ settings, onBackToMenu, onReady, embedded = false, onUI, options, story, overlay, renderPrompt }) => {
   const { t } = useTranslation("worlds");
   const mountRef = useRef<HTMLDivElement | null>(null);
   const engineRef = useRef<Engine | null>(null);
@@ -119,7 +125,9 @@ export const RoomV2Page: React.FC<RoomV2PageProps> = ({ settings, onBackToMenu, 
       {ui.started && (ui.locked || ui.cursorMode) && !ui.inspecting && !ui.ended && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className={`rounded-full transition-all duration-300 ${ui.focus ? "h-5 w-5 border border-white/70" : "h-1 w-1 bg-white/60"}`} />
-          {ui.prompt && (
+          {ui.prompt && ui.anchor && renderPrompt ? (
+            renderPrompt(ui.prompt, ui.anchor)
+          ) : ui.prompt && (
             <div className="absolute top-1/2 mt-7 flex items-center gap-2 text-[13px] tracking-wide text-white/85" style={SHADOW}>
               <span className={`${keyClass} text-white/80`}>E</span>
               {ui.prompt}

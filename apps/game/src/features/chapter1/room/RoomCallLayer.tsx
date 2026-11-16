@@ -1,5 +1,6 @@
 // The call UI of the room chapter (task 10.2). Mounts the unchanged `CallPresentation` with the
-// voice hooks, the per-call Speaker toggle and a Notes control. Presentation only: the only
+// voice hooks and the per-call Speaker toggle (the Notes chip lives in the HUD chip row of
+// `RoomChapterLayer`). Presentation only: the only
 // writes are the three dispatches the call UI already needs (ANSWER_CALL, END_CALL,
 // SELECT_DIALOGUE_OPTION). Voice and audio never change story state.
 //
@@ -7,15 +8,12 @@
 // `roomPresentation`; this component draws the caller info and controls (the phone screen) and,
 // outside the phone, the caller subtitle and the player's replies.
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { NotebookText } from "lucide-react";
-import { useTranslation } from "react-i18next";
 import type { GameSettings } from "@scammaze/shared-types";
 import type { ChapterStore } from "../../../game/narrative/store";
 import type { ScenarioDefinition } from "../../../game/narrative/types";
 import type { WebAudioEngine } from "../../../game/voice/webAudioEngine";
 import { CallPresentation } from "../call/CallPresentation";
 import { createPhoneScreenSink, type PhoneScreenSink } from "../call/phoneScreenSink";
-import { UI } from "../theme";
 import { useChapterState } from "../useChapterState";
 import { useCallAudio } from "../voice/useCallAudio";
 import { useCallDuration } from "../voice/useCallDuration";
@@ -35,8 +33,6 @@ export interface RoomCallLayerProps {
   /** Shared Web Audio engine for the call sounds, or null (tests, no audio support). */
   engine: WebAudioEngine | null;
   voiceDeps?: VoicePlaybackDeps;
-  /** Opens the journal without ending the call. */
-  onOpenNotes: () => void;
 }
 
 /**
@@ -74,9 +70,7 @@ export const RoomCallLayer: React.FC<RoomCallLayerProps> = ({
   screenSink: screenSinkProp,
   engine,
   voiceDeps,
-  onOpenNotes,
 }) => {
-  const { t } = useTranslation("chapter1");
   const call = useChapterState(store, (state) => state.call);
   const [ownSink] = useState(createPhoneScreenSink);
   const screenSink = screenSinkProp ?? ownSink;
@@ -141,27 +135,6 @@ export const RoomCallLayer: React.FC<RoomCallLayerProps> = ({
         subtitlesEnabled={settings.subtitlesEnabled}
         speaker={speaker}
       />
-      {call.status === "active" && !paused && (
-        <div
-          role="group"
-          aria-label={t("room.call.toolsLabel")}
-          data-testid="room-call-tools"
-          className="fixed right-4 top-4 z-40"
-          onMouseDown={(event) => event.stopPropagation()}
-        >
-          <button
-            type="button"
-            className={UI.buttonSecondary}
-            aria-label={t("room.call.notesLabel")}
-            aria-keyshortcuts="J"
-            data-testid="room-call-notes"
-            onClick={onOpenNotes}
-          >
-            <NotebookText className="h-4 w-4" aria-hidden="true" />
-            <span>{t("room.call.notes")}</span>
-          </button>
-        </div>
-      )}
     </>
   );
 };

@@ -100,8 +100,12 @@ const room = {
       hintPanelLabel: "Hint for the current objective",
       mouseKeyHint: "Use the mouse",
       mouseLockedHint: "Press Ctrl to use the mouse.",
+      controlsLabel: "Movement controls",
+      moveHint: "Move",
+      lookHint: "Look around",
     },
     call: {
+      moreReplies: "More replies are below. Scroll or use the arrow keys.",
       toolsLabel: "Call tools",
       notes: "Notes",
       notesLabel: "Open your notes. The call keeps going.",

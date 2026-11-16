@@ -52,11 +52,11 @@ export const SCREEN_CORNER_RATIO = 0.176;
 /** Viewports narrower than this use the narrow layout (same as Tailwind `sm`). */
 export const NARROW_BREAKPOINT = 640;
 /** The phone screen is never taller than this, in CSS pixels. */
-export const MAX_SCREEN_HEIGHT = 660;
+export const MAX_SCREEN_HEIGHT = 720;
 /** The wide layout keeps at least this width for the choice region, in CSS pixels. */
 export const MIN_CHOICE_WIDTH = 280;
-/** The subtitle region is never taller than this, in CSS pixels. */
-export const SUBTITLE_MAX_HEIGHT = 104;
+/** The wide subtitle region (name pill plus a bar of two lines) is never taller than this, in CSS pixels. */
+export const SUBTITLE_MAX_HEIGHT = 96;
 /** The narrow layout never gives the subtitle more than this, in CSS pixels (a long line scrolls). */
 export const NARROW_SUBTITLE_MAX_HEIGHT = 140;
 /** The narrow layout gives the subtitle at least this height when room allows, in CSS pixels. */
@@ -73,8 +73,26 @@ const NARROW_MIN_SCREEN_HEIGHT = 288;
  */
 const NARROW_SCREEN_HEIGHT_RATIO = 0.45;
 /** Leaves room above and below the glass so the whole phone body and its frame are visible. */
-const WIDE_SCREEN_HEIGHT_RATIO = 0.8;
-const MAX_CHOICE_WIDTH = 720;
+export const WIDE_SCREEN_HEIGHT_RATIO = 0.82;
+/** The wide subtitle ends this far above the bottom edge (clear of the Ctrl/Esc footer strip), in CSS pixels. */
+export const WIDE_BOTTOM_INSET = 56;
+/** Gap between the response cards and the subtitle region, in CSS pixels. */
+export const CHOICE_SUBTITLE_GAP = 12;
+/** The wide choice region starts at this share of the height (or lower), so 4 cards always fit. */
+export const WIDE_CHOICE_TOP_RATIO = 0.22;
+/** Height of 4 compact cards (44 px, gap 6 px) plus the list padding (8 px), in CSS pixels. */
+export const FOUR_CARDS_HEIGHT = 4 * 44 + 3 * 6 + 8;
+/** Largest width of the response cards, from `CINE.widthPx.choice` (kept literal: this module imports nothing). */
+export const MAX_CHOICE_WIDTH = 420;
+/** Largest width of the bottom-left subtitle, from `CINE.widthPx.subtitle`. */
+export const MAX_SUBTITLE_WIDTH = 520;
+/** The wide layout keeps the cards and the subtitle this share of the width from the left edge. */
+export const WIDE_LEFT_INSET_RATIO = 0.06;
+/** Share of the width that the response cards and the subtitle try to use (34 to 42 percent). */
+export const CHOICE_WIDTH_RATIO = 0.36;
+export const SUBTITLE_WIDTH_RATIO = 0.42;
+/** The wide layout leaves this share of the width to the right of the phone. */
+export const WIDE_RIGHT_INSET_RATIO = 0.06;
 /** Guard so the screen anchor can never reach the camera near plane (0.05 m). */
 const MIN_POSE_DISTANCE_M = 0.06;
 
@@ -126,37 +144,39 @@ export function computeCallLayout(viewport: Viewport): CallLayout {
     };
   }
 
+  // Cinematic framing: the phone sits right of center and large, and the left of the room stays
+  // visible. The subtitle (name pill plus a bar) stands bottom-left with its left edge at 6
+  // percent of the width. The response cards stand above it in the lower-left, bottom-anchored.
   const m = WIDE_MARGIN;
+  const rightInset = Math.max(m, Math.round(WIDE_RIGHT_INSET_RATIO * W));
+  const leftInset = Math.max(m, Math.round(WIDE_LEFT_INSET_RATIO * W));
   const height = Math.min(
     WIDE_SCREEN_HEIGHT_RATIO * H,
     MAX_SCREEN_HEIGHT,
-    (W - 3 * m - MIN_CHOICE_WIDTH) / SCREEN_ASPECT,
+    (W - leftInset - m - rightInset - MIN_CHOICE_WIDTH) / SCREEN_ASPECT,
   );
   const width = height * SCREEN_ASPECT;
-  const choiceWidth = Math.min(W - 3 * m - width, MAX_CHOICE_WIDTH);
-  const choice: Rect = {
-    left: m,
-    top: H / 2,
-    width: choiceWidth,
-    height: H / 2 - m,
-  };
-  // The subtitle sits in the left column directly above the choice region.
+  const screen = screenRectOfHeight(height, W - rightInset - width, (H - height) / 2);
+  const freeWidth = screen.left - m - leftInset;
+
   const subtitleHeight = Math.min(SUBTITLE_MAX_HEIGHT, Math.max(0, H / 2 - 2 * m));
+  const subtitleWidth = Math.min(freeWidth, MAX_SUBTITLE_WIDTH, Math.max(MIN_CHOICE_WIDTH, SUBTITLE_WIDTH_RATIO * W));
+  // The subtitle ends WIDE_BOTTOM_INSET above the bottom edge, clear of the Ctrl/Esc footer strip.
   const subtitle: Rect = {
-    left: m,
-    top: H / 2 - m - subtitleHeight,
-    width: choice.width,
+    left: leftInset,
+    top: H - WIDE_BOTTOM_INSET - subtitleHeight,
+    width: subtitleWidth,
     height: subtitleHeight,
   };
-  // Center the screen in the space right of the choice region (between its right edge plus
-  // one margin and the viewport right edge minus one margin), and vertically in the viewport.
-  const spaceLeft = choice.left + choice.width + m;
-  const spaceRight = W - m;
-  const screen = screenRectOfHeight(
-    height,
-    spaceLeft + (spaceRight - spaceLeft - width) / 2,
-    (H - height) / 2,
-  );
+  // The cards stand right above the subtitle and may start high: room for 4 cards and narration.
+  const choiceBottom = subtitle.top - CHOICE_SUBTITLE_GAP;
+  const choiceTop = Math.min(choiceBottom, Math.max(m, Math.round(WIDE_CHOICE_TOP_RATIO * H)));
+  const choice: Rect = {
+    left: leftInset,
+    top: choiceTop,
+    width: Math.min(freeWidth, MAX_CHOICE_WIDTH, Math.max(MIN_CHOICE_WIDTH, CHOICE_WIDTH_RATIO * W)),
+    height: Math.max(0, choiceBottom - choiceTop),
+  };
   return {
     kind: "wide",
     screen,

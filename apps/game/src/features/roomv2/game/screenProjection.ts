@@ -79,3 +79,45 @@ export function cornersChanged(a: ArrayLike<number>, b: ArrayLike<number>, toler
   for (let i = 0; i < 8; i++) if (Math.abs(a[i] - b[i]) > tolerance) return true;
   return false;
 }
+
+/** A projected world point in CSS pixels, relative to the engine container. */
+export interface PromptAnchor {
+  x: number;
+  y: number;
+}
+
+/** Distance (px) the anchored prompt must move before the engine reports it again. */
+export const ANCHOR_TOLERANCE_PX = 0.5;
+
+/** True when the anchor appeared, disappeared or moved by more than `tolerance` pixels. */
+export function anchorMoved(prev: PromptAnchor | null, nextX: number | null, nextY: number | null, tolerance: number): boolean {
+  if (nextX === null || nextY === null) return prev !== null;
+  if (prev === null) return true;
+  return Math.abs(prev.x - nextX) > tolerance || Math.abs(prev.y - nextY) > tolerance;
+}
+
+/**
+ * Where to draw a prompt box of `width` x `height` next to an anchor: to the right of it with a
+ * short `offset`, flipped to the left side when it would leave the viewport, vertically centered
+ * on the anchor, and always inside the viewport with `margin` pixels to spare.
+ */
+export function placePrompt(
+  anchorX: number,
+  anchorY: number,
+  viewportWidth: number,
+  viewportHeight: number,
+  width: number,
+  height: number,
+  offset: number,
+  margin: number,
+): { left: number; top: number } {
+  let left = anchorX + offset;
+  if (left + width > viewportWidth - margin) left = anchorX - offset - width;
+  const maxLeft = Math.max(margin, viewportWidth - margin - width);
+  const maxTop = Math.max(margin, viewportHeight - margin - height);
+  const top = anchorY - height / 2;
+  return {
+    left: Math.min(Math.max(left, margin), maxLeft),
+    top: Math.min(Math.max(top, margin), maxTop),
+  };
+}

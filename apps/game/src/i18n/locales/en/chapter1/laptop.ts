@@ -7,6 +7,7 @@ const laptop = {
     back: "Back",
     home: "Home",
     appsLabel: "Apps",
+    windowTitle: "Northgate Bank",
     clock: "23:09",
     apps: {
       notifications: "Notifications",

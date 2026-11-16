@@ -21,9 +21,10 @@
  * stops being free, and 0 disables it.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Lightbulb, NotebookText } from "lucide-react";
+import { NotebookText } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { GameSettings } from "@scammaze/shared-types";
+import { useReducedMotion } from "../../../components/ui/useReducedMotion";
 import type { ChapterSession } from "../../../game/chapters/chapterSession";
 import type { ClaimId, DeductionId, DeviceActionId, EvidenceId, InteractableId, ObjectiveId } from "../../../game/narrative/chapter1/ids";
 import { createInitialState } from "../../../game/narrative/reducer";
@@ -32,6 +33,7 @@ import {
   selectClaimStatuses,
   selectCombinationOptions,
   selectDecisionPanel,
+  selectDialogueView,
   selectJournalEntries,
   selectLaptopView,
   selectPhoneMessages,
@@ -63,7 +65,9 @@ import { EvidenceJournal } from "../journal/EvidenceJournal";
 import { relatedDeductionStatements } from "../journal/relatedDeductions";
 import { EMPTY_OVERLAYS, isOpen, pop, push, top, type Overlay, type OverlayKind, type OverlayStack } from "../overlays";
 import { PhoneOverlay } from "../phone/PhoneOverlay";
-import { UI } from "../theme";
+import { CINE, CINE_KEYCAP_STYLE, cinePanelStyle } from "../theme";
+import { MovementHints } from "../hud/MovementHints";
+import { deriveUiMode } from "./uiMode";
 import { useChapterState } from "../useChapterState";
 import { useCheckpointSaver } from "../useCheckpointSaver";
 import type { VoicePlaybackDeps } from "../voice/useVoicePlayback";
@@ -100,6 +104,11 @@ const PROP_TO_OBJECT: Partial<Record<RoomPropId, InteractableId>> = {
 };
 
 const INTRO_CONTROLS = ["move", "look", "interact", "journal"] as const;
+
+/** Small translucent key-cap chip of the cinematic UI (Journal, hints). Colors come from `CINE`. */
+const HUD_CHIP_CLASS =
+  "relative flex items-center gap-2 py-1 pl-1.5 pr-3 font-medium cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b9a5f5]";
+const HUD_CHIP_STYLE = { ...cinePanelStyle(), borderRadius: CINE.radiusPx.chip, fontSize: CINE.fontPx.small } as const;
 
 export interface RoomLayerApi {
   store: ChapterStore;
@@ -673,6 +682,33 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
     document.exitPointerLock?.();
   }, [anyOverlay, bridge, engineReady, overlays, blocking]);
 
+  // "Press Ctrl to use the mouse": shown for `CINE.mouseHintMs` after the pointer lock starts or an
+  // overlay closes, then it fades out (reduced motion: it just disappears). The next lock shows it
+  // again. Presentation only.
+  const reducedMotionPref = useReducedMotion();
+  const mouseHintEligible = pointerLocked && !anyOverlay;
+  const [mouseHintPhase, setMouseHintPhase] = useState<"hidden" | "shown" | "fading">("hidden");
+  useEffect(() => {
+    if (!mouseHintEligible) {
+      setMouseHintPhase("hidden");
+      return undefined;
+    }
+    setMouseHintPhase("shown");
+    let fadeId: number | undefined;
+    const id = window.setTimeout(() => {
+      if (reducedMotionPref) {
+        setMouseHintPhase("hidden");
+        return;
+      }
+      setMouseHintPhase("fading");
+      fadeId = window.setTimeout(() => setMouseHintPhase("hidden"), CINE.motion.baseMs);
+    }, CINE.mouseHintMs);
+    return () => {
+      window.clearTimeout(id);
+      if (fadeId !== undefined) window.clearTimeout(fadeId);
+    };
+  }, [mouseHintEligible, reducedMotionPref]);
+
   // --- Rings: only while the room is free ---------------------------------------------------
   const ringableSelector = useCallback((state: ChapterState) => selectRingableCall(state, scenario), [scenario]);
   const ringable = useChapterState(store, ringableSelector);
@@ -692,7 +728,8 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
     return () => window.clearTimeout(id);
   }, [free, ringable, ringSettleMs, store]);
 
-  // --- Keys: Escape (capture), J, Tab trap --------------------------------------------------
+  // --- Keys: Escape (capture), J, H, Tab trap -----------------------------------------------
+  const [hintOn, setHintOn] = useState(false);
   const [decideRequest, setDecideRequest] = useState(0);
   const handleDecide = useCallback(() => {
     onOpenDecision?.();
@@ -734,6 +771,11 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
       if (event.code === "KeyJ") {
         event.preventDefault();
         toggleJournal();
+      } else if (event.code === "KeyH") {
+        // Hints are a HUD toggle only: no story state changes.
+        if (store.getState().status !== "playing" || overlaysRef.current.length > 0) return;
+        event.preventDefault();
+        setHintOn((on) => !on);
       }
     };
     const onTab = (event: KeyboardEvent) => {
@@ -751,7 +793,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keydown", onTab);
     };
-  }, [canClose, closeTop, toggleJournal]);
+  }, [canClose, closeTop, store, toggleJournal]);
 
   // Focus returns to the element that opened the overlay when it closes (Requirement 22.1).
   const previousOverlaysRef = useRef<OverlayStack>(EMPTY_OVERLAYS);
@@ -792,8 +834,21 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
   const chapterState = useChapterState(store);
   const relatedDeductions = useMemo(() => relatedDeductionStatements(chapterState, scenario), [chapterState, scenario]);
 
+  const callStatus = useChapterState(store, (state) => state.call.status);
+  const hasReplyOptions = useChapterState(store, (state) => {
+    const view = selectDialogueView(state, scenario);
+    return view !== null && view.options.length > 0;
+  });
+  const uiMode = deriveUiMode({
+    callStatus,
+    hasReplyOptions,
+    overlayKind: top(overlays)?.kind ?? null,
+    inspecting,
+  });
+  const callFocused = uiMode === "call" || uiMode === "decision";
+  const trackerHidden = callFocused || uiMode === "investigation" || overlays.length > 0;
+
   const { toast, notice, announcements, completed, dismissToast, dismissNotice } = useHudNotices(store);
-  const [hintOn, setHintOn] = useState(false);
   const currentHint = activeObjectives.find((objective) => objective.hint !== undefined)?.hint ?? null;
 
   // --- Overlay content ----------------------------------------------------------------------
@@ -865,6 +920,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
   const stopMouseDown = useCallback((event: React.MouseEvent) => event.stopPropagation(), []);
   const hudVisible = !introOpen && status === "playing";
   const journalUnread = Math.max(0, discoveredCount - journalSeen);
+  const completedObjective = completed !== null && Object.hasOwn(scenario.objectives, completed) ? scenario.objectives[completed] : null;
   const objectiveText = (id: ObjectiveId): string => (Object.hasOwn(scenario.objectives, id) ? scenario.objectives[id].text : id);
 
   const announcementText = (item: Announcement): string => {
@@ -891,7 +947,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
   return (
     <ScreenQuadContext.Provider value={screenSource}>
     <ComfortProvider settings={settings}>
-      <div data-testid="room-chapter-layer" className="contents">
+      <div data-testid="room-chapter-layer" data-ui-mode={uiMode} className="contents">
         {/* Polite live region: new notification, new evidence, recorded deduction (Requirement 22.2). */}
         <div role="status" aria-live="polite" aria-atomic="false" className="sr-only" data-testid="room-live-region">
           {announcements.map((item) => (
@@ -901,46 +957,58 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
 
         {hudVisible && (
           <>
-            <div className="pointer-events-none absolute left-4 top-4 z-10">
+            <div
+              className="pointer-events-none absolute left-4 top-4 z-10"
+              data-testid="objective-tracker-slot"
+              style={{
+                // The call, its replies, the laptop, the phone records and the journal own the
+                // screen: the tracker steps aside, then returns.
+                opacity: trackerHidden ? 0 : 1,
+                visibility: trackerHidden ? "hidden" : "visible",
+                transition: `opacity ${CINE.motion.baseMs}ms ${CINE.motion.ease}, visibility ${CINE.motion.baseMs}ms`,
+              }}
+            >
               <ObjectiveTracker
                 objectives={activeObjectives}
                 store={store}
                 scenario={scenario}
                 announcement={completed === null ? null : text("room.objectiveToast.done", { objective: objectiveText(completed) })}
+                completed={completedObjective ? [completedObjective] : []}
+                hint={currentHint}
+                hintOn={hintOn}
               />
             </div>
 
             {/* Visual only: the live region above announces the same events once. */}
             <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-4 z-10 flex -translate-x-1/2 flex-col items-center gap-2">
               {toast && <ObjectiveToast key={toast.key} kind={toast.kind} text={objectiveText(toast.objectiveId)} onDismiss={dismissToast} />}
-              {notice && (
-                <EvidenceNotice
-                  key={notice.key}
-                  title={Object.hasOwn(scenario.evidence, notice.evidenceId) ? scenario.evidence[notice.evidenceId].title : notice.evidenceId}
-                  onDismiss={dismissNotice}
-                />
-              )}
             </div>
 
-            <div className="absolute right-4 top-4 z-10 flex flex-col items-end gap-2" onMouseDown={stopMouseDown}>
-              <div className="flex gap-3">
+            {/* During a call the chip row rises above the call presentation (z-40) so Notes is reachable. */}
+            <div
+              className="absolute right-4 top-4 z-10 flex flex-col items-end gap-2"
+              style={callFocused ? { zIndex: 45 } : undefined}
+              data-testid="hud-chip-row"
+              onMouseDown={stopMouseDown}
+            >
+              <div className="flex gap-2">
                 <button
                   type="button"
-                  className={`${UI.buttonSecondary} relative`}
+                  className={HUD_CHIP_CLASS}
+                  style={HUD_CHIP_STYLE}
                   aria-pressed={isOpen(overlays, "journal")}
                   aria-keyshortcuts="J"
                   onClick={toggleJournal}
                 >
-                  <NotebookText className="h-4 w-4" aria-hidden="true" />
-                  <span>{text("hud.journal")}</span>
-                  <kbd aria-hidden="true" className="rounded border border-[#38344f] px-1.5 font-mono text-xs text-[#a9a4c4]">
+                  <kbd aria-hidden="true" className="inline-flex items-center justify-center font-mono" style={CINE_KEYCAP_STYLE}>
                     J
                   </kbd>
+                  <span>{text("hud.journal")}</span>
                   {journalUnread > 0 && (
                     <>
                       <span
                         aria-hidden="true"
-                        className="absolute -right-2 -top-2 min-w-5 rounded-full bg-[#f2b24b] px-1.5 text-center text-xs font-bold leading-5 text-[#171521]"
+                        className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full bg-[#f2b24b] px-1.5 text-center text-xs font-bold leading-5 text-[#171521]"
                       >
                         {journalUnread}
                       </span>
@@ -950,23 +1018,73 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
                     </>
                   )}
                 </button>
-                <button type="button" className={UI.buttonSecondary} aria-pressed={hintOn} onClick={() => setHintOn((on) => !on)}>
-                  <Lightbulb className="h-4 w-4" aria-hidden="true" />
-                  <span>{hintOn ? text("room.hints.hide") : text("room.hints.show")}</span>
+                <button
+                  type="button"
+                  className={HUD_CHIP_CLASS}
+                  style={HUD_CHIP_STYLE}
+                  aria-pressed={hintOn}
+                  aria-keyshortcuts="H"
+                  aria-label={hintOn ? text("room.hints.hide") : text("room.hints.show")}
+                  data-testid="hud-hints-chip"
+                  onClick={() => setHintOn((on) => !on)}
+                >
+                  <kbd aria-hidden="true" className="inline-flex items-center justify-center font-mono" style={CINE_KEYCAP_STYLE}>
+                    H
+                  </kbd>
+                  <span aria-hidden="true">{text("room.hints.heading")}</span>
                 </button>
+                {/* Only while a call is active and nothing is on top of it. Same chip style as Journal and Hint. */}
+                {callStatus === "active" && overlays.length === 0 && (
+                  <button
+                    type="button"
+                    className={HUD_CHIP_CLASS}
+                    style={HUD_CHIP_STYLE}
+                    aria-label={text("room.call.notesLabel")}
+                    aria-keyshortcuts="J"
+                    data-testid="room-call-notes"
+                    onClick={openJournal}
+                  >
+                    <NotebookText className="ml-1 h-4 w-4" aria-hidden="true" />
+                    <span>{text("room.call.notes")}</span>
+                  </button>
+                )}
               </div>
-              {pointerLocked && !anyOverlay && (
-                <p className={`${UI.hudPanel} max-w-xs`} role="note" data-testid="room-mouse-hint">
+              {mouseHintPhase !== "hidden" && (
+                <p
+                  className="px-3 py-2"
+                  style={{
+                    ...cinePanelStyle(),
+                    maxWidth: CINE.widthPx.toast,
+                    fontSize: CINE.fontPx.body,
+                    opacity: mouseHintPhase === "fading" ? 0 : 1,
+                    transition: reducedMotionPref ? "none" : `opacity ${CINE.motion.baseMs}ms ${CINE.motion.ease}`,
+                  }}
+                  role="note"
+                  data-testid="room-mouse-hint"
+                >
                   {text("room.hud.mouseLockedHint")}
                 </p>
               )}
-              {hintOn && (
-                <p className={`${UI.hudPanel} max-w-xs`} role="note" aria-label={text("room.hud.hintPanelLabel")} data-testid="room-hint">
-                  <span className={UI.label}>{text("room.hints.heading")}</span>
-                  <span className="mt-1 block">{currentHint ?? text("room.hints.none")}</span>
-                </p>
-              )}
             </div>
+
+            {/* Visual only (the live region above announces it). Above the laptop and phone surface
+                (z-index from `CINE.toast`), never takes clicks, and sits under the chip row. */}
+            {notice && (
+              <div
+                aria-hidden="true"
+                data-testid="evidence-notice-slot"
+                className="pointer-events-none absolute right-4"
+                style={{ top: mouseHintPhase !== "hidden" ? 112 : 64, zIndex: CINE.toast.zIndex }}
+              >
+                <EvidenceNotice
+                  key={notice.key}
+                  title={Object.hasOwn(scenario.evidence, notice.evidenceId) ? scenario.evidence[notice.evidenceId].title : notice.evidenceId}
+                  onDismiss={dismissNotice}
+                />
+              </div>
+            )}
+
+            <MovementHints active={uiMode === "exploration" && overlays.length === 0 && !introOpen} />
           </>
         )}
 
@@ -989,7 +1107,6 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
             screenSink={callSink}
             engine={engine}
             voiceDeps={voiceDeps}
-            onOpenNotes={openJournal}
           />
           {overlays.map((overlay) => (
             <React.Fragment key={overlay.kind}>{renderOverlay(overlay)}</React.Fragment>
@@ -1011,7 +1128,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
         </div>
 
         {saveFailed && (
-          <div className="absolute right-4 top-20 z-50" onMouseDown={stopMouseDown}>
+          <div className="absolute bottom-4 right-4 z-50" onMouseDown={stopMouseDown}>
             <SaveFailureNotice onDismiss={() => setSaveFailed(false)} />
           </div>
         )}
