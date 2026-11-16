@@ -597,7 +597,7 @@ class Bike {
       this.g.traverse((o) => { o.castShadow = true; });
     }
     this.dir = dir; this.lane = dir > 0 ? 1.8 + r() * 0.5 : -1.8 - r() * 0.5; this.x = x; this.base = 4.5 + r() * 5;
-    if (this.reckless) { this.base = RECKLESS_SPEED[0] + Math.random() * (RECKLESS_SPEED[1] - RECKLESS_SPEED[0]); this.stuntIn = 3 + Math.random() * 5; }
+    if (this.reckless) { this.base = RECKLESS_SPEED[0] + Math.random() * (RECKLESS_SPEED[1] - RECKLESS_SPEED[0]); this.stuntIn = 2 + Math.random() * 4; }
     this.g.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2; ctx.root.add(this.g);
     this.info = { pos: this.g.position, speed: 0 }; vehicles.push(this.info);
     this.prevLat = this.lane;
@@ -833,8 +833,14 @@ export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vect
   seat(20.6, 0.02, 45.8, Math.PI, 'sit', { elder: true }, [6, 22], 'npcFreya');
   statics.push(new Static(ctx, r, 10.3, 0.02, 14.0, -Math.PI / 2, 'sweep', {}, [5.5, 7.2]));
   statics.push(new Static(ctx, r, 15.3, 0.02, 45.0, 0, 'phone', { kid: true }, [15.5, 22]));
-  // Two of the twelve riders are the reckless one (one per direction), picked at random each visit; without its model there are none.
-  const recklessAt = new Set<number>(baothu ? [Math.floor(Math.random() * 6) * 2, Math.floor(Math.random() * 6) * 2 + 1] : []);
+  // Four of the twelve riders are the reckless one (two per direction), picked at random each visit; without his model there are none.
+  const recklessAt = new Set<number>();
+  if (baothu) {
+    for (const parity of [0, 1]) {
+      const slots = [0, 1, 2, 3, 4, 5].sort(() => Math.random() - 0.5).slice(0, 2);
+      for (const k of slots) recklessAt.add(k * 2 + parity);
+    }
+  }
   for (let i = 0; i < 12; i++) {
     const wild = recklessAt.has(i);
     bikes.push(new Bike(ctx, r, i % 2 ? 1 : -1, -70 + i * 12 + r() * 6, vehicles, wild ? baothu : bikeRider, wild));
