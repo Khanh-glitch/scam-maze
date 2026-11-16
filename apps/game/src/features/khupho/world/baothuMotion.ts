@@ -5,13 +5,13 @@
 export type StuntKind = "wheelie" | "weave";
 
 export const WHEELIE_SECONDS = 3.2;
-export const WEAVE_SECONDS = 3;
+export const WEAVE_SECONDS = 3.6;
 /** Pitch of a full wheelie (about 32 degrees). */
 export const WHEELIE_PITCH = 0.56;
 /** Sideways swing of a weave, each way (m). */
-export const WEAVE_AMPLITUDE = 0.6;
+export const WEAVE_AMPLITUDE = 0.75;
 /** Number of full left-right swings in a weave. */
-export const WEAVE_SWINGS = 2;
+export const WEAVE_SWINGS = 3;
 
 /** Smooth 0..1 ramp. */
 const smooth = (x: number) => {
@@ -36,18 +36,18 @@ export function weaveOffset(t: number): number {
 export const stuntSeconds = (kind: StuntKind) => (kind === "wheelie" ? WHEELIE_SECONDS : WEAVE_SECONDS);
 
 /** Seconds of calm riding between two stunts: [min, max]. */
-export const STUNT_PAUSE: [number, number] = [7, 16];
+export const STUNT_PAUSE: [number, number] = [3, 8];
 /** A stunt starts only with at least this much free road ahead (m) of the player and of the next bike in its way. */
 export const STUNT_FREE_PLAYER = 22;
 export const STUNT_FREE_BIKE = 14;
 /** Share of stunts that are wheelies. */
-export const WHEELIE_SHARE = 0.55;
+export const WHEELIE_SHARE = 0.35;
 
 /** Picks the next stunt from a random number in [0, 1). */
 export const pickStunt = (random: number): StuntKind => (random < WHEELIE_SHARE ? "wheelie" : "weave");
 
 /** Sideways offset (m, toward the road center) a bike takes to pass a slower bike. */
-export const PASS_OFFSET = 1.35;
+export const PASS_OFFSET = 1.8;
 
 /** Engine shake while revving: small vertical jitter (m) and pitch rock (rad) at time `t`. */
 export function revShake(t: number): { lift: number; rock: number } {
