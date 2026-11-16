@@ -3,6 +3,7 @@ import { act, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GameLocale } from "@scammaze/shared-types";
 import { applyLocale } from "../../../i18n";
+import { CINE } from "../theme";
 import enPhone from "../../../i18n/locales/en/chapter1/phone";
 import viPhone from "../../../i18n/locales/vi/chapter1/phone";
 import type { SubtitleContent } from "./callDialogueView";
@@ -95,18 +96,19 @@ describe.each(LOCALES)("CallSubtitleOverlay (%s)", (locale) => {
 describe("CallSubtitleOverlay behavior", () => {
   it("is empty and transparent when not visible and there is no notice", () => {
     render(<CallSubtitleOverlay {...props({ visible: false })} />);
-    const root = screen.getByTestId("call-subtitle-overlay");
+    const bar = screen.getByTestId("call-subtitle-bar");
     expect(screen.getByTestId("call-subtitle-region").textContent).toBe("");
     expect(screen.getByTestId("call-notice").textContent).toBe("");
-    expect(root.className).toContain("bg-transparent");
-    expect(root.className).toContain("border-transparent");
+    expect(bar.className).toContain("bg-transparent");
+    expect(bar.className).toContain("border-transparent");
+    expect(screen.queryByTestId("call-subtitle-speaker")).toBeNull();
   });
 
   it("hides the connecting text when not visible, but keeps the notice", () => {
     render(<CallSubtitleOverlay {...props({ content: { kind: "connecting" }, visible: false, notice: "no-audio" })} />);
     expect(screen.getByTestId("call-subtitle-region").textContent).toBe("");
     expect(screen.getByTestId("call-notice").textContent).toBe(enPhone.phone.call.notice.noAudio);
-    expect(screen.getByTestId("call-subtitle-overlay").className).not.toContain("bg-transparent");
+    expect(screen.getByTestId("call-subtitle-bar").className).not.toContain("bg-transparent");
   });
 
   it("keeps the same live region elements across a rerender", () => {
@@ -134,7 +136,13 @@ describe("CallSubtitleOverlay behavior", () => {
     render(<CallSubtitleOverlay {...props({ content: { ...LINE_A, text: long } as SubtitleContent })} />);
     const root = screen.getByTestId("call-subtitle-overlay");
     expect(root.style.maxHeight).toBe(`${REGION.height}px`);
-    expect(root.style.overflowY).toBe("auto");
+    // The bar shows two lines, then the text scrolls inside it.
+    const scroller = screen.getByTestId("call-subtitle-scroller");
+    expect(scroller.style.overflowY).toBe("auto");
+    // Two full lines PLUS the top padding (the box is border-box, so the padding is not text room).
+    expect(parseFloat(scroller.style.maxHeight)).toBe(
+      Math.round(CINE.fontPx.subtitle * CINE.subtitle.lineHeight) * CINE.subtitleVisibleLines + Math.round(CINE.subtitle.pillHeightPx / 4),
+    );
     const line = screen.getByTestId("call-subtitle-line");
     expect(line.textContent).toBe(long);
     expect(line.className).not.toMatch(/truncate|line-clamp|text-ellipsis/);
@@ -153,5 +161,58 @@ describe("CallSubtitleOverlay behavior", () => {
     expect(screen.getByTestId("call-subtitle-line").parentElement?.style.animation).toBe("");
     expect(container.querySelector("style")).toBeNull();
     expect(container.innerHTML).not.toContain("scammaze-subtitle-in");
+  });
+});
+
+describe("CallSubtitleOverlay placement (cinematic)", () => {
+  it("anchors to the bottom edge of its region, left aligned, outside the phone", () => {
+    render(<CallSubtitleOverlay {...props()} />);
+    const root = screen.getByTestId("call-subtitle-overlay");
+    // Bottom anchored: a short line sits at the bottom of the region, not at its top.
+    expect(root.style.bottom).toContain(`${REGION.top + REGION.height}px`);
+    expect(root.style.top).toBe("");
+    expect(root.className).toContain("text-left");
+    expect(root.style.left).toBe(`${REGION.left}px`);
+    expect(root.style.width).toBe(`${REGION.width}px`);
+  });
+
+  it("is a compact translucent panel, with the speaker name smaller than the line", () => {
+    render(<CallSubtitleOverlay {...props()} />);
+    const bar = screen.getByTestId("call-subtitle-bar");
+    expect(bar.style.backdropFilter).toContain("blur");
+    expect(bar.style.background).toContain("rgba(");
+    const line = screen.getByTestId("call-subtitle-line");
+    const speaker = screen.getByText("Caller A");
+    expect(parseFloat(speaker.style.fontSize)).toBeLessThan(parseFloat(line.style.fontSize));
+    // Never below the minimum effective text size.
+    expect(parseFloat(speaker.style.fontSize)).toBeGreaterThanOrEqual(13);
+  });
+});
+
+describe("CallSubtitleOverlay speaker pill and scroll hint", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("shows the speaker in a violet pill on the top-left of the bar, inside the live region", () => {
+    render(<CallSubtitleOverlay {...props()} />);
+    const pill = screen.getByTestId("call-subtitle-speaker");
+    expect(pill.textContent).toBe("Caller A");
+    expect(pill.style.background).toContain("118, 84, 214");
+    expect(parseFloat(pill.style.top)).toBeLessThan(0);
+    expect(screen.getByTestId("call-subtitle-region").contains(pill)).toBe(true);
+    expect(screen.getByTestId("call-subtitle-bar").contains(pill)).toBe(true);
+  });
+
+  it("shows a chevron only while more text is below the visible lines", () => {
+    // jsdom has no layout: report a 200 px text in a 48 px scroller for the first render only.
+    const scrollHeight = vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(200);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(48);
+    const { rerender } = render(<CallSubtitleOverlay {...props()} />);
+    expect(screen.getByTestId("call-subtitle-more").getAttribute("aria-hidden")).toBe("true");
+    // The whole text fits: no chevron.
+    scrollHeight.mockReturnValue(48);
+    rerender(<CallSubtitleOverlay {...props({ content: LINE_B })} />);
+    expect(screen.queryByTestId("call-subtitle-more")).toBeNull();
   });
 });

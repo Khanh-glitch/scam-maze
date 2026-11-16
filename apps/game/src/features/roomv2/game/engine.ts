@@ -14,7 +14,7 @@ import { clock, type LaptopFrame, type PhoneMode } from './screens';
 import { tr, trLines } from './strings';
 import { CharacterArmsViewmodel } from '../../player/runtime/CharacterArmsViewmodel';
 import { dropMaskCanvas, paintDropMask, canvas, toTex } from './textures';
-import { projectCornersToViewport, cornersChanged, type ScreenCornersPx, type ScreenDeviceId } from './screenProjection';
+import { projectCornersToViewport, projectPointToViewport, cornersChanged, anchorMoved, ANCHOR_TOLERANCE_PX, type ScreenCornersPx, type ScreenDeviceId } from './screenProjection';
 import { pickHoverId, laptopInteractRoute, inspectDurationSec } from './storyInteract';
 import { setGameElapsedSeconds } from '../../../game/clock/gameClock';
 import { isRoomPropId, type RoomOptions, type RoomStoryCommands } from './outside';
@@ -23,6 +23,8 @@ export type Caption = { text: string; voice?: boolean; id: number };
 export type UIAction = { key: string; label: string };
 export interface UIState {
   prompt: string | null;
+  /** Story mode: the aimed prop's projected position (container pixels), or null. */
+  anchor: { x: number; y: number } | null;
   focus: boolean;
   captions: Caption[];
   inspecting: { title: string; actions: UIAction[] } | null;
@@ -59,7 +61,9 @@ const POSES: Record<string, Pose> = {
  * side so the portrait screen appears upright.
  */
 const STORY_POSES: Record<string, Pose> = {
-  laptop: { pos: V(-1.63, 0.932, -1.56), look: V(-1.63, 0.862, -1.84), fov: 42 },
+  // Pulled back (z -1.56 to -1.53) and moved right (x -1.63 to -1.583) so the laptop surface sits
+  // about 880 px wide at 1280x720 with at least 330 px free on its right for the evidence notice.
+  laptop: { pos: V(-1.583, 0.932, -1.53), look: V(-1.583, 0.862, -1.84), fov: 42 },
   phone: { pos: V(0.936, 0.88, -1.745), look: V(0.93, 0.559, -1.78), fov: 29 },
 };
 
@@ -68,6 +72,10 @@ const _scrViewProj = new THREE.Matrix4();
 const _scrPoint = new THREE.Vector3();
 const _scrWorld = new Array<number>(12).fill(0);
 const _scrOut = new Array<number>(8).fill(0);
+/** Scratch objects of the anchored prompt (no allocation per hover tick). */
+const _anchorBox = new THREE.Box3();
+const _anchorPoint = new THREE.Vector3();
+const _anchorOut = new Array<number>(2).fill(0);
 
 const CAPTION_COUNTS: Record<string, number> = {
   window: 2, laptop: 1, note: 1, receipts: 1, mug: 1, phone: 1, calendar: 1, photo: 1, fridge: 3, bed: 2, jacket: 1, umbrella: 1, door: 1,
@@ -122,7 +130,7 @@ export class Engine implements RoomStoryCommands {
   neonSpot!: THREE.SpotLight;
   winRect!: THREE.RectAreaLight;
 
-  ui: UIState = { prompt: null, focus: false, captions: [], inspecting: null, locked: false, fade: 1, ended: null, started: false, seated: false, cursorMode: false };
+  ui: UIState = { prompt: null, anchor: null, focus: false, captions: [], inspecting: null, locked: false, fade: 1, ended: null, started: false, seated: false, cursorMode: false };
   onUI: (s: UIState) => void;
   /** Part of the neighborhood: built ahead in standby (`live` false), shown by `activate`, left through the door. */
   opts: RoomOptions;
@@ -280,7 +288,7 @@ export class Engine implements RoomStoryCommands {
     cancelAnimationFrame(this.raf);
     this.keys.clear();
     this.audio.suspend();
-    this.ui.started = false; this.ui.locked = false; this.ui.prompt = null; this.ui.focus = false;
+    this.ui.started = false; this.ui.locked = false; this.ui.prompt = null; this.ui.anchor = null; this.ui.focus = false;
     this.emit();
   }
 
@@ -937,7 +945,7 @@ export class Engine implements RoomStoryCommands {
     this.yaw = THREE.MathUtils.euclideanModulo(this.yaw + Math.PI, Math.PI * 2) - Math.PI;
     this.seatFrom = { pos: this.pos.clone(), yaw: this.yaw, pitch: this.pitch };
     this.vel.set(0, 0, 0);
-    this.ui.seated = true; this.ui.prompt = null; this.ui.focus = false; this.emit();
+    this.ui.seated = true; this.ui.prompt = null; this.ui.anchor = null; this.ui.focus = false; this.emit();
     this.audio.chairRoll();
     this.later(1.4, () => this.audio.sit());
     this.later(2.3, () => { this.laptopWoken = true; this.audio.setFan(true); });
@@ -1062,8 +1070,24 @@ export class Engine implements RoomStoryCommands {
     void dt;
   }
 
+  /** Projects the world point of the aimed prop into `_anchorOut`. False when it is behind the camera. */
+  private projectHoverAnchor(id: string, found: THREE.Intersection[]): boolean {
+    const known = Object.hasOwn(this.apt.points, id) ? this.apt.points[id] : null;
+    if (known) _anchorPoint.copy(known);
+    else {
+      const hit = found.find((h) => h.object.userData.id === id);
+      if (!hit) return false;
+      _anchorBox.setFromObject(hit.object).getCenter(_anchorPoint);
+    }
+    const cam = this.camera;
+    cam.updateMatrixWorld();
+    cam.matrixWorldInverse.copy(cam.matrixWorld).invert();
+    _scrViewProj.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+    return projectPointToViewport(_scrViewProj.elements, _anchorPoint.x, _anchorPoint.y, _anchorPoint.z, this.container.clientWidth, this.container.clientHeight, 0, 0, _anchorOut, 0);
+  }
+
   updateHover() {
-    if (this.inspect || !this.ui.started || this.seat === 'sitting' || this.seat === 'standing') { if (this.ui.prompt) { this.ui.prompt = null; this.ui.focus = false; this.emit(); } this.hovered = null; return; }
+    if (this.inspect || !this.ui.started || this.seat === 'sitting' || this.seat === 'standing') { if (this.ui.prompt || this.ui.anchor) { this.ui.prompt = null; this.ui.anchor = null; this.ui.focus = false; this.emit(); } this.hovered = null; return; }
     // The prompt under the crosshair is refreshed at 30 Hz; nobody can tell, and it halves the raycasts.
     if ((this.hoverFrame++ & 1) === 1) return;
     this.raycaster.setFromCamera(_center, this.camera);
@@ -1073,9 +1097,15 @@ export class Engine implements RoomStoryCommands {
       ? pickHoverId(found.map((h) => ({ id: h.object.userData.id as string, proxy: !!h.object.userData.hitProxy, distance: h.distance })))
       : ((found[0]?.object.userData.id as string) ?? null);
     if (id === 'chair' && this.seat !== 'none') id = null;
-    if (id !== this.hovered || (id && this.label(id) !== this.ui.prompt)) {
+    // Story mode only: the aimed prop's world point, projected; the prompt is drawn next to it.
+    let ax: number | null = null;
+    let ay: number | null = null;
+    if (id && this.opts.story && this.label(id) !== null && this.projectHoverAnchor(id, found)) { ax = _anchorOut[0]; ay = _anchorOut[1]; }
+    const moved = anchorMoved(this.ui.anchor, ax, ay, ANCHOR_TOLERANCE_PX);
+    if (id !== this.hovered || (id && this.label(id) !== this.ui.prompt) || moved) {
       this.hovered = id;
       this.ui.prompt = id ? this.label(id) : null;
+      this.ui.anchor = ax !== null && ay !== null ? { x: ax, y: ay } : null;
       this.ui.focus = !!id;
       this.emit();
     }

@@ -44,6 +44,8 @@ const hud: LocaleShape<typeof en> = {
   },
   objectives: {
     heading: "Mục tiêu",
+    card: "Mục tiêu",
+    doneLabel: "Đã hoàn thành:",
     empty: "Không có mục tiêu nào đang thực hiện",
   },
   toast: {
@@ -52,6 +54,8 @@ const hud: LocaleShape<typeof en> = {
   },
   notice: {
     evidenceRecorded: "Đã ghi lại bằng chứng mới:",
+    newEvidence: "Bằng chứng mới",
+    addedToJournal: "Đã thêm vào sổ ghi chép",
   },
   resume: {
     prompt: "Nhấn để tiếp tục",

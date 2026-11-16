@@ -8,6 +8,7 @@ const laptop: LocaleShape<typeof en> = {
     back: "Quay lại",
     home: "Trang chủ",
     appsLabel: "Ứng dụng",
+    windowTitle: "Northgate Bank",
     clock: "23:09",
     apps: {
       notifications: "Thông báo",

@@ -129,7 +129,7 @@ export const PrologueHud: React.FC<PrologueHudProps> = ({ objective, prompt, sho
       </div>
 
       <div className="absolute bottom-4 left-[clamp(1rem,3vw,2.5rem)] right-[clamp(1rem,3vw,2.5rem)] z-10 flex items-end justify-between gap-4">
-        <div data-testid="hud-key-hints" className={`pointer-events-none flex flex-wrap items-center gap-x-5 max-sm:hidden gap-y-2 font-menu text-xs font-semibold uppercase tracking-[0.14em] text-zinc-300 ${SHADOW}`}>
+        <div data-testid="hud-key-hints" data-hud-footer-hints="" className={`pointer-events-none flex flex-wrap items-center gap-x-5 max-sm:hidden gap-y-2 font-menu text-xs font-semibold uppercase tracking-[0.14em] text-zinc-300 ${SHADOW}`}>
           <span className="flex items-center gap-1.5">
             <kbd className={KEYCAP}>Ctrl</kbd>
             {t("chapter1:room.hud.mouseKeyHint")}

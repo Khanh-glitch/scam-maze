@@ -145,7 +145,7 @@ function renderedOptions(): { id: string; text: string; button: HTMLButtonElemen
   if (overlay === null) return [];
   return Array.from(overlay.querySelectorAll<HTMLButtonElement>("ol > li > button")).map((button) => ({
     id: (button.dataset.testid ?? "").replace(/^dialogue-option-/, ""),
-    text: button.querySelector("span:last-child")?.textContent ?? "",
+    text: button.querySelector("span.flex-1")?.textContent ?? "",
     button,
   }));
 }
