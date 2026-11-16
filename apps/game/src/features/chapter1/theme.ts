@@ -81,3 +81,153 @@ export const UI = {
   choiceOption:
     "flex w-full items-start gap-2 rounded-lg border border-[#38344f] bg-[#171521] px-4 py-3 text-left text-sm font-medium leading-relaxed text-[#f7f5ff] whitespace-normal break-words motion-safe:transition-colors hover:border-[#7654d6] hover:bg-[#26233a] active:border-[#b9a5f5] active:bg-[#2f2a48] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b9a5f5] disabled:cursor-not-allowed disabled:border-[#38344f] disabled:bg-[#171521] disabled:text-[#a9a4c4] cursor-pointer",
 } as const;
+
+/**
+ * Cinematic gameplay UI tokens. EVERY visual value of the cinematic redesign (colors, radii,
+ * blur, widths, durations) lives here, so a pass against the final reference image only edits
+ * this object. Components read these values through inline styles and the helpers below; they
+ * never write their own numbers. Only layout classes (flex, gap, position) stay in Tailwind.
+ */
+export const CINE = {
+  color: {
+    /** Charcoal panel base as `r,g,b`, combined with the alpha values below. */
+    panelRgb: "18,18,24",
+    /** Alpha of a normal panel (tracker, toast, subtitle, response card). */
+    panelAlpha: 0.66,
+    /** Alpha of a panel that carries reading text over the 3D world. */
+    panelAlphaStrong: 0.74,
+    border: "rgba(185,165,245,0.18)",
+    borderStrong: "rgba(185,165,245,0.34)",
+    text: BRAND.ivory,
+    textMuted: BRAND.mist,
+    accent: BRAND.purple,
+    accentText: BRAND.lavender,
+    /** Hover and keyboard selection of a response card. */
+    selectedBg: "rgba(118,84,214,0.30)",
+    selectedBorder: "rgba(185,165,245,0.75)",
+    /** Soft violet glow of the selected response card (alpha at most 0.35). */
+    selectedGlow: "0 0 18px rgba(118,84,214,0.32)",
+    /** Darker, unselected response card and its hairline border. */
+    cardBg: "rgba(14,14,20,0.74)",
+    cardBorder: "rgba(255,255,255,0.08)",
+    /** Violet speaker pill above the subtitle bar. */
+    namePillBg: "rgba(118,84,214,0.92)",
+    namePillText: "#ffffff",
+    /** Round icon holder of a response card. */
+    iconCircleBg: "rgba(255,255,255,0.09)",
+    iconCircleSelectedBg: "rgba(118,84,214,0.55)",
+    /** Security alert banner of the laptop notification. */
+    alertBg: "#b3343e",
+    alertText: "#ffffff",
+    /** Sidebar of the laptop window. */
+    sidebarBg: "#13111b",
+    sidebarSelectedBg: "rgba(118,84,214,0.28)",
+    unreadDot: "#f2b24b",
+    success: BRAND.teal,
+    checkboxBorder: "rgba(255,255,255,0.5)",
+    keycapBg: "rgba(255,255,255,0.08)",
+    keycapBorder: "rgba(255,255,255,0.22)",
+    /** Soft dim behind a call: transparent in the center, darker at the edges. */
+    vignette: "radial-gradient(ellipse at 62% 50%, rgba(10,9,16,0) 38%, rgba(10,9,16,0.58) 100%)",
+    /** Laptop window chrome. */
+    laptopBar: "#14121d",
+    laptopBody: "#1a1826",
+    laptopDock: "#100f18",
+    laptopDots: ["#ff6b6b", "#f2b24b", "#4fd1b5"],
+  },
+  blurPx: 14,
+  radiusPx: { panel: 14, card: 12, keycap: 6, chip: 999 },
+  /** Minimum effective text size, in px. */
+  fontPx: { body: 14, small: 13, subtitle: 17 },
+  widthPx: { choice: 420, subtitle: 520, toast: 320, tracker: 288, hint: 232 },
+  /** Objective card: checkbox sizes and the indent of the dim sub-lines, in px. */
+  objective: { boxPx: 14, smallBoxPx: 11, indentPx: 22 },
+  /** Laptop window: width of the app sidebar, in px. */
+  laptop: { sidebarPx: 176 },
+  /** Round icon holder of a response card, in px. */
+  iconCirclePx: 28,
+  /** Subtitle bar metrics, in px (line height is a ratio of the font size). */
+  subtitle: { lineHeight: 1.4, padXPx: 14, padYPx: 10, pillHeightPx: 22 },
+  /** Maximum visible lines of the subtitle bar before it scrolls. */
+  subtitleVisibleLines: 2,
+  /** Anchored interaction prompt: offset from the prop, margin to the screen edge and its box estimate, in px. */
+  prompt: { offsetPx: 22, marginPx: 12, boxWidthPx: 230, boxHeightPx: 34 },
+  motion: {
+    fastMs: 150,
+    baseMs: 200,
+    slideMs: 220,
+    slidePx: 12,
+    /** How long an evidence notice stays. */
+    toastMs: 4200,
+    /** Time without a change before the objective tracker fades down. */
+    idleFadeAfterMs: 6000,
+    /** Opacity of the tracker while idle. */
+    idleOpacity: 0.5,
+    /** Fade-out time of the movement hints after first use. */
+    hintFadeMs: 600,
+    ease: "cubic-bezier(0.22, 0.61, 0.36, 1)",
+  },
+  /** Evidence notice: right edge gap and z-index (above the laptop surface), in px. */
+  toast: { zIndex: 60 },
+  /** Maximum number of response cards shown before the list scrolls. */
+  choiceVisibleCards: 4,
+  /** How long the "Press Ctrl to use the mouse" note stays after the pointer lock starts or an overlay closes. */
+  mouseHintMs: 6000,
+  /** Distance of the movement hints from the bottom edge, in px (clear of the Ctrl/Esc footer strip). */
+  hintsBottomPx: 64,
+  /** If a picked reply changes nothing (the action was refused), the cards come back after this time. */
+  choiceRecoverMs: 700,
+  /** Key under which the movement hints remember that they were used (session only). */
+  hintStorageKey: "scammaze.chapter1.movementHintsSeen",
+} as const;
+
+/** `rgba(...)` of the panel color with an alpha. */
+export function cineRgba(alpha: number): string {
+  return `rgba(${CINE.color.panelRgb},${alpha})`;
+}
+
+/** Inline style of a translucent charcoal panel. `strong` is for text that must stay readable. */
+export function cinePanelStyle(strong = false): {
+  background: string;
+  border: string;
+  borderRadius: number;
+  backdropFilter: string;
+  WebkitBackdropFilter: string;
+  color: string;
+} {
+  const blur = `blur(${CINE.blurPx}px)`;
+  return {
+    background: cineRgba(strong ? CINE.color.panelAlphaStrong : CINE.color.panelAlpha),
+    border: `1px solid ${CINE.color.border}`,
+    borderRadius: CINE.radiusPx.panel,
+    backdropFilter: blur,
+    WebkitBackdropFilter: blur,
+    color: CINE.color.text,
+  };
+}
+
+/** Inline style of a key-cap (E, J, 1-3, W A S D). */
+export const CINE_KEYCAP_STYLE = {
+  background: CINE.color.keycapBg,
+  border: `1px solid ${CINE.color.keycapBorder}`,
+  borderRadius: CINE.radiusPx.keycap,
+  color: CINE.color.text,
+  minWidth: 22,
+  height: 22,
+  fontSize: CINE.fontPx.small,
+  lineHeight: 1,
+} as const;
+
+/** Keyframes shared by the cinematic components. Render once next to an animated element. */
+export const CINE_KEYFRAMES = `@keyframes scammaze-cine-slide-in {
+  from { opacity: 0; transform: translateX(-${CINE.motion.slidePx}px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes scammaze-cine-rise-in {
+  from { opacity: 0; transform: translateY(${CINE.motion.slidePx}px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes scammaze-cine-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}`;

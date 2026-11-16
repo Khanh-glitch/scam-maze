@@ -1,18 +1,24 @@
 // Notification app of the laptop overlay: the alert in a list, its details and the dismiss action.
 // Addresses and numbers are plain text spans: no link, no input, no form, no network.
 import React from "react";
-import { Bell, ShieldAlert } from "lucide-react";
+import { Bell, ShieldCheck, TriangleAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { CoreAction } from "../../../../game/narrative/types";
-import { UI } from "../../theme";
+import { CINE, UI } from "../../theme";
 import type { NotificationAppView } from "./laptopView";
 
 export interface NotificationAppProps {
   view: NotificationAppView;
   dispatch: (action: CoreAction) => void;
+  /**
+   * Opens the Review Security page. The page sends `dev.review-security` itself when it opens, so
+   * this button runs the same device action path as the Review Security app. When absent, the
+   * button is not shown.
+   */
+  onOpenSecurity?: () => void;
 }
 
-export const NotificationApp: React.FC<NotificationAppProps> = ({ view, dispatch }) => {
+export const NotificationApp: React.FC<NotificationAppProps> = ({ view, dispatch, onOpenSecurity }) => {
   const { t } = useTranslation("chapter1");
   const run = (deviceActionId: NonNullable<NotificationAppView["openAction"]>) =>
     dispatch({ type: "DEVICE_ACTION", deviceActionId });
@@ -35,33 +41,48 @@ export const NotificationApp: React.FC<NotificationAppProps> = ({ view, dispatch
         <p className={UI.body}>{t("laptop.notification.empty")}</p>
       ) : (
         <ul className="space-y-3">
-          <li className={`${UI.card} space-y-2`} data-testid="laptop-notification-item">
-            <div className="flex items-start justify-between gap-3">
-              <p className="flex items-center gap-2 text-sm font-semibold text-[#f7f5ff]">
-                <ShieldAlert className={`h-4 w-4 ${UI.textWarning}`} aria-hidden="true" />
+          <li
+            className="overflow-hidden"
+            data-testid="laptop-notification-item"
+            style={{ border: `1px solid ${CINE.color.cardBorder}`, borderRadius: CINE.radiusPx.card, background: CINE.color.laptopDock }}
+          >
+            <div
+              data-testid="laptop-alert-banner"
+              className="flex items-center justify-between gap-3 px-3 py-2"
+              style={{ background: CINE.color.alertBg, color: CINE.color.alertText }}
+            >
+              <p className="flex items-center gap-2 text-sm font-bold">
+                <TriangleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
                 {t("laptop.notification.alertTitle")}
               </p>
-              <span className={`${UI.label} shrink-0`}>{badge}</span>
+              <span className="shrink-0 text-xs font-semibold uppercase tracking-wider">{badge}</span>
             </div>
-            <p className={UI.textMuted + " text-xs"}>
-              <span>{t("laptop.notification.alertSender")}</span> · <span>{t("laptop.notification.alertTime")}</span>
-            </p>
-            <p className={UI.body}>{t("laptop.notification.alertText")}</p>
-            {view.state === "dismissed" ? <p className={UI.body}>{t("laptop.notification.historyNote")}</p> : null}
-            <div className="flex flex-wrap gap-2">
-              {view.openAction ? (
-                <button type="button" className={UI.buttonPrimary} onClick={() => run(view.openAction!)}>
-                  {view.state === "dismissed" ? t("laptop.notification.reopen") : t("laptop.notification.details")}
-                </button>
-              ) : null}
-              {view.dismissAction ? (
-                <button type="button" className={UI.buttonSecondary} onClick={() => run(view.dismissAction!)}>
-                  {t("laptop.notification.dismiss")}
-                </button>
-              ) : null}
+            <div className="space-y-2 p-3">
+              <p className={UI.textMuted + " text-xs"}>
+                <span>{t("laptop.notification.alertSender")}</span> · <span>{t("laptop.notification.alertTime")}</span>
+              </p>
+              <p className={UI.body}>{t("laptop.notification.alertText")}</p>
+              {view.state === "dismissed" ? <p className={UI.body}>{t("laptop.notification.historyNote")}</p> : null}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                {onOpenSecurity ? (
+                  <button type="button" data-testid="laptop-review-security" className={UI.buttonPrimary} onClick={onOpenSecurity}>
+                    <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+                    {t("laptop.notification.reviewSecurity")}
+                  </button>
+                ) : null}
+                {view.openAction ? (
+                  <button type="button" className={UI.buttonSecondary} onClick={() => run(view.openAction!)}>
+                    {view.state === "dismissed" ? t("laptop.notification.reopen") : t("laptop.notification.details")}
+                  </button>
+                ) : null}
+                {view.dismissAction ? (
+                  <button type="button" className={UI.buttonSecondary} onClick={() => run(view.dismissAction!)}>
+                    {t("laptop.notification.dismiss")}
+                  </button>
+                ) : null}
+              </div>
             </div>
-          </li>
-        </ul>
+          </li>        </ul>
       )}
 
       {view.detailsOpen ? (

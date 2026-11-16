@@ -16,6 +16,7 @@ import type { SaveGameSource } from "../../../game/saves/saveGame";
 import { SettingsModal } from "../../menu/SettingsModal";
 import { PrologueHud, ProloguePauseMenu } from "../../prologue/PrologueHud";
 import type { Engine as RoomEngine, UIState as RoomUI } from "../../roomv2/game/engine";
+import { AnchoredPrompt } from "../hud/AnchoredPrompt";
 import { RoomChapterLayer } from "./RoomChapterLayer";
 import { RoomStoryBridge } from "./roomStoryBridge";
 
@@ -115,6 +116,7 @@ export const RoomChapterPage: React.FC<RoomChapterPageProps> = ({
           embedded
           story={bridge}
           onUI={setRoomUI}
+          renderPrompt={(label, anchor) => <AnchoredPrompt label={label} anchor={anchor} />}
           onReady={handleReady}
           overlay={
             <RoomChapterLayer

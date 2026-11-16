@@ -19,6 +19,7 @@ import { selectDialogueView } from "../../../game/narrative/selectors";
 import type { ChapterStore } from "../../../game/narrative/store";
 import type { ChapterState, ScenarioDefinition } from "../../../game/narrative/types";
 import type { VoiceSnapshot } from "../../../game/voice/VoiceDialoguePlayer";
+import { CINE } from "../theme";
 import { useChapterState } from "../useChapterState";
 import { deriveCallDialogueView, isSubtitleVisible } from "./callDialogueView";
 import { computeCallLayout } from "./callLayout";
@@ -227,6 +228,15 @@ export const CallPresentation: React.FC<CallPresentationProps> = ({
       data-mode={mode}
     >
       {mode !== "model" && <div className="absolute inset-0 bg-[#171521]/70" aria-hidden="true" />}
+      {/* Soft vignette over the room behind the 3D phone. CSS only: no per-frame cost. */}
+      {mode === "model" && (
+        <div
+          className="pointer-events-none absolute inset-0"
+          aria-hidden="true"
+          data-testid="call-vignette"
+          style={{ background: CINE.color.vignette }}
+        />
+      )}
       <PhoneScreenHost mode={mode} layout={layout} screenSink={screenSink}>
         <PhoneCallScreen
           view={screenView}

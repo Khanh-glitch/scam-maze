@@ -101,8 +101,12 @@ const room: LocaleShape<typeof en> = {
       hintPanelLabel: "Gợi ý cho mục tiêu hiện tại",
       mouseKeyHint: "Dùng chuột",
       mouseLockedHint: "Nhấn Ctrl để dùng chuột.",
+      controlsLabel: "Điều khiển di chuyển",
+      moveHint: "Di chuyển",
+      lookHint: "Nhìn xung quanh",
     },
     call: {
+      moreReplies: "Còn thêm lựa chọn phía dưới. Hãy cuộn hoặc dùng phím mũi tên.",
       toolsLabel: "Công cụ trong cuộc gọi",
       notes: "Ghi chú",
       notesLabel: "Mở ghi chú của bạn. Cuộc gọi vẫn tiếp tục.",

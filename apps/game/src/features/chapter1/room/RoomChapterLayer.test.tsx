@@ -298,6 +298,41 @@ describe("overlays", () => {
     fireEvent.click(screen.getByRole("button", { name: ROOM.hints.show }));
     expect(screen.getByTestId("room-hint")).toBeTruthy();
   });
+
+  it("shows the Journal and Hint key-cap chips (J and H) and toggles the hint with the H key", () => {
+    setup({ restoreActions: AFTER_DECLINE });
+    finishIntro();
+    const journal = screen.getByRole("button", { name: /Journal/ });
+    expect(journal.querySelector("kbd")?.textContent).toBe("J");
+    expect(journal.getAttribute("aria-keyshortcuts")).toBe("J");
+    const chip = screen.getByTestId("hud-hints-chip");
+    expect(chip.querySelector("kbd")?.textContent).toBe("H");
+    expect(chip.getAttribute("aria-keyshortcuts")).toBe("H");
+    expect(chip.getAttribute("aria-pressed")).toBe("false");
+    expect(chip.textContent).toContain(ROOM.hints.heading);
+    fireEvent.keyDown(window, { key: "h", code: "KeyH" });
+    expect(screen.getByTestId("room-hint")).toBeTruthy();
+    expect(chip.getAttribute("aria-pressed")).toBe("true");
+    expect(chip.getAttribute("aria-label")).toBe(ROOM.hints.hide);
+    fireEvent.keyDown(window, { key: "h", code: "KeyH" });
+    expect(screen.queryByTestId("room-hint")).toBeNull();
+  });
+
+  it("ignores H while an overlay is open", () => {
+    setup({ restoreActions: AFTER_DECLINE });
+    finishIntro();
+    fireEvent.keyDown(window, { key: "j", code: "KeyJ" });
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    fireEvent.keyDown(window, { key: "h", code: "KeyH" });
+    expect(screen.getByTestId("hud-hints-chip").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("shows the current objective in the objective card with an unchecked checkbox", () => {
+    setup({ restoreActions: AFTER_DECLINE });
+    finishIntro();
+    const current = screen.getByTestId("objective-current");
+    expect(current.querySelector("[data-testid='objective-checkbox']")?.getAttribute("data-checked")).toBe("false");
+  });
 });
 
 describe("rings only while the room is free", () => {
