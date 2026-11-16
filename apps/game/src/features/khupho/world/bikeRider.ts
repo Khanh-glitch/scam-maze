@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
-import { BIKE_RIDER_GLB } from '../../../config/assetPaths';
+import { BAOTHU_GLB, BIKE_RIDER_GLB } from '../../../config/assetPaths';
 
 /**
  * Scooter-and-rider model for the street traffic (scripts/optimize-bike-rider.cjs). Every bike
@@ -10,6 +10,8 @@ import { BIKE_RIDER_GLB } from '../../../config/assetPaths';
  */
 export interface BikeRiderTemplate {
   levels: THREE.Object3D[];
+  /** Model z (units) of the rear wheel contact point: the whole bike pitches about it. 0 = the model origin. */
+  rearPivotZ?: number;
 }
 
 /** The source bike is ~0.97 m long with ~0.14 m wheels; this brings it to a real scooter (~1.85 m). */
@@ -23,13 +25,15 @@ const HIDE_DISTANCE = 60;
 /** Largest head turn toward the player while stopped (radians). */
 const HEAD_TURN_MAX = 0.9;
 
-export async function loadBikeRider(): Promise<BikeRiderTemplate> {
+/** Rear wheel pivot of the reckless rider's source model (z of the RearWheel joint). */
+const BAOTHU_REAR_PIVOT_Z = -0.29;
+export async function loadBikeRider(url: string = BIKE_RIDER_GLB, rearPivotZ = 0): Promise<BikeRiderTemplate> {
   const loader = new GLTFLoader();
   loader.setMeshoptDecoder(MeshoptDecoder);
-  const gltf = await loader.loadAsync(BIKE_RIDER_GLB);
+  const gltf = await loader.loadAsync(url);
   const levels = ['BikeRider_LOD0', 'BikeRider_LOD1', 'BikeRider_LOD2'].map((name) => {
     const level = gltf.scene.getObjectByName(name);
-    if (!level) throw new Error(`[khupho] "${name}" missing in ${BIKE_RIDER_GLB}`);
+    if (!level) throw new Error(`[khupho] "${name}" missing in ${url}`);
     level.removeFromParent();
     level.traverse((o) => {
       const mesh = o as THREE.Mesh;
@@ -39,12 +43,16 @@ export async function loadBikeRider(): Promise<BikeRiderTemplate> {
     });
     return level;
   });
-  return { levels };
+  return { levels, rearPivotZ };
 }
+/** The reckless rider: same layout and size as the other riders, pitched about its rear wheel. */
+export const loadBaoThu = () => loadBikeRider(BAOTHU_GLB, BAOTHU_REAR_PIVOT_Z);
 
 /** One bike instance: the LOD object plus the parts the game turns. */
 export class BikeRiderInstance {
   readonly object: THREE.LOD;
+  /** Parent of `object`, placed at the rear wheel contact point: pitch, roll and yaw are set on it (`setPose`). */
+  readonly root = new THREE.Group();
   private readonly wheels: THREE.Object3D[] = [];
   private readonly heads: THREE.Object3D[] = [];
   private wheelAngle = 0;
@@ -62,6 +70,16 @@ export class BikeRiderInstance {
     });
     this.object.addLevel(new THREE.Object3D(), HIDE_DISTANCE, 0.05);
     this.object.scale.setScalar(BIKE_RIDER_SCALE);
+    const pivot = (template.rearPivotZ ?? 0) * BIKE_RIDER_SCALE;
+    this.root.rotation.order = 'YXZ';
+    this.root.position.z = pivot;
+    this.object.position.z = -pivot;
+    this.root.add(this.object);
+  }
+  /** Tilts the whole bike about its rear wheel: `pitch` lifts the front wheel, `roll` leans, `yaw` turns, `lift` raises it (m). */
+  setPose(pitch: number, roll: number, yaw: number, lift: number) {
+    this.root.rotation.set(-pitch, yaw, roll);
+    this.root.position.y = lift;
   }
 
   /**
