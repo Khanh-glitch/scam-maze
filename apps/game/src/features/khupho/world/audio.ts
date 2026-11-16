@@ -9,6 +9,8 @@ const RAIN_URL = '/audio/rain.mp3';
 const THUNDER_URL = '/audio/thunder.mp3';
 /** Recorded scooter horn (owner-supplied): a short double beep. */
 const HORN_URL = '/audio/horn.mp3';
+/** Recorded engine rev (owner-supplied, 4.9 s): the reckless rider revs it when something blocks the road. */
+const REV_URL = '/audio/netpo.mp3';
 /** Recorded footsteps (owner-supplied): one dry step, and a looping walk on a wet street. */
 const FOOTSTEP_URL = '/audio/footstep.mp3';
 const RAIN_WALK_URL = '/audio/rainWalking.mp3';
@@ -73,6 +75,7 @@ export class AudioSys implements Sfx {
       .then((buf) => { if (this.ac !== ac) return; const s = ac.createBufferSource(); s.buffer = buf; s.loop = true; s.connect(rainG); s.start(0, Math.random() * Math.max(0, buf.duration - 1)); })
       .catch((err) => console.warn('[khupho] rain sound failed to load', err));
     load(THUNDER_URL).then((buf) => { if (this.ac === ac) this.thunderBuf = buf; }).catch((err) => console.warn('[khupho] thunder sound failed to load', err));
+    load(REV_URL).then((buf) => { if (this.ac === ac) this.revBuf = buf; }).catch((err) => console.warn('[khupho] engine rev sound failed to load', err));
     load(HORN_URL).then((buf) => { if (this.ac === ac) this.hornBuf = buf; }).catch((err) => console.warn('[khupho] horn sound failed to load', err));
     load(FOOTSTEP_URL).then((buf) => { if (this.ac === ac) this.stepBuf = buf; }).catch((err) => console.warn('[khupho] footstep sound failed to load', err));
     // Wet walking: one looping source whose gain follows the player's movement and whose rate
@@ -86,6 +89,7 @@ export class AudioSys implements Sfx {
   private thunderBuf: AudioBuffer | null = null;
   private stepBuf: AudioBuffer | null = null;
   private hornBuf: AudioBuffer | null = null;
+  private revBuf: AudioBuffer | null = null;
   private wetSrc: AudioBufferSourceNode | null = null;
   private wetGain: GainNode | null = null;
   /** True while outdoors in rain: steps come from the wet loop instead of single steps. */
@@ -162,6 +166,17 @@ export class AudioSys implements Sfx {
     const on = this.wet && speed > 0.3;
     g.gain.setTargetAtTime(on ? (running ? 0.85 : 0.6) : 0, t, on ? 0.06 : 0.12);
     s.playbackRate.setTargetAtTime(running ? RAIN_RUN_RATE : RAIN_WALK_RATE, t, 0.15);
+  }
+  /** One engine rev at `pos` from the recorded sound; returns its length in seconds (0 when it did not play). */
+  rev(pos: THREE.Vector3): number {
+    const ac = this.ac, buf = this.revBuf;
+    if (!ac || !buf || this.muted) return 0;
+    const s = ac.createBufferSource(); s.buffer = buf; s.playbackRate.value = 0.98 + Math.random() * 0.04;
+    const g = ac.createGain(); g.gain.value = 1;
+    const p = ac.createPanner(); p.panningModel = 'equalpower'; p.distanceModel = 'inverse'; p.refDistance = 2.5; p.rolloffFactor = 1.3;
+    if (p.positionX) { p.positionX.value = pos.x; p.positionY.value = pos.y + 0.5; p.positionZ.value = pos.z; }
+    s.connect(g); g.connect(p); p.connect(this.outBus); s.start();
+    return buf.duration / s.playbackRate.value;
   }
   /**
    * One honk at `pos` from the recorded horn (synthesized beeps until it has loaded). Callers pace

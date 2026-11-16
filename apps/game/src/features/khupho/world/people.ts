@@ -8,13 +8,14 @@ import { motorbike } from './furniture';
 import { mulberry32, clamp } from './util';
 import { mat } from './materials';
 import { BikeRiderInstance, type BikeRiderTemplate } from './bikeRider';
+import { PASS_OFFSET, STUNT_FREE_BIKE, STUNT_FREE_PLAYER, STUNT_PAUSE, pickStunt, revShake, stuntSeconds, weaveOffset, wheeliePitch, type StuntKind } from './baothuMotion';
 import type { HumanActor, HumanLibrary, HumanModelId, OutfitPart } from './humans';
 import { hasProp, propSize, queueWorldProp } from './streetFurniture';
 
 export interface Life {
   update(dt: number, t: number): void;
   /** Positions of the path walkers and the bikes (dev checks and tests). */
-  stats(): { people: readonly THREE.Vector3[]; bikes: { x: number; lane: number; dir: number; speed: number }[] };
+  stats(): { people: readonly THREE.Vector3[]; bikes: { x: number; lane: number; dir: number; speed: number; reckless: boolean; lat: number; pitch: number }[] };
 }
 
 const SKIN = ['#e0ac84', '#d49a72', '#c98d68', '#e8bb96', '#a8714f'];
@@ -494,6 +495,20 @@ const EYE_HEIGHT = 1.62;
 const HORN_FIRST: [number, number] = [0.6, 1.2];
 const HORN_EVERY: [number, number] = [4, 6.5];
 
+/** The reckless rider: cruising speed (m/s) is well above the other bikes' 4.5 to 9.5, and it accelerates harder. */
+const RECKLESS_SPEED: [number, number] = [12, 15];
+const RECKLESS_ACCEL = 2.4;
+/** It starts passing a slower bike this far ahead (m), and stays out until it is this far past (m). */
+const PASS_LOOK = 28;
+const PASS_CLEAR = 4;
+/** Sideways speed (m/s) of a lane change. */
+const PASS_RATE = 1.6;
+/** Delay (s) before the reckless rider's first rev when held up, and the pause after each rev. */
+const REV_FIRST: [number, number] = [0.3, 0.8];
+const REV_PAUSE: [number, number] = [0.6, 1.8];
+/** Lean (rad per m/s of sideways speed) and its limit. */
+const LEAN_PER_SPEED = 0.12;
+const LEAN_MAX = 0.35;
 /** Highest speed that still stops `gap` meters ahead at BIKE_DECEL (0 when the gap is used up). */
 const speedForGap = (gap: number) => (gap <= BIKE_STOP_GAP ? 0 : Math.sqrt(2 * BIKE_DECEL * (gap - BIKE_STOP_GAP)));
 
@@ -553,13 +568,28 @@ class Bike {
   col: Col;
   /** The scanned scooter and rider when its file loaded; otherwise the procedural bike and person below. */
   private model: BikeRiderInstance | null = null;
-  constructor(ctx: Ctx, r: () => number, dir: 1 | -1, x: number, vehicles: { pos: THREE.Vector3; speed: number }[], template: BikeRiderTemplate | null) {
+  /** The reckless rider: fast, passes slower bikes, does stunts and revs instead of honking. */
+  readonly reckless: boolean;
+  /** Sideways offsets (m) added to `lane`: a lane change to pass, and the swing of a weave. */
+  private passOff = 0;
+  private weaveOff = 0;
+  private prevLat = 0;
+  private lean = 0;
+  private pitch = 0;
+  get currentPitch() { return this.pitch; }
+  private clock = 0;
+  private stunt: { kind: StuntKind; t: number } | null = null;
+  private stuntIn = 0;
+  /** Seconds the current rev still sounds (shakes the bike). */
+  private revLeft = 0;
+  constructor(ctx: Ctx, r: () => number, dir: 1 | -1, x: number, vehicles: { pos: THREE.Vector3; speed: number }[], template: BikeRiderTemplate | null, reckless = false) {
     const col = pick(r, ['#c92f2a', '#2a5aa0', '#222', '#e8e6e0', '#3a7a4a', '#d8a92a', '#7a2a2a']);
     const shirt = pick(r, SHIRT);
+    this.reckless = reckless && template !== null;
     if (template) {
       this.g = new THREE.Group();
       this.model = new BikeRiderInstance(template);
-      this.g.add(this.model.object);
+      this.g.add(this.model.root);
     } else {
       this.g = makeGroup((b) => motorbike(b, 0, 0, 0, 0, col, false));
       const rider = makePerson(r, { shirt, helmet: true }); rider.g.position.set(0, 0.0, -0.1); this.g.add(rider.g);
@@ -567,15 +597,24 @@ class Bike {
       this.g.traverse((o) => { o.castShadow = true; });
     }
     this.dir = dir; this.lane = dir > 0 ? 1.8 + r() * 0.5 : -1.8 - r() * 0.5; this.x = x; this.base = 4.5 + r() * 5;
+    if (this.reckless) { this.base = RECKLESS_SPEED[0] + Math.random() * (RECKLESS_SPEED[1] - RECKLESS_SPEED[0]); this.stuntIn = 3 + Math.random() * 5; }
     this.g.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2; ctx.root.add(this.g);
     this.info = { pos: this.g.position, speed: 0 }; vehicles.push(this.info);
+    this.prevLat = this.lane;
     this.col = { x0: 0, x1: 0, y0: 0, y1: 1.5, z0: this.lane - BIKE_HALF_WIDTH, z1: this.lane + BIKE_HALF_WIDTH, enabled: true, tag: 'bike' };
     ctx.phys.dynamic.push(this.col);
     this.placeCollider();
   }
-  private placeCollider() { this.col.x0 = this.x - BIKE_HALF_LEN; this.col.x1 = this.x + BIKE_HALF_LEN; }
+  /** Where the bike is across the street now: its lane plus any lane change and weave. */
+  get lat() { return this.lane + this.passOff + this.weaveOff; }
+  private placeCollider() {
+    this.col.x0 = this.x - BIKE_HALF_LEN; this.col.x1 = this.x + BIKE_HALF_LEN;
+    this.col.z0 = this.lat - BIKE_HALF_WIDTH; this.col.z1 = this.lat + BIKE_HALF_WIDTH;
+  }
   /** Free road (m) in front of this bike's nose up to `x`, along its direction, across the street loop. */
   private aheadOf(x: number) { const L = STREET_END * 2; return (((x - this.x) * this.dir) % L + L) % L; }
+  /** Like `aheadOf`, but negative for a bike behind: -L/2 to L/2. */
+  private signedAhead(x: number) { const a = this.aheadOf(x), L = STREET_END * 2; return a > L / 2 ? a - L : a; }
   /**
    * Speed limit from what is ahead: the player standing in (or next to) the lane, and the next
    * bike in the same lane. Bikes brake to stop BIKE_STOP_GAP short of either.
@@ -583,7 +622,8 @@ class Bike {
   private limit(player: THREE.Vector3, bikes: readonly Bike[]): { v: number; playerGap: number; bikeGap: number } {
     let v = this.base, playerGap = Infinity, bikeGap = Infinity;
     const feet = player.y - EYE_HEIGHT;
-    if (feet < 0.8 && Math.abs(player.z - this.lane) < BIKE_HALF_WIDTH + PLAYER_RADIUS + 0.35) {
+    const lat = this.lat;
+    if (feet < 0.8 && Math.abs(player.z - lat) < BIKE_HALF_WIDTH + PLAYER_RADIUS + 0.35) {
       const along = (player.x - this.x) * this.dir;
       // Also while overlapping from behind the nose (the player stepped onto the bike): stand still.
       if (along > -BIKE_HALF_LEN - PLAYER_RADIUS && along < BIKE_LOOK) {
@@ -592,53 +632,115 @@ class Bike {
       }
     }
     for (const o of bikes) {
-      if (o === this || o.dir !== this.dir || Math.abs(o.lane - this.lane) > BIKE_HALF_WIDTH * 2 + 0.25) continue;
+      if (o === this || o.dir !== this.dir || Math.abs(o.lat - lat) > BIKE_HALF_WIDTH * 2 + 0.25) continue;
       const gap = this.aheadOf(o.x) - BIKE_HALF_LEN * 2;
       bikeGap = Math.min(bikeGap, gap);
       if (gap < BIKE_LOOK) v = Math.min(v, Math.max(0, Math.min(o.speed + speedForGap(gap) * 0.5, speedForGap(gap))));
     }
     return { v, playerGap, bikeGap };
   }
+  /** Reckless rider: moves into the inner lane to pass a slower bike ahead, and back once it is past. */
+  private updatePassing(dt: number, bikes: readonly Bike[]) {
+    let want = false;
+    for (const o of bikes) {
+      if (o === this || o.dir !== this.dir || Math.abs(o.lane - this.lane) > BIKE_HALF_WIDTH * 2 + 0.25) continue;
+      const rel = this.signedAhead(o.x);
+      if (rel < -PASS_CLEAR || rel > PASS_LOOK) continue;
+      // Starts only for a bike that is moving (a stopped one is held up by the player: wait behind it).
+      if (o.speed < this.base - 1.5 && (o.speed > 0.8 || this.passOff !== 0)) { want = true; break; }
+    }
+    const target = want ? -Math.sign(this.lane) * PASS_OFFSET : 0;
+    this.passOff += clamp(target - this.passOff, -PASS_RATE * dt, PASS_RATE * dt);
+  }
+  /** Reckless rider: now and then a wheelie or a weave, only on a free road. Sets `pitch` and `weaveOff`. */
+  private updateStunt(dt: number, free: boolean) {
+    if (this.stunt) {
+      this.stunt.t += dt;
+      if (!free || this.stunt.t >= stuntSeconds(this.stunt.kind)) { this.stunt = null; this.stuntIn = STUNT_PAUSE[0] + Math.random() * (STUNT_PAUSE[1] - STUNT_PAUSE[0]); }
+    } else {
+      this.stuntIn -= dt;
+      if (this.stuntIn <= 0 && free && this.speed > this.base * 0.7) {
+        // A weave swings across the lane, so it waits until the rider is back in its own lane.
+        const kind = pickStunt(Math.random());
+        if (kind === 'wheelie' || Math.abs(this.passOff) < 0.05) this.stunt = { kind, t: 0 };
+      }
+    }
+    const s = this.stunt;
+    const pitchTarget = s?.kind === 'wheelie' ? wheeliePitch(s.t) : 0;
+    // Smoothed, so a stunt that is cut short lands the bike instead of snapping it down.
+    this.pitch += (pitchTarget - this.pitch) * Math.min(1, dt * 12);
+    const weaveTarget = s?.kind === 'weave' ? weaveOffset(s.t) : 0;
+    this.weaveOff += (weaveTarget - this.weaveOff) * Math.min(1, dt * 12);
+  }
   /** Seconds to the next honk while this bike is held up by the player (NaN when not held up). */
   private hornT = NaN;
   update(dt: number, player: THREE.Vector3, audio: AudioSys, bikes: readonly Bike[]) {
+    this.clock += dt;
+    if (this.reckless) this.updatePassing(dt, bikes);
     const { v, playerGap, bikeGap } = this.limit(player, bikes);
+    if (this.reckless) this.updateStunt(dt, playerGap > STUNT_FREE_PLAYER && bikeGap > STUNT_FREE_BIKE);
     // Brake at once to the limit when it is below the speed; speed up gently otherwise.
     if (v < this.speed) this.speed = Math.max(v, this.speed - BIKE_DECEL * 2.5 * dt);
-    else this.speed += (v - this.speed) * Math.min(1, dt * 1.2);
+    else this.speed += (v - this.speed) * Math.min(1, dt * (this.reckless ? RECKLESS_ACCEL : 1.2));
     let step = this.speed * dt;
     // Never move into the player or the bike ahead, whatever the speed was.
     if (playerGap !== Infinity) step = Math.min(step, Math.max(0, playerGap - BIKE_STOP_GAP * 0.5));
     for (const o of bikes) {
-      if (o === this || o.dir !== this.dir || Math.abs(o.lane - this.lane) > BIKE_HALF_WIDTH * 2 + 0.25) continue;
+      if (o === this || o.dir !== this.dir || Math.abs(o.lat - this.lat) > BIKE_HALF_WIDTH * 2 + 0.25) continue;
       step = Math.min(step, Math.max(0, this.aheadOf(o.x) - BIKE_HALF_LEN * 2 - 0.3));
     }
     if (step < this.speed * dt) this.speed = step / Math.max(dt, 1e-4);
     this.x += this.dir * step; if (this.x > STREET_END) this.x -= STREET_END * 2; if (this.x < -STREET_END) this.x += STREET_END * 2;
-    this.g.position.set(this.x, 0, this.lane); this.info.speed = this.speed;
+    const lat = this.lat;
+    this.g.position.set(this.x, 0, lat); this.info.speed = this.speed;
     this.placeCollider();
     if (this.model) {
       // While stopped, the rider looks at the player (yaw in the bike's own frame, 0 = ahead).
       let look: number | null = null;
       if (this.speed < 1.5) {
-        const yaw = this.g.rotation.y, dx = player.x - this.x, dz = player.z - this.lane;
+        const yaw = this.g.rotation.y, dx = player.x - this.x, dz = player.z - lat;
         look = Math.atan2(dx * Math.cos(yaw) - dz * Math.sin(yaw), dx * Math.sin(yaw) + dz * Math.cos(yaw));
       }
       this.model.update(dt, this.speed, look);
+      if (this.reckless) this.poseReckless(dt, lat);
     }
+    this.prevLat = lat;
     // Only the first bike held up by the player honks (the ones queued behind wait quietly):
     // a first honk soon after stopping, then one every few seconds with a pause between.
+    // The reckless rider revs its engine instead (netpo.mp3), then waits a moment and revs again.
     const heldUp = this.speed < 0.5 && playerGap < 4 && playerGap < bikeGap;
+    if (this.revLeft > 0) this.revLeft = Math.max(0, this.revLeft - dt);
     if (!heldUp) this.hornT = NaN;
     else {
-      if (Number.isNaN(this.hornT)) this.hornT = HORN_FIRST[0] + Math.random() * (HORN_FIRST[1] - HORN_FIRST[0]);
+      if (Number.isNaN(this.hornT)) {
+        const first = this.reckless ? REV_FIRST : HORN_FIRST;
+        this.hornT = first[0] + Math.random() * (first[1] - first[0]);
+      }
       this.hornT -= dt;
-      if (this.hornT <= 0) { audio.horn(this.g.position); this.hornT = HORN_EVERY[0] + Math.random() * (HORN_EVERY[1] - HORN_EVERY[0]); }
+      if (this.hornT <= 0) {
+        if (this.reckless) {
+          const len = audio.rev(this.g.position);
+          this.revLeft = len;
+          this.hornT = len + REV_PAUSE[0] + Math.random() * (REV_PAUSE[1] - REV_PAUSE[0]);
+        } else {
+          audio.horn(this.g.position);
+          this.hornT = HORN_EVERY[0] + Math.random() * (HORN_EVERY[1] - HORN_EVERY[0]);
+        }
+      }
     }
   }
+  /** Reckless rider: the wheelie pitch, the lean and turn of a lane change or weave, and the engine shake while revving. */
+  private poseReckless(dt: number, lat: number) {
+    // Sideways speed in the bike's own frame (+ = to its left).
+    const latV = (lat - this.prevLat) / Math.max(dt, 1e-4);
+    const left = -this.dir * latV;
+    this.lean += (clamp(-left * LEAN_PER_SPEED, -LEAN_MAX, LEAN_MAX) - this.lean) * Math.min(1, dt * 6);
+    const yaw = Math.atan2(left, Math.max(this.speed, 1)) * 0.6;
+    const shake = this.revLeft > 0 ? revShake(this.clock) : { lift: 0, rock: 0 };
+    this.model!.setPose(this.pitch + shake.rock, this.lean, yaw, shake.lift);
+  }
 }
-
-export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vector3; speed: number }[], audio: AudioSys, bikeRider: BikeRiderTemplate | null = null, humans: HumanLibrary | null = null): Life {
+export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vector3; speed: number }[], audio: AudioSys, bikeRider: BikeRiderTemplate | null = null, humans: HumanLibrary | null = null, baothu: BikeRiderTemplate | null = null): Life {
   PERSON_GROUPS.length = 0;
   const r = mulberry32(99);
   const residents: Resident[] = [], walkers: Walker[] = [], statics: Static[] = [], bikes: Bike[] = [];
@@ -731,7 +833,12 @@ export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vect
   seat(20.6, 0.02, 45.8, Math.PI, 'sit', { elder: true }, [6, 22], 'npcFreya');
   statics.push(new Static(ctx, r, 10.3, 0.02, 14.0, -Math.PI / 2, 'sweep', {}, [5.5, 7.2]));
   statics.push(new Static(ctx, r, 15.3, 0.02, 45.0, 0, 'phone', { kid: true }, [15.5, 22]));
-  for (let i = 0; i < 12; i++) bikes.push(new Bike(ctx, r, i % 2 ? 1 : -1, -70 + i * 12 + r() * 6, vehicles, bikeRider));
+  // Two of the twelve riders are the reckless one (one per direction), picked at random each visit; without its model there are none.
+  const recklessAt = new Set<number>(baothu ? [Math.floor(Math.random() * 6) * 2, Math.floor(Math.random() * 6) * 2 + 1] : []);
+  for (let i = 0; i < 12; i++) {
+    const wild = recklessAt.has(i);
+    bikes.push(new Bike(ctx, r, i % 2 ? 1 : -1, -70 + i * 12 + r() * 6, vehicles, wild ? baothu : bikeRider, wild));
+  }
   // Everyone walking a path, for side-stepping (each walker skips its own entry).
   const people: THREE.Vector3[] = [...walkers.map((w) => w.p.g.position), ...modelWalkers.map((w) => w.a.object.position)];
   // People standing or sitting still on the street are in the way too (vendor, seated customers, statics).
@@ -740,7 +847,7 @@ export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vect
   let acc = 0;
   const occ = new Map<object, number>();
   return {
-    stats: () => ({ people, bikes: bikes.map((b) => ({ x: b.x, lane: b.lane, dir: b.dir, speed: b.speed })) }),
+    stats: () => ({ people, bikes: bikes.map((b) => ({ x: b.x, lane: b.lane, dir: b.dir, speed: b.speed, reckless: b.reckless, lat: b.lat, pitch: b.currentPitch })) }),
     update(dt, t) {
       const hour = ctx.env.hour, pp = ctx.eye;
       for (const rs of residents) rs.update(dt, t, hour, pp);

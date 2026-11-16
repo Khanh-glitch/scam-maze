@@ -39,6 +39,8 @@ export const STREET_PROPS_GLB = "/assets/3d/optimized/street-props.optimized.glb
  * (Meshopt, produced by scripts/optimize-bike-rider.cjs).
  */
 export const BIKE_RIDER_GLB = "/assets/3d/optimized/bike-rider.optimized.glb";
+/** The reckless rider ("Bao Thu"): same layout as BIKE_RIDER_GLB (`optimize-bike-rider.cjs baothu`). */
+export const BAOTHU_GLB = "/assets/3d/optimized/baothu.optimized.glb";
 /**
  * Folder of the animated character models (skinned, Meshopt + WebP, produced by
  * scripts/optimize-characters.cjs). The files are listed in features/khupho/world/humans.ts.
