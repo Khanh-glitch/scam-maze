@@ -430,7 +430,8 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
       clip.src = "";
     };
   }, [maiNode, locale, gain]);
-  const narrating = stage === "neighborhood" && revealed && worldReady && (!started || callOpen);
+  // The street sound also drops while Auntie Mai talks, so her voice stays on top.
+  const narrating = stage === "neighborhood" && revealed && worldReady && (!started || callOpen || dialogue !== null);
   useEffect(() => {
     streetRef.current?.audio.setDuck(narrating);
   }, [narrating, worldReady]);

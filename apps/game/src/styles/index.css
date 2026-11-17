@@ -185,3 +185,13 @@ input, textarea, [contenteditable="true"] {
 :root:has([data-ui-mode="call"], [data-ui-mode="decision"]) [data-hud-footer-hints] {
   display: none;
 }
+
+/* Dialogue: the pointer next to the selected reply slides left and right a little. */
+@keyframes dialogue-nudge {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(5px); }
+}
+.dialogue-nudge { animation: dialogue-nudge 0.9s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .dialogue-nudge { animation: none; }
+}
