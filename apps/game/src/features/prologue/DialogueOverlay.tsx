@@ -34,7 +34,7 @@ export const DialogueOverlay: React.FC<DialogueOverlayProps> = ({ graph, state, 
   const lastNode = useRef<string | null>(null);
   const first = useRef<HTMLButtonElement | null>(null);
   const node = state.node;
-  const wheel = useRef({ acc: 0, last: 0 });
+  const wheel = useRef({ acc: 0, last: 0, prev: 0, abs: 0, dir: 0, locked: false });
 
   // Moves the highlight by one reply and plays the hover sound.
   const move = useCallback(
@@ -46,16 +46,30 @@ export const DialogueOverlay: React.FC<DialogueOverlayProps> = ({ graph, state, 
     [options.length, onHoverSound],
   );
 
-  // Wheel or trackpad: a trackpad sends a stream of small events, so they add up and a cooldown keeps one flick to one step.
+  // Wheel or trackpad: one swipe is one step. A trackpad keeps sending small events while the swipe coasts, so after a
+  // step the picker waits for a pause in the events, or for a swipe the other way, or for a clearly stronger new push.
   const onWheel = (event: React.WheelEvent) => {
     if (options.length < 2) return;
     const w = wheel.current, now = performance.now();
-    if (now - w.last > 350) w.acc = 0;
-    w.acc += event.deltaY * (event.deltaMode === 1 ? 16 : 1);
-    if (Math.abs(w.acc) < 40 || now - w.last < 220) return;
+    const dy = event.deltaY * (event.deltaMode === 1 ? 16 : 1);
+    const gap = now - w.prev;
+    const reversed = Math.sign(dy) !== Math.sign(w.dir) && Math.abs(dy) >= 8;
+    const stronger = now - w.last > 300 && Math.abs(dy) > w.abs * 1.8 && Math.abs(dy) >= 30;
+    if (w.locked && (gap > 130 || reversed || stronger)) {
+      w.locked = false;
+      w.acc = 0;
+    }
+    w.prev = now;
+    w.abs = Math.abs(dy);
+    if (w.locked) return;
+    if (gap > 350) w.acc = 0;
+    w.acc += dy;
+    if (Math.abs(w.acc) < 40) return;
+    w.dir = w.acc;
     move(w.acc > 0 ? 1 : -1);
     w.acc = 0;
     w.last = now;
+    w.locked = true;
   };
 
   // A new line starts with the first reply highlighted.
@@ -129,10 +143,18 @@ export const DialogueOverlay: React.FC<DialogueOverlayProps> = ({ graph, state, 
                     if (!on) onHoverSound?.();
                     setActive(index);
                   }}
-                  className={`relative flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-full border px-4 py-2 text-left outline-none transition-colors duration-300 cursor-pointer ${on ? "border-white/80 text-[#171521]" : "border-white/30 bg-black/55 text-zinc-100"}`}
+                  className={`relative flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-full border px-4 py-2 text-left outline-none transition-colors duration-200 delay-100 cursor-pointer ${on ? "border-white/80 text-[#171521]" : "border-white/30 bg-black/55 text-zinc-100"}`}
                 >
                   {/* The highlight sweeps in from the left; on the way out it just fades. */}
-                  <span aria-hidden="true" className={`pointer-events-none absolute inset-0 origin-left bg-white/90 ${on ? "scale-x-100 opacity-100 [transition:transform_380ms_cubic-bezier(0.22,1,0.36,1),opacity_120ms]" : "scale-x-0 opacity-0 [transition:opacity_220ms_ease-out,transform_0s_linear_220ms]"}`} />
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 origin-left bg-white/90"
+                    style={{
+                      transform: on ? "scaleX(1)" : "scaleX(0)",
+                      opacity: on ? 1 : 0,
+                      transition: on ? "transform 380ms cubic-bezier(0.22,1,0.36,1), opacity 120ms" : "opacity 220ms ease-out, transform 0s linear 220ms",
+                    }}
+                  />
                   <img src={ICON_CHAT} alt="" width={22} height={22} draggable={false} className={`relative h-[22px] w-[22px] shrink-0 transition-[filter] duration-300 ${on ? "invert" : ""}`} />
                   <span className="relative text-base font-medium leading-snug">{text(optionKey(graph, option.id))}</span>
                 </button>

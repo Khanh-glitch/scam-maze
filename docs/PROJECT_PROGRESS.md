@@ -177,6 +177,13 @@ Resolved:
 - The 3D model licenses of some owner-supplied riders, bikes and the Bao Thu model are "not stated" in
   their `SOURCE.md` files; confirm before a public release.
 ## Task History
+### 2026-11-17 — Reply picker: one swipe is one step; the highlight background now sweeps
+- **Objective:** owner feedback: a swipe moved several replies, and only the text changed colour, not the pill background.
+- **Completed:** (1) after a wheel step the picker waits for a pause of 130 ms in the events, a swipe the other way, or a clearly stronger new push, so a coasting trackpad swipe gives one step. (2) The sweep layer was animating Tailwind's `scale-x-*`, which in Tailwind v4 sets the `scale` property, so the `transform` transition never ran and the background switched at once. It now uses an inline `transform` and `transition`; the text and border colour changes are delayed by 100 ms so they follow the sweep.
+- **Files:** `prologue/DialogueOverlay.tsx` and test, this file.
+- **Validation:** `tsc`, full `vitest run`, `pnpm build`. In headless Chrome the layer's computed scale was read at an intermediate value (0.18), so it does animate now; the headless frame rate was too low to watch the whole sweep.
+- **Limitations:** the coasting-swipe logic was tested with synthetic events only, not on a real trackpad; the thresholds (130 ms, 1.8x) may need tuning by feel.
+- **Deviations:** none. **Follow-up:** owner to try on the trackpad.
 ### 2026-11-17 — Reply picker: sound on every move, wheel/trackpad, left-to-right highlight
 - **Objective:** owner request for the Auntie Mai reply picker.
 - **Completed:** moving the highlight with Up/Down now plays the same hover sound as the pointer. Mouse wheel and trackpad scroll also move it (deltas add up to a 40 px threshold, 220 ms cooldown per step so one flick is one step). The highlight no longer switches colour at once: a light layer sweeps in from the left in 380 ms, and fades out when the reply is left; the F key cap and pointer fade in and out. All of it is off the reduced-motion rule only for the pointer slide; the sweep is a short transition.
