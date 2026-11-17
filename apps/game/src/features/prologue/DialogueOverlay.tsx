@@ -23,7 +23,7 @@ export interface DialogueOverlayProps {
  * name and line, and the player's replies as a separate list on the right. The highlighted reply
  * shows the F key and a pointer that slides gently. A line with no replies shows "continue".
  *
- * Keys: Up and Down move the highlight; F picks the highlighted reply (or continues); Escape leaves.
+ * Keys: Up and Down move the highlight; F picks the highlighted reply (or continues); Escape leaves. A click anywhere continues a line without replies.
  */
 export const DialogueOverlay: React.FC<DialogueOverlayProps> = ({ graph, state, speaker, onChoose, onAdvance, onClose, onHoverSound }) => {
   const { t } = useTranslation("worlds");
@@ -80,7 +80,11 @@ export const DialogueOverlay: React.FC<DialogueOverlayProps> = ({ graph, state, 
   const line = text(lineKey(graph, node));
 
   return (
-    <div className="absolute inset-0 z-[64] select-none" onMouseDown={stop} onClick={stop}>
+    <div className="absolute inset-0 z-[64] select-none" onMouseDown={stop} onClick={(event) => {
+      stop(event);
+      // A line with no replies: a click anywhere moves on.
+      if (options.length === 0) onAdvance();
+    }}>
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-[46%] bg-gradient-to-t from-black/85 via-black/55 to-transparent" />
       {options.length > 0 && (
         <ul aria-label={text("quests.dialogue.replies")} className="absolute bottom-[26%] right-[clamp(1rem,7vw,8rem)] flex w-full max-w-md flex-col items-stretch gap-2">
@@ -121,18 +125,12 @@ export const DialogueOverlay: React.FC<DialogueOverlayProps> = ({ graph, state, 
             {line}
           </p>
           {options.length === 0 && (
-            <button
-              ref={first}
-              type="button"
-              onClick={onAdvance}
-              onPointerEnter={onHoverSound}
-              className="mt-3 flex items-center gap-2 font-menu text-sm font-semibold uppercase tracking-[0.14em] text-zinc-200 outline-none hover:text-white focus-visible:text-white cursor-pointer"
-            >
+            <p className="mt-3 flex items-center gap-2 font-menu text-sm font-semibold uppercase tracking-[0.14em] text-zinc-200">
               <kbd aria-hidden="true" className={KEYCAP}>
                 F
               </kbd>
               {text("quests.dialogue.continue")}
-            </button>
+            </p>
           )}
         </div>
       </div>

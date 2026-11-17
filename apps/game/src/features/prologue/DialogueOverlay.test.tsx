@@ -50,7 +50,8 @@ describe("DialogueOverlay", () => {
   it("shows Continue on a line without replies", () => {
     const h = handlers();
     render(<DialogueOverlay graph={MAI_DIALOGUE} state={startDialogue(MAI_DIALOGUE, "work")} speaker="Auntie Mai" {...h} />);
-    expect(screen.getAllByRole("button")).toHaveLength(1);
+    expect(screen.queryAllByRole("button")).toHaveLength(0);
+    expect(screen.getByText(enQuests.quests.dialogue.continue)).toBeTruthy();
     fireEvent.keyDown(window, { key: "Enter", code: "Enter" });
     expect(h.onAdvance).not.toHaveBeenCalled();
     fireEvent.keyDown(window, { key: "f", code: "KeyF" });
@@ -58,6 +59,15 @@ describe("DialogueOverlay", () => {
     expect(h.onChoose).not.toHaveBeenCalled();
   });
 
+  it("continues on a click anywhere when there are no replies, and not when there are", () => {
+    const h = handlers();
+    const { container, rerender } = render(<DialogueOverlay graph={MAI_DIALOGUE} state={startDialogue(MAI_DIALOGUE, "work")} speaker="Auntie Mai" {...h} />);
+    fireEvent.click(container.firstElementChild as Element);
+    expect(h.onAdvance).toHaveBeenCalledTimes(1);
+    rerender(<DialogueOverlay graph={MAI_DIALOGUE} state={startDialogue(MAI_DIALOGUE, "greet")} speaker="Auntie Mai" {...h} />);
+    fireEvent.click(container.firstElementChild as Element);
+    expect(h.onAdvance).toHaveBeenCalledTimes(1);
+  });
   it("ignores a number with no matching reply and closes on Escape", () => {
     const h = handlers();
     render(<DialogueOverlay graph={MAI_DIALOGUE} state={startDialogue(MAI_DIALOGUE, "bye")} speaker="Auntie Mai" {...h} />);

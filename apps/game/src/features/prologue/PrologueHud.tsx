@@ -91,7 +91,7 @@ export const PrologueHud: React.FC<PrologueHudProps> = ({ objective, prompt, sho
   return (
     <>
       <div className={`pointer-events-none absolute left-[clamp(1rem,3vw,2.5rem)] top-4 z-10 max-w-sm space-y-4 ${SHADOW}`}>
-        <div className={minimap ? "flex items-start gap-4" : undefined}>
+        <div className={minimap ? "flex items-start gap-4 pb-8" : undefined}>
           {minimap}
           {clock && (
             <div aria-label={t("worlds:khupho.game.story.clock")} className={minimap ? "pt-1" : undefined}>
@@ -103,7 +103,7 @@ export const PrologueHud: React.FC<PrologueHudProps> = ({ objective, prompt, sho
             </div>
           )}
         </div>
-        {questArea && <div className="mt-4">{questArea}</div>}
+        {questArea}
         {objective && (
           <section aria-labelledby="prologue-objective-heading">
             <h2 id="prologue-objective-heading" className="flex items-center gap-2.5 font-menu text-xs font-semibold uppercase tracking-[0.3em] text-[#c9bbf7]">

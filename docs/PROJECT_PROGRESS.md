@@ -177,6 +177,13 @@ Resolved:
 - The 3D model licenses of some owner-supplied riders, bikes and the Bao Thu model are "not stated" in
   their `SOURCE.md` files; confirm before a public release.
 ## Task History
+### 2026-11-17 — Dialogue: click anywhere to continue; objective clear of the quest button
+- **Objective:** owner feedback: a line with no replies should continue on a click anywhere; the objective text was still partly hidden by the quest button.
+- **Completed:** the dialogue layer advances on any click when a line has no replies (the "Continue F" hint is now plain text, no longer a button). The minimap row got 2 rem of bottom padding, so both the tracker and the plain objective sit below the quest button (the plain objective had no spacing before).
+- **Files:** `prologue/DialogueOverlay.tsx` and test, `prologue/PrologueHud.tsx`, this file.
+- **Validation:** `tsc`, full `vitest run`, `pnpm build`; headless screenshot of the HUD.
+- **Limitations:** the "take a walk" objective state was not captured; clicking was tested in jsdom only.
+- **Deviations:** none. **Follow-up:** none.
 ### 2026-11-17 — Dialogue: one key (F), arrows to choose, separate reply list, voice above the street
 - **Objective:** owner feedback on the Auntie Mai conversation.
 - **Completed:** F is the only confirm key (picks the highlighted reply, or continues); Up/Down move the highlight; number keys, Enter, Space and E no longer act in the conversation. The replies moved out of the line's frame into their own list on the right. The highlighted reply shows an up/down hint, the F key cap and a pointer that slides gently left and right (CSS `dialogue-nudge`, off under reduced motion). The street sound now ducks to 0.28 while Mai talks (it only ducked for the intro narration before), so her voice, already boosted 1.6x, stays above it.
