@@ -127,6 +127,9 @@ What exists in Chapter 1 today:
 
 Planned, not built yet: a simulated mobile web browser and a parcel app.
 
+### 1b. Prologue HUD: minimap, quests, conversations
+In the New Game prologue (`/khupho`): a round **minimap** top-left (it turns with the camera, shows the street, houses and the tracked quest) with the in-game **clock** to its right; a **quest list** button under it (red mark for a new quest); the tracked quest shown as the **objective** with its distance. Pressing the quest (or `Q`) lights a **guide trail** on the ground to the person. The first quest, "Go see Auntie Mai", leads to the banh mi vendor, who has a quest icon above her head. Talking to her (`E`) opens a branching conversation (replies with `1`-`3`) about the scams going around: a fake bank call that asks for the OTP, a fake police call, and what they have in common. Voice for these lines is not recorded yet.
+
 ### 2. Main Menu & Cinematic 3D Scene
 * **First-Person Street Camera:** Camera breathing, mouse parallax and a customizable Field of View (FOV).
 * **Atmospheric Environment:** Low-poly city pack, animated moving vehicles, customizable sky dome with cloud drift.
@@ -189,10 +192,11 @@ SCAMMAZE is architected as an ultra-fast, modern **pnpm monorepo**:
 | **Answer / Decline a ringing phone (room)** | `F` / `R` | Round Accept / Decline buttons |
 | **Pick a reply during a call** | `1`-`3` | Arrows + `Enter` |
 | **Leave an inspected object (room)** | `Q` | `Backspace` |
-| **Evidence Journal / Hints** | `J` / `H` | — |
+| **Quest list / show the path to the tracked quest (street)** | `J` / `Q` | Click the quest name or the quest icon (free the cursor with `Ctrl`) |
+| **Evidence Journal / Hints (room)** | `J` / `H` | — |
 | **Free the mouse cursor** | `Ctrl` | — |
 | **Pause / Main Menu** | `Escape` | — |
-| **Street extras (`/khupho`)** | `T` pause time · `R` rain · `M` mute · `G` tour | — |
+| **Street extras (`/khupho` prototype route only)** | `T` pause time · `R` rain · `M` mute · `G` tour | — |
 
 ---
 
