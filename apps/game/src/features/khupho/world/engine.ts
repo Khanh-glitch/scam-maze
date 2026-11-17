@@ -35,6 +35,8 @@ export interface Hud { time: string; hour: number; loc: string; prompt: string |
 /** Story-mode clock: the player explores from the afternoon until the rain starts and it is time to go home. */
 export const STORY_CLOCK = { startHour: 16.6, rainHour: 17.7, callHomeHour: 18.4 } as const;
 export type StoryEvent = 'rain' | 'callHome';
+/** Far end of the street (x, z in metres), the goal of the "walk the street" quest. */
+export const STREET_END = { x: -58, z: 0 } as const;
 export interface EngineOptions {
   /** Start in the afternoon, advance the clock only while playing, and report the story events. */
   story?: boolean;
@@ -111,6 +113,8 @@ export class Engine {
   /** Resolves when the street props are in the world (or failed to load). */
   propsReady: Promise<PlacedProp[]>;
   private storyRain = false; private storyCall = false;
+  /** Story pacing set by the host: `slow` while a conversation runs (the clock crawls, no story beat fires); `gate` keeps the rain from starting yet. */
+  private storySlow = false; private storyGate = false;
   /** Quest icons, the guide trail and the minimap data (story mode with a quest host only). */
   quest: QuestLayer | null = null;
   /** The player's house (no. 59), a host asked to take over (`homeBusy`), and the world standing still behind it. */
@@ -189,7 +193,7 @@ export class Engine {
       if (opts.story) e.player.teleport(STORY_SPAWN.x, STORY_SPAWN.z, STORY_SPAWN.yaw);
       report('life'); await yieldFrame(); if (isCancelled()) return e;
       e.life = buildLife(e.ctx, e.houses, e.vehicles, e.audio, await bikeRider, await humans, await baothu);
-      if (opts.quest) e.quest = new QuestLayer({ scene: e.scene, phys: e.phys, inter: e.inter, houses: e.houses, npcs: e.life.npcs, onTalk: opts.quest.onTalk, label: opts.quest.label });
+      if (opts.quest) e.quest = new QuestLayer({ scene: e.scene, phys: e.phys, inter: e.inter, houses: e.houses, npcs: e.life.npcs, onTalk: opts.quest.onTalk, label: opts.quest.label, target: (id) => e.targetPosition(id) });
       report('optimize'); await yieldFrame(); if (isCancelled()) return e;
       e.optimizeStatic();
       placeStreetFurniture(e.ctx.root);
@@ -400,6 +404,18 @@ export class Engine {
   /** World position of a person the quests talk about. */
   npcPosition(id: string) { return this.quest?.npcPosition(id) ?? null; }
   setNpcMarker(id: string, kind: MarkerKind | null) { this.quest?.setMarker(id, kind); }
+  /** Story pacing for the host (see `storySlow`, `storyGate`). */
+  setStoryPacing(slow: boolean, gate: boolean) { this.storySlow = slow; this.storyGate = gate; }
+  /** World position of a quest goal: a person, the far end of the street, house no. 59's door, or the white doorway upstairs. */
+  targetPosition(id: string): { x: number; z: number } | null {
+    if (id === 'streetEnd') return { x: STREET_END.x, z: STREET_END.z };
+    const h = this.home;
+    if (h && id === 'home') { const p = h.wp(h.doorX, 0, -1.0); return { x: p.x, z: p.z }; }
+    if (h?.doorway && id === 'homeUp') { const d = h.doorway; const p = h.wp((d.x0 + d.x1) / 2, 0, d.z); return { x: p.x, z: p.z }; }
+    return this.npcPosition(id);
+  }
+  /** True while the player is inside house no. 59. */
+  insideHome() { const h = this.home; return !!h && h.contains(this.player.pos.x, this.player.pos.z); }
   /** Lights the guide trail from the player to a person. */
   showPathTo(id: string) { this.quest?.showPath(id); }
   hidePath() { this.quest?.hidePath(); }
@@ -471,6 +487,7 @@ export class Engine {
   private updateStory() {
     if (!this.opts.story || !this.started) return;
     const e = this.env;
+    if (this.storySlow) return;
     if (!this.storyRain && e.hour >= STORY_CLOCK.rainHour) { this.storyRain = true; this.setRain(1); this.opts.onStory?.('rain'); }
     if (!this.storyCall && e.hour >= STORY_CLOCK.callHomeHour && e.rain > 0.4) { this.storyCall = true; this.opts.onStory?.('callHome'); }
   }
@@ -523,7 +540,12 @@ export class Engine {
 
   update(dt: number) {
     const e = this.env;
-    if (this.started || !this.opts.story) e.hour = (e.hour + (dt * this.timeScale) / 3600) % 24;
+    if (this.started || !this.opts.story) {
+      let next = e.hour + (dt * this.timeScale * (this.opts.story && this.storySlow ? 0.1 : 1)) / 3600;
+      // Until the host opens the gate, the clock waits just before dusk, so the rain does not start unseen.
+      if (this.opts.story && this.storyGate && !this.storyRain && next >= STORY_CLOCK.rainHour) next = STORY_CLOCK.rainHour - 0.001;
+      e.hour = next % 24;
+    }
     this.updateStory();
     e.rain += (this.rainTarget - e.rain) * Math.min(1, dt * 0.35);
     this.wet += ((this.rainTarget > 0.2 ? 1 : 0) - this.wet) * Math.min(1, dt * (this.rainTarget > 0.2 ? 0.08 : 0.01));

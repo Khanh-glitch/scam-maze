@@ -4,17 +4,24 @@
 // This is walk-around state kept by the prologue page. The deterministic chapter core (`game/
 // narrative/`) starts with the room, so nothing here changes the story outcome.
 
-export type QuestId = "meetMai";
+export type QuestId = "meetMai" | "walkStreet" | "goHome" | "goUp";
 export type QuestStatus = "active" | "done";
-
 export interface QuestDefinition {
   id: QuestId;
-  /** Person the quest leads to (an NPC id of the neighborhood world). */
-  npc: "mai";
+  /** Where the quest leads: a person's id or a named place; the street world resolves it to x and z. */
+  target: string;
+  /** The guide trail can be lit to the target (false when the way is not on the street, such as the stairs). */
+  trail: boolean;
 }
-
-export const QUESTS: readonly QuestDefinition[] = [{ id: "meetMai", npc: "mai" }];
-
+/** In story order: each quest starts when the one before it (or a story beat) ends. */
+export const QUESTS: readonly QuestDefinition[] = [
+  { id: "meetMai", target: "mai", trail: true },
+  { id: "walkStreet", target: "streetEnd", trail: true },
+  { id: "goHome", target: "home", trail: true },
+  { id: "goUp", target: "homeUp", trail: false },
+];
+/** How close (m) the player must get to the far end of the street. */
+export const STREET_END_RADIUS = 6;
 export interface QuestState {
   status: Readonly<Partial<Record<QuestId, QuestStatus>>>;
   /** Quest shown outside the list (the tracker); null when none. */
@@ -35,6 +42,11 @@ export function completeQuest(state: QuestState, id: QuestId): QuestState {
   return { ...state, status, tracked: state.tracked === id ? nextActive : state.tracked };
 }
 
+/** Makes a quest active and tracked, and marks the list as unseen so the new-quest dot shows. */
+export function startQuest(state: QuestState, id: QuestId): QuestState {
+  if (state.status[id]) return state;
+  return { ...state, status: { ...state.status, [id]: "active" }, tracked: id, seen: false };
+}
 export const trackQuest = (state: QuestState, id: QuestId | null): QuestState =>
   id === null || state.status[id] === "active" ? { ...state, tracked: id } : state;
 

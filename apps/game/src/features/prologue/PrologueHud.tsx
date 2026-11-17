@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { CloudRain, DoorOpen, MousePointerClick, Play, Settings, SlidersHorizontal, Volume2, VolumeX } from "lucide-react";
 
 /** Keyboard keys are literal text in every language. */
-export const GO_HOME_KEY = "H";
 
 // The in-game HUD uses the main menu's language: Barlow Condensed uppercase labels, key-cap boxes,
 // the slanted purple accent and ivory text with a soft shadow, straight on the 3D view (no panels).
@@ -72,11 +71,8 @@ export interface PrologueHudProps {
   cursorMode: boolean;
   /** In-world clock and weather (neighborhood only). */
   clock?: { time: string; detail: string; raining: boolean } | null;
-  /** Shows the go-home action (neighborhood only). */
-  onGoHome?: () => void;
   /** Draw the center dot (the room draws its own). */
   crosshair?: boolean;
-  onHoverSound?: () => void;
   /** The minimap disc; when given, the clock sits to its right. */
   minimap?: React.ReactNode;
   /** Quest button, tracked quest and toast, under the minimap. */
@@ -86,7 +82,7 @@ export interface PrologueHudProps {
 }
 
 /** Story HUD in the game's style: clock, objective, crosshair, prompt, resume hint, key hints. */
-export const PrologueHud: React.FC<PrologueHudProps> = ({ objective, prompt, showResume, cursorMode, clock, onGoHome, crosshair = true, onHoverSound, minimap, questArea, questKeys }) => {
+export const PrologueHud: React.FC<PrologueHudProps> = ({ objective, prompt, showResume, cursorMode, clock, crosshair = true, minimap, questArea, questKeys }) => {
   const { t } = useTranslation(["chapter1", "worlds"]);
   return (
     <>
@@ -161,14 +157,6 @@ export const PrologueHud: React.FC<PrologueHudProps> = ({ objective, prompt, sho
             </>
           )}
         </div>
-        {onGoHome && (
-          <button type="button" onMouseDown={stop} onClick={onGoHome} onPointerEnter={onHoverSound} aria-keyshortcuts={GO_HOME_KEY} className={MENU_BUTTON}>
-            <span aria-hidden="true" className={`${KEYCAP} ${KEYCAP_HOVER}`}>
-              {GO_HOME_KEY}
-            </span>
-            <span className="text-base">{t("worlds:khupho.game.story.goHome")}</span>
-          </button>
-        )}
       </div>
     </>
   );
