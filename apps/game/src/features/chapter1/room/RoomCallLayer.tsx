@@ -33,6 +33,8 @@ export interface RoomCallLayerProps {
   /** Shared Web Audio engine for the call sounds, or null (tests, no audio support). */
   engine: WebAudioEngine | null;
   voiceDeps?: VoicePlaybackDeps;
+  /** Plays the hover sound when the reply highlight moves. */
+  onHoverSound?: () => void;
 }
 
 /**
@@ -70,6 +72,7 @@ export const RoomCallLayer: React.FC<RoomCallLayerProps> = ({
   screenSink: screenSinkProp,
   engine,
   voiceDeps,
+  onHoverSound,
 }) => {
   const call = useChapterState(store, (state) => state.call);
   const [ownSink] = useState(createPhoneScreenSink);
@@ -134,6 +137,7 @@ export const RoomCallLayer: React.FC<RoomCallLayerProps> = ({
         durationSeconds={durationSeconds}
         subtitlesEnabled={settings.subtitlesEnabled}
         speaker={speaker}
+        onHoverSound={onHoverSound}
       />
     </>
   );

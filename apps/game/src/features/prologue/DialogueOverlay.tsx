@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { createWheelStepper } from "../../components/ui/wheelStep";
 import { KEYCAP, SHADOW, stop } from "./PrologueHud";
 import { lineKey, optionKey, visibleOptions, type DialogueGraph, type DialogueState } from "./quest/dialogue";
 
@@ -34,7 +35,6 @@ export const DialogueOverlay: React.FC<DialogueOverlayProps> = ({ graph, state, 
   const lastNode = useRef<string | null>(null);
   const first = useRef<HTMLButtonElement | null>(null);
   const node = state.node;
-  const wheel = useRef({ acc: 0, last: 0, prev: 0, abs: 0, dir: 0, locked: false });
 
   // Moves the highlight by one reply and plays the hover sound.
   const move = useCallback(
@@ -46,30 +46,11 @@ export const DialogueOverlay: React.FC<DialogueOverlayProps> = ({ graph, state, 
     [options.length, onHoverSound],
   );
 
-  // Wheel or trackpad: one swipe is one step. A trackpad keeps sending small events while the swipe coasts, so after a
-  // step the picker waits for a pause in the events, or for a swipe the other way, or for a clearly stronger new push.
+  // Wheel or trackpad: one swipe is one step (see `createWheelStepper`).
+  const stepper = useRef(createWheelStepper());
   const onWheel = (event: React.WheelEvent) => {
-    if (options.length < 2) return;
-    const w = wheel.current, now = performance.now();
-    const dy = event.deltaY * (event.deltaMode === 1 ? 16 : 1);
-    const gap = now - w.prev;
-    const reversed = Math.sign(dy) !== Math.sign(w.dir) && Math.abs(dy) >= 8;
-    const stronger = now - w.last > 300 && Math.abs(dy) > w.abs * 1.8 && Math.abs(dy) >= 30;
-    if (w.locked && (gap > 130 || reversed || stronger)) {
-      w.locked = false;
-      w.acc = 0;
-    }
-    w.prev = now;
-    w.abs = Math.abs(dy);
-    if (w.locked) return;
-    if (gap > 350) w.acc = 0;
-    w.acc += dy;
-    if (Math.abs(w.acc) < 40) return;
-    w.dir = w.acc;
-    move(w.acc > 0 ? 1 : -1);
-    w.acc = 0;
-    w.last = now;
-    w.locked = true;
+    const step = stepper.current(event.deltaY, event.deltaMode, performance.now());
+    if (step !== 0) move(step);
   };
 
   // A new line starts with the first reply highlighted.

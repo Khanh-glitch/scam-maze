@@ -5,7 +5,7 @@
 //
 // For any Chapter 1 call (scam call, callback, official line) from src/test/callStates.ts, for
 // any seeded sequence of option positions and activation methods (pointer click, Enter, Space,
-// number key), in both locales and in both presentation modes (model and fallback, simulated
+// F key), in both locales and in both presentation modes (model and fallback, simulated
 // through the PhoneScreenSink), selecting the options through `CallPresentation` and its
 // Choice_Overlay produces the same Narrative_Core state as dispatching the same actions directly
 // on the reducer. After every step the rendered option IDs, order and text equal
@@ -38,12 +38,12 @@ const PROPERTY_TIMEOUT_MS = 60_000;
 /** Extra option steps taken through the overlay after the generated walk. */
 const MAX_EXTRA_OPTIONS = 4;
 
-type OptionMethod = "click" | "enter" | "space" | "number-key";
-type ButtonMethod = Exclude<OptionMethod, "number-key">;
+type OptionMethod = "click" | "enter" | "space" | "f-key";
+type ButtonMethod = Exclude<OptionMethod, "f-key">;
 /** model: rect published; sink-null: rect then null (model -> fallback); no-model: modelAllowed false. */
 type ModeVariant = "model" | "sink-null" | "no-model";
 
-const OPTION_METHODS: readonly OptionMethod[] = ["click", "enter", "space", "number-key"];
+const OPTION_METHODS: readonly OptionMethod[] = ["click", "enter", "space", "f-key"];
 const BUTTON_METHODS: readonly ButtonMethod[] = ["click", "enter", "space"];
 const MODE_VARIANTS: readonly ModeVariant[] = ["model", "sink-null", "no-model"];
 const ALLOWED_TYPES = new Set<CoreAction["type"]>(["ANSWER_CALL", "SELECT_DIALOGUE_OPTION", "END_CALL"]);
@@ -131,15 +131,15 @@ function activateButton(button: HTMLButtonElement, method: ButtonMethod, dispatc
   fireEvent.click(button);
 }
 
-/** Activates option `index` with `method`; number keys go to the focused element and bubble to window. */
+/** Activates option `index` with `method`; the F key picks the highlighted option, reached with the arrow keys. */
 function activateOption(option: RenderedOption, index: number, method: OptionMethod, dispatched: CoreAction[]): void {
-  if (method !== "number-key") {
+  if (method !== "f-key") {
     activateButton(option.button, method, dispatched);
     return;
   }
-  const target = document.activeElement ?? document.body;
+  for (let i = 0; i < index; i += 1) fireEvent.keyDown(window, { key: "ArrowDown", code: "ArrowDown" });
   // The window listener calls preventDefault when it selects an option.
-  expect(fireEvent.keyDown(target, { key: String(index + 1), code: `Digit${index + 1}` })).toBe(false);
+  expect(fireEvent.keyDown(window, { key: "f", code: "KeyF" })).toBe(false);
 }
 
 describe("CallPresentation equivalence (Property 1)", () => {
@@ -149,8 +149,8 @@ describe("CallPresentation equivalence (Property 1)", () => {
       const generated = generateCallStates(CASES, SEED);
       const next = createLcg(SEED);
       const optionSelections: Record<GameLocale, Record<OptionMethod, number>> = {
-        en: { click: 0, enter: 0, space: 0, "number-key": 0 },
-        vi: { click: 0, enter: 0, space: 0, "number-key": 0 },
+        en: { click: 0, enter: 0, space: 0, "f-key": 0 },
+        vi: { click: 0, enter: 0, space: 0, "f-key": 0 },
       };
       const callsSeen = new Set<string>();
       const modesSeen = new Set<ModeVariant>();
