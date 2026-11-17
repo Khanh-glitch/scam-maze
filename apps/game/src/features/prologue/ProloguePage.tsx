@@ -14,7 +14,7 @@ import type { Engine as RoomEngine, UIState as RoomUI } from "../roomv2/game/eng
 import type { RoomOptions } from "../roomv2/game/outside";
 import { HomeCallOverlay } from "./HomeCallOverlay";
 import { DialogueOverlay } from "./DialogueOverlay";
-import { Minimap } from "./Minimap";
+import { Minimap, NoSignalMinimap } from "./Minimap";
 import { QUEST_LIST_KEY, QUEST_PATH_KEY, QuestListButton, QuestListPanel, QuestToast, QuestTracker, useDistance } from "./QuestHud";
 import { advance, chooseOption, isEnded, startDialogue, type DialogueState } from "./quest/dialogue";
 import { MAI_DIALOGUE, maiStart } from "./quest/maiDialogue";
@@ -627,6 +627,7 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
                     saveSource={saveSource}
                     engineReady={roomCommands}
                     onReturnToMenu={onBackToMenu}
+                    onHoverSound={onHoverSound}
                   />
                 ) : undefined
               }
@@ -642,7 +643,7 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
           </Suspense>
         </div>
       )}
-      {stage === "room" && playingRoom && !paused && <PrologueHud objective={null} prompt={null} showResume={showResume} cursorMode={roomCursor} crosshair={false} />}
+      {stage === "room" && playingRoom && !paused && <PrologueHud objective={null} prompt={null} showResume={showResume} cursorMode={roomCursor} crosshair={false} minimap={<NoSignalMinimap label={t("worlds:quests.noSignal")} />} />}
 
       {inGame && !callOpen && !paused && !(session && stage === "room") && (
         <PrologueTopBar soundEnabled={soundOn} onToggleSound={toggleSound} onOpenSettings={openPause} onHoverSound={onHoverSound} />

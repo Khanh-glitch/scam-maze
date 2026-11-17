@@ -16,6 +16,7 @@ const quests: LocaleShape<typeof en> = {
     newQuest: "Nhiệm vụ mới",
     minimap: "Bản đồ nhỏ",
     north: "B",
+    noSignal: "Không có tín hiệu",
     keyList: "Nhiệm vụ",
     keyPath: "Hiện đường đi",
     questMarker: "Nhiệm vụ",

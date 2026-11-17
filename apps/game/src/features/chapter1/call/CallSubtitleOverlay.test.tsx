@@ -139,10 +139,8 @@ describe("CallSubtitleOverlay behavior", () => {
     // The bar shows two lines, then the text scrolls inside it.
     const scroller = screen.getByTestId("call-subtitle-scroller");
     expect(scroller.style.overflowY).toBe("auto");
-    // Two full lines PLUS the top padding (the box is border-box, so the padding is not text room).
-    expect(parseFloat(scroller.style.maxHeight)).toBe(
-      Math.round(CINE.fontPx.subtitle * CINE.subtitle.lineHeight) * CINE.subtitleVisibleLines + Math.round(CINE.subtitle.pillHeightPx / 4),
-    );
+    // Exactly the visible lines; the speaker name sits above the scroller.
+    expect(parseFloat(scroller.style.maxHeight)).toBe(Math.round(CINE.fontPx.subtitle * CINE.subtitle.lineHeight) * CINE.subtitleVisibleLines);
     const line = screen.getByTestId("call-subtitle-line");
     expect(line.textContent).toBe(long);
     expect(line.className).not.toMatch(/truncate|line-clamp|text-ellipsis/);
@@ -176,32 +174,34 @@ describe("CallSubtitleOverlay placement (cinematic)", () => {
     expect(root.style.width).toBe(`${REGION.width}px`);
   });
 
-  it("is a compact translucent panel, with the speaker name smaller than the line", () => {
+  it("has no panel of its own: a dark band behind the text, the speaker name in gold capitals", () => {
     render(<CallSubtitleOverlay {...props()} />);
     const bar = screen.getByTestId("call-subtitle-bar");
-    expect(bar.style.backdropFilter).toContain("blur");
-    expect(bar.style.background).toContain("rgba(");
-    const line = screen.getByTestId("call-subtitle-line");
+    expect(bar.style.backdropFilter).toBe("");
+    expect(bar.style.background).toBe("");
+    expect(screen.getByTestId("call-subtitle-band").getAttribute("aria-hidden")).toBe("true");
     const speaker = screen.getByText("Caller A");
-    expect(parseFloat(speaker.style.fontSize)).toBeLessThan(parseFloat(line.style.fontSize));
+    expect(speaker.className).toContain("uppercase");
+    expect(speaker.style.color).toBe("rgb(243, 201, 105)");
     // Never below the minimum effective text size.
     expect(parseFloat(speaker.style.fontSize)).toBeGreaterThanOrEqual(13);
   });
 });
 
-describe("CallSubtitleOverlay speaker pill and scroll hint", () => {
+describe("CallSubtitleOverlay speaker name and scroll hint", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("shows the speaker in a violet pill on the top-left of the bar, inside the live region", () => {
+  it("shows the speaker name above the line, inside the live region", () => {
     render(<CallSubtitleOverlay {...props()} />);
-    const pill = screen.getByTestId("call-subtitle-speaker");
-    expect(pill.textContent).toBe("Caller A");
-    expect(pill.style.background).toContain("118, 84, 214");
-    expect(parseFloat(pill.style.top)).toBeLessThan(0);
-    expect(screen.getByTestId("call-subtitle-region").contains(pill)).toBe(true);
-    expect(screen.getByTestId("call-subtitle-bar").contains(pill)).toBe(true);
+    const name = screen.getByTestId("call-subtitle-speaker");
+    expect(name.textContent).toBe("Caller A");
+    expect(screen.getByTestId("call-subtitle-region").contains(name)).toBe(true);
+    expect(screen.getByTestId("call-subtitle-bar").contains(name)).toBe(true);
+    // The name comes before the line in the document.
+    const line = screen.getByTestId("call-subtitle-line");
+    expect(name.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("shows a chevron only while more text is below the visible lines", () => {
