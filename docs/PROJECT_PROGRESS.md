@@ -177,6 +177,13 @@ Resolved:
 - The 3D model licenses of some owner-supplied riders, bikes and the Bao Thu model are "not stated" in
   their `SOURCE.md` files; confirm before a public release.
 ## Task History
+### 2026-11-17 — Reply picker: sound on every move, wheel/trackpad, left-to-right highlight
+- **Objective:** owner request for the Auntie Mai reply picker.
+- **Completed:** moving the highlight with Up/Down now plays the same hover sound as the pointer. Mouse wheel and trackpad scroll also move it (deltas add up to a 40 px threshold, 220 ms cooldown per step so one flick is one step). The highlight no longer switches colour at once: a light layer sweeps in from the left in 380 ms, and fades out when the reply is left; the F key cap and pointer fade in and out. All of it is off the reduced-motion rule only for the pointer slide; the sweep is a short transition.
+- **Files:** `prologue/DialogueOverlay.tsx` and test, this file.
+- **Validation:** `tsc`, full `vitest run`, `pnpm build`; headless screenshot of the final state.
+- **Limitations:** sound, wheel feel on a real trackpad and the sweep animation were not experienced in motion (headless Chrome, no audio). One unrelated test (`ProloguePage.room`, "keeps the street silent") failed once under load and passed on re-runs.
+- **Deviations:** none. **Follow-up:** owner to tune the wheel threshold and cooldown by feel.
 ### 2026-11-17 — Reply picker: new mouse icon; quest HUD icons moved to `ui/hud/`
 - **Objective:** owner request: replace the mouse icon with `mouse2`, and put the icon files in sensible folders.
 - **Completed:** `mouse2.png` was cropped to its content (326x512) and converted to `public/assets/ui/hud/mouse.webp` (85% opacity in the picker). The quest HUD icons now live in `public/assets/ui/hud/`: `task.webp`, `dot.webp`, `mouse.webp`, `scammaze-quest-icon-512.png`, `scammaze-chat-icon-512.png`. Code paths updated in `Minimap.tsx`, `QuestHud.tsx`, `DialogueOverlay.tsx`, `questLayer.ts`. Earlier entries below still name the old `ui/` paths.

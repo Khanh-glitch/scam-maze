@@ -7,7 +7,7 @@ import { DialogueOverlay } from "./DialogueOverlay";
 import { startDialogue } from "./quest/dialogue";
 import { MAI_DIALOGUE } from "./quest/maiDialogue";
 
-const handlers = () => ({ onChoose: vi.fn(), onAdvance: vi.fn(), onClose: vi.fn() });
+const handlers = () => ({ onChoose: vi.fn(), onAdvance: vi.fn(), onClose: vi.fn(), onHoverSound: vi.fn() });
 
 describe("DialogueOverlay", () => {
   beforeEach(() => applyLocale("en"));
@@ -47,6 +47,19 @@ describe("DialogueOverlay", () => {
     expect(h.onChoose).toHaveBeenCalledTimes(2);
   });
 
+  it("plays the hover sound for arrows and for the wheel, and the wheel moves the highlight", () => {
+    const h = handlers();
+    const { container } = render(<DialogueOverlay graph={MAI_DIALOGUE} state={startDialogue(MAI_DIALOGUE, "greet")} speaker="Auntie Mai" {...h} />);
+    fireEvent.keyDown(window, { key: "ArrowDown", code: "ArrowDown" });
+    expect(h.onHoverSound).toHaveBeenCalledTimes(1);
+    fireEvent.wheel(container.firstElementChild as Element, { deltaY: 100 });
+    expect(h.onHoverSound).toHaveBeenCalledTimes(2);
+    fireEvent.keyDown(window, { key: "f", code: "KeyF" });
+    expect(h.onChoose).toHaveBeenLastCalledWith("stall");
+    // A tiny scroll below the threshold does nothing.
+    fireEvent.wheel(container.firstElementChild as Element, { deltaY: 5 });
+    expect(h.onHoverSound).toHaveBeenCalledTimes(2);
+  });
   it("shows Continue on a line without replies", () => {
     const h = handlers();
     render(<DialogueOverlay graph={MAI_DIALOGUE} state={startDialogue(MAI_DIALOGUE, "work")} speaker="Auntie Mai" {...h} />);

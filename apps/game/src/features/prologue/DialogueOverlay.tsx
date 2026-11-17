@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { KEYCAP, SHADOW, stop } from "./PrologueHud";
 import { lineKey, optionKey, visibleOptions, type DialogueGraph, type DialogueState } from "./quest/dialogue";
@@ -24,7 +24,7 @@ export interface DialogueOverlayProps {
  * name and line, and the player's replies as a separate list on the right. The highlighted reply
  * shows the F key and a pointer that slides gently. A line with no replies shows "continue".
  *
- * Keys: Up and Down move the highlight; F picks the highlighted reply (or continues); Escape leaves. A click anywhere continues a line without replies.
+ * Keys: Up and Down (or the mouse wheel / trackpad scroll) move the highlight, with the hover sound; F picks the highlighted reply (or continues); Escape leaves. A click anywhere continues a line without replies.
  */
 export const DialogueOverlay: React.FC<DialogueOverlayProps> = ({ graph, state, speaker, onChoose, onAdvance, onClose, onHoverSound }) => {
   const { t } = useTranslation("worlds");
@@ -34,6 +34,29 @@ export const DialogueOverlay: React.FC<DialogueOverlayProps> = ({ graph, state, 
   const lastNode = useRef<string | null>(null);
   const first = useRef<HTMLButtonElement | null>(null);
   const node = state.node;
+  const wheel = useRef({ acc: 0, last: 0 });
+
+  // Moves the highlight by one reply and plays the hover sound.
+  const move = useCallback(
+    (delta: number) => {
+      if (options.length < 2) return;
+      setActive((i) => (i + delta + options.length) % options.length);
+      onHoverSound?.();
+    },
+    [options.length, onHoverSound],
+  );
+
+  // Wheel or trackpad: a trackpad sends a stream of small events, so they add up and a cooldown keeps one flick to one step.
+  const onWheel = (event: React.WheelEvent) => {
+    if (options.length < 2) return;
+    const w = wheel.current, now = performance.now();
+    if (now - w.last > 350) w.acc = 0;
+    w.acc += event.deltaY * (event.deltaMode === 1 ? 16 : 1);
+    if (Math.abs(w.acc) < 40 || now - w.last < 220) return;
+    move(w.acc > 0 ? 1 : -1);
+    w.acc = 0;
+    w.last = now;
+  };
 
   // A new line starts with the first reply highlighted.
   useEffect(() => {
@@ -63,10 +86,10 @@ export const DialogueOverlay: React.FC<DialogueOverlayProps> = ({ graph, state, 
       }
       if (event.key === "ArrowDown") {
         event.preventDefault();
-        setActive((i) => (i + 1) % options.length);
+        move(1);
       } else if (event.key === "ArrowUp") {
         event.preventDefault();
-        setActive((i) => (i + options.length - 1) % options.length);
+        move(-1);
       } else if (confirm) {
         event.preventDefault();
         onChoose(options[Math.min(active, options.length - 1)].id);
@@ -75,13 +98,13 @@ export const DialogueOverlay: React.FC<DialogueOverlayProps> = ({ graph, state, 
     // Capture phase: the page's own Escape handling must not also open the pause menu.
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [options, active, onChoose, onAdvance, onClose]);
+  }, [options, active, move, onChoose, onAdvance, onClose]);
 
   if (node === null) return null;
   const line = text(lineKey(graph, node));
 
   return (
-    <div className="absolute inset-0 z-[64] select-none" onMouseDown={stop} onClick={(event) => {
+    <div className="absolute inset-0 z-[64] select-none" onMouseDown={stop} onWheel={onWheel} onClick={(event) => {
       stop(event);
       // A line with no replies: a click anywhere moves on.
       if (options.length === 0) onAdvance();
@@ -93,7 +116,7 @@ export const DialogueOverlay: React.FC<DialogueOverlayProps> = ({ graph, state, 
             const on = index === active;
             return (
               <li key={option.id} className="flex items-center gap-2">
-                <span aria-hidden="true" className={`flex shrink-0 items-center gap-1.5 ${on ? "" : "invisible"}`}>
+                <span aria-hidden="true" className={`flex shrink-0 items-center gap-1.5 transition-opacity duration-300 ${on ? "opacity-100" : "opacity-0"}`}>
                   {options.length > 1 && <img src={ICON_MOUSE} alt="" width={20} height={32} draggable={false} className="h-8 w-5 shrink-0 opacity-85" />}
                   <kbd className={`${KEYCAP} !bg-white !text-[#171521]`}>F</kbd>
                   <span className="dialogue-nudge text-sm leading-none text-white">&#9654;</span>
@@ -106,10 +129,12 @@ export const DialogueOverlay: React.FC<DialogueOverlayProps> = ({ graph, state, 
                     if (!on) onHoverSound?.();
                     setActive(index);
                   }}
-                  className={`flex min-w-0 flex-1 items-center gap-3 rounded-full border px-4 py-2 text-left outline-none transition-colors cursor-pointer ${on ? "border-white/80 bg-white/90 text-[#171521]" : "border-white/30 bg-black/55 text-zinc-100"}`}
+                  className={`relative flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-full border px-4 py-2 text-left outline-none transition-colors duration-300 cursor-pointer ${on ? "border-white/80 text-[#171521]" : "border-white/30 bg-black/55 text-zinc-100"}`}
                 >
-                  <img src={ICON_CHAT} alt="" width={22} height={22} draggable={false} className={`h-[22px] w-[22px] shrink-0 ${on ? "invert" : ""}`} />
-                  <span className="text-base font-medium leading-snug">{text(optionKey(graph, option.id))}</span>
+                  {/* The highlight sweeps in from the left; on the way out it just fades. */}
+                  <span aria-hidden="true" className={`pointer-events-none absolute inset-0 origin-left bg-white/90 ${on ? "scale-x-100 opacity-100 [transition:transform_380ms_cubic-bezier(0.22,1,0.36,1),opacity_120ms]" : "scale-x-0 opacity-0 [transition:opacity_220ms_ease-out,transform_0s_linear_220ms]"}`} />
+                  <img src={ICON_CHAT} alt="" width={22} height={22} draggable={false} className={`relative h-[22px] w-[22px] shrink-0 transition-[filter] duration-300 ${on ? "invert" : ""}`} />
+                  <span className="relative text-base font-medium leading-snug">{text(optionKey(graph, option.id))}</span>
                 </button>
               </li>
             );
