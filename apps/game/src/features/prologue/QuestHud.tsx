@@ -5,7 +5,8 @@ import { Accent, KEYCAP, SHADOW, stop } from "./PrologueHud";
 import { hasNewQuest, questsWith, type QuestId, type QuestState } from "./quest/quests";
 
 const ICON_QUEST = "/assets/ui/scammaze-quest-icon-512.png";
-const ICON_LIST = "/assets/ui/scammaze-quest-list-icon-512.png";
+const ICON_TASK = "/assets/ui/task.webp";
+const ICON_DOT = "/assets/ui/dot.webp";
 
 /** Keys the page listens for (shown as key caps; the page owns the handlers). */
 export const QUEST_LIST_KEY = "J";
@@ -21,10 +22,16 @@ export interface QuestListButtonProps {
   state: QuestState;
   onOpen: () => void;
   onHoverSound?: () => void;
+  /** Placement from the host (it sits on the corner of the minimap). */
+  className?: string;
 }
 
-/** The bookmark icon under the minimap; a red mark shows while a quest has not been looked at. */
-export const QuestListButton: React.FC<QuestListButtonProps> = ({ state, onOpen, onHoverSound }) => {
+/**
+ * The task icon on the minimap's lower-left corner. `dot.webp` lies on the upper-right corner of the
+ * bookmark shape (both files are 512 px canvases with the shape off center, so the dot is offset to
+ * put its circle on that corner) and shows only while a new quest has not been looked at.
+ */
+export const QuestListButton: React.FC<QuestListButtonProps> = ({ state, onOpen, onHoverSound, className = "" }) => {
   const q = useQuestText();
   return (
     <button
@@ -34,10 +41,12 @@ export const QuestListButton: React.FC<QuestListButtonProps> = ({ state, onOpen,
       onPointerEnter={onHoverSound}
       aria-label={q("quests.openList")}
       aria-keyshortcuts={QUEST_LIST_KEY}
-      className="pointer-events-auto relative flex h-14 w-14 shrink-0 items-center justify-center rounded-lg outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-[#b9a5f5]"
+      className={`pointer-events-auto z-10 flex h-14 w-14 items-center justify-center rounded-lg outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-[#b9a5f5] ${className}`}
     >
-      <img src={ICON_LIST} alt="" width={48} height={48} draggable={false} className="h-12 w-12 select-none drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]" />
-      {hasNewQuest(state) && <span data-testid="quest-new-mark" aria-hidden="true" className="absolute right-1 top-1 h-3 w-3 rounded-full bg-[#ef6f7d] ring-2 ring-black/40" />}
+      <span className="relative block h-[3.25rem] w-[3.25rem]">
+        <img src={ICON_TASK} alt="" draggable={false} className="h-full w-full select-none object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]" />
+        {hasNewQuest(state) && <img data-testid="quest-new-mark" src={ICON_DOT} alt="" aria-hidden="true" draggable={false} style={{ width: "115%", height: "115%", left: "28.8%", top: "-48%" }} className="absolute max-w-none select-none object-contain" />}
+      </span>
     </button>
   );
 };

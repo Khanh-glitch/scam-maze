@@ -10,8 +10,8 @@ import type { House } from './house';
  * No story rules live here: the host page decides which icon shows and what a conversation does.
  */
 
-/** Icon above an NPC: a pending quest, or a conversation in progress. */
-export type MarkerKind = 'quest' | 'chat';
+/** Icon above an NPC: a pending quest, or the same icon emphasized (bigger, with a pulsing glow) while talking. */
+export type MarkerKind = 'quest' | 'active';
 
 export interface MapRect { x0: number; z0: number; x1: number; z1: number; kind: 'road' | 'walk' | 'alley' | 'court' }
 export interface MapData {
@@ -33,10 +33,9 @@ export interface QuestLayerDeps {
   label: (npc: string) => string;
 }
 
-const ICON_URLS: Record<MarkerKind, string> = {
-  quest: '/assets/ui/scammaze-quest-icon-512.png',
-  chat: '/assets/ui/scammaze-chat-icon-512.png',
-};
+const ICON_URL = '/assets/ui/scammaze-quest-icon-512.png';
+const ICON_SIZE = 0.05;
+const ICON_SIZE_ACTIVE = 0.066;
 
 /** Street, sidewalks, alley and courtyard as laid out in neighborhood.ts. */
 const MAP_RECTS: MapRect[] = [
@@ -52,8 +51,8 @@ const MAP_RECTS: MapRect[] = [
 const NAV = { x0: -64, z0: -8, x1: 64, z1: 56, cell: 0.8 };
 /** Clearance (m) the trail keeps from walls and props. */
 const NAV_RADIUS = 0.42;
-/** The trail stops this far short of the person (m). */
-const TRAIL_STOP = 1.7;
+/** The trail ends this far from the person's feet (m): at her feet, not short of her. */
+const TRAIL_STOP = 0.25;
 const TRAIL_STEP = 0.6;
 const TRAIL_WIDTH = 0.95;
 const TRAIL_LIFT = 0.05;
@@ -87,8 +86,9 @@ void main() {
   float s = fract(x / 1.5 - uTime * 0.55);
   float line = 0.3 + 0.35 * (1.0 - v);
   float chev = smoothstep(0.09, 0.0, abs(s - line));
-  float fadeStart = smoothstep(0.4, 2.2, x);
-  float fadeEnd = 1.0 - smoothstep(max(uLen - 1.2, 0.0), max(uLen, 0.01), x);
+  float fadeStart = smoothstep(0.4, max(0.8, min(2.2, uLen * 0.45)), x);
+  // Only dims a little near the end so the light still lands on her feet.
+  float fadeEnd = 1.0 - 0.3 * smoothstep(max(uLen - 1.0, 0.0), max(uLen, 0.01), x);
   float a = ((0.22 + chev * 0.9) * mask * fadeEnd + head * 0.8) * edge * fadeStart;
   vec3 col = mix(vec3(1.0, 0.86, 0.5), vec3(0.78, 0.7, 1.0), smoothstep(0.0, 1.0, v));
   gl_FragColor = vec4(col * a * uAlpha, a * uAlpha);
@@ -96,8 +96,8 @@ void main() {
 
 export class QuestLayer {
   private d: QuestLayerDeps;
-  private textures = new Map<MarkerKind, THREE.Texture>();
-  private markers = new Map<string, { sprite: THREE.Sprite; kind: MarkerKind; top: number | null }>();
+  private texture: THREE.Texture;
+  private markers = new Map<string, { sprite: THREE.Sprite; halo: THREE.Sprite; kind: MarkerKind; top: number | null }>();
   private nav: NavGrid | null = null;
   private trail: THREE.Mesh;
   private trailUniforms = { uTime: { value: 0 }, uReveal: { value: 0 }, uLen: { value: 1 }, uAlpha: { value: 0 } };
@@ -111,12 +111,8 @@ export class QuestLayer {
 
   constructor(deps: QuestLayerDeps) {
     this.d = deps;
-    const loader = new THREE.TextureLoader();
-    for (const kind of Object.keys(ICON_URLS) as MarkerKind[]) {
-      const tex = loader.load(ICON_URLS[kind]);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      this.textures.set(kind, tex);
-    }
+    this.texture = new THREE.TextureLoader().load(ICON_URL);
+    this.texture.colorSpace = THREE.SRGBColorSpace;
     // Trail mesh: geometry is rebuilt when the path changes.
     const mat = new THREE.ShaderMaterial({
       vertexShader: TRAIL_VERT, fragmentShader: TRAIL_FRAG, uniforms: this.trailUniforms,
@@ -145,30 +141,32 @@ export class QuestLayer {
     return { x: this.tmp.x, z: this.tmp.z };
   }
 
-  /** Shows an icon above a person; `null` removes it. */
+  /** Shows the quest icon above a person (`active`: emphasized while talking); `null` hides it. */
   setMarker(id: string, kind: MarkerKind | null) {
-    const current = this.markers.get(id);
+    let m = this.markers.get(id);
     if (kind === null) {
-      if (current) current.sprite.visible = false;
+      if (m) { m.sprite.visible = false; m.halo.visible = false; }
       return;
     }
-    if (current) {
-      if (current.kind !== kind) {
-        (current.sprite.material as THREE.SpriteMaterial).map = this.textures.get(kind) as THREE.Texture;
-        (current.sprite.material as THREE.SpriteMaterial).needsUpdate = true;
-        current.kind = kind;
-      }
-      current.sprite.visible = true;
-      return;
+    if (!m) {
+      // Always drawn on top and a fixed size on screen, so it can be seen through walls and from far away.
+      const make = (additive: boolean) => {
+        const mat = new THREE.SpriteMaterial({ map: this.texture, transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending });
+        const sprite = new THREE.Sprite(mat);
+        sprite.frustumCulled = false;
+        sprite.renderOrder = additive ? 9 : 10;
+        this.d.scene.add(sprite);
+        return sprite;
+      };
+      m = { sprite: make(false), halo: make(true), kind, top: null };
+      this.markers.set(id, m);
     }
-    // Always drawn on top and a fixed size on screen, so it can be seen through walls and from far away.
-    const mat = new THREE.SpriteMaterial({ map: this.textures.get(kind), transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false });
-    const sprite = new THREE.Sprite(mat);
-    sprite.scale.set(0.05, 0.05, 1);
-    sprite.renderOrder = 10;
-    sprite.frustumCulled = false;
-    this.d.scene.add(sprite);
-    this.markers.set(id, { sprite, kind, top: null });
+    m.kind = kind;
+    m.sprite.visible = true;
+    m.halo.visible = kind === 'active';
+    const size = kind === 'active' ? ICON_SIZE_ACTIVE : ICON_SIZE;
+    m.sprite.scale.set(size, size, 1);
+    m.halo.scale.set(size * 1.7, size * 1.7, 1);
   }
 
   /** Lights the guide trail from the player to a person. Calling it again restarts the animation. */
@@ -250,11 +248,14 @@ export class QuestLayer {
     for (const [id, m] of this.markers) {
       const obj = this.d.npcs[id];
       if (!m.sprite.visible || !obj) continue;
-      if (!obj.visible) { m.sprite.position.set(0, -1000, 0); continue; }
+      if (!obj.visible) { m.sprite.position.set(0, -1000, 0); m.halo.position.set(0, -1000, 0); continue; }
       obj.getWorldPosition(this.tmp);
       if (m.top === null) { const box = new THREE.Box3().setFromObject(obj); m.top = Number.isFinite(box.max.y) ? Math.min(1.65, Math.max(1.5, box.max.y - this.tmp.y)) : 1.7; }
       const far = Math.hypot(this.tmp.x - player.x, this.tmp.z - player.z) > 160;
-      m.sprite.position.set(this.tmp.x, far ? -1000 : this.tmp.y + m.top + 0.18 + Math.sin(elapsed * 2.2) * 0.06, this.tmp.z);
+      const y = far ? -1000 : this.tmp.y + m.top + 0.18 + Math.sin(elapsed * 2.2) * 0.06;
+      m.sprite.position.set(this.tmp.x, y, this.tmp.z);
+      m.halo.position.copy(m.sprite.position);
+      if (m.kind === 'active') (m.halo.material as THREE.SpriteMaterial).opacity = 0.35 + 0.25 * Math.sin(elapsed * 4);
     }
     if (!this.trailTarget) return;
     this.trailT += dt;
@@ -277,11 +278,11 @@ export class QuestLayer {
   dispose() {
     for (const f of this.disposers) f();
     this.disposers.length = 0;
-    for (const m of this.markers.values()) { this.d.scene.remove(m.sprite); (m.sprite.material as THREE.Material).dispose(); }
+    for (const m of this.markers.values()) { for (const sp of [m.sprite, m.halo]) { this.d.scene.remove(sp); (sp.material as THREE.Material).dispose(); } }
     this.markers.clear();
     this.d.scene.remove(this.trail);
     this.trail.geometry.dispose();
     (this.trail.material as THREE.Material).dispose();
-    for (const t of this.textures.values()) t.dispose();
+    this.texture.dispose();
   }
 }

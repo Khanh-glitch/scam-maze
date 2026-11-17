@@ -422,12 +422,12 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
     streetRef.current?.audio.setDuck(narrating);
   }, [narrating, worldReady]);
 
-  // Auntie Mai's icon: a quest mark while the quest is open, a chat bubble while talking.
+  // Auntie Mai's icon: the quest mark while the quest is open, emphasized while talking.
   const maiOpen = quests.status.meetMai === "active";
   useEffect(() => {
     const street = streetRef.current;
     if (!street || !started) return;
-    street.setNpcMarker("mai", dialogue ? "chat" : maiOpen ? "quest" : null);
+    street.setNpcMarker("mai", dialogue ? "active" : maiOpen ? "quest" : null);
   }, [dialogue, maiOpen, started, worldReady]);
   // The "quest complete" notice stays a few seconds.
   useEffect(() => {
@@ -501,18 +501,18 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
               onGoHome={goHome}
               onHoverSound={onHoverSound}
               questKeys
-              minimap={<Minimap getPose={getPose} getTarget={getTarget} map={mapData} label={t("worlds:quests.minimap")} north={t("worlds:quests.north")} />}
-              questArea={
-                <div className="flex items-start gap-3">
-                  <QuestListButton state={quests} onOpen={openListPanel} onHoverSound={onHoverSound} />
-                  <div className="min-w-0 pt-1">
-                    {toast ? (
-                      <QuestToast questId={toast} />
-                    ) : quests.tracked && !headingHome ? (
-                      <QuestTracker questId={quests.tracked} distance={distance} onShowPath={() => showQuestPath()} onHoverSound={onHoverSound} />
-                    ) : null}
-                  </div>
+              minimap={
+                <div className="relative shrink-0">
+                  <Minimap getPose={getPose} getTarget={getTarget} map={mapData} label={t("worlds:quests.minimap")} north={t("worlds:quests.north")} />
+                  <QuestListButton state={quests} onOpen={openListPanel} onHoverSound={onHoverSound} className="absolute -bottom-4 -left-4" />
                 </div>
+              }
+              questArea={
+                toast ? (
+                  <QuestToast questId={toast} />
+                ) : quests.tracked && !headingHome ? (
+                  <QuestTracker questId={quests.tracked} distance={distance} onShowPath={() => showQuestPath()} onHoverSound={onHoverSound} />
+                ) : null
               }
             />
           )}
