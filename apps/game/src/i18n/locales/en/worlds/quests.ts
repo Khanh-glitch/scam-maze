@@ -14,6 +14,7 @@ const quests = {
     newQuest: "New quest",
     minimap: "Minimap",
     north: "N",
+    noSignal: "No signal",
     keyList: "Quests",
     keyPath: "Show path",
     questMarker: "Quest",

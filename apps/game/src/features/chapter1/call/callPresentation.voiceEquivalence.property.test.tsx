@@ -266,8 +266,8 @@ describe("CallPresentation with voice props, equivalence (Property 7)", () => {
             expect(index).toBeGreaterThanOrEqual(0);
             step({ type: "SELECT_DIALOGUE_OPTION", optionId }, () => {
               if (index < 9 && next() < 0.3) {
-                const target = document.activeElement ?? document.body;
-                expect(fireEvent.keyDown(target, { key: String(index + 1), code: `Digit${index + 1}` })).toBe(false);
+                for (let i = 0; i < index; i += 1) fireEvent.keyDown(window, { key: "ArrowDown", code: "ArrowDown" });
+                expect(fireEvent.keyDown(window, { key: "f", code: "KeyF" })).toBe(false);
               } else {
                 fireEvent.click(rendered[index].button);
               }

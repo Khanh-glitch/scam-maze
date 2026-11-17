@@ -146,6 +146,8 @@ export interface RoomChapterLayerProps {
   onOpenDecision?: () => void;
   /** Called by "Return to menu" on the debrief. */
   onReturnToMenu?: () => void;
+  /** Plays the hover sound (the call's reply highlight). */
+  onHoverSound?: () => void;
   /** True while an extension overlay (call, decision, ending, debrief) is open. Blocks rings. */
   extensionBlocking?: boolean;
   /** Rendered inside the overlay layer. */
@@ -303,6 +305,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
   onIntroBegin,
   onOpenDecision,
   onReturnToMenu,
+  onHoverSound,
   extensionBlocking = false,
   renderExtension,
   voiceDeps: voiceDepsProp,
@@ -1107,6 +1110,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
             screenSink={callSink}
             engine={engine}
             voiceDeps={voiceDeps}
+            onHoverSound={onHoverSound}
           />
           {overlays.map((overlay) => (
             <React.Fragment key={overlay.kind}>{renderOverlay(overlay)}</React.Fragment>
