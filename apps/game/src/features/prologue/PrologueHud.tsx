@@ -91,7 +91,7 @@ export const PrologueHud: React.FC<PrologueHudProps> = ({ objective, prompt, sho
   return (
     <>
       <div className={`pointer-events-none absolute left-[clamp(1rem,3vw,2.5rem)] top-4 z-10 max-w-sm space-y-4 ${SHADOW}`}>
-        <div className={minimap ? "flex items-start gap-4 pb-8" : undefined}>
+        <div className={minimap ? "flex items-start gap-4 pb-5" : undefined}>
           {minimap}
           {clock && (
             <div aria-label={t("worlds:khupho.game.story.clock")} className={minimap ? "pt-1" : undefined}>
