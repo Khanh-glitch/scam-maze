@@ -108,7 +108,7 @@ SCAMMAZE is designed as an extensible platform for a wide spectrum of modern soc
 | **The Family Emergency (Social Engineering)** | Voice / Message | Spoofed message or voice claiming a loved one is hospitalized or arrested, demanding instant money transfers. | Perform out-of-band verification by contacting family directly. |
 | **Street Impersonation & Rogue Solicitations** | In-Person NPC | Shady street encounters, bogus donation drives, fake building utility inspectors requesting cash or personal data. | Demand official physical credentials; verify with building management. |
 
-> *Note: New scenario modules, in-person street interactions, and multi-channel scam archetypes are actively being designed and added to the scenario engine.*
+> *Status: only the first row is built so far, as Chapter 1 "The Urgent Call" (a fake bank-security call, then a second deception that looks like the fix). The other rows are planned scenarios ("The Missing Parcel" is deferred to a later chapter).*
 
 ---
 
@@ -117,39 +117,27 @@ SCAMMAZE is designed as an extensible platform for a wide spectrum of modern soc
 
 The interface is engineered to seamlessly blend a 3D game engine with an authentic, interactive smartphone, in-world physical inspection, and forensic HUD:
 
-### 1. In-Game Smartphone (Digital Interaction Gateway)
-The player's smartphone is accessible via `[Tab]` or `[P]`:
-* **Incoming Audio Call Screen:** Displays simulated caller ID, pulsating audio waveform, and voiced dialogue playback with real-time text sync.
-* **SMS & Messaging App:** Threaded chats with spoofed corporate accounts, urgent delivery deadlines, and disguised links.
-* **Simulated Mobile Web Browser:** Displays fictional corporate portals and landing pages built exclusively on reserved domains (`.test`, `.example`, `.invalid`).
-* **Banking & OTP Simulator:** Educational mock transaction confirmation screens (strictly non-functional, zero real financial data).
+### 1. In-Game Phone and Laptop (Digital Interaction Surfaces)
+What exists in Chapter 1 today:
+* **Incoming and active calls on a 3D phone:** an iPhone 17 Pro model (2D fallback when WebGL or the model is unavailable) with a status bar showing the in-game clock, a Dynamic Island, round Accept / Decline buttons, and in-call Mute, Speaker and Replay. The caller's lines appear as subtitles next to the phone; your replies are cards you pick with `1`-`3`, arrows or Enter.
+* **Phone records:** call history, messages and voicemail, shown on the phone screen in the 3D view. Opening an item can reveal evidence.
+* **Laptop:** a fictional bank app, a security notification, a compare view and a Review Security page, shown on the laptop screen in the 3D view. No text inputs, forms or live links.
+* **Evidence journal:** collected evidence (combine 2 to 3 items to form deductions) and hints.
+* All numbers and domains are fictional and plain text (reserved domains `.test`, `.example`, `.invalid`), and nothing is functional banking.
 
-```text
-┌──────────────────────────────────────┐
-│  10:42 📶 🔋 98%                      │
-│                                      │
-│           [ 👤 UNKNOWN SENDER ]      │
-│         +84 90 123 4567 (.test)      │
-│                                      │
-│        "URGENT: Your account has     │
-│         been flagged for fraud!      │
-│         Verify immediately at:       │
-│         https://bank-verify.test"    │
-│                                      │
-│   [ ⚠️ Inspect Link ]   [ 🚫 Block ]  │
-└──────────────────────────────────────┘
-```
+Planned, not built yet: a simulated mobile web browser and a parcel app.
 
 ### 2. Main Menu & Cinematic 3D Scene
-* **First-Person Street Camera:** Dynamic camera breathing, realistic mouse parallax, and customizable Field of View (FOV).
+* **First-Person Street Camera:** Camera breathing, mouse parallax and a customizable Field of View (FOV).
 * **Atmospheric Environment:** Low-poly city pack, animated moving vehicles, customizable sky dome with cloud drift.
 * **Bilingual Switcher:** Instant runtime language toggle between **English** and **Tiếng Việt**.
 * **Settings & Credits Modals:** Full control over graphics quality tiers, audio volume, and verified asset licenses.
 
 ### 3. In-World Inspection & Evidence Journal
-* **Contextual Reticle:** Dynamic hover feedback when targeting interactable world items (`[E] Inspect`, examining flyers, posters, lockers, or talking to NPCs).
-* **Clue Journal:** Automatically logs collected evidence, conflicting statements, and suspicious URL strings.
-* **Dual-Language Subtitles:** Synchronized with professional voice narration for both English and Vietnamese clips.
+* **Contextual prompts:** a prompt appears next to the item you aim at in the room (`[E]` to inspect or use).
+* **Evidence Journal (`J`):** logs collected evidence and deductions; `H` toggles hints.
+* **Dual-language subtitles and voice:** 88 generated voice clips (English and Vietnamese) with synchronized text.
+* **Forensic debrief:** timeline of your decisions, missed clues and trust analysis at the end of the chapter.
 
 ---
 
@@ -160,13 +148,15 @@ SCAMMAZE features multiple custom-built 3D environments crafted with Three.js, R
 
 | Environment | Route | Atmosphere & Narrative Setting |
 |---|---|---|
-| **Main Menu Street** | `/` | Cinematic dusk street scene with parallax camera, moving cars, and low-poly city backdrop. |
-| **Khu Phố** | `/khupho` | Authentic Vietnamese neighborhood with alleyways, street vendors, shophouses, and sidewalk life. |
-| **Room V2 ("After the Rain")** | `/roomv2` | Cozy first-person apartment room with warm desk lighting, atmospheric rain sounds, and interactive items. |
-| **Miền Tây (Mekong Delta)** | `/mientay` | Peaceful river waterways, traditional wooden sampans, lush tropical greenery, and floating market vibes. |
-| **Huế Heritage** | `/hue` | Historic Citadel architecture, ancient bridges, royal tombs, and imperial stone monuments. |
-| **UEH Campus** | `/ueh` | Modern university campus grounds featuring interactive vehicle exploration. |
-| **Chapter 1: The Urgent Call** | `/chapter1` | The flagship playable narrative chapter: an urgent voice call threatens your security. |
+| **Main Menu Street** | `/` | Cinematic dusk street scene with parallax camera, moving cars, and low-poly city backdrop. New Game and Continue start from here. |
+| **Khu Phố** | `/khupho` | Vietnamese neighborhood with alleyways, shophouses, model residents and shop staff, a banh mi vendor, parked bikes and scooter traffic (including one reckless rider who weaves, pulls wheelies and revs his engine). House no. 59 leads to the player's room. |
+| **Room V2** | `/roomv2` | The player's apartment room: warm desk lighting, rain, interactive items. In New Game it is the setting of Chapter 1. |
+| **Street test** | `/testmove` | Street scene with a driveable Lexus GX 550 (first-person driving test). |
+| **Miền Tây (Mekong Delta)** | `/mientay` | River waterways, wooden sampans, tropical greenery, floating market. |
+| **Huế Heritage** | `/hue` | Citadel architecture, ancient bridges, royal tombs. |
+| **UEH Campus** | `/ueh` | University campus with interactive vehicle exploration. |
+
+**Chapter 1 "The Urgent Call"** has no route of its own. Start it with **New Game**: the neighborhood prologue in `/khupho` leads through the white doorway of house no. 59 into the room, where the chapter plays. **Continue** resumes a saved chapter in the room (save format v3).
 
 ---
 
@@ -183,7 +173,7 @@ SCAMMAZE is architected as an ultra-fast, modern **pnpm monorepo**:
 | **Audio & Voice** | Web Audio API · Native HTML5 Audio | Dual-language voiced dialogue (EN/VI) with typed text synchronization |
 | **Localization (i18n)** | i18next v27 · react-i18next v18 | Seamless bilingual support across all UI, subtitles, and world text |
 | **State & Logic** | Pure TypeScript Deterministic Engine | Decoupled game state, branching consequences, and scenario rules |
-| **Testing & Quality** | Vitest · TypeScript Workspace Check | 130+ test suites and 1,170+ unit & component tests |
+| **Testing & Quality** | Vitest · TypeScript Workspace Check | 182 test files, 1,618 unit, component and property tests (no browser or end-to-end tests yet) |
 
 ---
 
@@ -192,13 +182,17 @@ SCAMMAZE is architected as an ultra-fast, modern **pnpm monorepo**:
 
 | Action | Primary Key | Secondary Key |
 |---|---|---|
-| **Move Forward / Backward** | `W` / `S` | `Up` / `Down` Arrow |
-| **Strafe Left / Right** | `A` / `D` | `Left` / `Right` Arrow |
+| **Move** | `W` `A` `S` `D` | Arrow keys |
+| **Sprint (street)** | `Shift` | — |
 | **Look Around** | `Mouse Movement` | — |
-| **Toggle Smartphone** | `Tab` | `P` |
-| **Interact / Inspect** | `E` | `Left Click` |
-| **Advance Narration** | `Left Click` | `Space` |
+| **Interact / Inspect** | `E` | `Space` (street), `Left Click` |
+| **Answer / Decline a ringing phone (room)** | `F` / `R` | Round Accept / Decline buttons |
+| **Pick a reply during a call** | `1`-`3` | Arrows + `Enter` |
+| **Leave an inspected object (room)** | `Q` | `Backspace` |
+| **Evidence Journal / Hints** | `J` / `H` | — |
+| **Free the mouse cursor** | `Ctrl` | — |
 | **Pause / Main Menu** | `Escape` | — |
+| **Street extras (`/khupho`)** | `T` pause time · `R` rain · `M` mute · `G` tour | — |
 
 ---
 
@@ -232,7 +226,7 @@ pnpm dev:landing
 # Run workspace-wide TypeScript verification
 pnpm typecheck
 
-# Run Vitest test suites (130+ files, 1170+ unit & component tests)
+# Run Vitest test suites (182 files, 1,618 tests)
 pnpm test
 
 # Build production artifacts for game and landing
@@ -257,14 +251,18 @@ scam-maze/
 │   │       ├── app/                  # Route manager & global settings state
 │   │       ├── components/ui/        # Reusable UI (Modals, Buttons, LoadingScreen)
 │   │       ├── features/
-│   │       │   ├── chapter1/         # The Urgent Call (Phone, Dialogue, HUD, Debrief)
+│   │       │   ├── chapter1/         # Chapter 1 UI: room layer, call/phone, laptop, journal, debrief
+│   │       │   ├── prologue/         # New Game prologue: neighborhood to house no. 59 to the room
 │   │       │   ├── menu/             # Main menu overlay, Settings, Credits
 │   │       │   ├── khupho/           # Vietnamese neighborhood world engine
-│   │       │   ├── roomv2/           # "After the Rain" room engine
+│   │       │   ├── roomv2/           # Room engine (host of Chapter 1)
 │   │       │   ├── mientay/          # Mekong Delta world engine
 │   │       │   ├── hue/              # Imperial Citadel world engine
-│   │       │   └── ueh/              # Campus vehicle explorer
+│   │       │   ├── ueh/, testmove/   # Campus and street driving explorers
+│   │       │   └── player/, vehicle/ # Shared first-person controller and vehicle audio
+│   │       ├── game/narrative/       # Deterministic chapter core (reducer, evidence, debrief)
 │   │       ├── game/world/           # Shared world lifecycle, stats & quality probe
+│   │       ├── legacy/               # Parked street version of Chapter 1 (not maintained)
 │   │       └── i18n/                 # Localization dictionaries (en / vi)
 │   │
 │   └── landing/                      # Marketing portal & Full-Page Knowledge Hub

@@ -58,7 +58,7 @@ definition)** · [master plan](SCAMMAZE_KIROWEEN_2026_FULL_PLAN.md) ·
 - Inspect the existing code and docs before changing anything; reuse existing conventions.
 - Current stack (verified): pnpm monorepo with `apps/landing`, `apps/game`, and `packages/shared-types`.
   - Landing app (`apps/landing`): React 19, TypeScript, Vite 8, Tailwind CSS v4, `lucide-react`. Deploys to GitHub Pages.
-  - Game app (`apps/game`): React 19, TypeScript, Vite 8, Three.js r174, React Three Fiber v9, Drei v10, Tailwind CSS v4, `lucide-react`, `i18next` v27 and `react-i18next` v18 (game UI localization, en/vi). Implements the 3D first-person Main Menu street environment with verified Sketchfab assets.
+  - Game app (`apps/game`): React 19, TypeScript, Vite 8, Three.js r174, React Three Fiber v9, Drei v10, Tailwind CSS v4, `lucide-react`, `i18next` v27 and `react-i18next` v18 (game UI localization, en/vi). Implements the 3D first-person main menu street scene, the world pages (`/khupho`, `/roomv2`, `/testmove`, `/ueh`, `/hue`, `/mientay`), the New Game prologue and Chapter 1 "The Urgent Call" in the player's room (Room v2), with Sketchfab and owner-supplied assets.
   - Shared contracts (`packages/shared-types`): Pure TypeScript definitions without React or Three.js dependencies.
 - **Game stack details** (owner decision, 8 Nov 2026; details in
   [OVERVIEW.md, section 3.1](docs/architecture/OVERVIEW.md#31-game-application-stack)):

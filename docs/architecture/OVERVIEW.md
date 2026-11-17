@@ -31,24 +31,26 @@ Every architecture statement in `docs/` uses one of these labels.
 
 ## 2. What exists today (`IMPLEMENTED`)
 
-Verified on `feat/chapter-01-playable` (11 Nov 2026):
+Verified on `main` @ `e9ee63f` (PR #49, 16 Nov 2026), with the test counts from the documentation sync task:
 
 | Area | Current implementation |
 |---|---|
 | Repository Architecture | **pnpm monorepo** with `apps/landing`, `apps/game`, and `packages/shared-types`. Unified workspace scripts: `pnpm dev:landing`, `pnpm dev:game`, `pnpm build:landing`, `pnpm build:game`, `pnpm build`, `pnpm typecheck`. |
 | Landing Application | Located in `apps/landing`: React 19, TypeScript, Vite 8, Tailwind CSS v4, `lucide-react`, self-hosted fonts. Deploys to GitHub Pages via `.github/workflows/deploy.yml`. Features 4 responsive landing sections and a 9-section Full-Page Knowledge Hub (`/#docs`, `/#privacy`, `/#license`, etc.). |
 | Game Application | Located in `apps/game`: React 19, TypeScript, Vite 8, **Three.js r174**, **React Three Fiber v9**, **Drei v10**, Tailwind CSS v4. Implements the cinematic first-person 3D street scene serving as the game's Main Menu. |
+| World pages and routes | `apps/game/src/app/App.tsx` routes: `/` (main menu street scene), `/khupho` (`features/khupho/`, Vietnamese neighborhood: houses, model residents and shop staff, banh mi vendor, parked bikes, scanned scooter riders in traffic, a reckless rider), `/roomv2` (`features/roomv2/`, the player's room), `/testmove` (street with a driveable Lexus), `/ueh` (campus), `/hue` (Huế heritage), `/mientay` (Mekong Delta). `/hochiminh` was removed on 12 Nov 2026. The pages share a world lifecycle, quality probe, stats and context-loss handling in `game/world/` and the first-person controller in `features/player/`. |
+| Prologue | `features/prologue/ProloguePage.tsx`: the New Game prologue. It builds the `/khupho` world and the room together, plays the welcome narration, and goes through the white doorway of house no. 59 (or "go home" from a call) into the room. The street world is muted and suspended while the room is shown. |
 | 3D Environment & Assets | Binary glTF models verified from `Kiroween/Asset3D/`: `low_poly_city_asset_pack.glb` (Calipo, CC-BY 4.0) and `low_poly_cars_pack.glb` (matisosanimation, CC-BY 4.0). Renders modular buildings (B1–B5, corner, shopfront, hospital), road asphalt with dashed lines, streetlights with warm point lights, low-poly trees, and parked cars along curbs. |
 | Camera & Controls | First-person eye-level camera (`y ≈ 2.05m`) facing down the street towards an atmospheric vanishing point. Smooth breathing idle motion and pointer parallax lerping. Configurable FOV (60°–85°). |
 | Menu UI & Modals | Interactive UI overlay over 3D Canvas: `NEW GAME` (opens the Prologue modal, whose "Begin Chapter 1" action starts chapter loading), `CONTINUE` (enabled only when the local save names a known chapter and its version 3 progress replays through the chapter core; an older save format is reported as incompatible; `app/continueAvailability.ts`), `SETTINGS` (real-time graphics quality, FOV, sound toggle, master volume with `localStorage` persistence), `CREDITS` (verified third-party asset licenses), and WebGL fallback detector. |
 | Loading screens | Startup screen for the menu scene and a chapter loading pipeline with byte-measured progress, asset verification, error recovery and fade transitions. For a new game, loading ends in the neighborhood prologue and then Room v2; for a saved game it ends in `RoomChapterPage` (see [section 4.2.3](#423-chapter-1-flow-and-room-v2-host-implemented)); a chapter with `gameplayAvailable: false` still ends on the "in development" screen. See [section 4.2.1](#421-chapter-loading-implemented). |
-| Chapter 1 "The Urgent Call" (narrative subtitle "The False Victory") | Rebuilt as a double-deception story in the player's apartment (Room v2), reached through the neighborhood prologue and house no. 59: a fake bank-security call, a laptop notification that looks like the fix, evidence and provenance, deductions by combining evidence, a third caller, five decisions and four endings (plus a case-report variant), then a forensic debrief. `IMPLEMENTED` and covered by automated tests on branch `feat/chapter-01-double-deception` (not merged); play time, pacing, real GPU rendering and real audio have not been checked by a person. The earlier street chapter is `DEPRECATED` and parked under `src/legacy/urgent-call-street/`. See [section 4.2.3](#423-chapter-1-flow-and-room-v2-host-implemented). Spec: `.kiro/specs/chapter-01-double-deception/`. |
+| Chapter 1 "The Urgent Call" (narrative subtitle "The False Victory") | Rebuilt as a double-deception story in the player's apartment (Room v2), reached through the neighborhood prologue and house no. 59: a fake bank-security call, a laptop notification that looks like the fix, evidence and provenance, deductions by combining evidence, a third caller, five decisions and four endings (plus a case-report variant), then a forensic debrief. `IMPLEMENTED`, merged in PR #49 and covered by automated tests; play time, pacing, real GPU rendering and real audio have not been checked by a person. The earlier street chapter is `DEPRECATED` and parked under `src/legacy/urgent-call-street/`. See [section 4.2.3](#423-chapter-1-flow-and-room-v2-host-implemented). Spec: `.kiro/specs/chapter-01-double-deception/`. |
 | Game core (deterministic) | `game/narrative/`: pure TypeScript reducer `chapterReducer(state, action, scenario)` with dialogue engine, evidence, deduction, beat, objective, outcome and debrief modules (16 Core_Action kinds); Chapter 1 content in `game/narrative/chapter1/`; hand-written scenario validation (`validateScenario.ts`); a framework-free `ChapterStore` read through `useSyncExternalStore`; a pure `localize.ts` for display-only translated copies of the scenario. No React, Three.js, Zustand, Dexie or i18n imports. See [section 4.3](#43-deterministic-core-narrative-engine-and-scam-intelligence-engine-implemented-for-chapter-1). |
 | In-game phone and laptop | 2D React overlay in `features/chapter1/phone/`: home screen, call history, messages and voicemail (the phone records overlay). The fictional bank app and the security notification are on the laptop overlay (`features/chapter1/room/laptop/`). Phone calls (ringing and active) are shown on a 3D phone in the chapter canvas, with a DOM device screen (avatar, name, number, status, timer and controls only), caller text in a separate subtitle overlay and a separate choice panel, and fall back to a 2D phone screen when the 3D phone cannot be shown (`features/chapter1/call/`, see [section 4.2](#42-game-client-implemented-for-the-menu-and-chapter-1-later-chapters-planned)). Phone actions are dispatched to the core as Core_Actions. |
 | Local saves (format v3) | `game/saves/saveGame.ts` behind the `SaveGameSource` interface, stored in `localStorage` (key `scammaze_save_v3`, with a `contentVersion`). A save holds the accepted Core_Actions (at most 1000), a checkpoint ID and the player pose. Restore replays the actions through the core (`game/saves/chapterProgress.ts`) and rejects saves that do not replay. Saves of format v1 and v2 are reported as incompatible; they are neither migrated nor deleted. Checkpoints are written by `features/chapter1/useCheckpointSaver.ts`. |
 | Game localization (English, Vietnamese) | `apps/game/src/i18n/`: i18next 27.1.1 and react-i18next 18.0.1 with bundled dictionaries, English as default and fallback, Vietnamese as second locale. The choice is stored in `GameSettings.language` (`localStorage` key `scammaze_settings_v1`) and `<html lang>` follows it. Chapter 1 narrative text is translated through a display-only overlay; the chapter core, its state and saves do not depend on the language. The landing app stays English-only. See [section 4.2.2](#422-localization-implemented). |
 | Shared Contracts | `packages/shared-types`: pure TypeScript definitions for scene IDs, graphics quality, game settings (including `language: GameLocale`), and scenario metadata. |
-| Quality Gates | Root `pnpm typecheck`, `pnpm test` (Vitest + Testing Library in `apps/game`) and `pnpm build`. On 11 Nov 2026, `pnpm test` reported 48 test files and 392 tests passed. Property tests use a seeded generator in `apps/game/src/test/` (no fast-check dependency). No lint script exists. |
+| Quality Gates | Root `pnpm typecheck`, `pnpm test` (Vitest + Testing Library in `apps/game`) and `pnpm build`. On `main` @ `e9ee63f`, `pnpm test` reports 182 test files and 1618 tests passed; the game's main JS chunk is 800.50 kB (gzip 244.10 kB). Property tests use a seeded generator in `apps/game/src/test/` (no fast-check dependency). No lint script exists. |
 
 ```mermaid
 flowchart TD
@@ -312,7 +314,7 @@ Components inside the game client (paths relative to `apps/game/src/`):
   stays playable with sound off. Status labels:
   - `IMPLEMENTED`, verified by unit, component and property tests (19 files, 123 tests in
     `game/voice`, `features/chapter1/voice`, `game/saves` and `game/chapters` passed on
-    12 Nov 2026): the pieces below. The tests use a fake audio port; no real audio device, network
+    12 Nov 2026; the full suite is counted in section 2): the pieces below. The tests use a fake audio port; no real audio device, network
     or browser was involved.
   - `PLANNED` or not verified: see the last bullet of this list.
   - **Voice module** (`game/voice/`, plain TypeScript). Files: `manifestTypes.ts` and
@@ -517,9 +519,9 @@ Adding a language: see the "Adding a language" section of [CONTRIBUTING.md](../.
 
 #### 4.2.3 Chapter 1 flow and Room v2 host (`IMPLEMENTED`)
 
-Verified by automated tests on branch `feat/chapter-01-double-deception` (160 test files, 1453
-tests, `pnpm typecheck` and `pnpm build` passed at the task 14 checkpoint). Not checked on a real
-GPU, with real speakers, on real devices or by a human player.
+Merged to `main` in PR #49. Verified by automated tests (the whole game suite: 182 test files, 1618
+tests on `main` @ `e9ee63f`; `pnpm typecheck` and `pnpm build` pass). Not checked on a real GPU, with
+real speakers, on real devices or by a human player.
 
 Flow: main menu, chapter loading, neighborhood prologue (`features/prologue/ProloguePage.tsx`,
 `/khupho` world), house no. 59, the player's room (Room v2, `features/roomv2/`) with the chapter
@@ -762,17 +764,17 @@ AWS promotional credits unless the provider is an eligible AWS service; see
 | Schema validation | Zod/JSON Schema | Zod | Hand-written validation `IMPLEMENTED` (`validateScenario.ts`, `isCoreAction`, save parsers); Zod `PLANNED`, not installed (deviation, section 4.3) |
 | Local persistence | IndexedDB/Dexie | IndexedDB/Dexie | `localStorage` save format v2 behind `SaveGameSource`, with replay validation and v1 migration, `IMPLEMENTED` (deviation, section 4.3); IndexedDB via Dexie `PLANNED`, not installed |
 | Visual system | "Cyber-noir detective lab", dark and light modes (section 3.5) | Game: stylized realism / stylized low-poly, not Halloween | Landing page: dark cinematic theme `IMPLEMENTED` (PR #7, replaced the flat theme of PR #2); game art `PLANNED`; plan 3.5 amended |
-| Tests | Vitest, Playwright, fast-check, coverage target | Tests for meaningful logic | Vitest + Testing Library (jsdom) `IMPLEMENTED` for the loading pipeline, the Chapter 1 core, saves, chapter UI and the call UI: 80 files, 747 tests passed at the game-3d-phone-call-ui checkpoint (task 12). Property tests use a seeded generator instead of fast-check (deviation; the voice layer tests follow the same rule, with a fake audio port and no real audio device). Playwright and a coverage target not added (`PLANNED`) |
+| Tests | Vitest, Playwright, fast-check, coverage target | Tests for meaningful logic | Vitest + Testing Library (jsdom) `IMPLEMENTED` for the loading pipeline, the Chapter 1 core, saves, chapter UI and the call UI: 182 files, 1618 tests pass on `main` @ `e9ee63f`. Property tests use a seeded generator instead of fast-check (deviation; the voice layer tests follow the same rule, with a fake audio port and no real audio device). Playwright and a coverage target not added (`PLANNED`) |
 
 ## 10. Known inaccuracies on the live landing page
 
-Reviewed against the PR #7 landing page on 8 Nov 2026. The previous list (offline claims,
+Reviewed against the PR #7 landing page on 8 Nov 2026; the concept row was updated in the documentation sync task. The previous list (offline claims,
 features, Kiro specs and hooks) no longer applies: that copy was removed in PR #7. Documentation
 is the source of truth until the copy is corrected (tracked in [Project progress](../PROJECT_PROGRESS.md)).
 
 | On the page | Reality |
 |---|---|
-| Product concept: "Five fictional digital environments, linked together" (messages, websites, email, social, marketplace); no mention of a 3D world, a neighbourhood, NPCs or a first-person game | Superseded by the 8 Nov 2026 owner decision (3D narrative game with an in-game phone). Copy update `PENDING`. |
+| Product concept: "Five fictional digital environments, linked together" (messages, websites, email, social, marketplace) | Resolved: the landing copy now describes a first-person 3D narrative game (updated with the monorepo restructure, 9 Nov 2026). |
 | Interactive previews ("Try the preview…", evidence workspace) | Accurate: labelled as simulated examples, not the real mission engine. |
 | Mission case files 001–003 | Accurate as plans: `src/data/missions.ts` states none is playable. Chapter 4 and the Prologue are not shown. |
 | "Enter the game" | Accurate: opens a "world is being prepared" dialog because `VITE_GAME_URL` is not set. |
