@@ -4,6 +4,7 @@ import { KEYCAP, SHADOW, stop } from "./PrologueHud";
 import { lineKey, optionKey, visibleOptions, type DialogueGraph, type DialogueState } from "./quest/dialogue";
 
 const ICON_CHAT = "/assets/ui/scammaze-chat-icon-512.png";
+const ICON_MOUSE = "/assets/ui/mouse.webp";
 
 export interface DialogueOverlayProps {
   graph: DialogueGraph;
@@ -93,7 +94,7 @@ export const DialogueOverlay: React.FC<DialogueOverlayProps> = ({ graph, state, 
             return (
               <li key={option.id} className="flex items-center gap-2">
                 <span aria-hidden="true" className={`flex shrink-0 items-center gap-1.5 ${on ? "" : "invisible"}`}>
-                  {options.length > 1 && <span className="font-menu text-[0.7rem] leading-none text-zinc-300">&#9650;&#9660;</span>}
+                  {options.length > 1 && <img src={ICON_MOUSE} alt="" width={21} height={28} draggable={false} className="h-7 w-[21px] shrink-0 opacity-85" />}
                   <kbd className={`${KEYCAP} !bg-white !text-[#171521]`}>F</kbd>
                   <span className="dialogue-nudge text-sm leading-none text-white">&#9654;</span>
                 </span>
