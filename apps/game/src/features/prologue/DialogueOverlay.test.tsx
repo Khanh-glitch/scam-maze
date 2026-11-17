@@ -1,0 +1,67 @@
+import { fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { applyLocale } from "../../i18n";
+import enQuests from "../../i18n/locales/en/worlds/quests";
+import viQuests from "../../i18n/locales/vi/worlds/quests";
+import { DialogueOverlay } from "./DialogueOverlay";
+import { startDialogue } from "./quest/dialogue";
+import { MAI_DIALOGUE } from "./quest/maiDialogue";
+
+const handlers = () => ({ onChoose: vi.fn(), onAdvance: vi.fn(), onClose: vi.fn() });
+
+describe("DialogueOverlay", () => {
+  beforeEach(() => applyLocale("en"));
+
+  it("shows the speaker, the line and numbered replies", () => {
+    render(<DialogueOverlay graph={MAI_DIALOGUE} state={startDialogue(MAI_DIALOGUE, "greet")} speaker="Auntie Mai" {...handlers()} />);
+    expect(screen.getByText("Auntie Mai")).toBeTruthy();
+    expect(screen.getByText(enQuests.quests.mai.lines.greet)).toBeTruthy();
+    const replies = screen.getAllByRole("button");
+    expect(replies).toHaveLength(3);
+    expect(replies[0].textContent).toContain(enQuests.quests.mai.options.busy);
+  });
+
+  it("picks a reply with its number key and with a click", () => {
+    const h = handlers();
+    render(<DialogueOverlay graph={MAI_DIALOGUE} state={startDialogue(MAI_DIALOGUE, "greet")} speaker="Auntie Mai" {...h} />);
+    fireEvent.keyDown(window, { code: "Digit2" });
+    expect(h.onChoose).toHaveBeenLastCalledWith("quiet");
+    fireEvent.click(screen.getByText(enQuests.quests.mai.options.stall));
+    expect(h.onChoose).toHaveBeenLastCalledWith("stall");
+  });
+
+  it("moves the highlight with the arrows and picks it with Enter", () => {
+    const h = handlers();
+    render(<DialogueOverlay graph={MAI_DIALOGUE} state={startDialogue(MAI_DIALOGUE, "greet")} speaker="Auntie Mai" {...h} />);
+    fireEvent.keyDown(window, { key: "ArrowDown", code: "ArrowDown" });
+    fireEvent.keyDown(window, { key: "Enter", code: "Enter" });
+    expect(h.onChoose).toHaveBeenLastCalledWith("quiet");
+  });
+
+  it("shows Continue on a line without replies", () => {
+    const h = handlers();
+    render(<DialogueOverlay graph={MAI_DIALOGUE} state={startDialogue(MAI_DIALOGUE, "work")} speaker="Auntie Mai" {...h} />);
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+    fireEvent.keyDown(window, { key: "Enter", code: "Enter" });
+    expect(h.onAdvance).toHaveBeenCalledTimes(1);
+    expect(h.onChoose).not.toHaveBeenCalled();
+  });
+
+  it("ignores a number with no matching reply and closes on Escape", () => {
+    const h = handlers();
+    render(<DialogueOverlay graph={MAI_DIALOGUE} state={startDialogue(MAI_DIALOGUE, "bye")} speaker="Auntie Mai" {...h} />);
+    fireEvent.keyDown(window, { code: "Digit3" });
+    expect(h.onChoose).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: "Escape", code: "Escape" });
+    expect(h.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("has a text for every line and reply in both languages", () => {
+    for (const quests of [enQuests, viQuests]) {
+      for (const node of Object.values(MAI_DIALOGUE.nodes)) {
+        expect((quests.quests.mai.lines as Record<string, string>)[node.id], `line ${node.id}`).toBeTruthy();
+        for (const o of node.options ?? []) expect((quests.quests.mai.options as Record<string, string>)[o.id], `option ${o.id}`).toBeTruthy();
+      }
+    }
+  });
+});

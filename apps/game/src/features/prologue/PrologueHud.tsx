@@ -7,13 +7,13 @@ export const GO_HOME_KEY = "H";
 
 // The in-game HUD uses the main menu's language: Barlow Condensed uppercase labels, key-cap boxes,
 // the slanted purple accent and ivory text with a soft shadow, straight on the 3D view (no panels).
-const SHADOW = "[text-shadow:0_1px_8px_rgba(0,0,0,0.85)]";
-const KEYCAP = "flex min-w-[1.6rem] items-center justify-center border border-white/25 bg-black/45 px-1.5 py-[0.2rem] font-menu text-xs font-semibold text-zinc-100";
-const MENU_BUTTON = `group flex items-center gap-2 font-menu text-sm font-semibold uppercase tracking-[0.14em] text-zinc-200 ${SHADOW} outline-none transition-colors hover:text-[#f3efe4] focus-visible:text-[#f3efe4] cursor-pointer`;
-const KEYCAP_HOVER = "transition-colors group-hover:border-white/60 group-focus-visible:border-[#f3efe4]";
+export const SHADOW = "[text-shadow:0_1px_8px_rgba(0,0,0,0.85)]";
+export const KEYCAP = "flex min-w-[1.6rem] items-center justify-center border border-white/25 bg-black/45 px-1.5 py-[0.2rem] font-menu text-xs font-semibold text-zinc-100";
+export const MENU_BUTTON = `group flex items-center gap-2 font-menu text-sm font-semibold uppercase tracking-[0.14em] text-zinc-200 ${SHADOW} outline-none transition-colors hover:text-[#f3efe4] focus-visible:text-[#f3efe4] cursor-pointer`;
+export const KEYCAP_HOVER = "transition-colors group-hover:border-white/60 group-focus-visible:border-[#f3efe4]";
 
 /** Stops a HUD click from also reaching the 3D view (which would interact or take the pointer). */
-const stop = (event: React.SyntheticEvent) => event.stopPropagation();
+export const stop = (event: React.SyntheticEvent) => event.stopPropagation();
 
 export interface PrologueTopBarProps {
   soundEnabled: boolean;
@@ -59,7 +59,7 @@ export const PrologueTopBar: React.FC<PrologueTopBarProps> = ({ soundEnabled, on
 };
 
 /** Slanted purple accent used before every HUD label (as on the loading screen and the menu). */
-const Accent: React.FC = () => <span aria-hidden="true" className="inline-block h-3.5 w-1.5 -skew-x-[18deg] bg-[#7654d6]" />;
+export const Accent: React.FC = () => <span aria-hidden="true" className="inline-block h-3.5 w-1.5 -skew-x-[18deg] bg-[#7654d6]" />;
 
 export interface PrologueHudProps {
   /** Objective line, already translated; null hides it. */
@@ -77,23 +77,33 @@ export interface PrologueHudProps {
   /** Draw the center dot (the room draws its own). */
   crosshair?: boolean;
   onHoverSound?: () => void;
+  /** The minimap disc; when given, the clock sits to its right. */
+  minimap?: React.ReactNode;
+  /** Quest button, tracked quest and toast, under the minimap. */
+  questArea?: React.ReactNode;
+  /** Shows the quest key hints (J and Q) in the footer. */
+  questKeys?: boolean;
 }
 
 /** Story HUD in the game's style: clock, objective, crosshair, prompt, resume hint, key hints. */
-export const PrologueHud: React.FC<PrologueHudProps> = ({ objective, prompt, showResume, cursorMode, clock, onGoHome, crosshair = true, onHoverSound }) => {
+export const PrologueHud: React.FC<PrologueHudProps> = ({ objective, prompt, showResume, cursorMode, clock, onGoHome, crosshair = true, onHoverSound, minimap, questArea, questKeys }) => {
   const { t } = useTranslation(["chapter1", "worlds"]);
   return (
     <>
       <div className={`pointer-events-none absolute left-[clamp(1rem,3vw,2.5rem)] top-4 z-10 max-w-sm space-y-4 ${SHADOW}`}>
-        {clock && (
-          <div aria-label={t("worlds:khupho.game.story.clock")}>
-            <p className="font-menu text-4xl font-bold leading-none tracking-[0.04em] text-[#f3efe4] tabular-nums">{clock.time}</p>
-            <p className="mt-1 flex items-center gap-1.5 font-menu text-xs font-semibold uppercase tracking-[0.18em] text-zinc-300">
-              {clock.raining && <CloudRain className="h-3.5 w-3.5 text-[#b9a5f5]" aria-hidden="true" />}
-              {clock.detail}
-            </p>
-          </div>
-        )}
+        <div className={minimap ? "flex items-start gap-4" : undefined}>
+          {minimap}
+          {clock && (
+            <div aria-label={t("worlds:khupho.game.story.clock")} className={minimap ? "pt-1" : undefined}>
+              <p className="font-menu text-4xl font-bold leading-none tracking-[0.04em] text-[#f3efe4] tabular-nums">{clock.time}</p>
+              <p className="mt-1 flex items-center gap-1.5 font-menu text-xs font-semibold uppercase tracking-[0.18em] text-zinc-300">
+                {clock.raining && <CloudRain className="h-3.5 w-3.5 text-[#b9a5f5]" aria-hidden="true" />}
+                {clock.detail}
+              </p>
+            </div>
+          )}
+        </div>
+        {questArea}
         {objective && (
           <section aria-labelledby="prologue-objective-heading">
             <h2 id="prologue-objective-heading" className="flex items-center gap-2.5 font-menu text-xs font-semibold uppercase tracking-[0.3em] text-[#c9bbf7]">
@@ -138,6 +148,18 @@ export const PrologueHud: React.FC<PrologueHudProps> = ({ objective, prompt, sho
             <kbd className={KEYCAP}>Esc</kbd>
             {t("worlds:khupho.game.story.pause")}
           </span>
+          {questKeys && (
+            <>
+              <span className="flex items-center gap-1.5">
+                <kbd className={KEYCAP}>J</kbd>
+                {t("worlds:quests.keyList")}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <kbd className={KEYCAP}>Q</kbd>
+                {t("worlds:quests.keyPath")}
+              </span>
+            </>
+          )}
         </div>
         {onGoHome && (
           <button type="button" onMouseDown={stop} onClick={onGoHome} onPointerEnter={onHoverSound} aria-keyshortcuts={GO_HOME_KEY} className={MENU_BUTTON}>
