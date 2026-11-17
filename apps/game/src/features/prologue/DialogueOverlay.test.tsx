@@ -56,9 +56,12 @@ describe("DialogueOverlay", () => {
     expect(h.onHoverSound).toHaveBeenCalledTimes(2);
     fireEvent.keyDown(window, { key: "f", code: "KeyF" });
     expect(h.onChoose).toHaveBeenLastCalledWith("stall");
-    // A tiny scroll below the threshold does nothing.
-    fireEvent.wheel(container.firstElementChild as Element, { deltaY: 5 });
+    // The rest of a coasting swipe, and a tiny scroll, do nothing.
+    for (const deltaY of [80, 60, 40, 20, 5]) fireEvent.wheel(container.firstElementChild as Element, { deltaY });
     expect(h.onHoverSound).toHaveBeenCalledTimes(2);
+    // Swiping the other way is a new step.
+    fireEvent.wheel(container.firstElementChild as Element, { deltaY: -100 });
+    expect(h.onHoverSound).toHaveBeenCalledTimes(3);
   });
   it("shows Continue on a line without replies", () => {
     const h = handlers();
