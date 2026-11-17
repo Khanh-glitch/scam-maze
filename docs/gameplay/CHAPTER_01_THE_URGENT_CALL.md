@@ -1,16 +1,25 @@
 # Chapter 1: The Urgent Call
 
-> **Status:** scenario content and deterministic chapter core `IMPLEMENTED`; prop positions
-> `IMPLEMENTED` but not calibrated in a browser; touch movement `PLANNED` (deferred); play time
-> target not measured.
+> **Status: `DEPRECATED` (parked).** This document describes the **earlier street version** of
+> Chapter 1 (the player on the street, the shopkeeper Sam, a single bank-security call). That version
+> was replaced on 2026-11-16 (PR #49) by the room version, "The Urgent Call" with the narrative
+> subtitle "The False Victory": a double-deception story in the player's room (Room v2), with a
+> laptop, phone records, deductions, a third caller, five decisions and four endings. The street code
+> is parked in `apps/game/src/legacy/urgent-call-street/` and is not maintained, tested or reachable
+> from the game.
 >
-> **Source of truth:** this document describes the data in
-> `apps/game/src/game/narrative/chapter1/` and the call timing in
-> `apps/game/src/features/chapter1/useCallTriggers.ts`. If the code and this document differ, the
-> code is correct and this document must be updated.
+> **For the current chapter** see [OVERVIEW.md section 4.2.3](../architecture/OVERVIEW.md#423-chapter-1-flow-and-room-v2-host-implemented)
+> and the spec `.kiro/specs/chapter-01-double-deception/` (requirements, design, tasks). The
+> current scenario data is in `apps/game/src/game/narrative/chapter1/`. A player-facing gameplay
+> document for the room version has not been written yet (see
+> [Project progress](../PROJECT_PROGRESS.md)).
 >
-> **Spec:** `.kiro/specs/chapter-01-the-urgent-call/` (requirements, design, tasks).
-
+> What follows is kept as a record of the street version. Its file paths (for example
+> `features/chapter1/useCallTriggers.ts` and `features/chapter1/world/propLayout.ts`) now live under
+> `apps/game/src/legacy/urgent-call-street/`. The scenario id, title and subtitle at the end of
+> section 1 are still `chapter-1`, "The Urgent Call" and "The notification arrives before breakfast.".
+>
+> **Spec of the street version:** `.kiro/specs/chapter-01-the-urgent-call/`.
 ## 1. Premise
 
 It is morning, before breakfast. The player stands on their street with a coffee. An urgent text

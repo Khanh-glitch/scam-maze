@@ -8,41 +8,33 @@
 - **Product definition:** Browser-based, first-person 3D narrative game in a small persistent
   world with chapter-based stories (owner decision, 2026-11-08). Canonical document:
   [product positioning](product/PRODUCT_POSITIONING.md).
-- **Product stage:** Pre-Alpha / Game Foundation.
+- **Product stage:** Pre-Alpha / Game Foundation. Everything below is on `main` (last merge: PR #49,
+  `e9ee63f`, 2026-11-16).
   - Landing application (`apps/landing`): live on GitHub Pages with 4 cinematic sections and full Knowledge Hub.
-  - Game application (`apps/game`): 3D first-person street scene serving as the game's Main Menu built with Three.js r174, R3F v9, Drei v10, and verified Sketchfab 3D assets.
-  - Chapter 1 "The Urgent Call": playable vertical slice from New Game and Continue on branch
-    `feat/chapter-01-playable` (not merged, not deployed). Covered by automated tests only; not
-    yet played through in a browser.
-  - Game localization (English and Vietnamese): `i18next` locale module, persisted Language
-    setting and a Vietnamese Chapter 1 narrative overlay on branch `feat/game-i18n-en-vi`
-    (built on `feat/chapter-01-playable`, not merged). `pnpm typecheck`, `pnpm test` and
-    `pnpm build` pass after the test-file type fixes in commit `5b1c785` (see the task history
-    entry of 2026-11-12). Not yet checked in a browser.
-  - Chapter 1 calls on a 3D phone with a separate choice overlay, on branch
-    `feat/game-3d-phone-call-ui` (built on `feat/game-i18n-en-vi`, not merged). `pnpm test`
-    (80 files, 747 tests), `pnpm typecheck` and `pnpm build` pass. Not yet checked in a browser.
-  - Chapter 1 voice and narrative expansion (spec `chapter-01-voice-narrative`), on branch
-    `feat/chapter-01-voice-narrative` (built on the phone branch, not merged): 5 dialogue graphs,
-    64 nodes, 138 options, 15 evidence items, 8 objectives, 6 acts, 4 endings, and 108 generated
-    voice clips (54 en, 54 vi, 0 missing). `pnpm test` (117 files, 1061 tests), `pnpm typecheck`
-    and `pnpm build` pass. Not played by a human, not checked in a browser, clip quality and
-    MP3 playback not verified. Not complete.
-  - Phone call UI redesign (spec `game-phone-call-ui-redesign`), on branch
-    `feat/game-phone-call-ui-redesign` (from `feat/chapter-01-voice-narrative` @ `f5694a6`, not
-    merged, not pushed yet): code and tests are committed in `a9f1573`, docs and spec in the
-    next commit. The phone screen shows only device content, and the caller line moved to a
-    subtitle overlay outside the phone.
-    `pnpm test` (121 files, 1107 tests), `pnpm typecheck` and `pnpm build` pass. No manual visual
-    check was run.
-  - Chapter 1 "The False Victory" (double deception) in Room v2 (spec
-    `chapter-01-double-deception`), on branch `feat/chapter-01-double-deception` (from `main` @
-    `37eeedd`, not merged, not pushed): replaces the street chapter, which is parked under
-    `apps/game/src/legacy/urgent-call-street/`. At the task 14 checkpoint `pnpm test` (160 files,
-    1453 tests), `pnpm typecheck` and `pnpm build` passed and `voice:report` showed 88 clips
-    present. Not playtested by a human, not rendered on a real GPU, not heard on real speakers,
-    and the Vietnamese text has no native-speaker review.
+  - Game application (`apps/game`): Three.js r174, R3F v9, Drei v10, React 19, Vite 8. Routes: `/`
+    (main menu, 3D street scene), `/khupho` (Vietnamese neighborhood with street traffic, people and
+    house no. 59), `/roomv2` (the player's room), `/testmove` (street with the driveable Lexus), `/ueh`
+    (campus), `/hue` (Huế heritage), `/mientay` (Mekong Delta). The old `/hochiminh` route was removed
+    on 2026-11-12 (commit `942bcc3`).
+  - Chapter 1 "The Urgent Call" (narrative subtitle "The False Victory"), merged in PR #49: a
+    double-deception story in the player's room (Room v2). New Game plays the neighborhood prologue,
+    goes through the white doorway of house no. 59 into the room, then the chapter (fake bank-security
+    call, laptop notification, evidence and deductions, third caller, five decisions, four endings,
+    forensic debrief). Saves are format v3. 88 voice clips (44 en, 44 vi). The earlier street chapter is
+    parked in `apps/game/src/legacy/urgent-call-street/` and is not maintained. Covered by automated
+    tests only: not playtested by a person, not checked on a real GPU or real speakers.
+  - Game localization (English, Vietnamese): `i18next`, persisted Language setting, Vietnamese
+    Chapter 1 overlay (no native-speaker review yet).
+  - Chapter 1 phone: 3D iPhone 17 Pro for ringing and active calls (2D fallback), call screen with a
+    status bar (in-game clock) and round buttons; laptop and phone-records overlays mapped onto the 3D
+    device screens; four-mode cinematic UI (exploration, call, decision, investigation).
+  - Street life in `/khupho`: model residents and shop staff, banh mi vendor, parked bikes, scanned
+    scooter riders in traffic, and the reckless rider ("Bao Thu": faster, passes, wheelies, weaves, revs
+    instead of honking). The riding sound of that rider is not added yet.
+  - Shared world engine (`game/world/`) for the world pages (lifecycle, diagnostics, context-loss handling).
   - Shared contracts (`packages/shared-types`): pure TypeScript types.
+  - Quality gates on `main` @ `e9ee63f` (run in the documentation sync task): `pnpm typecheck` and `pnpm build` pass,
+    `vitest run` 182 files, 1618 tests pass. The game's main JS chunk is 800.50 kB (gzip 244.10 kB).
 - **Current milestone:** Phase B — 3D Vertical Slice & Narrative Foundation.
 - **Architecture status:** pnpm monorepo structure `IMPLEMENTED`. 3D rendering pipeline `IMPLEMENTED`.
 - **Database decision:** `PENDING` ([database strategy](architecture/DATABASE_STRATEGY.md)).
@@ -50,20 +42,21 @@
 - **Deployment status:** Landing page on GitHub Pages (<https://teehihi.github.io/scam-maze/>). Game client build ready for independent Vercel project deployment.
 - **AWS budget:** $200 promotional credits, 3-month evaluation, estimate $28.68
   ([cost estimation](finops/COST_ESTIMATION.md)); no actual spend yet.
-- **Last updated:** 2026-11-16 (Chapter 1 double-deception rebuild recorded)
+- **Last updated:** 2026-11-17 (status sections synchronized with `main`)
 
 ## Completed
 
 Verified against merged pull requests on GitHub and local workspace builds.
+- [x] **Merged after the first Chapter 1 slice (PRs #8 to #49, 2026-11-12 to 2026-11-16; details in Task History):** game localization (en, vi); Chapter 1 voice and narrative expansion; 3D phone call UI and its redesign; main menu redesign; new routes `/mientay`, `/khupho` and `/roomv2`; Kiro workflow files (`.kiro/agents`, skills, steering); shared world engine (lifecycle, diagnostics, context-loss handling); new-game prologue (neighborhood to house no. 59 to the room); `/khupho` performance slices, street people and traffic models; the Chapter 1 double-deception rebuild; iPhone 17 Pro call phone with Dynamic Island and status bar; the reckless rider; Chapter 1 cinematic UI redesign.
 
-- [x] **Chapter 1 "The False Victory" (double deception) rebuilt in Room v2 (branch `feat/chapter-01-double-deception`, not merged, not pushed):** deterministic core extended (16 Core_Action kinds, deductions, device actions, beats, data-driven ringing, objectives and endings), new scenario with 4 endings, laptop and phone-records overlays, forensic debrief, save format v3, 88 voice clips and a Vietnamese overlay. Verified by `pnpm test` (160 files, 1453 tests), `pnpm typecheck`, `pnpm build` and `voice:report` (88 present, 0 missing). Not verified: human playtest and pacing, real GPU, real speakers, real devices, browser flows. See the task history entry of 2026-11-16.
-- [x] **Chapter 1 "The Urgent Call" playable vertical slice (branch `feat/chapter-01-playable`, not merged):** Deterministic narrative core (reducer, selectors, dialogue engine, scenario validator), versioned save v2 with replay validation, Chapter 1 street canvas with interactable props, smartphone (calls, messages, call history, bank app), face-to-face dialogue, evidence journal, decisions, three ending groups (`verified`, `risky`, `uncertain`), debrief, checkpoints and pause menu. Verified by `pnpm test` (48 files, 392 tests); not verified in a browser. See the task history entry of 2026-11-11.
+- [x] **Chapter 1 "The False Victory" (double deception) rebuilt in Room v2 (merged in PR #49, 2026-11-16):** deterministic core extended (16 Core_Action kinds, deductions, device actions, beats, data-driven ringing, objectives and endings), new scenario with 4 endings, laptop and phone-records overlays, forensic debrief, save format v3, 88 voice clips and a Vietnamese overlay. Verified by `pnpm test` (160 files, 1453 tests), `pnpm typecheck`, `pnpm build` and `voice:report` (88 present, 0 missing). Not verified: human playtest and pacing, real GPU, real speakers, real devices, browser flows. See the task history entry of 2026-11-16.
+- [x] **Chapter 1 "The Urgent Call" street vertical slice (merged; later replaced by the room version above and parked under `src/legacy/urgent-call-street/`):** Deterministic narrative core (reducer, selectors, dialogue engine, scenario validator), versioned save v2 with replay validation, Chapter 1 street canvas with interactable props, smartphone (calls, messages, call history, bank app), face-to-face dialogue, evidence journal, decisions, three ending groups (`verified`, `risky`, `uncertain`), debrief, checkpoints and pause menu. Verified by `pnpm test` (48 files, 392 tests); not verified in a browser. See the task history entry of 2026-11-11.
 - [x] **Lexus GX 550 Vehicle Interaction, Solid Collider Box & First-Person Driving System (`/testmove`):** Added an oriented bounding box (OBB) collider for the gold Lexus GX 550 SUV preventing walking through the vehicle. Integrated proximity detection to the driver door with an animated `[E] Lên xe Lexus GX 550 (Lái xe)` interaction badge. Built driver seat cockpit POV camera with lowered sitting height, free head look around the cabin, procedural 3D steering wheel with driver hands and forearms gripping and turning with `A`/`D`, deterministic driving physics (acceleration up to 63 km/h, braking, reverse, handbrake slide, suspension pitch/roll, road curb clamping), zero-latency procedural Web Audio V8 engine rumble synthesis, digital speedometer (km/h) with gear indicator (`[D]`, `[R]`, `[P]`), and `E` key exit when stopped.
-- [x] **Cinematic chapter loading screen (branch `feat/game-cinematic-loading-screen`, not merged):** Real loading pipeline for New Game / Continue with byte-measured progress, asset verification, stall watchdog, error recovery, fade transitions and reduced-motion support. Startup menu loading rewritten without fabricated progress. First automated tests (Vitest, 103 tests after the 2026-11-10 startup loading percentage task). Startup screen shows a byte-measured percentage of the street GLB. Loading screens are opaque from the first frame and stay up for a minimum display time (1.5 s chapter, 1.2 s startup). At the time, loading ended on an honest "in development" screen; on branch `feat/chapter-01-playable` it now opens the Chapter 1 page.
+- [x] **Cinematic chapter loading screen (merged):** Real loading pipeline for New Game / Continue with byte-measured progress, asset verification, stall watchdog, error recovery, fade transitions and reduced-motion support. Startup menu loading rewritten without fabricated progress. First automated tests (Vitest, 103 tests after the 2026-11-10 startup loading percentage task). Startup screen shows a byte-measured percentage of the street GLB. Loading screens are opaque from the first frame and stay up for a minimum display time (1.5 s chapter, 1.2 s startup). At the time, loading ended on an honest "in development" screen; on branch `feat/chapter-01-playable` it now opens the Chapter 1 page.
 - [x] **Main Menu Performance Optimization (Round 2 — Progressive Loading & Deep GLB Reduction):** Implemented instantaneous menu UI interaction on Frame 1 with non-blocking progressive loading. Decoupled Suspense boundaries so the sky dome and procedural street fallback (`StreetFallback.tsx`) render immediately without waiting for the 3D model. Conducted deep decimation across heavy vehicle CAD hierarchies (VinFast VF3, Lexus GX 550, PCX, fence, pedestrian scan), dropping triangles from 2.68M down to 542k (-91.6% from original) and file size to 21.50 MB (-95.1% from original). Resized normal maps with high-quality WebP, and added parallel asynchronous GPU shader pre-compilation via `gl.compileAsync` to eliminate first-render freeze spikes.
 - [x] **Deep Performance Optimization of Main Menu 3D Scene (Phases 1–7):** Conducted complete asset forensics on the 440.5MB `MenuBG.glb` asset. Engineered an automated Node.js optimization pipeline (`apps/game/scripts/optimize-environment.cjs`) utilizing `@gltf-transform`, Meshopt, and Sharp. Reduced GLB file size from 440.53MB to 43.00MB (-89.76%) and polygon count from 6.48M to 2.68M triangles (-58.6%) without degrading visual fidelity from the authored camera viewpoint. Replaced 8K/4K scan textures with WebP (172.8MB -> 24.1MB), eliminated hidden dead meshes, froze static matrices, eliminated frame-loop memory allocations in `MenuCamera`, optimized SkyDome geometry, capped Retina DPR, and resolved WebGL context exhaustion.
 - [x] **Main Menu Initialization & Render Performance Optimization:** Eliminated initial camera rotation swing and blue-screen flash on menu entry. Added an atmospheric cyber-safety Loading Screen (`LoadingScreen.tsx`) covering 3D asset downloads. Optimized Three.js rendering pipeline by removing 420MB scene cloning, freezing static mesh matrices (`matrixAutoUpdate = false`), capping device pixel ratio, and limiting dynamic foliage animation to ensure smooth 60 FPS performance.
-- [x] **Ho Chi Minh City 2025 3D Map Explorer (`/hochiminh` route):** Integrated 19.6MB 3D model of Ho Chi Minh City (Saigon 3D City, CC-BY 4.0, 493,715 vertices). Developed dynamic procedural coloring engine mapping elevations, surface normals, and architectural styles across Saigon River, city avenues, colonial shophouse facades, terracotta roofs, and high-rise glass towers (Bitexco, Landmark). Provided 4 aesthetic themes (Daylight, Cyberpunk Neon, Golden Sunset, Tech Blueprint), 3D landmark pins, cinematic camera presets, auto-rotation, and full routing isolation from the main game menu.
+- [x] **Ho Chi Minh City 2025 3D Map Explorer (`/hochiminh` route, removed on 2026-11-12):** Integrated 19.6MB 3D model of Ho Chi Minh City (Saigon 3D City, CC-BY 4.0, 493,715 vertices). Developed dynamic procedural coloring engine mapping elevations, surface normals, and architectural styles across Saigon River, city avenues, colonial shophouse facades, terracotta roofs, and high-rise glass towers (Bitexco, Landmark). Provided 4 aesthetic themes (Daylight, Cyberpunk Neon, Golden Sunset, Tech Blueprint), 3D landmark pins, cinematic camera presets, auto-rotation, and full routing isolation from the main game menu.
 - [x] **Monorepo restructure & Game Foundation:** Split repository into pnpm monorepo with `apps/landing`, `apps/game`, and `packages/shared-types`. Root workspace build and typecheck commands (`pnpm build`, `pnpm typecheck`, `pnpm dev:landing`, `pnpm dev:game`).
 - [x] **Verified 3D Assets Integration:** Discovered and integrated `low_poly_city_asset_pack.glb` (Calipo, CC-BY 4.0) and `low_poly_cars_pack.glb` (matisosanimation, CC-BY 4.0) from local `Kiroween/Asset3D/`. Recorded in `THIRD_PARTY_NOTICES.md`.
 - [x] **First-Person 3D Main Menu:** Real Three.js r174 + R3F v9 + Drei v10 scene. Human eye-level camera with subtle breathing motion, mouse parallax, customizable FOV, atmospheric lighting, modular buildings, storefronts, hospital, road, streetlights with warm point lights, low-poly trees, and parked cars along curbs.
@@ -84,70 +77,37 @@ Verified against merged pull requests on GitHub and local workspace builds.
 - [x] Full-Page Knowledge Hub with 9 legal & documentation sections and instant tab switching — 2026-11-09.
 
 ## In Progress
-
-- [ ] Chapter 1 double-deception rebuild (spec `chapter-01-double-deception`, branch
-      `feat/chapter-01-double-deception`). Code, tests and voice are committed in 10 commits and
-      pass the task 14 checkpoint. Documentation is written but not committed (task 15.2); push
-      and pull request pending (task 15.3). Open: human playtest (pacing, the 18 to 22 minute
-      target, soft locks), real GPU check of Room v2 and the 3D phone overlay, real-speaker
-      check of the clips, native-speaker review of the Vietnamese overlay, browser flows.
-- [ ] Game localization, English and Vietnamese (spec `game-i18n-en-vi`, branch
-      `feat/game-i18n-en-vi`). Code, translations and tests are committed in 9 commits (the
-      cross-cutting tests of task 10.3 in `5b1c785`, with the two test-file type fixes).
-      `pnpm typecheck`, `pnpm test` (62 files, 585 tests) and `pnpm build` pass. The
-      documentation is committed in a tenth commit (task 12.6). Still open: a browser check of
-      the language switch, and a
-      native-speaker review of all Vietnamese text. The pull request depends on the Chapter 1
-      pull request.
-- [ ] Chapter 1 calls on a 3D phone (spec `game-3d-phone-call-ui`, branch
-      `feat/game-3d-phone-call-ui`). Code and tests committed in 10 commits; automated checks
-      pass (80 files, 747 tests; typecheck; build). Docs commit pending (task 13.3). Still open:
-      browser check, 30 fps and 4 px alignment checks, back-render logo check, native-speaker
-      review of the new Vietnamese strings. Depends on the localization and Chapter 1 pull
-      requests.
-- [ ] Chapter 1 "The Urgent Call" documentation commit (spec task 16.5). Gameplay document,
-      architecture overview update and the quality gate record (task 16.4: 48 files, 392 tests,
-      typecheck and build passed) are done but not committed.
-- [ ] Chapter 1 voice and narrative expansion (spec `chapter-01-voice-narrative`, branch
-      `feat/chapter-01-voice-narrative`). Automated checks pass (117 files, 1061 tests;
-      typecheck; build). Documentation commit and push pending (tasks 28.2 and 29.1). Open: the
-      manual playtest checklist in the task history entry of 2026-11-12 (playtime, listening to
-      108 clips, browser MP3 playback, autoplay, screen reader, keyboard-only, offline
-      generator run, redistribution terms of the generated audio), option count above target.
-- [ ] Phone call UI redesign (spec `game-phone-call-ui-redesign`, branch
-      `feat/game-phone-call-ui-redesign`). Code and tests are written and pass automated checks
-      (121 files, 1107 tests; typecheck; build). Code is committed in `a9f1573`; docs and spec are
-      committed in the following docs commit. Push pending (task 8.3).
-      Open: manual visual checks at 320, 768 and 1920 px, real-speaker sound check of the Speaker
-      toggle, native-speaker review of the new Vietnamese strings.
-- [ ] Chapter 1 manual browser playthrough: all endings, prop position calibration, play time,
-      FPS, keyboard-only and screen-reader checks.
-
+- [ ] Chapter 1 manual verification (nothing here has been done by a person): full playthrough of all
+      four endings and the 18 to 22 minute target, soft locks, the 3D phone and device screens on a
+      real GPU, real-speaker check of the 88 clips and the ringtone mix, the layouts at 390x844,
+      1280x720 and 1920x1080, keyboard-only and screen-reader checks, pointer-lock behavior with a
+      real mouse.
+- [ ] Native-speaker review of all Vietnamese game text (367 Chapter 1 overlay entries and the UI).
+- [ ] Reckless rider: the riding engine sound (owner will supply it); the rev sound and the weave lean
+      are not checked by ear or eye.
+- [ ] Documentation synchronization with `main` (this task): status sections done; see the Task History
+      entry for what was and was not updated.
 ## Planned
 
 Updated for the 3D direction (positioning section 11). Items marked "partly done" have a first
-version on branch `feat/chapter-01-playable`.
+version on `main`.
 
-- [ ] 3D prototype and benchmark with Three.js + React Three Fiber + Drei (and Rapier, if
-      adopted): walkable apartment and street on target devices (integrated
-      GPUs), to set triangle, draw-call and memory budgets.
+- [ ] 3D benchmark, partly done: a walkable room (`/roomv2`) and neighborhood (`/khupho`) exist, with
+      performance slices and a diagnostics probe. Still planned: measure triangle, draw-call and memory
+      budgets on target devices (integrated GPUs) and decide about Rapier.
 - [ ] Deterministic core, partly done: the Chapter 1 reducer, evidence and scenario validator
-      exist in pure TypeScript with a small hand-written store and a `localStorage` save (v2).
+      exist in pure TypeScript with a small hand-written store and a `localStorage` save (v3).
       Still planned: Zod schemas, Zustand, Dexie/IndexedDB saves and persistent world state
       across chapters, if still needed.
-- [ ] In-game smartphone UI, partly done: calls, messages, call history and a bank app exist
-      for Chapter 1; ringing and active calls are shown on a 3D phone on branch
-      `feat/game-3d-phone-call-ui`. Still planned: browser with fictional sites, parcel app.
-- [ ] Move the unused candidate phone GLBs (about 51 MB) out of `apps/game/public/` so they are
-      not copied to `dist`.
+- [ ] In-game smartphone UI, partly done: ringing and active calls on a 3D phone, and a phone-records
+      overlay (call history, messages, voicemail); the fictional bank app is on the laptop overlay.
+      Still planned: browser with fictional sites, parcel app.
 - [ ] Later chapter "The Missing Parcel" (positioning section 11; moved after Chapter 1 "The
       Urgent Call" by owner decision 2026-11-10/11).
 - [ ] Touch controls for the chapter page.
 - [ ] Game localization follow-ups: native-speaker review of all Vietnamese text; translate the
       remaining English strings (`ModalDialog` "Close dialog", `MenuButton` "Unavailable",
-      `GameCanvas` WebGL error messages); add accessible names to the Ho Chi Minh City close
-      buttons; update the key table in the `game-i18n-en-vi` design.
-- [ ] Reduce the game JS bundle below the 1,500 kB warning limit (code-split the chapter page).
+      `GameCanvas` WebGL error messages); update the key table in the `game-i18n-en-vi` design.
 - [ ] Bounded AI Scam Actor with authored fallback and AI on/off toggle (after provider approval).
 - [ ] Phase D — Usability sessions with Vietnamese and international participants; polish.
 - [ ] Phase E — Submission package, video, release tag.
@@ -192,38 +152,36 @@ Resolved:
       customization is future scope.
 
 ## Known Issues
-
-- The live landing page (PR #7) describes the earlier concept ("five fictional digital
-  environments, linked together") and does not mention the 3D world. See
-  [OVERVIEW.md section 10](architecture/OVERVIEW.md#10-known-inaccuracies-on-the-live-landing-page).
+- Nothing in Chapter 1, the prologue or the world pages has been played through by a person or
+  checked on a real GPU, real speakers or a screen reader (see "In Progress"). The 3D phone, the
+  device-screen overlays, pointer lock and the cinematic UI are covered by automated tests only.
 - Delivery risk: the internal deadline is 3 Dec 2026 23:00 ICT; the slice must stay small
-  (positioning section 11, master plan risk register). Chapter 1 exists but is not merged or
-  played through in a browser.
+  (positioning section 11, master plan risk register).
+- The landing page copy describes the first-person 3D game (since 2026-11-09). Its "Enter the game"
+  controls open a "being prepared" dialog unless `VITE_GAME_URL` is set at build time (no custom
+  domain; see [OVERVIEW.md section 10](architecture/OVERVIEW.md#10-known-inaccuracies-on-the-live-landing-page)).
 - Issue #4 (URL checker flags official country domains such as `google.co.uk`) was closed as
-  completed on 2026-11-07, but `src/lib/urlCheck.ts` has not been changed; the false positive
-  still exists (the checker is now legacy code, not shown on the site).
-- PR #7 did not update this file or the architecture documents; reconciled on 2026-11-08.
-- `ACCESSIBILITY.md` still describes the flat light theme of PR #2; not re-audited after PR #7.
-- Automated tests (Vitest, jsdom, a seeded property-test generator; no fast-check) cover the loading pipeline, the Chapter 1
-  narrative core, saves and the chapter page (48 files, 392 tests on 2026-11-11). There are no
-  browser or end-to-end tests and no manual accessibility audit yet.
-- Game JS chunk is 1,755 kB, over the 1,500 kB Vite warning limit (about 1,340 kB before
-  Chapter 1).
-- The main menu canvas stays mounted (paused) under the Chapter 1 page, so two WebGL contexts
-  exist at once; memory and GPU cost not measured.
-- The prologue banner location "District 4 · Morning" (Vietnamese "Quận 4 · Buổi sáng") is
-  country-specific, against the `audience.md` rule for core content.
-- On branch `feat/game-i18n-en-vi` the game JS chunk is 1,905.88 kB (gzip 541.91 kB), over the
-  1,500 kB Vite warning limit.
-- The game localization (branch `feat/game-i18n-en-vi`) has not been checked in a browser or
-  with a screen reader, and its Vietnamese text has not had a native-speaker review.
-- Chapter 1 voice clips (branch `feat/chapter-01-voice-narrative`): sound quality, browser MP3
-  playback and the redistribution terms of the generated audio are not verified; Vietnamese has
-  one male voice; the option count (138) is above the 80 to 120 target; the `apartment` scene
-  is absent; the game JS chunk is 2,041.10 kB. Two accessibility gaps (2D fallback wobble and
-  the reduced-stress hint) are listed in `ACCESSIBILITY.md`.
-
+  completed on 2026-11-07, but `apps/landing/src/lib/urlCheck.ts` has not been changed; the false
+  positive still exists (the checker is legacy code, used by the info pages).
+- Automated tests: Vitest with jsdom and a seeded property-test generator (no fast-check). On `main`
+  @ `e9ee63f`: 182 files, 1618 tests pass. There are no browser or end-to-end tests and no manual
+  accessibility audit yet.
+- The main menu canvas stays mounted (paused) under the prologue and chapter pages, so two WebGL
+  contexts exist at once, plus the optional 3D phone canvas in the room; memory and GPU cost not
+  measured.
+- The Vietnamese text (UI and the 367-entry Chapter 1 overlay) has no native-speaker review.
+- Chapter 1 voice: 88 TTS clips made with installed Windows voices (David, Zira, Mark, An), so several
+  speakers share a voice; sound quality, browser MP3 playback and the redistribution terms of the
+  generated audio are not verified. Two accessibility gaps (2D fallback wobble and the reduced-stress
+  hint) are listed in `ACCESSIBILITY.md`.
+- The 3D model licenses of some owner-supplied riders, bikes and the Bao Thu model are "not stated" in
+  their `SOURCE.md` files; confirm before a public release.
 ## Task History
+### 2026-11-17 — Documentation synchronized with the current state of `main`
+- **Objective:** Owner request: many documents disagreed with each other and with the game. Bring them in line with `main` @ `e9ee63f` (all earlier feature branches are merged).
+- **Completed:** (1) `PROJECT_PROGRESS.md`: rewrote Project Status (routes, Chapter 1 as merged, phone, street life, quality gates), marked the old "not merged" entries as merged, added a summary of PRs #8 to #49, rewrote In Progress, Planned (removed done items: phone GLB move, bundle size) and Known Issues (old per-branch counts and chunk sizes replaced by current ones; removed items that no longer apply: flat light theme note, District 4 banner, landing concept). (2) `README.md`: worlds table and routes (removed the non-existent `/chapter1`, added `/testmove`, how New Game reaches Chapter 1), controls (the phone no longer opens with Tab or P), the phone and laptop section (SMS, browser and banking simulator are marked planned), the scenario table note, project structure, test counts. (3) `OVERVIEW.md`: verification line, merge status, test counts, new rows for world pages and the prologue, landing-copy row of section 10. (4) `CHAPTER_01_THE_URGENT_CALL.md`: banner saying it describes the parked street version, with pointers to the current chapter. (5) `PRODUCT_POSITIONING.md`: dated implementation note on Chapter 1 (deviation from section 11). (6) `ACCESSIBILITY.md`: notes that the call buttons draw no focus ring, as an owner design choice. (7) `AGENTS.md`: game app description.
+- **Validation:** `pnpm typecheck`, `vitest run` (182 files, 1618 tests) and `pnpm build` passed on `main` before the edits (documentation only changes after that). Facts were checked against the code, `git log` and the build output; links to anchors were not machine-checked.
+- **Not done:** a player-facing gameplay document for the room version of Chapter 1 (the street version's document is now marked deprecated); `SCAMMAZE_KIROWEEN_2026_FULL_PLAN.md` (historical plan) and `docs/finops/COST_ESTIMATION.md`, `DEPLOYMENT.md`, `DATABASE_STRATEGY.md` were not re-read in this task; old Task History entries were left as written (they describe their own date).
 ### 2026-11-17 — Chapter 1 cinematic gameplay UI redesign (4 modes)
 
 - **Objective:** restyle the Chapter 1 UI into four modes (exploration, call, decision, investigation) from a written brief. The 4-panel reference image was not delivered, so the visual match is unverified.
