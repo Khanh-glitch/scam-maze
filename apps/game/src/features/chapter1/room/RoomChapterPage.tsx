@@ -10,10 +10,12 @@
  * (Escape, settings, return to menu), which it skips while a chapter overlay is open.
  */
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { GameSettings } from "@scammaze/shared-types";
 import type { ChapterSession } from "../../../game/chapters/chapterSession";
 import type { SaveGameSource } from "../../../game/saves/saveGame";
 import { SettingsModal } from "../../menu/SettingsModal";
+import { NoSignalMinimap } from "../../prologue/Minimap";
 import { PrologueHud, ProloguePauseMenu } from "../../prologue/PrologueHud";
 import type { Engine as RoomEngine, UIState as RoomUI } from "../../roomv2/game/engine";
 import { AnchoredPrompt } from "../hud/AnchoredPrompt";
@@ -41,6 +43,7 @@ export const RoomChapterPage: React.FC<RoomChapterPageProps> = ({
   onReturnToMenu,
   saveSource,
 }) => {
+  const { t } = useTranslation("worlds");
   // One bridge per page, created once, so the engine and the layer always share the same port.
   const [bridge] = useState(() => new RoomStoryBridge());
   const [engineReady, setEngineReady] = useState(false);
@@ -126,13 +129,14 @@ export const RoomChapterPage: React.FC<RoomChapterPageProps> = ({
               saveSource={saveSource}
               engineReady={engineReady}
               onReturnToMenu={onReturnToMenu}
+              onHoverSound={onHoverSound}
             />
           }
         />
       </Suspense>
 
       {playing && !paused && (
-        <PrologueHud objective={null} prompt={null} showResume={showResume} cursorMode={cursorMode} crosshair={false} />
+        <PrologueHud objective={null} prompt={null} showResume={showResume} cursorMode={cursorMode} crosshair={false} minimap={<NoSignalMinimap label={t("quests.noSignal")} />} />
       )}
 
       {paused && !settingsOpen && (

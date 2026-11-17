@@ -5,9 +5,10 @@
 //
 // - Root: fixed at `region` (`layout.subtitle`, bottom-left in the wide layout), `pointer-events:
 //   none`, not a tab stop, anchored to the bottom of the region. It holds one bar.
-// - Bar: a dark translucent panel with the line (at most `CINE.subtitleVisibleLines` visible lines,
-//   then it scrolls, it is never cut), a violet speaker pill sitting on its top-left edge and a
-//   small chevron-down at the right while more text is below.
+// - Same look as the street conversation (`prologue/DialogueOverlay`): no panel, a dark gradient band
+//   at the bottom of the screen, the speaker's name in gold capitals over a hairline, then the line
+//   (at most `CINE.subtitleVisibleLines` visible lines, then it scrolls, it is never cut) and a small
+//   chevron-down at the right while more text is below.
 // - Two persistent polite live regions (the line with the speaker, and the notice) that are never
 //   remounted, so a re-render with the same line makes no new announcement.
 // - Transparent, without border, when there is nothing to show.
@@ -16,7 +17,7 @@ import React, { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { usePrefersReducedMotion } from "../../../components/ui/usePrefersReducedMotion";
-import { CINE, cinePanelStyle } from "../theme";
+import { CINE } from "../theme";
 import type { SubtitleContent } from "./callDialogueView";
 import type { Rect } from "./callLayout";
 
@@ -89,50 +90,38 @@ export const CallSubtitleOverlay: React.FC<CallSubtitleOverlayProps> = ({
       }}
     >
       {reducedMotion ? null : <style>{FADE_KEYFRAMES}</style>}
+      {hasContent ? (
+        <div aria-hidden="true" data-testid="call-subtitle-band" className="pointer-events-none" style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: "46%", zIndex: -1, background: "linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.55) 50%, transparent)" }} />
+      ) : null}
 
       <div
         data-testid="call-subtitle-bar"
         className={hasContent ? "relative" : "relative border border-transparent bg-transparent"}
         style={{
-          ...(hasContent ? cinePanelStyle(true) : null),
-          borderRadius: CINE.radiusPx.card,
-          padding: hasContent ? `${CINE.subtitle.padYPx}px ${CINE.subtitle.padXPx}px` : 0,
+          padding: 0,
           boxSizing: "border-box",
           pointerEvents: hasContent ? "auto" : "none",
+          textShadow: "0 2px 10px rgba(0,0,0,0.85)",
         }}
       >
         <div aria-live="polite" aria-atomic="true" data-testid="call-subtitle-region">
           {showLine && content.kind === "line" ? (
             <React.Fragment key={content.nodeKey}>
-              <p
-                data-testid="call-subtitle-speaker"
-                className="absolute font-semibold"
-                style={{
-                  left: CINE.subtitle.padXPx,
-                  top: -Math.round(CINE.subtitle.pillHeightPx / 2),
-                  height: CINE.subtitle.pillHeightPx,
-                  lineHeight: `${CINE.subtitle.pillHeightPx}px`,
-                  padding: "0 10px",
-                  borderRadius: CINE.radiusPx.chip,
-                  background: CINE.color.namePillBg,
-                  color: CINE.color.namePillText,
-                  fontSize: CINE.fontPx.small,
-                }}
-              >
+              <p data-testid="call-subtitle-speaker" className="font-menu font-bold uppercase" style={{ fontSize: 20, lineHeight: "24px", letterSpacing: "0.08em", color: "#f3c969" }}>
                 {content.speakerName}
               </p>
+              <div aria-hidden="true" className="mb-1 mt-0.5 h-px w-full" style={{ background: "linear-gradient(to right, rgba(243,201,105,0.8), rgba(243,201,105,0.3), transparent)" }} />
               <div
                 ref={scrollerRef}
                 data-testid="call-subtitle-scroller"
                 onScroll={measure}
                 style={{
                   // Border-box: the top padding is added so both lines stay fully visible.
-                  maxHeight: lineHeightPx * CINE.subtitleVisibleLines + Math.round(CINE.subtitle.pillHeightPx / 4),
+                  maxHeight: lineHeightPx * CINE.subtitleVisibleLines,
                   overflowY: "auto",
                   overflowX: "hidden",
                   overscrollBehavior: "contain",
                   paddingRight: more ? 22 : 0,
-                  paddingTop: Math.round(CINE.subtitle.pillHeightPx / 4),
                 }}
               >
                 <div style={reducedMotion ? undefined : { animation: FADE_ANIMATION }}>
@@ -150,7 +139,7 @@ export const CallSubtitleOverlay: React.FC<CallSubtitleOverlayProps> = ({
                   data-testid="call-subtitle-more"
                   aria-hidden="true"
                   className="absolute h-4 w-4"
-                  style={{ right: CINE.subtitle.padXPx - 2, bottom: CINE.subtitle.padYPx, color: CINE.color.accentText }}
+                  style={{ right: 0, bottom: 2, color: "#f3c969" }}
                 />
               ) : null}
             </React.Fragment>          ) : showConnecting ? (

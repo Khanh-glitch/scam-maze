@@ -16,7 +16,6 @@ import enStory from "../../../i18n/locales/en/chapter1/story";
 import viStory from "../../../i18n/locales/vi/chapter1/story";
 import enRoom from "../../../i18n/locales/en/chapter1/room";
 import viRoom from "../../../i18n/locales/vi/chapter1/room";
-import { CINE } from "../theme";
 import { choiceIconKind } from "./choiceIcon";
 import { CHOICE_CARD_CLASS, PlayerChoiceOverlay } from "./PlayerChoiceOverlay";
 
@@ -53,6 +52,7 @@ function renderOverlay(props: {
   narration?: string | null;
   disabled?: boolean;
   onSelectOption?: (optionId: string) => void;
+  onHoverSound?: () => void;
 }) {
   const onSelectOption = props.onSelectOption ?? vi.fn();
   const utils = render(
@@ -62,6 +62,7 @@ function renderOverlay(props: {
       disabled={props.disabled ?? false}
       onSelectOption={onSelectOption}
       region={REGION}
+      onHoverSound={props.onHoverSound}
     />,
   );
   return { ...utils, onSelectOption, overlay: screen.getByTestId("player-choice-overlay") };
@@ -160,7 +161,7 @@ describe.each(LOCALES)("PlayerChoiceOverlay (%s)", (locale) => {
 
     const buttons = within(overlay).getAllByRole("button");
     for (const button of buttons) {
-      expect(button.className).toBe(CHOICE_CARD_CLASS);
+      expect(button.className).toContain(CHOICE_CARD_CLASS);
       expect(button.className).toContain("whitespace-normal");
       expect(button.className).toContain("break-words");
       const text = button.querySelector("span.flex-1");
@@ -168,7 +169,7 @@ describe.each(LOCALES)("PlayerChoiceOverlay (%s)", (locale) => {
       expect(text?.className).toContain("break-words");
     }
     // State classes of the card (keyboard focus, disabled).
-    for (const token of ["focus-visible:outline-2", "disabled:text-[#a9a4c4]"]) {
+    for (const token of ["rounded-full", "disabled:opacity-60"]) {
       expect(CHOICE_CARD_CLASS).toContain(token);
     }
     // No truncation or ellipsis anywhere in the overlay.
@@ -220,47 +221,64 @@ describe.each(LOCALES)("PlayerChoiceOverlay (%s)", (locale) => {
     }
   });
 
-  it("selects with keys 1 to 3, moves with the arrow keys, and hides the cards after a pick", () => {
+  it("moves with the arrow keys, picks with F, ignores number keys, and hides the cards after a pick", () => {
     setLocale();
     const view = viewFor(SCAM_OPEN, scenario);
     expect(view.options.length).toBeGreaterThanOrEqual(2);
     const onSelectOption = vi.fn();
-    const { overlay } = renderOverlay({ view, onSelectOption });
-
+    const onHoverSound = vi.fn();
+    const { overlay } = renderOverlay({ view, onSelectOption, onHoverSound });
     // The first card has focus and the selected highlight on open.
     const buttons = within(overlay).getAllByRole("button");
     expect(document.activeElement).toBe(buttons[0]);
     expect(buttons[0].getAttribute("data-selected")).toBe("true");
-    // Arrow down moves focus and the highlight to the second card; arrow up wraps back.
-    fireEvent.keyDown(buttons[0], { key: "ArrowDown" });
+    // Arrow down moves focus and the highlight to the second card (with the hover sound); arrow up wraps back.
+    fireEvent.keyDown(window, { key: "ArrowDown" });
     expect(document.activeElement).toBe(buttons[1]);
     expect(buttons[1].getAttribute("data-selected")).toBe("true");
     expect(buttons[0].getAttribute("data-selected")).toBe("false");
-    fireEvent.keyDown(buttons[1], { key: "ArrowUp" });
+    expect(onHoverSound).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(window, { key: "ArrowUp" });
     expect(document.activeElement).toBe(buttons[0]);
-
-    // Number keys 1 to 3 pick the option at that position.
-    fireEvent.keyDown(window, { key: "2" });
+    expect(onHoverSound).toHaveBeenCalledTimes(2);
+    // Number keys do nothing; F picks the highlighted option.
+    fireEvent.keyDown(window, { key: "2", code: "Digit2" });
+    expect(onSelectOption).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: "ArrowDown" });
+    fireEvent.keyDown(window, { key: "f", code: "KeyF" });
     expect(onSelectOption).toHaveBeenCalledTimes(1);
     expect(onSelectOption).toHaveBeenLastCalledWith(view.options[1].id);
-
-    // The cards leave at once: no cards, no list, and a second key does nothing.
+    // The cards leave at once: no cards, no list, and a second F does nothing.
     expect(within(overlay).queryAllByRole("button")).toHaveLength(0);
     expect(within(overlay).queryByRole("list")).toBeNull();
-    fireEvent.keyDown(window, { key: "1" });
+    fireEvent.keyDown(window, { key: "f", code: "KeyF" });
     expect(onSelectOption).toHaveBeenCalledTimes(1);
   });
-
-  it("shows the key-cap numbers 1 to N on the cards", () => {
+  it("moves the highlight with the mouse wheel, one step per swipe", () => {
+    setLocale();
+    const view = viewFor(SCAM_OPEN, scenario);
+    const onHoverSound = vi.fn();
+    const { overlay } = renderOverlay({ view, onHoverSound });
+    const buttons = within(overlay).getAllByRole("button");
+    fireEvent.wheel(window, { deltaY: 100 });
+    expect(buttons[1].getAttribute("data-selected")).toBe("true");
+    // The rest of the same swipe does not move it again.
+    for (const deltaY of [80, 60, 40, 20]) fireEvent.wheel(window, { deltaY });
+    expect(buttons[1].getAttribute("data-selected")).toBe("true");
+    expect(onHoverSound).toHaveBeenCalledTimes(1);
+  });
+  it("shows no number key caps; the highlighted card shows the F key", () => {
     setLocale();
     const view = viewFor(SCAM_OPEN, scenario);
     const { overlay } = renderOverlay({ view });
     const buttons = within(overlay).getAllByRole("button");
-    buttons.forEach((button, index) => {
-      expect(button.querySelector("kbd")?.textContent).toBe(String(index + 1));
-    });
+    for (const button of buttons) expect(button.querySelector("kbd")).toBeNull();
+    const hints = within(overlay).getAllByTestId("choice-hint");
+    expect(hints).toHaveLength(buttons.length);
+    expect(hints[0].textContent).toContain("F");
+    expect(hints[0].className).toContain("opacity-100");
+    expect(hints[1].className).toContain("opacity-0");
   });
-
   it("keeps every option reachable when the list overflows: a scrolling list, a hint, and the hang-up pinned", () => {
     setLocale();
     const base = viewFor(SCAM_OPEN, scenario);
@@ -317,7 +335,7 @@ describe.each(LOCALES)("PlayerChoiceOverlay (%s)", (locale) => {
       expect((button as HTMLButtonElement).disabled).toBe(true);
       fireEvent.click(button);
     }
-    fireEvent.keyDown(window, { key: "1" });
+    fireEvent.keyDown(window, { key: "f", code: "KeyF" });
     expect(onSelectOption).not.toHaveBeenCalled();
     // No option takes focus while paused.
     expect(buttons).not.toContain(document.activeElement);
@@ -334,8 +352,6 @@ describe("PlayerChoiceOverlay icons and selection style (cinematic)", () => {
     icons.forEach((icon, index) => {
       expect(icon.getAttribute("aria-hidden")).toBe("true");
       expect(icon.getAttribute("data-icon")).toBe(choiceIconKind(view.options[index]));
-      expect(icon.style.width).toBe(`${CINE.iconCirclePx}px`);
-      expect(icon.style.height).toBe(`${CINE.iconCirclePx}px`);
     });
   });
 
@@ -352,22 +368,24 @@ describe("PlayerChoiceOverlay icons and selection style (cinematic)", () => {
     applyLocale("en");
   });
 
-  it("draws the selected card with a violet border and glow, the others darker with a hairline", () => {
+  it("draws the selected card as a light pill (swept in from the left), the others dark with a hairline", () => {
     applyLocale("en");
     const view = viewFor(SCAM_OPEN, getDisplayScenario("en"));
     const { overlay } = renderOverlay({ view });
     const buttons = within(overlay).getAllByRole("button");
+    const sweep = (button: HTMLElement) => button.querySelector("span[aria-hidden='true'].origin-left") as HTMLElement;
     expect(buttons[0].getAttribute("data-selected")).toBe("true");
-    expect(buttons[0].style.boxShadow).toContain("118, 84, 214");
-    expect(buttons[0].style.borderColor).toContain("185, 165, 245");
+    expect(buttons[0].className).toContain("border-white/80");
+    expect(sweep(buttons[0]).style.transform).toBe("scaleX(1)");
     expect(buttons[1].getAttribute("data-selected")).toBe("false");
-    expect(buttons[1].style.boxShadow === "" || buttons[1].style.boxShadow === "none").toBe(true);
-    expect(buttons[1].style.borderColor).toContain("255, 255, 255");
+    expect(buttons[1].className).toContain("border-white/30");
+    expect(buttons[1].className).toContain("bg-black/55");
+    expect(sweep(buttons[1]).style.transform).toBe("scaleX(0)");
     // Hover moves the selection style to the hovered card.
-    fireEvent.mouseEnter(buttons[1]);
+    fireEvent.pointerEnter(buttons[1]);
     expect(buttons[1].getAttribute("data-selected")).toBe("true");
-    expect(buttons[1].style.boxShadow).toContain("118, 84, 214");
-    expect(buttons[0].style.boxShadow === "" || buttons[0].style.boxShadow === "none").toBe(true);
+    expect(sweep(buttons[1]).style.transform).toBe("scaleX(1)");
+    expect(sweep(buttons[0]).style.transform).toBe("scaleX(0)");
   });
 
   it("anchors the cards to the bottom of the region (lower-left, above the subtitle)", () => {

@@ -95,18 +95,18 @@ describe.each(LOCALES)("PlayerChoiceOverlay reply gate (%s)", (locale) => {
     expect(onSelectOption).not.toHaveBeenCalled();
   });
 
-  it("ignores number keys while waiting", () => {
+  it("ignores number keys and F while waiting", () => {
     applyLocale(locale);
     const view = viewFor(scenario);
     const onSelectOption = vi.fn();
     render(overlayElement(view, { waiting: true, onSelectOption }));
 
     fireEvent.keyDown(window, { key: "1" });
-    fireEvent.keyDown(window, { key: "2" });
+    fireEvent.keyDown(window, { key: "f", code: "KeyF" });
     expect(onSelectOption).not.toHaveBeenCalled();
   });
 
-  it("moves focus to the first option and re-enables number keys when the wait ends", () => {
+  it("moves focus to the first option and re-enables the F key when the wait ends", () => {
     applyLocale(locale);
     const view = viewFor(scenario);
     const onSelectOption = vi.fn();
@@ -119,7 +119,7 @@ describe.each(LOCALES)("PlayerChoiceOverlay reply gate (%s)", (locale) => {
     expect(screen.queryByRole("status")).toBeNull();
     expect(document.activeElement).toBe(screen.getByTestId(`dialogue-option-${view.options[0].id}`));
 
-    fireEvent.keyDown(window, { key: "1" });
+    fireEvent.keyDown(window, { key: "f", code: "KeyF" });
     expect(onSelectOption).toHaveBeenCalledTimes(1);
     expect(onSelectOption).toHaveBeenLastCalledWith(view.options[0].id);
   });
@@ -136,7 +136,7 @@ describe.each(LOCALES)("PlayerChoiceOverlay reply gate (%s)", (locale) => {
     expect(within(overlay).getAllByRole("button")).toHaveLength(view.options.length);
     expect(document.activeElement).toBe(screen.getByTestId(`dialogue-option-${view.options[0].id}`));
 
-    fireEvent.keyDown(window, { key: "1" });
+    fireEvent.keyDown(window, { key: "f", code: "KeyF" });
     expect(onSelectOption).toHaveBeenCalledWith(view.options[0].id);
   });
 });

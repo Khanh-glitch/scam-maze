@@ -59,6 +59,8 @@ export interface CallPresentationProps {
   subtitlesEnabled?: boolean;
   /** Speaker toggle state. Absent: the Speaker button is off and does nothing. */
   speaker?: { on: boolean; onToggle: () => void };
+  /** Plays the hover sound when the reply highlight moves. */
+  onHoverSound?: () => void;
 }
 
 /** The pieces of the `VoiceController` this component needs. */
@@ -112,6 +114,7 @@ export const CallPresentation: React.FC<CallPresentationProps> = ({
   durationSeconds = 0,
   subtitlesEnabled = true,
   speaker,
+  onHoverSound,
 }) => {
   const { t } = useTranslation("chapter1");
   const call = useChapterState(store, callSelector);
@@ -274,6 +277,7 @@ export const CallPresentation: React.FC<CallPresentationProps> = ({
           waiting={voice?.optionsWaiting ?? false}
           onSkipWait={voice?.skipWait}
           region={layout.choice}
+          onHoverSound={onHoverSound}
         />
       ) : null}
     </div>
