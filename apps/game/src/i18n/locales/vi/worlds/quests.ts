@@ -24,6 +24,21 @@ const quests: LocaleShape<typeof en> = {
       description: "Cô Mai bán bánh mì ở xe hàng phía bắc con phố. Ghé qua chào cô một tiếng.",
       done: "Con đã nói chuyện với cô Mai.",
     },
+    walkStreet: {
+      title: "Đi dạo hết con phố",
+      description: "Đi đến cuối phố và nhìn ngắm khu phố một vòng.",
+      done: "Bạn đã đi hết con phố.",
+    },
+    goHome: {
+      title: "Về nhà số 59",
+      description: "Trời mưa ngày càng nặng hạt. Hãy về nhà số 59 của bạn.",
+      done: "Bạn đã về đến nhà.",
+    },
+    goUp: {
+      title: "Lên phòng của bạn",
+      description: "Đi cầu thang lên tầng hai và mở cửa phòng ngủ phía sau.",
+      done: "Bạn đã lên phòng của mình.",
+    },
     dialogue: {
       continue: "Nhấn để tiếp tục",
       replies: "Câu trả lời của bạn",

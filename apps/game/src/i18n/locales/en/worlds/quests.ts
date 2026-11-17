@@ -22,6 +22,21 @@ const quests = {
       description: "Auntie Mai sells banh mi from her cart on the north side of the street. Stop by and say hello.",
       done: "You talked with Auntie Mai.",
     },
+    walkStreet: {
+      title: "Take a walk down the street",
+      description: "Walk to the far end of the street and look around the neighborhood.",
+      done: "You walked the whole street.",
+    },
+    goHome: {
+      title: "Head home to No. 59",
+      description: "The rain is getting heavier. Go back to your house, No. 59.",
+      done: "You reached your house.",
+    },
+    goUp: {
+      title: "Go up to your room",
+      description: "Take the stairs up to the second floor and open your bedroom door at the back.",
+      done: "You went up to your room.",
+    },
     dialogue: {
       continue: "Click to continue",
       replies: "Your reply",

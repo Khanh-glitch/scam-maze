@@ -31,6 +31,10 @@ export interface QuestLayerDeps {
   onTalk: (npc: string) => void;
   /** Interaction prompt text for a person, already translated. */
   label: (npc: string) => string;
+  /** World position of any quest goal (a person or a place), by id. */
+  target?: (id: string) => Point | null;
+  /** A hand-made climbing path (with heights) from the player's eye to a goal, for goals inside a building; null when the street grid applies. */
+  route?: (id: string, from: { x: number; y: number; z: number }) => Point[] | null;
 }
 
 const ICON_URL = '/assets/ui/hud/scammaze-quest-icon-512.png';
@@ -215,8 +219,9 @@ export class QuestLayer {
     return this.nav;
   }
 
-  private rebuildTrail(from: Point, to: Point) {
-    const raw = findPath(this.ensureNav(), from, to) ?? [from, to];
+  private rebuildTrail(from: Point, to: Point, eyeY: number) {
+    const climb = this.trailTarget ? this.d.route?.(this.trailTarget, { x: from.x, y: eyeY, z: from.z }) ?? null : null;
+    const raw = climb ?? findPath(this.ensureNav(), from, to) ?? [from, to];
     const path = trimEnd(raw, TRAIL_STOP);
     const total = pathLength(path);
     if (path.length < 2 || total < 0.5) { this.trailUniforms.uLen.value = 0.01; this.trail.geometry.setDrawRange(0, 0); return; }
@@ -229,7 +234,7 @@ export class QuestLayer {
       const l = Math.hypot(dx, dz) || 1;
       dx /= l; dz /= l;
       const nx = -dz * TRAIL_WIDTH / 2, nz = dx * TRAIL_WIDTH / 2;
-      const y = this.d.phys.floorAt(pts[i].x, pts[i].z, 0.6).y + TRAIL_LIFT;
+      const y = (pts[i].y ?? this.d.phys.floorAt(pts[i].x, pts[i].z, 0.6).y) + TRAIL_LIFT;
       pos.set([pts[i].x + nx, y, pts[i].z + nz, pts[i].x - nx, y, pts[i].z - nz], i * 6);
       uv.set([pts[i].d, -1, pts[i].d, 1], i * 4);
       if (i < n - 1) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
@@ -267,10 +272,10 @@ export class QuestLayer {
     this.repathT -= dt;
     if (this.repathT <= 0) {
       this.repathT = REPATH_S;
-      const to = this.npcPosition(this.trailTarget);
+      const to = this.d.target?.(this.trailTarget) ?? this.npcPosition(this.trailTarget);
       if (to && Math.hypot(player.x - this.lastFrom.x, player.z - this.lastFrom.y) > 0.4) {
         this.lastFrom.set(player.x, player.z);
-        this.rebuildTrail({ x: player.x, z: player.z }, to);
+        this.rebuildTrail({ x: player.x, z: player.z }, to, player.y);
       }
     }
   }

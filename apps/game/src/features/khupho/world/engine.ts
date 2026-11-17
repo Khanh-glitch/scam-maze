@@ -35,6 +35,8 @@ export interface Hud { time: string; hour: number; loc: string; prompt: string |
 /** Story-mode clock: the player explores from the afternoon until the rain starts and it is time to go home. */
 export const STORY_CLOCK = { startHour: 16.6, rainHour: 17.7, callHomeHour: 18.4 } as const;
 export type StoryEvent = 'rain' | 'callHome';
+/** Far end of the street (x, z in metres), the goal of the "walk the street" quest. */
+export const STREET_END = { x: -58, z: 0 } as const;
 export interface EngineOptions {
   /** Start in the afternoon, advance the clock only while playing, and report the story events. */
   story?: boolean;
@@ -111,6 +113,8 @@ export class Engine {
   /** Resolves when the street props are in the world (or failed to load). */
   propsReady: Promise<PlacedProp[]>;
   private storyRain = false; private storyCall = false;
+  /** Story pacing set by the host: `slow` while a conversation runs (the clock crawls, no story beat fires); `gate` keeps the rain from starting yet. */
+  private storySlow = false; private storyGate = false;
   /** Quest icons, the guide trail and the minimap data (story mode with a quest host only). */
   quest: QuestLayer | null = null;
   /** The player's house (no. 59), a host asked to take over (`homeBusy`), and the world standing still behind it. */
@@ -189,7 +193,7 @@ export class Engine {
       if (opts.story) e.player.teleport(STORY_SPAWN.x, STORY_SPAWN.z, STORY_SPAWN.yaw);
       report('life'); await yieldFrame(); if (isCancelled()) return e;
       e.life = buildLife(e.ctx, e.houses, e.vehicles, e.audio, await bikeRider, await humans, await baothu);
-      if (opts.quest) e.quest = new QuestLayer({ scene: e.scene, phys: e.phys, inter: e.inter, houses: e.houses, npcs: e.life.npcs, onTalk: opts.quest.onTalk, label: opts.quest.label });
+      if (opts.quest) e.quest = new QuestLayer({ scene: e.scene, phys: e.phys, inter: e.inter, houses: e.houses, npcs: e.life.npcs, onTalk: opts.quest.onTalk, label: opts.quest.label, target: (id) => e.targetPosition(id), route: (id, from) => e.climbRoute(id, from) });
       report('optimize'); await yieldFrame(); if (isCancelled()) return e;
       e.optimizeStatic();
       placeStreetFurniture(e.ctx.root);
@@ -400,6 +404,52 @@ export class Engine {
   /** World position of a person the quests talk about. */
   npcPosition(id: string) { return this.quest?.npcPosition(id) ?? null; }
   setNpcMarker(id: string, kind: MarkerKind | null) { this.quest?.setMarker(id, kind); }
+  /** Story pacing for the host (see `storySlow`, `storyGate`). */
+  setStoryPacing(slow: boolean, gate: boolean) { this.storySlow = slow; this.storyGate = gate; }
+  /** World position of a quest goal: a person, the far end of the street, house no. 59's door, or the white doorway upstairs. */
+  targetPosition(id: string): { x: number; z: number } | null {
+    if (id === 'streetEnd') return { x: STREET_END.x, z: STREET_END.z };
+    const h = this.home;
+    if (h && id === 'home') { const p = h.wp(h.doorX, 0, -1.0); return { x: p.x, z: p.z }; }
+    if (h?.doorway && id === 'homeUp') { const d = h.doorway; const p = h.wp((d.x0 + d.x1) / 2, 0, d.z); return { x: p.x, z: p.z }; }
+    return this.npcPosition(id);
+  }
+  /**
+   * Guide path up house no. 59's stairs to the white doorway, with heights (world metres). Follows the walkers'
+   * route (`House.route`): the hall spine, the dog-leg stairs (flight A, landing, flight B), the upper hall. `from.y`
+   * is the eye height. Null when the player is not inside the house, or for another goal.
+   */
+  climbRoute(id: string, from: { x: number; y: number; z: number }): { x: number; z: number; y?: number }[] | null {
+    const h = this.home, d = h?.doorway;
+    if (id !== 'homeUp' || !h || !d || !h.contains(from.x, from.z)) return null;
+    const { xs, zs, Lf, W, t, kz0, spineX: sx } = h;
+    const F0 = h.F(0), F1 = h.F(1), half = F0 + h.FH / 2;
+    const lL = xs + 0.42, lR = W - t - 0.42;
+    const yA = (z: number) => F0 + ((z - zs) / Lf) * (half - F0);
+    const yB = (z: number) => half + ((zs + Lf - z) / Lf) * (F1 - half);
+    const xc = (d.x0 + d.x1) / 2;
+    // The climb, in order: hall spine, flight A, landing, flight B, upper hall, door.
+    const C = [
+      { x: sx, z: zs - 0.3, y: F0 }, { x: lL, z: zs - 0.3, y: F0 }, { x: lL, z: zs + 0.1, y: yA(zs + 0.1) }, { x: lL, z: zs + Lf - 0.05, y: yA(zs + Lf - 0.05) },
+      { x: lL, z: zs + Lf + 0.5, y: half }, { x: lR, z: zs + Lf + 0.5, y: half }, { x: lR, z: zs + Lf - 0.05, y: yB(zs + Lf - 0.05) }, { x: lR, z: zs + 0.1, y: yB(zs + 0.1) },
+      { x: lR, z: zs - 0.3, y: F1 }, { x: sx, z: zs - 0.3, y: F1 }, { x: sx, z: kz0 - 0.8, y: F1 }, { x: xc, z: kz0 - 0.8, y: F1 }, { x: xc, z: d.z + 0.3, y: F1 },
+    ];
+    const l = h.toLocal(from.x, from.z);
+    const lx = l.x, lz = l.z;
+    const floorY = from.y - 1.62;
+    let start: number;
+    const lane = (x0: number, x1: number) => lx >= x0 && lx <= x1;
+    if (floorY >= F1 - 0.3) start = 10; // upstairs: along the hall to the door
+    else if (floorY >= half - 0.25) start = lane(lR - 0.5, W) && lz < zs + Lf ? 7 : 5; // on flight B, or on the landing
+    else if (lane(xs, xs + 0.95) && lz >= zs && lz <= zs + Lf) start = 3;
+    else start = 0;
+    const pre = start === 0 ? [{ x: sx, z: Math.min(lz, zs - 0.3), y: F0 }] : [];
+    const p0 = { x: l.x, z: l.z, y: floorY };
+    const pts = [p0, ...pre, ...C.slice(start)].map((p) => { const w = h.wp(p.x, p.y, p.z); return { x: w.x, z: w.z, y: w.y }; });
+    return pts;
+  }
+  /** True while the player is inside house no. 59. */
+  insideHome() { const h = this.home; return !!h && h.contains(this.player.pos.x, this.player.pos.z); }
   /** Lights the guide trail from the player to a person. */
   showPathTo(id: string) { this.quest?.showPath(id); }
   hidePath() { this.quest?.hidePath(); }
@@ -471,6 +521,7 @@ export class Engine {
   private updateStory() {
     if (!this.opts.story || !this.started) return;
     const e = this.env;
+    if (this.storySlow) return;
     if (!this.storyRain && e.hour >= STORY_CLOCK.rainHour) { this.storyRain = true; this.setRain(1); this.opts.onStory?.('rain'); }
     if (!this.storyCall && e.hour >= STORY_CLOCK.callHomeHour && e.rain > 0.4) { this.storyCall = true; this.opts.onStory?.('callHome'); }
   }
@@ -523,7 +574,12 @@ export class Engine {
 
   update(dt: number) {
     const e = this.env;
-    if (this.started || !this.opts.story) e.hour = (e.hour + (dt * this.timeScale) / 3600) % 24;
+    if (this.started || !this.opts.story) {
+      let next = e.hour + (dt * this.timeScale * (this.opts.story && this.storySlow ? 0.1 : 1)) / 3600;
+      // Until the host opens the gate, the clock waits just before dusk, so the rain does not start unseen.
+      if (this.opts.story && this.storyGate && !this.storyRain && next >= STORY_CLOCK.rainHour) next = STORY_CLOCK.rainHour - 0.001;
+      e.hour = next % 24;
+    }
     this.updateStory();
     e.rain += (this.rainTarget - e.rain) * Math.min(1, dt * 0.35);
     this.wet += ((this.rainTarget > 0.2 ? 1 : 0) - this.wet) * Math.min(1, dt * (this.rainTarget > 0.2 ? 0.08 : 0.01));

@@ -55,19 +55,21 @@ export interface QuestTrackerProps {
   questId: QuestId;
   /** Meters to the target, or null when unknown. */
   distance: number | null;
+  /** A quest that just started: shown with a "new quest" label and a glow for a few seconds. */
+  fresh?: boolean;
   /** Lights the guide trail. */
   onShowPath: () => void;
   onHoverSound?: () => void;
 }
 
 /** The tracked quest outside the list: the objective block of the HUD. Press it (or Q) to light the path. */
-export const QuestTracker: React.FC<QuestTrackerProps> = ({ questId, distance, onShowPath, onHoverSound }) => {
+export const QuestTracker: React.FC<QuestTrackerProps> = ({ questId, distance, fresh, onShowPath, onHoverSound }) => {
   const q = useQuestText();
   return (
-    <section aria-labelledby="quest-tracker-heading" className="pointer-events-auto max-w-sm">
+    <section aria-labelledby="quest-tracker-heading" data-fresh={fresh ? "true" : undefined} className={`pointer-events-auto max-w-sm ${fresh ? "quest-fresh" : ""}`}>
       <h2 id="quest-tracker-heading" className={`flex items-center gap-2.5 font-menu text-xs font-semibold uppercase tracking-[0.3em] text-[#c9bbf7] ${SHADOW}`}>
         <Accent />
-        {q("khupho.game.story.objective")}
+        {fresh ? <span className="text-[#f3c969]">{q("quests.newQuest")}</span> : q("khupho.game.story.objective")}
       </h2>
       <button
         type="button"
@@ -135,7 +137,7 @@ export const QuestListPanel: React.FC<QuestListPanelProps> = ({ state, onClose, 
             <Accent />
             {q("quests.title")}
           </h2>
-          <button ref={closeRef} type="button" onClick={onClose} onPointerEnter={onHoverSound} aria-label={q("quests.close")} aria-keyshortcuts={`${QUEST_LIST_KEY} Escape`} className="flex items-center gap-2 rounded border border-white/20 px-2 py-1 font-menu text-sm font-semibold uppercase tracking-[0.1em] text-zinc-200 outline-none hover:border-white/50 focus-visible:ring-2 focus-visible:ring-[#b9a5f5] cursor-pointer">
+          <button ref={closeRef} type="button" onClick={onClose} onPointerEnter={onHoverSound} aria-label={q("quests.close")} aria-keyshortcuts={`${QUEST_LIST_KEY} Escape`} className="flex items-center gap-2 rounded border border-white/20 px-2 py-1 font-menu text-sm font-semibold uppercase tracking-[0.1em] text-zinc-200 outline-none hover:border-white/50 cursor-pointer">
             <span aria-hidden="true" className={KEYCAP}>{QUEST_LIST_KEY}</span>
             <X className="h-4 w-4" aria-hidden="true" />
           </button>

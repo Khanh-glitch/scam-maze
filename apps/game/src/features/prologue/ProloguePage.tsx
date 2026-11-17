@@ -19,9 +19,9 @@ import { QUEST_LIST_KEY, QUEST_PATH_KEY, QuestListButton, QuestListPanel, QuestT
 import { advance, chooseOption, isEnded, startDialogue, type DialogueState } from "./quest/dialogue";
 import { MAI_DIALOGUE, maiStart } from "./quest/maiDialogue";
 import { MAI_VOICE_BASE } from "../../config/assetPaths";
-import { completeQuest, initialQuestState, markSeen, questDefinition, trackQuest, type QuestId } from "./quest/quests";
+import { completeQuest, initialQuestState, markSeen, questDefinition, startQuest, STREET_END_RADIUS, trackQuest, type QuestId } from "./quest/quests";
 import type { MapData } from "../khupho/world/questLayer";
-import { GO_HOME_KEY, PrologueHud, ProloguePauseMenu, PrologueTopBar } from "./PrologueHud";
+import { PrologueHud, ProloguePauseMenu, PrologueTopBar } from "./PrologueHud";
 import { SettingsModal } from "../menu/SettingsModal";
 import type { ChapterSession } from "../../game/chapters/chapterSession";
 import type { SaveGameSource } from "../../game/saves/saveGame";
@@ -94,7 +94,6 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
   const [locked, setLocked] = useState(false);
   const [paused, setPaused] = useState(false);
   const [callOpen, setCallOpen] = useState(false);
-  const [headingHome, setHeadingHome] = useState(false);
   // Walk-around quests (the first one: meet Auntie Mai) and the conversation.
   const [quests, setQuests] = useState(initialQuestState);
   const [questListOpen, setQuestListOpen] = useState(false);
@@ -220,7 +219,6 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
     // The call has buttons, so the pointer must be free.
     if (document.pointerLockElement) document.exitPointerLock();
     setCallOpen(true);
-    setHeadingHome(true);
   }, []);
 
   const handleHud = useCallback((hud: Hud) => {
@@ -254,10 +252,12 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
     return () => window.clearTimeout(timer);
   }, [started, mountRoom]);
 
-  const stayOutside = useCallback(() => {
+  /** The rain narration is over: the player is back in the street and the way home becomes the next quest. */
+  const finishCall = useCallback(() => {
     setCallOpen(false);
     streetRef.current?.setInputBlocked(false);
     streetRef.current?.lock();
+    setQuests((q) => startQuest(q, "goHome"));
   }, []);
 
   /** Frees the pointer and stops world input while a quest overlay is open, and takes it back after. */
@@ -293,7 +293,7 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
     setConversation(null);
     holdWorld(false);
     if (!completed) return;
-    setQuests((q) => completeQuest(q, "meetMai"));
+    setQuests((q) => startQuest(completeQuest(q, "meetMai"), "walkStreet"));
     setToast("meetMai");
   }, [holdWorld, setConversation]);
 
@@ -329,7 +329,7 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
     const target = id ?? quests.tracked;
     if (!target) return;
     setQuests((q) => trackQuest(q, target));
-    streetRef.current?.showPathTo(questDefinition(target).npc);
+    streetRef.current?.showPathTo(questDefinition(target).target);
   }, [quests.tracked]);
 
   const openPause = useCallback(() => {
@@ -389,14 +389,10 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
         showQuestPath();
         return;
       }
-      if (event.code === `Key${GO_HOME_KEY}` && playingStreet && !paused && !event.ctrlKey && !event.metaKey) {
-        event.preventDefault();
-        goHome();
-      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [bridge, paused, settingsOpen, playingStreet, playingRoom, resume, openPause, goHome, stage, started, callOpen, questListOpen, closeListPanel, openListPanel, showQuestPath]);
+  }, [bridge, paused, settingsOpen, playingStreet, playingRoom, resume, openPause, stage, started, callOpen, questListOpen, closeListPanel, openListPanel, showQuestPath]);
 
   const handleProgress = useCallback((step: BuildStep, fraction: number) => {
     const index = BUILD_STEPS.indexOf(step);
@@ -449,15 +445,63 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
     const timer = window.setTimeout(() => setToast(null), 4200);
     return () => window.clearTimeout(timer);
   }, [toast]);
-  const trackedNpc = quests.tracked ? questDefinition(quests.tracked).npc : null;
+  // A new quest: its tracker pops up with a "new quest" label and the guide trail lights at once (hiding it
+  // after a while is automatic; the player lights it again with Q or by pressing the quest).
+  const [fresh, setFresh] = useState<QuestId | null>(null);
+  const announced = useRef<QuestId | null>("meetMai");
+  useEffect(() => {
+    const id = quests.tracked;
+    if (!id || announced.current === id || quests.status[id] !== "active") return;
+    announced.current = id;
+    setFresh(id);
+    const timer = window.setTimeout(() => showQuestPath(id), 500);
+    return () => window.clearTimeout(timer);
+  }, [quests, showQuestPath]);
+  useEffect(() => {
+    if (!fresh || toast) return undefined;
+    const timer = window.setTimeout(() => setFresh(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [fresh, toast]);
+  const trackedTarget = quests.tracked ? questDefinition(quests.tracked).target : null;
   const distance = useDistance(() => {
     const street = streetRef.current;
     const pose = street?.getPlayerPose();
-    const at = trackedNpc && street ? street.npcPosition(trackedNpc) : null;
+    const at = trackedTarget && street ? street.targetPosition(trackedTarget) : null;
     return pose && at ? Math.hypot(at.x - pose.x, at.z - pose.z) : null;
-  }, stage === "neighborhood" && started && trackedNpc !== null);
+  }, stage === "neighborhood" && started && trackedTarget !== null);
   const getPose = useCallback(() => streetRef.current?.getPlayerPose() ?? null, []);
-  const getTarget = useCallback(() => (trackedNpc ? streetRef.current?.npcPosition(trackedNpc) ?? null : null), [trackedNpc]);
+  const getTarget = useCallback(() => (trackedTarget ? streetRef.current?.targetPosition(trackedTarget) ?? null : null), [trackedTarget]);
+
+  // Story pacing: the clock crawls while Auntie Mai talks (and no story beat fires), and the rain waits until
+  // the player has walked the street.
+  const walkDone = quests.status.walkStreet === "done";
+  useEffect(() => {
+    streetRef.current?.setStoryPacing(dialogue !== null, !walkDone);
+  }, [dialogue, walkDone, worldReady]);
+
+  // Reaching the end of the street, and stepping into house no. 59, finish their quests.
+  const walkActive = quests.status.walkStreet === "active";
+  const homeActive = quests.status.goHome === "active";
+  useEffect(() => {
+    if (stage !== "neighborhood" || !started || callOpen || (!walkActive && !homeActive)) return undefined;
+    const timer = window.setInterval(() => {
+      const street = streetRef.current;
+      const pose = street?.getPlayerPose();
+      if (!street || !pose) return;
+      if (walkActive) {
+        const at = street.targetPosition("streetEnd");
+        if (!at || Math.hypot(at.x - pose.x, at.z - pose.z) > STREET_END_RADIUS) return;
+        setQuests((q) => completeQuest(q, "walkStreet"));
+        setToast("walkStreet");
+        street.hidePath();
+      } else if (street.insideHome()) {
+        setQuests((q) => startQuest(completeQuest(q, "goHome"), "goUp"));
+        setToast("goHome");
+        street.hidePath();
+      }
+    }, 300);
+    return () => window.clearInterval(timer);
+  }, [stage, started, callOpen, walkActive, homeActive]);
 
   const tips = LOADING_TIP_IDS.map((id) => t(`loading:tips.${id}`));
   const done = [roomChunk, hands, roomBuilt].filter(Boolean).length;
@@ -507,13 +551,11 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
           )}
           {revealed && worldReady && started && !callOpen && !paused && !dialogue && (
             <PrologueHud
-              objective={headingHome ? t("worlds:khupho.game.story.objectiveHome") : quests.tracked ? null : t("worlds:khupho.game.story.objectiveExplore")}
+              objective={null}
               prompt={prompt}
               showResume={showResume}
               cursorMode={streetCursor}
               clock={clock}
-              onGoHome={goHome}
-              onHoverSound={onHoverSound}
               questKeys
               minimap={
                 <div className="relative shrink-0">
@@ -524,8 +566,8 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
               questArea={
                 toast ? (
                   <QuestToast questId={toast} />
-                ) : quests.tracked && !headingHome ? (
-                  <QuestTracker questId={quests.tracked} distance={distance} onShowPath={() => showQuestPath()} onHoverSound={onHoverSound} />
+                ) : quests.tracked ? (
+                  <QuestTracker questId={quests.tracked} distance={distance} fresh={fresh === quests.tracked} onShowPath={() => showQuestPath()} onHoverSound={onHoverSound} />
                 ) : null
               }
             />
@@ -552,7 +594,7 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
               onHoverSound={onHoverSound}
             />
           )}
-          {callOpen && <HomeCallOverlay locale={locale} voiceGain={gain} onGoHome={goHome} onStay={stayOutside} />}
+          {callOpen && <HomeCallOverlay locale={locale} voiceGain={gain} onDone={finishCall} />}
           {revealed && worldError && (
             <div role="alert" className="absolute inset-0 z-[70] grid place-items-center bg-[#171521] p-8 text-center text-[#f7f5ff]">
               <div className="max-w-md space-y-4">
