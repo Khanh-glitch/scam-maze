@@ -53,3 +53,5 @@ export const CHARACTERS_GLB_BASE = "/assets/3d/optimized/characters";
 export const STREET_PROPS_MODELS_BASE = "/assets/3d/optimized/props";
 /** Base URL of the prologue voice clips: `<base>/<locale>/prologue_home<n>_<locale>.mp3` (locale is `en` or `vi`). */
 export const PROLOGUE_VOICE_BASE = "/audio/prologue";
+/** Base URL of Auntie Mai's street conversation clips: `<base>.<locale>/mai.<nodeId>.mp3` (locale is `en` or `vi`). */
+export const MAI_VOICE_BASE = "/assets/audio/mai";

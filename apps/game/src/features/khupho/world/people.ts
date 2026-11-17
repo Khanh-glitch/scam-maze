@@ -15,6 +15,8 @@ import { hasProp, propSize, queueWorldProp } from './streetFurniture';
 export interface Life {
   update(dt: number, t: number): void;
   /** Positions of the path walkers and the bikes (dev checks and tests). */
+  /** Named people the story needs (their 3D object), for markers, trails and conversations. */
+  npcs: Readonly<Record<string, THREE.Object3D>>;
   stats(): { people: readonly THREE.Vector3[]; bikes: { x: number; lane: number; dir: number; speed: number; reckless: boolean; lat: number; pitch: number }[] };
 }
 
@@ -822,8 +824,10 @@ export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vect
   }
   // Banh mi vendor beside the cart from streetProps.ts, with the tall plastic chair next to her.
   const vendorActor = humans?.spawn('banhmiVendor');
-  if (vendorActor) vendors.push(new Vendor(vendorActor, ctx, -1.75, 0.15, -4.9, 0, [6, 20]));
-  else statics.push(new Static(ctx, r, -1.75, 0.15, -4.9, 0, 'stand', { hat: true }, [6, 20]));
+  // Auntie Mai, the first quest: the vendor model, or the procedural standing person without it.
+  let maiObject: THREE.Object3D;
+  if (vendorActor) { vendors.push(new Vendor(vendorActor, ctx, -1.75, 0.15, -4.9, 0, [6, 20])); maiObject = vendorActor.object; }
+  else { const st = new Static(ctx, r, -1.75, 0.15, -4.9, 0, 'stand', { hat: true }, [6, 20]); statics.push(st); maiObject = st.p.g; }
   if (hasProp('stool-high')) {
     const cx = -1.0, cz = -5.25, sz = propSize('stool-high')!;
     queueWorldProp('stool-high', cx, 0.15, cz, -0.5);
@@ -853,6 +857,7 @@ export function buildLife(ctx: Ctx, houses: House[], vehicles: { pos: THREE.Vect
   let acc = 0;
   const occ = new Map<object, number>();
   return {
+    npcs: { mai: maiObject },
     stats: () => ({ people, bikes: bikes.map((b) => ({ x: b.x, lane: b.lane, dir: b.dir, speed: b.speed, reckless: b.reckless, lat: b.lat, pitch: b.currentPitch })) }),
     update(dt, t) {
       const hour = ctx.env.hour, pp = ctx.eye;

@@ -7,6 +7,7 @@ import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { Physics } from './physics';
 import { Interactions } from './interact';
+import { QuestLayer, type MapData, type MarkerKind } from './questLayer';
 import { Player } from './player';
 import { SkySys, makeEnvMap } from './sky';
 import { AudioSys } from './audio';
@@ -51,6 +52,8 @@ export interface EngineOptions {
    * the doorway is just a white panel.
    */
   onEnterHome?: () => void;
+  /** Quests: the player talked to a person (E at the prompt), and the prompt text for that person. */
+  quest?: { onTalk: (npc: string) => void; label: (npc: string) => string };
 }
 export type EngineQuality = 'low' | 'med' | 'high';
 /** Multisampling of the composer target per quality: MSAA only on high. */
@@ -108,6 +111,8 @@ export class Engine {
   /** Resolves when the street props are in the world (or failed to load). */
   propsReady: Promise<PlacedProp[]>;
   private storyRain = false; private storyCall = false;
+  /** Quest icons, the guide trail and the minimap data (story mode with a quest host only). */
+  quest: QuestLayer | null = null;
   /** The player's house (no. 59), a host asked to take over (`homeBusy`), and the world standing still behind it. */
   home: House | undefined; private homeBusy = false; private nearHomeSent = false; private suspended = false; private mutedBeforeSuspend = false;
   constructor(el: HTMLElement, onHud: (h: Hud) => void, opts: EngineOptions = {}) { this.el = el; this.opts = opts;
@@ -184,6 +189,7 @@ export class Engine {
       if (opts.story) e.player.teleport(STORY_SPAWN.x, STORY_SPAWN.z, STORY_SPAWN.yaw);
       report('life'); await yieldFrame(); if (isCancelled()) return e;
       e.life = buildLife(e.ctx, e.houses, e.vehicles, e.audio, await bikeRider, await humans, await baothu);
+      if (opts.quest) e.quest = new QuestLayer({ scene: e.scene, phys: e.phys, inter: e.inter, houses: e.houses, npcs: e.life.npcs, onTalk: opts.quest.onTalk, label: opts.quest.label });
       report('optimize'); await yieldFrame(); if (isCancelled()) return e;
       e.optimizeStatic();
       placeStreetFurniture(e.ctx.root);
@@ -387,6 +393,16 @@ export class Engine {
     else this.lock();
     this.hudT = 0;
   }
+  /** Where the player stands and which way they look (yaw: 0 faces -z), for the minimap. */
+  getPlayerPose() { return { x: this.player.pos.x, z: this.player.pos.z, yaw: this.player.yaw }; }
+  /** Roads and house footprints for the minimap; null without a quest host. */
+  getMapData(): MapData | null { return this.quest?.getMapData() ?? null; }
+  /** World position of a person the quests talk about. */
+  npcPosition(id: string) { return this.quest?.npcPosition(id) ?? null; }
+  setNpcMarker(id: string, kind: MarkerKind | null) { this.quest?.setMarker(id, kind); }
+  /** Lights the guide trail from the player to a person. */
+  showPathTo(id: string) { this.quest?.showPath(id); }
+  hidePath() { this.quest?.hidePath(); }
   /** Stops drawing and simulating (the room has the screen) and silences the street. */
   suspend() {
     if (this.suspended) return;
@@ -537,6 +553,7 @@ export class Engine {
     else this.loc = tr('loc.area');
     // sim
     this.life?.update(dt, t);
+    this.quest?.update(dt, t, this.camera.position);
     for (const f of this.ctx.dyn) f(dt, t);
     this.updateLights(dt, t);
     this.sky.update(e, cp, this.indoor);
@@ -663,5 +680,5 @@ export class Engine {
     if (next !== this.pr) { this.pr = next; this.renderer.setPixelRatio(next); this.resize(); this.settleT = 1; }
   }
 
-  dispose() { this.renderer.setAnimationLoop(null); this.arms.dispose(); if (document.pointerLockElement === this.renderer.domElement) document.exitPointerLock(); this.disposers.forEach((d) => d()); this.audio.dispose(); this.renderer.dispose(); this.renderer.domElement.remove(); }
+  dispose() { this.renderer.setAnimationLoop(null); this.quest?.dispose(); this.arms.dispose(); if (document.pointerLockElement === this.renderer.domElement) document.exitPointerLock(); this.disposers.forEach((d) => d()); this.audio.dispose(); this.renderer.dispose(); this.renderer.domElement.remove(); }
 }
