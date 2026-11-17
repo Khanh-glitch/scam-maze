@@ -125,10 +125,7 @@ export const DialogueOverlay: React.FC<DialogueOverlayProps> = ({ graph, state, 
             {line}
           </p>
           {options.length === 0 && (
-            <p className="mt-3 flex items-center gap-2 font-menu text-sm font-semibold uppercase tracking-[0.14em] text-zinc-200">
-              <kbd aria-hidden="true" className={KEYCAP}>
-                F
-              </kbd>
+            <p className="mt-3 font-menu text-sm font-semibold uppercase tracking-[0.14em] text-zinc-200">
               {text("quests.dialogue.continue")}
             </p>
           )}
