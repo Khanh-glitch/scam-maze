@@ -12,7 +12,7 @@ const handlers = () => ({ onChoose: vi.fn(), onAdvance: vi.fn(), onClose: vi.fn(
 describe("DialogueOverlay", () => {
   beforeEach(() => applyLocale("en"));
 
-  it("shows the speaker, the line and numbered replies", () => {
+  it("shows the speaker, the line and replies", () => {
     render(<DialogueOverlay graph={MAI_DIALOGUE} state={startDialogue(MAI_DIALOGUE, "greet")} speaker="Auntie Mai" {...handlers()} />);
     expect(screen.getByText("Auntie Mai")).toBeTruthy();
     expect(screen.getByText(enQuests.quests.mai.lines.greet)).toBeTruthy();
@@ -21,21 +21,30 @@ describe("DialogueOverlay", () => {
     expect(replies[0].textContent).toContain(enQuests.quests.mai.options.busy);
   });
 
-  it("picks a reply with its number key and with a click", () => {
+  it("picks the first reply with F and any reply with a click; number keys do nothing", () => {
     const h = handlers();
     render(<DialogueOverlay graph={MAI_DIALOGUE} state={startDialogue(MAI_DIALOGUE, "greet")} speaker="Auntie Mai" {...h} />);
     fireEvent.keyDown(window, { code: "Digit2" });
-    expect(h.onChoose).toHaveBeenLastCalledWith("quiet");
+    expect(h.onChoose).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: "f", code: "KeyF" });
+    expect(h.onChoose).toHaveBeenLastCalledWith("busy");
     fireEvent.click(screen.getByText(enQuests.quests.mai.options.stall));
     expect(h.onChoose).toHaveBeenLastCalledWith("stall");
   });
 
-  it("moves the highlight with the arrows and picks it with Enter", () => {
+  it("moves the highlight with the arrows and picks it with F", () => {
     const h = handlers();
     render(<DialogueOverlay graph={MAI_DIALOGUE} state={startDialogue(MAI_DIALOGUE, "greet")} speaker="Auntie Mai" {...h} />);
     fireEvent.keyDown(window, { key: "ArrowDown", code: "ArrowDown" });
-    fireEvent.keyDown(window, { key: "Enter", code: "Enter" });
+    fireEvent.keyDown(window, { key: "f", code: "KeyF" });
     expect(h.onChoose).toHaveBeenLastCalledWith("quiet");
+    fireEvent.keyDown(window, { key: "ArrowUp", code: "ArrowUp" });
+    fireEvent.keyDown(window, { key: "ArrowUp", code: "ArrowUp" });
+    fireEvent.keyDown(window, { key: "f", code: "KeyF" });
+    expect(h.onChoose).toHaveBeenLastCalledWith("stall");
+    fireEvent.keyDown(window, { key: "Enter", code: "Enter" });
+    fireEvent.keyDown(window, { code: "KeyE" });
+    expect(h.onChoose).toHaveBeenCalledTimes(2);
   });
 
   it("shows Continue on a line without replies", () => {
@@ -43,6 +52,8 @@ describe("DialogueOverlay", () => {
     render(<DialogueOverlay graph={MAI_DIALOGUE} state={startDialogue(MAI_DIALOGUE, "work")} speaker="Auntie Mai" {...h} />);
     expect(screen.getAllByRole("button")).toHaveLength(1);
     fireEvent.keyDown(window, { key: "Enter", code: "Enter" });
+    expect(h.onAdvance).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: "f", code: "KeyF" });
     expect(h.onAdvance).toHaveBeenCalledTimes(1);
     expect(h.onChoose).not.toHaveBeenCalled();
   });

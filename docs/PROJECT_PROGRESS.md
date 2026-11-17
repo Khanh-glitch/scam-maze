@@ -177,6 +177,19 @@ Resolved:
 - The 3D model licenses of some owner-supplied riders, bikes and the Bao Thu model are "not stated" in
   their `SOURCE.md` files; confirm before a public release.
 ## Task History
+### 2026-11-17 — Dialogue: one key (F), arrows to choose, separate reply list, voice above the street
+- **Objective:** owner feedback on the Auntie Mai conversation.
+- **Completed:** F is the only confirm key (picks the highlighted reply, or continues); Up/Down move the highlight; number keys, Enter, Space and E no longer act in the conversation. The replies moved out of the line's frame into their own list on the right. The highlighted reply shows an up/down hint, the F key cap and a pointer that slides gently left and right (CSS `dialogue-nudge`, off under reduced motion). The street sound now ducks to 0.28 while Mai talks (it only ducked for the intro narration before), so her voice, already boosted 1.6x, stays above it.
+- **Files:** `prologue/DialogueOverlay.tsx` and its test, `prologue/ProloguePage.tsx`, `styles/index.css`, this file.
+- **Validation:** `tsc` clean; `vitest run` full suite; `pnpm build`; headless Chrome screenshot of the conversation with the highlight moved by ArrowDown.
+- **Limitations:** the loudness balance was not listened to (no audio in headless Chrome); the slide animation was not seen in motion; the voice clip wiring was already in `ProloguePage` and was not changed.
+- **Deviations:** none. **Follow-up:** owner to listen and tune the duck level (0.28) if needed.
+### 2026-11-17 — Auntie Mai: voice clips connected to the conversation
+- **Objective:** the clips in `public/assets/audio/mai.{en,vi}` were not played in game.
+- **Completed:** `ProloguePage` plays `mai.<nodeId>.mp3` for the current line in the current locale, at the voice gain from the settings (silent when sound is off), and stops it when the line changes or the conversation ends. Added `MAI_VOICE_BASE` to `config/assetPaths.ts`.
+- **Files:** `apps/game/src/config/assetPaths.ts`, `apps/game/src/features/prologue/ProloguePage.tsx`, `docs/PROJECT_PROGRESS.md`.
+- **Validation:** `pnpm typecheck` passed; `vitest run src/features/prologue` (30 passed). Not tested in a browser, so playback is unverified. `pnpm build` not run.
+- **Limitations:** no automated test for the playback; a settings change during a line restarts that clip. **Deviations:** none.
 ### 2026-11-17 — Quest HUD polish: task/dot icons, list button on the map, trail to Auntie Mai's feet
 - **Objective:** owner feedback on the quest HUD.
 - **Completed:** (1) the list icon is now `task.webp` with `dot.webp` over its top corner, the dot only while a quest is new and unseen; the old `scammaze-quest-list-icon-512.png` was removed. (2) The button sits on the lower-left corner of the minimap, so the objective text is no longer indented. (3) The guide trail ends 0.25 m from Mai (was 1.7 m) and only dims 30% near the end, so it lands at her feet. (4) While talking, the same quest icon grows and gets a pulsing halo; the chat icon is no longer shown above her (it remains in reply pills).
