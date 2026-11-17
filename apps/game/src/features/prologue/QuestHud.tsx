@@ -4,9 +4,9 @@ import { Check, X } from "lucide-react";
 import { Accent, KEYCAP, SHADOW, stop } from "./PrologueHud";
 import { hasNewQuest, questsWith, type QuestId, type QuestState } from "./quest/quests";
 
-const ICON_QUEST = "/assets/ui/scammaze-quest-icon-512.png";
-const ICON_TASK = "/assets/ui/task.webp";
-const ICON_DOT = "/assets/ui/dot.webp";
+const ICON_QUEST = "/assets/ui/hud/scammaze-quest-icon-512.png";
+const ICON_TASK = "/assets/ui/hud/task.webp";
+const ICON_DOT = "/assets/ui/hud/dot.webp";
 
 /** Keys the page listens for (shown as key caps; the page owns the handlers). */
 export const QUEST_LIST_KEY = "J";

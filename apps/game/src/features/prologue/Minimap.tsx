@@ -29,7 +29,7 @@ const COLORS = {
   houseEdge: "#a79fc4",
 };
 
-const QUEST_ICON = "/assets/ui/scammaze-quest-icon-512.png";
+const QUEST_ICON = "/assets/ui/hud/scammaze-quest-icon-512.png";
 
 /**
  * Circular minimap in the top-left, like an action game's: it turns with the camera (what is

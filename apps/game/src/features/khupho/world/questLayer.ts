@@ -33,7 +33,7 @@ export interface QuestLayerDeps {
   label: (npc: string) => string;
 }
 
-const ICON_URL = '/assets/ui/scammaze-quest-icon-512.png';
+const ICON_URL = '/assets/ui/hud/scammaze-quest-icon-512.png';
 const ICON_SIZE = 0.05;
 const ICON_SIZE_ACTIVE = 0.066;
 
