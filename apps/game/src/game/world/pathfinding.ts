@@ -16,6 +16,8 @@ export interface NavGrid {
 export interface Point {
   x: number;
   z: number;
+  /** Height, when the path climbs (stairs); carried through resampling. */
+  y?: number;
 }
 
 /** Samples `isWalkable` at the center of every cell. */
@@ -178,8 +180,8 @@ export function pathLength(path: readonly Point[]): number {
 }
 
 /** Points along a polyline every `step` meters (first and last included), with the distance from the start. */
-export function resamplePath(path: readonly Point[], step: number): { x: number; z: number; d: number }[] {
-  const out: { x: number; z: number; d: number }[] = [];
+export function resamplePath(path: readonly Point[], step: number): { x: number; z: number; y?: number; d: number }[] {
+  const out: { x: number; z: number; y?: number; d: number }[] = [];
   if (!path.length) return out;
   let d = 0;
   out.push({ ...path[0], d: 0 });
@@ -189,7 +191,7 @@ export function resamplePath(path: readonly Point[], step: number): { x: number;
     const seg = Math.hypot(b.x - a.x, b.z - a.z);
     while (seg > 0 && next <= d + seg) {
       const t = (next - d) / seg;
-      out.push({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, d: next });
+      out.push({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, ...(a.y !== undefined && b.y !== undefined ? { y: a.y + (b.y - a.y) * t } : {}), d: next });
       next += step;
     }
     d += seg;
@@ -211,7 +213,7 @@ export function trimEnd(path: readonly Point[], meters: number): Point[] {
     const seg = Math.hypot(b.x - a.x, b.z - a.z);
     if (d + seg >= target) {
       const t = seg > 0 ? (target - d) / seg : 0;
-      out.push({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t });
+      out.push({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, ...(a.y !== undefined && b.y !== undefined ? { y: a.y + (b.y - a.y) * t } : {}) });
       return out;
     }
     out.push(b);
