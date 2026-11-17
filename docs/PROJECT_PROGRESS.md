@@ -177,6 +177,12 @@ Resolved:
 - The 3D model licenses of some owner-supplied riders, bikes and the Bao Thu model are "not stated" in
   their `SOURCE.md` files; confirm before a public release.
 ## Task History
+### 2026-11-17 — Reply picker: new mouse icon; quest HUD icons moved to `ui/hud/`
+- **Objective:** owner request: replace the mouse icon with `mouse2`, and put the icon files in sensible folders.
+- **Completed:** `mouse2.png` was cropped to its content (326x512) and converted to `public/assets/ui/hud/mouse.webp` (85% opacity in the picker). The quest HUD icons now live in `public/assets/ui/hud/`: `task.webp`, `dot.webp`, `mouse.webp`, `scammaze-quest-icon-512.png`, `scammaze-chat-icon-512.png`. Code paths updated in `Minimap.tsx`, `QuestHud.tsx`, `DialogueOverlay.tsx`, `questLayer.ts`. Earlier entries below still name the old `ui/` paths.
+- **Validation:** `tsc`, full `vitest run` (1645 passed); every path in code checked to exist on disk.
+- **Limitations:** the new icon size (20x32 px) was not viewed in the browser. The two quest and chat icons are still PNG.
+- **Deviations:** none. **Follow-up:** none.
 ### 2026-11-17 — Dialogue: click anywhere to continue; objective clear of the quest button
 - **Objective:** owner feedback: a line with no replies should continue on a click anywhere; the objective text was still partly hidden by the quest button.
 - **Completed:** the dialogue layer advances on any click when a line has no replies (the "Continue F" hint is now plain text, no longer a button). The minimap row got 2 rem of bottom padding, so both the tracker and the plain objective sit below the quest button (the plain objective had no spacing before).
