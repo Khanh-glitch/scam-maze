@@ -18,6 +18,7 @@ import { Minimap } from "./Minimap";
 import { QUEST_LIST_KEY, QUEST_PATH_KEY, QuestListButton, QuestListPanel, QuestToast, QuestTracker, useDistance } from "./QuestHud";
 import { advance, chooseOption, isEnded, startDialogue, type DialogueState } from "./quest/dialogue";
 import { MAI_DIALOGUE, maiStart } from "./quest/maiDialogue";
+import { MAI_VOICE_BASE } from "../../config/assetPaths";
 import { completeQuest, initialQuestState, markSeen, questDefinition, trackQuest, type QuestId } from "./quest/quests";
 import type { MapData } from "../khupho/world/questLayer";
 import { GO_HOME_KEY, PrologueHud, ProloguePauseMenu, PrologueTopBar } from "./PrologueHud";
@@ -417,6 +418,18 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
   const locale = i18n.language === "vi" ? "vi" : "en";
   // Narration must stay clear over the rain: a 1.6x boost (capped at full volume) while the world is ducked below.
   const gain = Math.min(1, 1.6 * voiceGain({ soundEnabled: settings.soundEnabled, masterVolume: settings.sfxVolume, voiceVolume: settings.voiceVolume }, false));
+  // Auntie Mai's voice: one clip per line, stopped when the line changes or the conversation ends.
+  const maiNode = dialogue?.node ?? null;
+  useEffect(() => {
+    if (maiNode === null || gain <= 0) return undefined;
+    const clip = new Audio(`${MAI_VOICE_BASE}.${locale}/mai.${maiNode}.mp3`);
+    clip.volume = gain;
+    clip.play().catch(() => undefined); // a blocked or missing clip leaves the text only
+    return () => {
+      clip.pause();
+      clip.src = "";
+    };
+  }, [maiNode, locale, gain]);
   const narrating = stage === "neighborhood" && revealed && worldReady && (!started || callOpen);
   useEffect(() => {
     streetRef.current?.audio.setDuck(narrating);
@@ -504,7 +517,7 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
               minimap={
                 <div className="relative shrink-0">
                   <Minimap getPose={getPose} getTarget={getTarget} map={mapData} label={t("worlds:quests.minimap")} north={t("worlds:quests.north")} />
-                  <QuestListButton state={quests} onOpen={openListPanel} onHoverSound={onHoverSound} className="absolute -bottom-4 -left-8" />
+                  <QuestListButton state={quests} onOpen={openListPanel} onHoverSound={onHoverSound} className="absolute -bottom-7 -left-10" />
                 </div>
               }
               questArea={
