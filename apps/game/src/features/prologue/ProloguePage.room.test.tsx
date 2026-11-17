@@ -13,10 +13,12 @@ const harness = vi.hoisted(() => ({
   layer: null as null | { bridge: unknown; session: ChapterSession; engineReady?: boolean; modelAllowed?: boolean },
   layerMounts: 0,
   streetMuted: [] as boolean[],
+  enterHome: (() => undefined) as () => void,
 }));
 
 vi.mock("../khupho/KhuphoStoryWorld", () => ({
-  KhuphoStoryWorld: (props: { onReady: (engine: unknown) => void }) => {
+  KhuphoStoryWorld: (props: { onReady: (engine: unknown) => void; onEnterHome?: () => void }) => {
+    harness.enterHome = () => props.onEnterHome?.();
     React.useEffect(() => {
       props.onReady({
         audio: { setMuted: (m: boolean) => void harness.streetMuted.push(m), setDuck: () => undefined },
@@ -33,6 +35,9 @@ vi.mock("../khupho/KhuphoStoryWorld", () => ({
         setNpcMarker: () => undefined,
         showPathTo: () => undefined,
         hidePath: () => undefined,
+        setStoryPacing: () => undefined,
+        targetPosition: () => ({ x: 10, z: 0 }),
+        insideHome: () => false,
       });
     }, []);
     return null;
@@ -91,9 +96,14 @@ describe("ProloguePage chapter layer", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Stub begin walk" }));
     expect(screen.queryByTestId("chapter-layer-stub")).toBeNull();
 
-    // H heads home: white doorway, then the room stage.
+    // H no longer sends the player home: only the white doorway of house no. 59 does.
     act(() => {
       fireEvent.keyDown(window, { code: "KeyH", key: "h" });
+    });
+    expect(screen.queryByTestId("chapter-layer-stub")).toBeNull();
+    // Stepping into the white doorway: the room stage.
+    act(() => {
+      harness.enterHome();
     });
     await waitFor(() => expect(screen.getByTestId("chapter-layer-stub")).toBeTruthy(), { timeout: 4000 });
 
@@ -121,7 +131,7 @@ describe("ProloguePage chapter layer", () => {
     );
     fireEvent.click(await screen.findByRole("button", { name: "Stub begin walk" }));
     act(() => {
-      fireEvent.keyDown(window, { code: "KeyH", key: "h" });
+      harness.enterHome();
     });
     await waitFor(() => expect(screen.getByTestId("chapter-layer-stub")).toBeTruthy(), { timeout: 4000 });
     // The room is built after the player went home; the sound effect that runs then must not unmute the street.
@@ -132,7 +142,7 @@ describe("ProloguePage chapter layer", () => {
     render(<ProloguePage settings={DEFAULT_SETTINGS} onUpdateSettings={() => undefined} onBackToMenu={() => undefined} revealed />);
     fireEvent.click(await screen.findByRole("button", { name: "Stub begin walk" }));
     act(() => {
-      fireEvent.keyDown(window, { code: "KeyH", key: "h" });
+      harness.enterHome();
     });
     await waitFor(() => expect(screen.getByTestId("room-v2-stub")).toBeTruthy(), { timeout: 4000 });
     expect(screen.queryByTestId("chapter-layer-stub")).toBeNull();

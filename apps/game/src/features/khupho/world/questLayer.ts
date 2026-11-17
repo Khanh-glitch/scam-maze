@@ -31,6 +31,8 @@ export interface QuestLayerDeps {
   onTalk: (npc: string) => void;
   /** Interaction prompt text for a person, already translated. */
   label: (npc: string) => string;
+  /** World position of any quest goal (a person or a place), by id. */
+  target?: (id: string) => Point | null;
 }
 
 const ICON_URL = '/assets/ui/hud/scammaze-quest-icon-512.png';
@@ -267,7 +269,7 @@ export class QuestLayer {
     this.repathT -= dt;
     if (this.repathT <= 0) {
       this.repathT = REPATH_S;
-      const to = this.npcPosition(this.trailTarget);
+      const to = this.d.target?.(this.trailTarget) ?? this.npcPosition(this.trailTarget);
       if (to && Math.hypot(player.x - this.lastFrom.x, player.z - this.lastFrom.y) > 0.4) {
         this.lastFrom.set(player.x, player.z);
         this.rebuildTrail({ x: player.x, z: player.z }, to);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { advance, chooseOption, isEnded, startDialogue, visibleOptions, type DialogueGraph } from "./dialogue";
 import { MAI_DIALOGUE, maiStart } from "./maiDialogue";
-import { completeQuest, hasNewQuest, initialQuestState, markSeen, questsWith, trackQuest } from "./quests";
+import { completeQuest, hasNewQuest, initialQuestState, markSeen, questsWith, startQuest, trackQuest, QUESTS } from "./quests";
 
 /** Every way through the graph: returns the set of (node, visited) states reached. */
 function explore(graph: DialogueGraph, start: string) {
@@ -95,5 +95,16 @@ describe("quest state", () => {
     const done = completeQuest(initialQuestState(), "meetMai");
     expect(trackQuest(done, "meetMai").tracked).toBeNull();
     expect(trackQuest(initialQuestState(), null).tracked).toBeNull();
+  });
+  it("starts the next quest as tracked and new, once", () => {
+    const seen = markSeen(completeQuest(initialQuestState(), "meetMai"));
+    const next = startQuest(seen, "walkStreet");
+    expect(next.tracked).toBe("walkStreet");
+    expect(questsWith(next, "active")).toEqual(["walkStreet"]);
+    expect(hasNewQuest(next)).toBe(true);
+    expect(startQuest(next, "walkStreet")).toBe(next);
+  });
+  it("only the stairs quest has no guide trail", () => {
+    expect(QUESTS.filter((q) => !q.trail).map((q) => q.id)).toEqual(["goUp"]);
   });
 });
