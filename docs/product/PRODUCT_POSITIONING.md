@@ -11,6 +11,15 @@
 > and the "safe simulated Internet" framing in sections 0, 3.4 and 3.5 of the
 > [master plan](../../SCAMMAZE_KIROWEEN_2026_FULL_PLAN.md). Audience, evidence and writing rules
 > from v1.0 are carried over in sections 4, 3.2 and 13.6.
+>
+> **Implementation note (2026-11-17, not a change of the product definition).** The first built
+> chapter differs from the plan in section 11. By owner decision (2026-11-10/11) Chapter 1 is
+> **"The Urgent Call"** (bank-security impersonation), not "The Missing Parcel", which is deferred to
+> a later chapter. Since 2026-11-16 it is told in the player's room (Room v2) as a double deception
+> (narrative subtitle "The False Victory"), reached through a neighborhood prologue, with a laptop and
+> phone records instead of the "browser, bank app and parcel app" listed for the MVP. See
+> [OVERVIEW.md section 4.2.3](../architecture/OVERVIEW.md#423-chapter-1-flow-and-room-v2-host-implemented)
+> and [Project progress](../PROJECT_PROGRESS.md).
 
 **Nothing described here as a game feature exists yet.** Today the repository contains a landing
 page only ([project progress](../PROJECT_PROGRESS.md)). The 3D game is `PLANNED`; every AI

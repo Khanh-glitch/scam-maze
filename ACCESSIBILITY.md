@@ -13,7 +13,7 @@ site has **not yet been formally audited**.
 
 - Semantic landmarks (`header`, `nav`, `main`, `footer`) and one `h1` per page.
 - Page language declared (`lang="en"`).
-- Visible keyboard focus ring on every interactive element.
+- Visible keyboard focus ring on every interactive element, except the call buttons (owner design choice, see the Chapter 1 section).
 - All game choices and the URL checker are native `button` / `input` elements,
   usable with keyboard only.
 - Results of the game and of the URL checker are announced through
@@ -120,6 +120,9 @@ following, and no one has checked them yet:
   the operating system "reduce motion" setting only, not the in-game "Reduce
   motion" setting. Choose "On" in the game and also check your system setting if
   you want to avoid it there.
+- Design choice (owner decision, 2026-11-15): the call buttons (Decline, Accept, End call) draw no
+  focus ring. Accept takes focus when a call rings, and the ring looked wrong on the phone glass.
+  They stay reachable and usable with the keyboard (Tab, Enter, Space).
 - The Settings text for reduced-stress mode mentions "no ring vibration". The
   code that turns off the 3D ring vibration is controlled by "Reduce motion",
   not by reduced-stress mode.
