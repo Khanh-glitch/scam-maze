@@ -25,7 +25,7 @@ const quests: LocaleShape<typeof en> = {
       done: "Con đã nói chuyện với cô Mai.",
     },
     dialogue: {
-      continue: "Tiếp tục",
+      continue: "Nhấn để tiếp tục",
       replies: "Câu trả lời của bạn",
       speakerMai: "Cô Mai",
       talk: "Nói chuyện với cô Mai",

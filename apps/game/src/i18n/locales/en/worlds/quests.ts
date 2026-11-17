@@ -23,7 +23,7 @@ const quests = {
       done: "You talked with Auntie Mai.",
     },
     dialogue: {
-      continue: "Continue",
+      continue: "Click to continue",
       replies: "Your reply",
       speakerMai: "Auntie Mai",
       talk: "Talk to Auntie Mai",
