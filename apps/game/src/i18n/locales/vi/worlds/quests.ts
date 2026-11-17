@@ -1,0 +1,67 @@
+/** Vietnamese text for the `worlds` namespace, `quests` area. Not reviewed by a native speaker yet. */
+import type en from "../../en/worlds/quests";
+import type { LocaleShape } from "../../../types";
+const quests: LocaleShape<typeof en> = {
+  quests: {
+    title: "Nhiệm vụ",
+    close: "Đóng",
+    inProgress: "Đang thực hiện",
+    completed: "Đã hoàn thành",
+    empty: "Chưa có nhiệm vụ nào.",
+    showPath: "Hiện đường đi",
+    tracking: "Đang theo dõi",
+    complete: "Hoàn thành nhiệm vụ",
+    distance: "{{meters}} m",
+    openList: "Mở danh sách nhiệm vụ",
+    newQuest: "Nhiệm vụ mới",
+    minimap: "Bản đồ nhỏ",
+    north: "B",
+    keyList: "Nhiệm vụ",
+    keyPath: "Hiện đường đi",
+    questMarker: "Nhiệm vụ",
+    meetMai: {
+      title: "Đến gặp cô Mai Bánh Mì",
+      description: "Cô Mai bán bánh mì ở xe hàng phía bắc con phố. Ghé qua chào cô một tiếng.",
+      done: "Con đã nói chuyện với cô Mai.",
+    },
+    dialogue: {
+      continue: "Nhấn để tiếp tục",
+      replies: "Câu trả lời của bạn",
+      speakerMai: "Cô Mai Bánh Mì",
+      talk: "Nói chuyện với cô Mai",
+    },
+    mai: {
+      lines: {
+        greet: "Ủa, trời trời, coi ai nè! Lại đây lại đây. Dạo này sao, ổn hông?",
+        work: "Việc, việc, việc tối ngày. Nhớ ăn uống đàng hoàng nghe con. Ổ bánh mì ngon thì chưa hại ai bao giờ đâu.",
+        quiet: "Yên ắng cũng tốt, miễn là con đừng thấy cô đơn. Người trên con phố này thân thiện lắm, rồi con sẽ thấy.",
+        stallTalk: "Hà! Mưa hay nắng thì người ta vẫn đói. Bán cũng đều đều, cảm ơn con đã hỏi.",
+        scams: "Ừ mà hên quá gặp con ở đây. Ra đường nhớ cẩn thận nghe. Dạo này vòng vòng ở đây nhiều vụ lừa đảo lắm... Bà hàng xóm của cô tuần trước mém xíu mất hết tiền tiết kiệm đó!",
+        comfort: "Ờ thì cũng hổng sao... hên bả cúp máy kịp. Con cứ cảnh giác, đừng có tin mấy cái người lạ nói qua điện thoại nghe!",
+        kinds: "Ôi, đủ kiểu hết. Dạo này chủ yếu là nó gọi điện thoại. Đứa thì giả bộ là ngân hàng, đứa thì nói là công an.",
+        otp: "Thì nó nói tài khoản của con có vấn đề, rồi xin cái mã gì đó vừa gửi vô điện thoại, ờ nhớ rồi, mã OTP. Mà cô nghe người ta nói trên truyền hình là ngân hàng thiệt không bao giờ xin cái mã đó!",
+        police: "Một giọng nghiêm nghị nói tên con dính vào một vụ án gì đó. Rồi nó hù con, kêu con chuyển tiền vô cái tài khoản của nó để chứng minh trong sạch. Còn dặn con đừng kể gì với ai.",
+        wrap: "Đó... thấy chưa? Câu chuyện thì khác nhau mà chiêu thì y chang. Nó hối con, hù con nè, đòi mã hoặc tiền, rồi kêu con đừng nói ai. Gặp vậy thì cúp máy, tự gọi số thiệt, hoặc là hỏi người con tin tưởng nghen.",
+        bye: "Thôi, nãy giờ cô với con nói chuyện cũng lâu dữ rồi à. Nhớ giữ gìn sức khỏe, rảnh ghé cô mua bánh mì nghen.",
+        again: "Quay lại rồi hả con? Ra đường cẩn thận, nhớ mấy cái cô dặn nghen.",
+      },
+      options: {
+        busy: "Dạ dạo này con cũng hơi bận việc, nhưng vẫn ổn ạ.",
+        quiet: "Con vẫn đang làm quen với chỗ mới. Ở nhà yên ắng lắm cô ạ.",
+        stall: "Dạ con cũng ổn. Còn xe bánh mì của cô sao rồi ạ?",
+        kinds: "Lừa đảo ạ? Lừa kiểu gì vậy cô?",
+        awful: "Nghe ghê quá. Mong là bà ấy không sao.",
+        leave: "Con xin phép đi trước nha cô.",
+        otp: "Giả ngân hàng là sao cô? Họ muốn gì khi làm vậy?",
+        police: "Ủa sao họ lại giả làm công an vậy cô?",
+        enough: "Con hiểu rồi. Cảm ơn cô đã nhắc con.",
+        policeToo: "Còn vụ giả công an thì sao cô?",
+        gotItOtp: "Con nhớ rồi. Con sẽ không bao giờ đưa mã OTP cho ai hết.",
+        otpToo: "Còn vụ giả ngân hàng là sao cô?",
+        gotItPolice: "Con nhớ rồi. Công an họ sẽ không làm việc qua tin nhắn và điện thoại cô ha!",
+        goodbye: "Dạ cảm ơn cô Mai. Hẹn gặp lại cô!",
+      },
+    },
+  },
+};
+export default quests;

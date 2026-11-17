@@ -27,6 +27,12 @@ vi.mock("../khupho/KhuphoStoryWorld", () => ({
         setPaused: () => undefined,
         placeAtHome: () => undefined,
         lock: () => undefined,
+        getMapData: () => null,
+        getPlayerPose: () => ({ x: 0, z: 0, yaw: 0 }),
+        npcPosition: () => ({ x: 10, z: 0 }),
+        setNpcMarker: () => undefined,
+        showPathTo: () => undefined,
+        hidePath: () => undefined,
       });
     }, []);
     return null;
