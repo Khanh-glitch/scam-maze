@@ -504,7 +504,7 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
               minimap={
                 <div className="relative shrink-0">
                   <Minimap getPose={getPose} getTarget={getTarget} map={mapData} label={t("worlds:quests.minimap")} north={t("worlds:quests.north")} />
-                  <QuestListButton state={quests} onOpen={openListPanel} onHoverSound={onHoverSound} className="absolute -bottom-4 -left-4" />
+                  <QuestListButton state={quests} onOpen={openListPanel} onHoverSound={onHoverSound} className="absolute -bottom-4 -left-8" />
                 </div>
               }
               questArea={
