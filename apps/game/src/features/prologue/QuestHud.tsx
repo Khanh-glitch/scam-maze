@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, X } from "lucide-react";
 import { Accent, KEYCAP, SHADOW, stop } from "./PrologueHud";
-import { hasNewQuest, questDefinition, questsWith, type QuestId, type QuestState } from "./quest/quests";
+import { hasNewQuest, questsWith, type QuestId, type QuestState } from "./quest/quests";
 
 const ICON_QUEST = "/assets/ui/hud/scammaze-quest-icon-512.png";
 const ICON_TASK = "/assets/ui/hud/task.webp";
@@ -55,29 +55,30 @@ export interface QuestTrackerProps {
   questId: QuestId;
   /** Meters to the target, or null when unknown. */
   distance: number | null;
+  /** A quest that just started: shown with a "new quest" label and a glow for a few seconds. */
+  fresh?: boolean;
   /** Lights the guide trail. */
   onShowPath: () => void;
   onHoverSound?: () => void;
 }
 
 /** The tracked quest outside the list: the objective block of the HUD. Press it (or Q) to light the path. */
-export const QuestTracker: React.FC<QuestTrackerProps> = ({ questId, distance, onShowPath, onHoverSound }) => {
+export const QuestTracker: React.FC<QuestTrackerProps> = ({ questId, distance, fresh, onShowPath, onHoverSound }) => {
   const q = useQuestText();
-  const trail = questDefinition(questId).trail;
   return (
-    <section aria-labelledby="quest-tracker-heading" className="pointer-events-auto max-w-sm">
+    <section aria-labelledby="quest-tracker-heading" data-fresh={fresh ? "true" : undefined} className={`pointer-events-auto max-w-sm ${fresh ? "quest-fresh" : ""}`}>
       <h2 id="quest-tracker-heading" className={`flex items-center gap-2.5 font-menu text-xs font-semibold uppercase tracking-[0.3em] text-[#c9bbf7] ${SHADOW}`}>
         <Accent />
-        {q("khupho.game.story.objective")}
+        {fresh ? <span className="text-[#f3c969]">{q("quests.newQuest")}</span> : q("khupho.game.story.objective")}
       </h2>
       <button
         type="button"
         onMouseDown={stop}
-        onClick={trail ? onShowPath : undefined}
-        onPointerEnter={trail ? onHoverSound : undefined}
-        aria-keyshortcuts={trail ? QUEST_PATH_KEY : undefined}
-        title={trail ? q("quests.showPath") : undefined}
-        className={`group mt-1.5 flex items-start gap-2.5 text-left outline-none ${trail ? "cursor-pointer" : "cursor-default"}`}
+        onClick={onShowPath}
+        onPointerEnter={onHoverSound}
+        aria-keyshortcuts={QUEST_PATH_KEY}
+        title={q("quests.showPath")}
+        className="group mt-1.5 flex items-start gap-2.5 text-left outline-none cursor-pointer"
       >
         <img src={ICON_QUEST} alt="" width={26} height={26} draggable={false} className="mt-0.5 h-6 w-6 shrink-0 select-none drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]" />
         <span className="grid">
@@ -136,7 +137,7 @@ export const QuestListPanel: React.FC<QuestListPanelProps> = ({ state, onClose, 
             <Accent />
             {q("quests.title")}
           </h2>
-          <button ref={closeRef} type="button" onClick={onClose} onPointerEnter={onHoverSound} aria-label={q("quests.close")} aria-keyshortcuts={`${QUEST_LIST_KEY} Escape`} className="flex items-center gap-2 rounded border border-white/20 px-2 py-1 font-menu text-sm font-semibold uppercase tracking-[0.1em] text-zinc-200 outline-none hover:border-white/50 focus-visible:ring-2 focus-visible:ring-[#b9a5f5] cursor-pointer">
+          <button ref={closeRef} type="button" onClick={onClose} onPointerEnter={onHoverSound} aria-label={q("quests.close")} aria-keyshortcuts={`${QUEST_LIST_KEY} Escape`} className="flex items-center gap-2 rounded border border-white/20 px-2 py-1 font-menu text-sm font-semibold uppercase tracking-[0.1em] text-zinc-200 outline-none hover:border-white/50 cursor-pointer">
             <span aria-hidden="true" className={KEYCAP}>{QUEST_LIST_KEY}</span>
             <X className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -154,11 +155,9 @@ export const QuestListPanel: React.FC<QuestListPanelProps> = ({ state, onClose, 
                       <div className="min-w-0 flex-1">
                         <p className="font-menu text-lg font-semibold uppercase tracking-[0.03em]">{q(`quests.${id}.title`)}</p>
                         <p className="mt-1 text-sm leading-relaxed text-zinc-300">{q(`quests.${id}.description`)}</p>
-                        {questDefinition(id).trail && (
                         <button type="button" onClick={() => onShowPath(id)} onPointerEnter={onHoverSound} className="mt-2 rounded bg-[#7654d6] px-3 py-1 font-menu text-sm font-semibold uppercase tracking-[0.1em] text-white outline-none hover:bg-[#8b6be8] focus-visible:ring-2 focus-visible:ring-[#b9a5f5] cursor-pointer">
                           {state.tracked === id ? `${q("quests.tracking")} · ${q("quests.showPath")}` : q("quests.showPath")}
                         </button>
-                        )}
                       </div>
                     </div>
                   </li>

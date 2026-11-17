@@ -329,8 +329,7 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
     const target = id ?? quests.tracked;
     if (!target) return;
     setQuests((q) => trackQuest(q, target));
-    const def = questDefinition(target);
-    if (def.trail) streetRef.current?.showPathTo(def.target);
+    streetRef.current?.showPathTo(questDefinition(target).target);
   }, [quests.tracked]);
 
   const openPause = useCallback(() => {
@@ -446,6 +445,23 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
     const timer = window.setTimeout(() => setToast(null), 4200);
     return () => window.clearTimeout(timer);
   }, [toast]);
+  // A new quest: its tracker pops up with a "new quest" label and the guide trail lights at once (hiding it
+  // after a while is automatic; the player lights it again with Q or by pressing the quest).
+  const [fresh, setFresh] = useState<QuestId | null>(null);
+  const announced = useRef<QuestId | null>("meetMai");
+  useEffect(() => {
+    const id = quests.tracked;
+    if (!id || announced.current === id || quests.status[id] !== "active") return;
+    announced.current = id;
+    setFresh(id);
+    const timer = window.setTimeout(() => showQuestPath(id), 500);
+    return () => window.clearTimeout(timer);
+  }, [quests, showQuestPath]);
+  useEffect(() => {
+    if (!fresh || toast) return undefined;
+    const timer = window.setTimeout(() => setFresh(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [fresh, toast]);
   const trackedTarget = quests.tracked ? questDefinition(quests.tracked).target : null;
   const distance = useDistance(() => {
     const street = streetRef.current;
@@ -551,7 +567,7 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
                 toast ? (
                   <QuestToast questId={toast} />
                 ) : quests.tracked ? (
-                  <QuestTracker questId={quests.tracked} distance={distance} onShowPath={() => showQuestPath()} onHoverSound={onHoverSound} />
+                  <QuestTracker questId={quests.tracked} distance={distance} fresh={fresh === quests.tracked} onShowPath={() => showQuestPath()} onHoverSound={onHoverSound} />
                 ) : null
               }
             />

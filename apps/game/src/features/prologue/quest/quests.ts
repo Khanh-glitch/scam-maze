@@ -10,15 +10,13 @@ export interface QuestDefinition {
   id: QuestId;
   /** Where the quest leads: a person's id or a named place; the street world resolves it to x and z. */
   target: string;
-  /** The guide trail can be lit to the target (false when the way is not on the street, such as the stairs). */
-  trail: boolean;
 }
 /** In story order: each quest starts when the one before it (or a story beat) ends. */
 export const QUESTS: readonly QuestDefinition[] = [
-  { id: "meetMai", target: "mai", trail: true },
-  { id: "walkStreet", target: "streetEnd", trail: true },
-  { id: "goHome", target: "home", trail: true },
-  { id: "goUp", target: "homeUp", trail: false },
+  { id: "meetMai", target: "mai" },
+  { id: "walkStreet", target: "streetEnd" },
+  { id: "goHome", target: "home" },
+  { id: "goUp", target: "homeUp" },
 ];
 /** How close (m) the player must get to the far end of the street. */
 export const STREET_END_RADIUS = 6;

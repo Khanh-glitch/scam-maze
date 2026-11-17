@@ -193,7 +193,7 @@ export class Engine {
       if (opts.story) e.player.teleport(STORY_SPAWN.x, STORY_SPAWN.z, STORY_SPAWN.yaw);
       report('life'); await yieldFrame(); if (isCancelled()) return e;
       e.life = buildLife(e.ctx, e.houses, e.vehicles, e.audio, await bikeRider, await humans, await baothu);
-      if (opts.quest) e.quest = new QuestLayer({ scene: e.scene, phys: e.phys, inter: e.inter, houses: e.houses, npcs: e.life.npcs, onTalk: opts.quest.onTalk, label: opts.quest.label, target: (id) => e.targetPosition(id) });
+      if (opts.quest) e.quest = new QuestLayer({ scene: e.scene, phys: e.phys, inter: e.inter, houses: e.houses, npcs: e.life.npcs, onTalk: opts.quest.onTalk, label: opts.quest.label, target: (id) => e.targetPosition(id), route: (id, from) => e.climbRoute(id, from) });
       report('optimize'); await yieldFrame(); if (isCancelled()) return e;
       e.optimizeStatic();
       placeStreetFurniture(e.ctx.root);
@@ -413,6 +413,40 @@ export class Engine {
     if (h && id === 'home') { const p = h.wp(h.doorX, 0, -1.0); return { x: p.x, z: p.z }; }
     if (h?.doorway && id === 'homeUp') { const d = h.doorway; const p = h.wp((d.x0 + d.x1) / 2, 0, d.z); return { x: p.x, z: p.z }; }
     return this.npcPosition(id);
+  }
+  /**
+   * Guide path up house no. 59's stairs to the white doorway, with heights (world metres). Follows the walkers'
+   * route (`House.route`): the hall spine, the dog-leg stairs (flight A, landing, flight B), the upper hall. `from.y`
+   * is the eye height. Null when the player is not inside the house, or for another goal.
+   */
+  climbRoute(id: string, from: { x: number; y: number; z: number }): { x: number; z: number; y?: number }[] | null {
+    const h = this.home, d = h?.doorway;
+    if (id !== 'homeUp' || !h || !d || !h.contains(from.x, from.z)) return null;
+    const { xs, zs, Lf, W, t, kz0, spineX: sx } = h;
+    const F0 = h.F(0), F1 = h.F(1), half = F0 + h.FH / 2;
+    const lL = xs + 0.42, lR = W - t - 0.42;
+    const yA = (z: number) => F0 + ((z - zs) / Lf) * (half - F0);
+    const yB = (z: number) => half + ((zs + Lf - z) / Lf) * (F1 - half);
+    const xc = (d.x0 + d.x1) / 2;
+    // The climb, in order: hall spine, flight A, landing, flight B, upper hall, door.
+    const C = [
+      { x: sx, z: zs - 0.3, y: F0 }, { x: lL, z: zs - 0.3, y: F0 }, { x: lL, z: zs + 0.1, y: yA(zs + 0.1) }, { x: lL, z: zs + Lf - 0.05, y: yA(zs + Lf - 0.05) },
+      { x: lL, z: zs + Lf + 0.5, y: half }, { x: lR, z: zs + Lf + 0.5, y: half }, { x: lR, z: zs + Lf - 0.05, y: yB(zs + Lf - 0.05) }, { x: lR, z: zs + 0.1, y: yB(zs + 0.1) },
+      { x: lR, z: zs - 0.3, y: F1 }, { x: sx, z: zs - 0.3, y: F1 }, { x: sx, z: kz0 - 0.8, y: F1 }, { x: xc, z: kz0 - 0.8, y: F1 }, { x: xc, z: d.z + 0.3, y: F1 },
+    ];
+    const l = h.toLocal(from.x, from.z);
+    const lx = l.x, lz = l.z;
+    const floorY = from.y - 1.62;
+    let start: number;
+    const lane = (x0: number, x1: number) => lx >= x0 && lx <= x1;
+    if (floorY >= F1 - 0.3) start = 10; // upstairs: along the hall to the door
+    else if (floorY >= half - 0.25) start = lane(lR - 0.5, W) && lz < zs + Lf ? 7 : 5; // on flight B, or on the landing
+    else if (lane(xs, xs + 0.95) && lz >= zs && lz <= zs + Lf) start = 3;
+    else start = 0;
+    const pre = start === 0 ? [{ x: sx, z: Math.min(lz, zs - 0.3), y: F0 }] : [];
+    const p0 = { x: l.x, z: l.z, y: floorY };
+    const pts = [p0, ...pre, ...C.slice(start)].map((p) => { const w = h.wp(p.x, p.y, p.z); return { x: w.x, z: w.z, y: w.y }; });
+    return pts;
   }
   /** True while the player is inside house no. 59. */
   insideHome() { const h = this.home; return !!h && h.contains(this.player.pos.x, this.player.pos.z); }
