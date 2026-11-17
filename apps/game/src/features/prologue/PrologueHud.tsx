@@ -103,7 +103,7 @@ export const PrologueHud: React.FC<PrologueHudProps> = ({ objective, prompt, sho
             </div>
           )}
         </div>
-        {questArea}
+        {questArea && <div className="mt-4">{questArea}</div>}
         {objective && (
           <section aria-labelledby="prologue-objective-heading">
             <h2 id="prologue-objective-heading" className="flex items-center gap-2.5 font-menu text-xs font-semibold uppercase tracking-[0.3em] text-[#c9bbf7]">
