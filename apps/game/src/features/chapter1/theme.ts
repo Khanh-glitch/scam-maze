@@ -139,7 +139,7 @@ export const CINE = {
   radiusPx: { panel: 14, card: 12, keycap: 6, chip: 999 },
   /** Minimum effective text size, in px. */
   fontPx: { body: 14, small: 13, subtitle: 17 },
-  widthPx: { choice: 420, subtitle: 520, toast: 320, tracker: 288, hint: 232 },
+  widthPx: { choice: 520, subtitle: 520, toast: 320, tracker: 288, hint: 232 },
   /** Objective card: checkbox sizes and the indent of the dim sub-lines, in px. */
   objective: { boxPx: 14, smallBoxPx: 11, indentPx: 22 },
   /** Laptop window: width of the app sidebar, in px. */

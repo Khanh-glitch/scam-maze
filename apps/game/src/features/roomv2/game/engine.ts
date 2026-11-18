@@ -549,7 +549,7 @@ export class Engine implements RoomStoryCommands {
     this.audio.doorClose();
     this.audio.keys();
     this.audio.sigh();
-    if (this.visits++ === 0) this.later(2.2, () => this.say(tr('say.arrive')));
+    this.visits++;
     this.later(9, () => { if (!this.lights.ceiling && !this.lights.bed && !this.lights.desk) this.say(tr('say.dark')); });
     this.emit();
   }
