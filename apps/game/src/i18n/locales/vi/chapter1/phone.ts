@@ -63,8 +63,7 @@ const phone: LocaleShape<typeof en> = {
       mute: "Tắt tiếng",
       unmute: "Bật tiếng",
       replay: "Nghe lại",
-      listening: "Đang nghe người gọi nói.",
-      showReplies: "Hiện các câu trả lời ngay",
+      continue: "Tiếp tục",
       notice: {
         autoplayBlocked: "Trình duyệt đang chặn âm thanh. Hãy nhấn Nghe lại để nghe câu này.",
         devPreview: "Đây là giọng xem thử khi phát triển. Đây không phải bản ghi âm.",

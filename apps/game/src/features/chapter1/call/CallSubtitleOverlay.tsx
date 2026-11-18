@@ -7,8 +7,8 @@
 //   none`, not a tab stop, anchored to the bottom of the region. It holds one bar.
 // - Same look as the street conversation (`prologue/DialogueOverlay`): no panel, a dark gradient band
 //   at the bottom of the screen, the speaker's name in gold capitals over a hairline, then the line
-//   (at most `CINE.subtitleVisibleLines` visible lines, then it scrolls, it is never cut) and a small
-//   chevron-down at the right while more text is below.
+//   (it grows to the region height, then scrolls; it is never cut) and a small chevron-down at the
+//   right while more text is below.
 // - Two persistent polite live regions (the line with the speaker, and the notice) that are never
 //   remounted, so a re-render with the same line makes no new announcement.
 // - Transparent, without border, when there is nothing to show.
@@ -36,6 +36,9 @@ const NOTICE_KEYS = {
   "english-voice": "phone.call.notice.englishVoice",
   "no-audio": "phone.call.notice.noAudio",
 } as const;
+
+/** Height of the speaker name, the hairline and their gaps above the line, in px. */
+const SPEAKER_BLOCK_PX = 40;
 
 const FADE_ANIMATION = `scammaze-subtitle-in ${CINE.motion.fastMs}ms ease-out both`;
 const FADE_KEYFRAMES = `@keyframes scammaze-subtitle-in {
@@ -70,6 +73,8 @@ export const CallSubtitleOverlay: React.FC<CallSubtitleOverlayProps> = ({
   }, [lineKey, measure, region.width]);
 
   const lineHeightPx = Math.round(CINE.fontPx.subtitle * CINE.subtitle.lineHeight);
+  // The line box may use the whole region below the speaker name and its hairline.
+  const scrollerMaxHeight = Math.max(lineHeightPx, region.height - SPEAKER_BLOCK_PX);
 
   return (
     <div
@@ -107,7 +112,7 @@ export const CallSubtitleOverlay: React.FC<CallSubtitleOverlayProps> = ({
         <div aria-live="polite" aria-atomic="true" data-testid="call-subtitle-region">
           {showLine && content.kind === "line" ? (
             <React.Fragment key={content.nodeKey}>
-              <p data-testid="call-subtitle-speaker" className="font-menu font-bold uppercase" style={{ fontSize: 20, lineHeight: "24px", letterSpacing: "0.08em", color: "#f3c969" }}>
+              <p data-testid="call-subtitle-speaker" className="font-menu font-bold uppercase" style={{ fontSize: 24, lineHeight: "30px", letterSpacing: "0.08em", color: "#f3c969" }}>
                 {content.speakerName}
               </p>
               <div aria-hidden="true" className="mb-1 mt-0.5 h-px w-full" style={{ background: "linear-gradient(to right, rgba(243,201,105,0.8), rgba(243,201,105,0.3), transparent)" }} />
@@ -116,8 +121,7 @@ export const CallSubtitleOverlay: React.FC<CallSubtitleOverlayProps> = ({
                 data-testid="call-subtitle-scroller"
                 onScroll={measure}
                 style={{
-                  // Border-box: the top padding is added so both lines stay fully visible.
-                  maxHeight: lineHeightPx * CINE.subtitleVisibleLines,
+                  maxHeight: scrollerMaxHeight,
                   overflowY: "auto",
                   overflowX: "hidden",
                   overscrollBehavior: "contain",
@@ -143,7 +147,7 @@ export const CallSubtitleOverlay: React.FC<CallSubtitleOverlayProps> = ({
                 />
               ) : null}
             </React.Fragment>          ) : showConnecting ? (
-            <p className="whitespace-normal break-words text-sm leading-relaxed text-[#a9a4c4]">
+            <p className="whitespace-normal break-words text-lg leading-relaxed text-[#a9a4c4]">
               {t("phone.call.connecting")}
             </p>
           ) : null}
@@ -153,7 +157,7 @@ export const CallSubtitleOverlay: React.FC<CallSubtitleOverlayProps> = ({
           aria-live="polite"
           aria-atomic="true"
           data-testid="call-notice"
-          className={showNotice ? "mt-1 text-sm leading-relaxed text-[#a9a4c4]" : undefined}
+          className={showNotice ? "mt-1 text-base leading-relaxed text-[#a9a4c4]" : undefined}
         >
           {showNotice ? t(NOTICE_KEYS[notice]) : null}
         </div>
