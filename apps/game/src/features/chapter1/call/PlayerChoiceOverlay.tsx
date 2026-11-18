@@ -16,8 +16,8 @@
 //   `dialogue.noOptions` and no list when empty. The list scrolls only when it really overflows the
 //   region (measured), and then a hint says so. The hang-up option is pinned at the bottom of the
 //   scroller. No option is ever dropped.
-// - While the caller line is still held (`waiting`), no status text is shown: like a street line with
-//   replies behind it, a "continue" hint (the F key cap) moves on to the replies.
+// - While the caller line is still typing (`waiting`), nothing is shown here; the replies appear as
+//   soon as the line is fully revealed. There is no "continue" step.
 // - The cards exist only at a decision point. After a pick they leave at once (until the node
 //   changes), so a reply cannot be picked twice.
 // - Keys: Up and Down (or the mouse wheel / trackpad) move the highlight, with the hover sound; F picks
@@ -48,10 +48,8 @@ export interface PlayerChoiceOverlayProps {
   onSelectOption: (optionId: string) => void;
   /** Region from `computeCallLayout` (`layout.choice`); its height is the maximum height. */
   region: Rect;
-  /** True while the caller is still speaking: replies are hidden until the player continues (F or a click) or the line ends. */
+  /** True while the caller line is still typing: replies are hidden until it is fully revealed. */
   waiting?: boolean;
-  /** Ends the wait: the "continue" step of the street conversation. */
-  onSkipWait?: () => void;
   /** Plays the hover sound when the highlight moves. */
   onHoverSound?: () => void;
 }
@@ -84,7 +82,6 @@ export const PlayerChoiceOverlay: React.FC<PlayerChoiceOverlayProps> = ({
   onSelectOption,
   region,
   waiting = false,
-  onSkipWait,
   onHoverSound,
 }) => {
   const { t } = useTranslation("chapter1");
@@ -126,15 +123,10 @@ export const PlayerChoiceOverlay: React.FC<PlayerChoiceOverlayProps> = ({
     nodeKey,
   });
 
-  const skipRef = useRef<HTMLButtonElement | null>(null);
   const wasWaiting = useRef(false);
   useEffect(() => {
-    if (waiting) {
-      skipRef.current?.focus();
-    } else if (wasWaiting.current) {
-      // The wait just ended: move focus from the removed button to the first option.
-      focusFirst();
-    }
+    // The line just finished typing: move focus to the first option.
+    if (!waiting && wasWaiting.current) focusFirst();
     wasWaiting.current = waiting;
   }, [waiting, focusFirst]);
 
@@ -153,19 +145,6 @@ export const PlayerChoiceOverlay: React.FC<PlayerChoiceOverlayProps> = ({
     [activeIndex, options.length, onHoverSound],
   );
   const stepper = useRef(createWheelStepper());
-  // While the line is held, F continues to the replies (the same key that picks a reply).
-  useEffect(() => {
-    if (!waiting || disabled) return undefined;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
-      if (event.code === "KeyF") {
-        event.preventDefault();
-        onSkipWait?.();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [waiting, disabled, onSkipWait]);
   useEffect(() => {
     if (!canAct) return undefined;
     const onKey = (event: KeyboardEvent) => {
@@ -252,25 +231,6 @@ export const PlayerChoiceOverlay: React.FC<PlayerChoiceOverlayProps> = ({
           </div>
         ) : null}
       </div>
-
-      {waiting ? (
-        <div className="flex items-center gap-2" data-testid="choice-waiting" style={{ pointerEvents: "auto" }}>
-          <span aria-hidden="true" className="flex shrink-0 items-center gap-1.5">
-            <kbd className="inline-flex min-w-[1.8rem] items-center justify-center bg-white px-1.5 py-[0.2rem] font-mono text-sm font-semibold text-[#171521]">F</kbd>
-            <span className="dialogue-nudge text-base leading-none text-white">&#9654;</span>
-          </span>
-          <button
-            type="button"
-            ref={skipRef}
-            data-testid="choice-skip-wait"
-            className="cursor-pointer font-menu text-base font-semibold uppercase tracking-[0.14em] text-zinc-200 outline-none focus-visible:outline-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={disabled}
-            onClick={() => onSkipWait?.()}
-          >
-            {t("phone.call.continue")}
-          </button>
-        </div>
-      ) : null}
 
       {showCards ? (
         // Names the list for assistive technology; it takes no visible row.

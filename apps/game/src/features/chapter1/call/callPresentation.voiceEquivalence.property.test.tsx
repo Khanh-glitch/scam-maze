@@ -5,10 +5,10 @@
 //
 // For any Chapter 1 call (scam call, callback, official line) from src/test/callStates.ts and any
 // seeded sequence of option choices, Answer and Hang up, driving the dialogue through
-// `CallPresentation` WITH voice props (a fake voice controller in random waiting, skip, muted and
+// `CallPresentation` WITH voice props (a fake voice controller in random waiting, muted and
 // notice states) produces the same Chapter_State, including the event log, as dispatching the same
 // actions directly on the reducer. The rendered option IDs and text equal the selector view, at most
-// one action is dispatched per activation, and the voice controls (skip wait, mute, replay) never
+// one action is dispatched per activation, and the voice controls (mute, replay) never
 // dispatch anything. The existing callPresentation.equivalence.property.test.tsx stays untouched.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { GameLocale } from "@scammaze/shared-types";
@@ -27,6 +27,8 @@ import { createLcg, pick, randomInt } from "../../../test/seededRandom";
 import { CallPresentation } from "./CallPresentation";
 import type { CallVoiceProps } from "./CallPresentation";
 import { createPhoneScreenSink } from "./phoneScreenSink";
+import { useInstantCallText } from "../../../test/instantCallText";
+useInstantCallText();
 
 const SEED = (CALL_STATE_SEED ^ 0x0000_0007) >>> 0;
 const CASES = 150;
@@ -157,7 +159,6 @@ describe("CallPresentation with voice props, equivalence (Property 7)", () => {
       const generated = generateCallStates(CASES, SEED);
       const next = createLcg(SEED);
       const callsSeen = new Set<string>();
-      let waitingSkipped = 0;
       let answers = 0;
       let endCalls = 0;
       let optionSteps = 0;
@@ -204,16 +205,11 @@ describe("CallPresentation with voice props, equivalence (Property 7)", () => {
 
           const checkOptions = () => {
             const rendered = renderedOptions();
-            const waiting = screen.queryByTestId("choice-waiting") !== null;
-            if (waiting) {
-              // Replies are hidden only while waiting; the state still has them.
-              expect(rendered).toEqual([]);
-            } else {
-              expect(rendered.map(({ id, text }) => ({ id, text }))).toEqual(
-                expectedOptions(store.getState(), scenario, locale),
-              );
-              expect(new Set(rendered.map((option) => option.id)).size).toBe(rendered.length);
-            }
+            // The voice state never hides replies: they depend on the typed caller line only.
+            expect(rendered.map(({ id, text }) => ({ id, text }))).toEqual(
+              expectedOptions(store.getState(), scenario, locale),
+            );
+            expect(new Set(rendered.map((option) => option.id)).size).toBe(rendered.length);
           };
 
           /** Random voice state, voice control clicks and wait skipping. None may dispatch. */
@@ -227,12 +223,6 @@ describe("CallPresentation with voice props, equivalence (Property 7)", () => {
               }
             }
             checkOptions();
-            const skip = screen.queryByTestId<HTMLButtonElement>("choice-skip-wait");
-            if (skip !== null) {
-              fireEvent.click(skip);
-              waitingSkipped += 1;
-              expect(screen.queryByTestId("choice-waiting")).toBeNull();
-            }
             expect(dispatched.length).toBe(before);
             checkOptions();
           };
@@ -321,7 +311,6 @@ describe("CallPresentation with voice props, equivalence (Property 7)", () => {
       });
 
       expect([...callsSeen].sort()).toEqual([...GENERATED_CALLS].sort());
-      expect(waitingSkipped).toBeGreaterThan(0);
       expect(answers).toBeGreaterThan(0);
       expect(endCalls).toBeGreaterThan(0);
       expect(optionSteps).toBeGreaterThan(0);
