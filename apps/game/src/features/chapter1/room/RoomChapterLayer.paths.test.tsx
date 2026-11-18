@@ -15,6 +15,8 @@ import enOutcome from "../../../i18n/locales/en/chapter1/outcome";
 import enPhone from "../../../i18n/locales/en/chapter1/phone";
 import enRoom from "../../../i18n/locales/en/chapter1/room";
 import { finishIntro, setupLayer, type LayerRig } from "./testHarness";
+import { useInstantCallText } from "../../../test/instantCallText";
+useInstantCallText();
 
 const LAPTOP = enLaptop.laptop;
 const PHONE = enPhone.phone;

@@ -28,6 +28,8 @@ export interface CallSubtitleOverlayProps {
   notice: "none" | "autoplay-blocked" | "dev-preview" | "english-voice" | "no-audio";
   /** Region from `computeCallLayout` (`layout.subtitle`); its height is the maximum height. */
   region: Rect;
+  /** Number of characters of the line revealed so far (typewriter). Absent: the whole line. */
+  revealedChars?: number;
 }
 
 const NOTICE_KEYS = {
@@ -46,11 +48,26 @@ const FADE_KEYFRAMES = `@keyframes scammaze-subtitle-in {
   to { opacity: 1; }
 }`;
 
+/** The revealed part, then the rest invisible, so the line keeps its final size while it types. */
+const TypedText: React.FC<{ text: string; revealed: number }> = ({ text, revealed }) => {
+  const chars = Array.from(text);
+  const count = Math.max(0, Math.min(chars.length, revealed));
+  return (
+    <>
+      <span data-testid="call-subtitle-typed">{chars.slice(0, count).join("")}</span>
+      <span aria-hidden="true" data-testid="call-subtitle-pending" style={{ opacity: 0 }}>
+        {chars.slice(count).join("")}
+      </span>
+    </>
+  );
+};
+
 export const CallSubtitleOverlay: React.FC<CallSubtitleOverlayProps> = ({
   content,
   visible,
   notice,
   region,
+  revealedChars,
 }) => {
   const { t } = useTranslation("chapter1");
   const reducedMotion = usePrefersReducedMotion();
@@ -134,7 +151,11 @@ export const CallSubtitleOverlay: React.FC<CallSubtitleOverlayProps> = ({
                     className="whitespace-normal break-words"
                     style={{ fontSize: CINE.fontPx.subtitle, lineHeight: `${lineHeightPx}px`, color: CINE.color.text }}
                   >
-                    {content.text}
+                    {revealedChars === undefined ? (
+                      content.text
+                    ) : (
+                      <TypedText text={content.text} revealed={revealedChars} />
+                    )}
                   </p>
                 </div>
               </div>
