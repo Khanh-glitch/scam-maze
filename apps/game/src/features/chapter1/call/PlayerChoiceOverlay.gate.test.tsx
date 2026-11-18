@@ -1,7 +1,7 @@
 // PlayerChoiceOverlay reply gate tests (task 18.12). Requirements 5.9 and 8.3.
 //
 // While `waiting` is true the caller is still speaking: the options and the number keys are off,
-// a listening status and one "Show replies now" button (with focus) are shown. When the wait ends
+// no status text is shown, only a "continue" hint (F or a click) with focus. When the wait ends
 // focus moves to the first option. Without `waiting` nothing changes.
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -63,7 +63,7 @@ describe.each(LOCALES)("PlayerChoiceOverlay reply gate (%s)", (locale) => {
   const phone = PHONE[locale].phone.call;
   const scenario = getDisplayScenario(locale);
 
-  it("hides the options and shows the listening status and one focused Skip button while waiting", () => {
+  it("hides the options and shows no status text and one focused Continue button while waiting", () => {
     applyLocale(locale);
     const view = viewFor(scenario);
     expect(view.options.length).toBeGreaterThan(0);
@@ -74,11 +74,12 @@ describe.each(LOCALES)("PlayerChoiceOverlay reply gate (%s)", (locale) => {
       expect(screen.queryByTestId(`dialogue-option-${option.id}`)).toBeNull();
     }
     expect(within(overlay).queryByRole("list")).toBeNull();
-    expect(within(overlay).getByRole("status").textContent).toBe(phone.listening);
+    expect(within(overlay).queryByRole("status")).toBeNull();
+    expect(overlay.textContent).not.toMatch(/Listening|Show replies|Đang nghe|Hiện các câu/);
 
     const buttons = within(overlay).getAllByRole("button");
     expect(buttons).toHaveLength(1);
-    expect(buttons[0].textContent).toBe(phone.showReplies);
+    expect(buttons[0].textContent).toBe(phone.continue);
     expect(buttons[0].getAttribute("data-testid")).toBe("choice-skip-wait");
     expect(document.activeElement).toBe(buttons[0]);
   });
@@ -95,14 +96,17 @@ describe.each(LOCALES)("PlayerChoiceOverlay reply gate (%s)", (locale) => {
     expect(onSelectOption).not.toHaveBeenCalled();
   });
 
-  it("ignores number keys and F while waiting", () => {
+  it("ignores number keys while waiting, and F continues without picking a reply", () => {
     applyLocale(locale);
     const view = viewFor(scenario);
     const onSelectOption = vi.fn();
-    render(overlayElement(view, { waiting: true, onSelectOption }));
+    const onSkipWait = vi.fn();
+    render(overlayElement(view, { waiting: true, onSelectOption, onSkipWait }));
 
     fireEvent.keyDown(window, { key: "1" });
+    expect(onSkipWait).not.toHaveBeenCalled();
     fireEvent.keyDown(window, { key: "f", code: "KeyF" });
+    expect(onSkipWait).toHaveBeenCalledTimes(1);
     expect(onSelectOption).not.toHaveBeenCalled();
   });
 

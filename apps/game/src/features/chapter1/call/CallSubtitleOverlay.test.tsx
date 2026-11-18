@@ -136,11 +136,13 @@ describe("CallSubtitleOverlay behavior", () => {
     render(<CallSubtitleOverlay {...props({ content: { ...LINE_A, text: long } as SubtitleContent })} />);
     const root = screen.getByTestId("call-subtitle-overlay");
     expect(root.style.maxHeight).toBe(`${REGION.height}px`);
-    // The bar shows two lines, then the text scrolls inside it.
+    // The box grows to the region (below the speaker), then the text scrolls inside it.
     const scroller = screen.getByTestId("call-subtitle-scroller");
     expect(scroller.style.overflowY).toBe("auto");
-    // Exactly the visible lines; the speaker name sits above the scroller.
-    expect(parseFloat(scroller.style.maxHeight)).toBe(Math.round(CINE.fontPx.subtitle * CINE.subtitle.lineHeight) * CINE.subtitleVisibleLines);
+    // More than two lines are visible; the speaker name sits above the scroller.
+    const lineHeight = Math.round(CINE.fontPx.subtitle * CINE.subtitle.lineHeight);
+    expect(parseFloat(scroller.style.maxHeight)).toBeGreaterThan(lineHeight * 2);
+    expect(parseFloat(scroller.style.maxHeight)).toBeLessThan(REGION.height);
     const line = screen.getByTestId("call-subtitle-line");
     expect(line.textContent).toBe(long);
     expect(line.className).not.toMatch(/truncate|line-clamp|text-ellipsis/);
