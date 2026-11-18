@@ -159,7 +159,6 @@ const roomv2 = {
         decline: "Decline",
       },
       say: {
-        arrive: "23:08. Finally home.",
         dark: "Pitch dark. The switch is right by the door.",
         ceilingLit: "Warm yellow light. Everything is just as you left it this morning.",
         kettle: "A little water on to boil. Instant noodles or a pot of tea, something.",

@@ -159,7 +159,6 @@ const roomv2: LocaleShape<typeof en> = {
         decline: "Từ chối",
       },
       say: {
-        arrive: "23:08. Cuối cùng cũng về đến nhà.",
         dark: "Tối om. Công tắc ở ngay cạnh cửa.",
         ceilingLit: "Ánh đèn vàng. Mọi thứ vẫn y như lúc sáng rời đi.",
         kettle: "Đun ít nước. Pha gói mì hay ấm trà gì đó.",

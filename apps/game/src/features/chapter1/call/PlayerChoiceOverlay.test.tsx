@@ -343,29 +343,16 @@ describe.each(LOCALES)("PlayerChoiceOverlay (%s)", (locale) => {
 });
 
 describe("PlayerChoiceOverlay icons and selection style (cinematic)", () => {
-  it("gives every card one icon whose kind comes from `choiceIconKind` of its option", () => {
+  it("gives every card the chat icon only", () => {
     applyLocale("en");
     const view = viewFor(SCAM_OPEN, getDisplayScenario("en"));
     const { overlay } = renderOverlay({ view });
     const icons = within(overlay).getAllByTestId("choice-icon");
     expect(icons).toHaveLength(view.options.length);
-    icons.forEach((icon, index) => {
+    icons.forEach((icon) => {
       expect(icon.getAttribute("aria-hidden")).toBe("true");
-      expect(icon.getAttribute("data-icon")).toBe(choiceIconKind(view.options[index]));
+      expect(icon.getAttribute("src")).toBe("/assets/ui/hud/scammaze-chat-icon-512.png");
     });
-  });
-
-  it("uses the same icons in English and Vietnamese", () => {
-    const kinds = (locale: GameLocale) => {
-      applyLocale(locale);
-      const view = viewFor(SCAM_OPEN, getDisplayScenario(locale));
-      const { overlay, unmount } = renderOverlay({ view });
-      const result = within(overlay).getAllByTestId("choice-icon").map((icon) => icon.getAttribute("data-icon"));
-      unmount();
-      return result;
-    };
-    expect(kinds("vi")).toEqual(kinds("en"));
-    applyLocale("en");
   });
 
   it("draws the selected card as a light pill (swept in from the left), the others dark with a hairline", () => {

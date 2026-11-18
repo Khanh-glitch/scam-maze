@@ -80,16 +80,16 @@ export const WIDE_BOTTOM_INSET = 56;
 export const CHOICE_SUBTITLE_GAP = 12;
 /** The wide choice region starts at this share of the height (or lower), so 4 cards always fit. */
 export const WIDE_CHOICE_TOP_RATIO = 0.22;
-/** Height of 4 compact cards (44 px, gap 6 px) plus the list padding (8 px), in CSS pixels. */
-export const FOUR_CARDS_HEIGHT = 4 * 44 + 3 * 6 + 8;
+/** Height of 4 compact cards (52 px, gap 6 px) plus the list padding (8 px), in CSS pixels. */
+export const FOUR_CARDS_HEIGHT = 4 * 52 + 3 * 6 + 8;
 /** Largest width of the response cards, from `CINE.widthPx.choice` (kept literal: this module imports nothing). */
-export const MAX_CHOICE_WIDTH = 420;
+export const MAX_CHOICE_WIDTH = 520;
 /** Largest width of the bottom-left subtitle, from `CINE.widthPx.subtitle`. */
 export const MAX_SUBTITLE_WIDTH = 520;
 /** The wide layout keeps the cards and the subtitle this share of the width from the left edge. */
 export const WIDE_LEFT_INSET_RATIO = 0.06;
 /** Share of the width that the response cards and the subtitle try to use (34 to 42 percent). */
-export const CHOICE_WIDTH_RATIO = 0.36;
+export const CHOICE_WIDTH_RATIO = 0.42;
 export const SUBTITLE_WIDTH_RATIO = 0.42;
 /** The wide layout leaves this share of the width to the right of the phone. */
 export const WIDE_RIGHT_INSET_RATIO = 0.06;
