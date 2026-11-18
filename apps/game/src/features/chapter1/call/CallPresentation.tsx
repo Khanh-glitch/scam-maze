@@ -226,10 +226,21 @@ export const CallPresentation: React.FC<CallPresentationProps> = ({
   const reducedMotion = usePrefersReducedMotion();
   const typedLine =
     call.status === "active" && subtitleVisible && subtitle.kind === "line" ? subtitle : null;
+  // The line types over the length of its generated voice clip. Without one (muted, missing, not
+  // loaded yet) it uses the fixed speed.
+  const clipDurationMs =
+    voice !== undefined &&
+    typedLine !== null &&
+    !voice.muted &&
+    voice.snapshot.source === "clip" &&
+    voice.snapshot.targetKey === typedLine.nodeKey
+      ? voice.snapshot.durationMs
+      : null;
   const typing = useTypewriter(
     typedLine === null ? "" : `${typedLine.nodeKey}:${typedLine.text}`,
     typedLine === null ? null : typedLine.text,
     reducedMotion,
+    clipDurationMs,
   );
   const typingActive = typedLine !== null && !typing.complete;
   const skipTyping = typing.skip;
