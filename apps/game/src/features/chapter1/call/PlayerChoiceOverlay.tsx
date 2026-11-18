@@ -22,7 +22,7 @@
 //   the highlighted reply. Enter and Space still work on a focused button. The overlay holds no dialogue
 //   state and only reports the chosen option ID.
 import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { MessageCircle, PhoneOff, ShieldQuestion } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { createWheelStepper } from "../../../components/ui/wheelStep";
 import { useReducedMotion } from "../../../components/ui/useReducedMotion";
@@ -30,14 +30,10 @@ import type { DialogueView } from "../../../game/narrative/selectors";
 import { CINE, CINE_KEYFRAMES, UI, cinePanelStyle } from "../theme";
 import { useDialogueOptionKeys } from "../dialogue/useDialogueOptionKeys";
 import type { Rect } from "./callLayout";
-import { choiceIconKind, type ChoiceIconKind } from "./choiceIcon";
+import { choiceIconKind } from "./choiceIcon";
 
+const ICON_CHAT = "/assets/ui/hud/scammaze-chat-icon-512.png";
 const ICON_MOUSE = "/assets/ui/hud/mouse.webp";
-const ICONS: Record<ChoiceIconKind, React.ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" | "false" }>> = {
-  "hang-up": PhoneOff,
-  challenge: ShieldQuestion,
-  reply: MessageCircle,
-};
 
 export interface PlayerChoiceOverlayProps {
   /** Call-linked view from `selectDialogueView`. */
@@ -60,18 +56,13 @@ export interface PlayerChoiceOverlayProps {
 
 /** Layout and state classes of a response pill. Colors are set by the active state. */
 export const CHOICE_CARD_CLASS =
-  "relative flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-full border px-4 py-2 text-left font-medium leading-snug whitespace-normal break-words cursor-pointer outline-none transition-colors duration-200 delay-100 disabled:cursor-not-allowed disabled:opacity-60";
+  "relative flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-full border px-5 py-2.5 text-left text-base font-medium leading-snug whitespace-normal break-words cursor-pointer outline-none transition-colors duration-200 delay-100 disabled:cursor-not-allowed disabled:opacity-60";
 const CARD_ON = "border-white/80 text-[#171521]";
 const CARD_OFF = "border-white/30 bg-black/55 text-zinc-100";
-/** Leading icon of a response pill. Decorative. */
-const OptionIcon: React.FC<{ kind: ChoiceIconKind; selected: boolean }> = ({ kind, selected }) => {
-  const Icon = ICONS[kind];
-  return (
-    <span aria-hidden="true" data-testid="choice-icon" data-icon={kind} className="relative inline-flex shrink-0 items-center justify-center" style={{ width: 22, height: 22, color: selected ? "#171521" : "#f4f4f5" }}>
-      <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
-    </span>
-  );
-};
+/** Leading icon of a response pill: the chat icon only, inverted on the light highlighted pill. Decorative. */
+const OptionIcon: React.FC<{ selected: boolean }> = ({ selected }) => (
+  <img data-testid="choice-icon" src={ICON_CHAT} alt="" aria-hidden="true" width={22} height={22} draggable={false} className={`relative h-[22px] w-[22px] shrink-0 transition-[filter] duration-300 ${selected ? "invert" : ""}`} />
+);
 /** The light layer of a highlighted pill: sweeps in from the left, fades out when the pill is left. */
 const Sweep: React.FC<{ on: boolean; reducedMotion: boolean }> = ({ on, reducedMotion }) => (
   <span
@@ -324,7 +315,6 @@ export const PlayerChoiceOverlay: React.FC<PlayerChoiceOverlayProps> = ({
                     data-testid={`dialogue-option-${option.id}`}
                     data-selected={index === activeIndex ? "true" : "false"}
                     className={`${CHOICE_CARD_CLASS} ${on ? CARD_ON : CARD_OFF}`}
-                    style={{ fontSize: CINE.fontPx.body }}
                     disabled={disabled}
                     onClick={() => handleSelect(option.id)}
                     onPointerEnter={() => {
@@ -337,7 +327,7 @@ export const PlayerChoiceOverlay: React.FC<PlayerChoiceOverlayProps> = ({
                     }}
                   >
                     <Sweep on={on} reducedMotion={reducedMotion} />
-                    <OptionIcon kind={choiceIconKind(option)} selected={on} />
+                    <OptionIcon selected={on} />
                     <span className="relative min-w-0 flex-1 whitespace-normal break-words">{option.fallback ? t("dialogue.fallbackOption") : option.text}</span>
                   </button>
                 </li>

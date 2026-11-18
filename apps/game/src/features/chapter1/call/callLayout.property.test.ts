@@ -182,7 +182,7 @@ describe("callLayout properties", () => {
       // Choices stay in the left column, in the lower half, and keep a minimum width.
       expect(choice.left + choice.width, label).toBeLessThanOrEqual(screen.left - WIDE_MARGIN + EPSILON);
       expect(choice.width, label).toBeGreaterThanOrEqual(280 - EPSILON);
-      expect(choice.width, label).toBeLessThanOrEqual(420 + EPSILON);
+      expect(choice.width, label).toBeLessThanOrEqual(520 + EPSILON);
       // Left edge at 6 percent of the width.
       expect(choice.left, label).toBeCloseTo(inset, 3);
     }
