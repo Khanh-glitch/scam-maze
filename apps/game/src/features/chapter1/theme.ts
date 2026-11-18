@@ -138,8 +138,8 @@ export const CINE = {
   blurPx: 14,
   radiusPx: { panel: 14, card: 12, keycap: 6, chip: 999 },
   /** Minimum effective text size, in px. */
-  fontPx: { body: 14, small: 13, subtitle: 17 },
-  widthPx: { choice: 520, subtitle: 520, toast: 320, tracker: 288, hint: 232 },
+  fontPx: { body: 14, small: 13, subtitle: 20 },
+  widthPx: { choice: 640, subtitle: 760, toast: 320, tracker: 288, hint: 232 },
   /** Objective card: checkbox sizes and the indent of the dim sub-lines, in px. */
   objective: { boxPx: 14, smallBoxPx: 11, indentPx: 22 },
   /** Laptop window: width of the app sidebar, in px. */
@@ -147,9 +147,7 @@ export const CINE = {
   /** Round icon holder of a response card, in px. */
   iconCirclePx: 28,
   /** Subtitle bar metrics, in px (line height is a ratio of the font size). */
-  subtitle: { lineHeight: 1.4, padXPx: 14, padYPx: 10, pillHeightPx: 22 },
-  /** Maximum visible lines of the subtitle bar before it scrolls. */
-  subtitleVisibleLines: 2,
+  subtitle: { lineHeight: 1.6, padXPx: 14, padYPx: 10, pillHeightPx: 22 },
   /** Anchored interaction prompt: offset from the prop, margin to the screen edge and its box estimate, in px. */
   prompt: { offsetPx: 22, marginPx: 12, boxWidthPx: 230, boxHeightPx: 34 },
   motion: {

@@ -63,8 +63,7 @@ const phone = {
       mute: "Mute",
       unmute: "Unmute",
       replay: "Replay",
-      listening: "Listening to the caller.",
-      showReplies: "Show replies now",
+      continue: "Continue",
       notice: {
         autoplayBlocked: "Sound is blocked by the browser. Press Replay to hear this line.",
         devPreview: "Development preview voice. This is not a recording.",
