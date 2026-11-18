@@ -16,7 +16,6 @@ import enStory from "../../../i18n/locales/en/chapter1/story";
 import viStory from "../../../i18n/locales/vi/chapter1/story";
 import enRoom from "../../../i18n/locales/en/chapter1/room";
 import viRoom from "../../../i18n/locales/vi/chapter1/room";
-import { choiceIconKind } from "./choiceIcon";
 import { CHOICE_CARD_CLASS, PlayerChoiceOverlay } from "./PlayerChoiceOverlay";
 
 const STORY = { en: enStory, vi: viStory } as const;
