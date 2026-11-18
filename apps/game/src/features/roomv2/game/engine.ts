@@ -472,6 +472,7 @@ export class Engine implements RoomStoryCommands {
   /* =================== INPUT =================== */
   onMouseMove = (e: MouseEvent) => {
     if (!this.ui.locked) return;
+    if (this.callHeld()) return;
     if (Math.abs(e.movementX) > MAX_MOUSE_STEP || Math.abs(e.movementY) > MAX_MOUSE_STEP) return;
     const s = 0.0021;
     if (this.seat === 'sitting' || this.seat === 'standing') return;
@@ -556,7 +557,12 @@ export class Engine implements RoomStoryCommands {
 
   later(sec: number, fn: () => void) { this.timeouts.push(window.setTimeout(() => { if (!this.disposed) fn(); }, sec * 1000)); }
 
+  /** True while a hosted phone call is on screen: its dialogue owns the arrow keys, so the view stays put. */
+  callHeld(): boolean { return !!this.opts.story && this.phoneMode === 'call'; }
+
   say(text: string, voice = false, dur?: number) {
+    // The call dialogue has its own captions; a room remark must not overlap it.
+    if (!voice && this.callHeld()) return;
     const id = ++this.captionId;
     this.ui.captions = [...this.ui.captions.slice(-1), { text, voice, id }];
     this.emit();
@@ -749,7 +755,10 @@ export class Engine implements RoomStoryCommands {
 
   /* =================== STORY HOST COMMANDS =================== */
   setPhoneMode(mode: PhoneMode) {
-    if (mode === 'call' && this.phoneMode !== 'call') this.callSec = 0;
+    if (mode === 'call' && this.phoneMode !== 'call') {
+      this.callSec = 0;
+      this.ui.captions = this.ui.captions.filter((c) => c.voice);
+    }
     this.phoneMode = mode;
   }
 
@@ -995,7 +1004,7 @@ export class Engine implements RoomStoryCommands {
 
   /* =================== PER-FRAME =================== */
   movePlayer(dt: number) {
-    if (this.inspect || this.seat !== 'none') { this.vel.set(0, 0, 0); return; }
+    if (this.inspect || this.seat !== 'none' || this.callHeld()) { this.vel.set(0, 0, 0); return; }
     const f = (this.keys.has('KeyW') || this.keys.has('ArrowUp') ? 1 : 0) - (this.keys.has('KeyS') || this.keys.has('ArrowDown') ? 1 : 0);
     const s = (this.keys.has('KeyD') || this.keys.has('ArrowRight') ? 1 : 0) - (this.keys.has('KeyA') || this.keys.has('ArrowLeft') ? 1 : 0);
     const run = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');

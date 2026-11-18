@@ -16,6 +16,8 @@
 //   `dialogue.noOptions` and no list when empty. The list scrolls only when it really overflows the
 //   region (measured), and then a hint says so. The hang-up option is pinned at the bottom of the
 //   scroller. No option is ever dropped.
+// - While the caller line is still held (`waiting`), no status text is shown: like a street line with
+//   replies behind it, a "continue" hint (the F key cap) moves on to the replies.
 // - The cards exist only at a decision point. After a pick they leave at once (until the node
 //   changes), so a reply cannot be picked twice.
 // - Keys: Up and Down (or the mouse wheel / trackpad) move the highlight, with the hover sound; F picks
@@ -46,9 +48,9 @@ export interface PlayerChoiceOverlayProps {
   onSelectOption: (optionId: string) => void;
   /** Region from `computeCallLayout` (`layout.choice`); its height is the maximum height. */
   region: Rect;
-  /** True while the caller is still speaking: replies are hidden until the wait ends. */
+  /** True while the caller is still speaking: replies are hidden until the player continues (F or a click) or the line ends. */
   waiting?: boolean;
-  /** Ends the wait early ("Show replies now"). */
+  /** Ends the wait: the "continue" step of the street conversation. */
   onSkipWait?: () => void;
   /** Plays the hover sound when the highlight moves. */
   onHoverSound?: () => void;
@@ -56,12 +58,12 @@ export interface PlayerChoiceOverlayProps {
 
 /** Layout and state classes of a response pill. Colors are set by the active state. */
 export const CHOICE_CARD_CLASS =
-  "relative flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-full border px-5 py-2.5 text-left text-base font-medium leading-snug whitespace-normal break-words cursor-pointer outline-none transition-colors duration-200 delay-100 disabled:cursor-not-allowed disabled:opacity-60";
+  "relative flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-full border px-6 py-3 text-left text-lg font-medium leading-snug whitespace-normal break-words cursor-pointer outline-none transition-colors duration-200 delay-100 disabled:cursor-not-allowed disabled:opacity-60";
 const CARD_ON = "border-white/80 text-[#171521]";
 const CARD_OFF = "border-white/30 bg-black/55 text-zinc-100";
 /** Leading icon of a response pill: the chat icon only, inverted on the light highlighted pill. Decorative. */
 const OptionIcon: React.FC<{ selected: boolean }> = ({ selected }) => (
-  <img data-testid="choice-icon" src={ICON_CHAT} alt="" aria-hidden="true" width={22} height={22} draggable={false} className={`relative h-[22px] w-[22px] shrink-0 transition-[filter] duration-300 ${selected ? "invert" : ""}`} />
+  <img data-testid="choice-icon" src={ICON_CHAT} alt="" aria-hidden="true" width={26} height={26} draggable={false} className={`relative h-[26px] w-[26px] shrink-0 transition-[filter] duration-300 ${selected ? "invert" : ""}`} />
 );
 /** The light layer of a highlighted pill: sweeps in from the left, fades out when the pill is left. */
 const Sweep: React.FC<{ on: boolean; reducedMotion: boolean }> = ({ on, reducedMotion }) => (
@@ -151,6 +153,19 @@ export const PlayerChoiceOverlay: React.FC<PlayerChoiceOverlayProps> = ({
     [activeIndex, options.length, onHoverSound],
   );
   const stepper = useRef(createWheelStepper());
+  // While the line is held, F continues to the replies (the same key that picks a reply).
+  useEffect(() => {
+    if (!waiting || disabled) return undefined;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.code === "KeyF") {
+        event.preventDefault();
+        onSkipWait?.();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [waiting, disabled, onSkipWait]);
   useEffect(() => {
     if (!canAct) return undefined;
     const onKey = (event: KeyboardEvent) => {
@@ -226,7 +241,7 @@ export const PlayerChoiceOverlay: React.FC<PlayerChoiceOverlayProps> = ({
       {/* Persistent polite region, so a new narration line is announced once. */}
       <div aria-live="polite" aria-atomic="true" data-testid="choice-narration" style={{ pointerEvents: "auto", marginTop: "auto" }}>
         {narration ? (
-          <div className="px-3.5 py-2.5" style={{ ...cinePanelStyle(true), fontSize: CINE.fontPx.body }}>
+          <div className="px-3.5 py-2.5" style={{ ...cinePanelStyle(true), fontSize: CINE.fontPx.subtitle }}>
             <p className={`${UI.label} flex items-center gap-1.5`}>
               <MessageCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span>{t("dialogue.systemSpeaker")}</span>
@@ -239,19 +254,20 @@ export const PlayerChoiceOverlay: React.FC<PlayerChoiceOverlayProps> = ({
       </div>
 
       {waiting ? (
-        <div className="flex flex-col gap-2" data-testid="choice-waiting" style={{ pointerEvents: "auto" }}>
-          <p role="status" className="px-1" style={{ fontSize: CINE.fontPx.body, color: CINE.color.textMuted }}>
-            {t("phone.call.listening")}
-          </p>
+        <div className="flex items-center gap-2" data-testid="choice-waiting" style={{ pointerEvents: "auto" }}>
+          <span aria-hidden="true" className="flex shrink-0 items-center gap-1.5">
+            <kbd className="inline-flex min-w-[1.8rem] items-center justify-center bg-white px-1.5 py-[0.2rem] font-mono text-sm font-semibold text-[#171521]">F</kbd>
+            <span className="dialogue-nudge text-base leading-none text-white">&#9654;</span>
+          </span>
           <button
             type="button"
             ref={skipRef}
             data-testid="choice-skip-wait"
-            className={`${CHOICE_CARD_CLASS} ${CARD_OFF}`}
+            className="cursor-pointer font-menu text-base font-semibold uppercase tracking-[0.14em] text-zinc-200 outline-none focus-visible:outline-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-60"
             disabled={disabled}
             onClick={() => onSkipWait?.()}
           >
-            <span className="relative min-w-0 flex-1 whitespace-normal break-words">{t("phone.call.showReplies")}</span>
+            {t("phone.call.continue")}
           </button>
         </div>
       ) : null}
@@ -264,7 +280,7 @@ export const PlayerChoiceOverlay: React.FC<PlayerChoiceOverlayProps> = ({
       ) : null}
 
       {!showCards ? null : options.length === 0 ? (
-        <p className="px-1" style={{ fontSize: CINE.fontPx.body, color: CINE.color.textMuted }}>
+        <p className="px-1" style={{ fontSize: CINE.fontPx.subtitle, color: CINE.color.textMuted }}>
           {t("dialogue.noOptions")}
         </p>
       ) : (
@@ -302,9 +318,9 @@ export const PlayerChoiceOverlay: React.FC<PlayerChoiceOverlayProps> = ({
                   }}
                 >
                   <span aria-hidden="true" data-testid="choice-hint" className={`flex shrink-0 items-center gap-1.5 transition-opacity duration-300 ${on ? "opacity-100" : "opacity-0"}`}>
-                    {options.length > 1 ? <img src={ICON_MOUSE} alt="" width={20} height={32} draggable={false} className="h-8 w-5 shrink-0 opacity-85" /> : null}
-                    <kbd className="inline-flex min-w-[1.6rem] items-center justify-center bg-white px-1.5 py-[0.2rem] font-mono text-xs font-semibold text-[#171521]">F</kbd>
-                    <span className="dialogue-nudge text-sm leading-none text-white">&#9654;</span>
+                    {options.length > 1 ? <img src={ICON_MOUSE} alt="" width={24} height={38} draggable={false} className="h-[38px] w-6 shrink-0 opacity-85" /> : null}
+                    <kbd className="inline-flex min-w-[1.8rem] items-center justify-center bg-white px-1.5 py-[0.2rem] font-mono text-sm font-semibold text-[#171521]">F</kbd>
+                    <span className="dialogue-nudge text-base leading-none text-white">&#9654;</span>
                   </span>
                   <button
                     type="button"

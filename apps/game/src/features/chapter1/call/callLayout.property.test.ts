@@ -143,7 +143,7 @@ describe("callLayout properties", () => {
         expect(subtitle.top, label).toBeGreaterThanOrEqual(screen.top + screen.height - EPSILON);
         expect(subtitleBottom, label).toBeLessThanOrEqual(choice.top + EPSILON);
       } else {
-        // Bottom-left: left edge at 6 percent of the width, width up to 42 percent (cap 520 px),
+        // Bottom-left: left edge at 6 percent of the width, width up to 50 percent (cap 760 px),
         // anchored near the bottom, below the response cards and left of the phone.
         // Ends 56 px above the bottom edge, clear of the Ctrl/Esc footer strip.
         expect(subtitleBottom, label).toBeLessThanOrEqual(viewport.height - 52 + EPSILON);
@@ -151,8 +151,8 @@ describe("callLayout properties", () => {
         expect(subtitle.top, label).toBeGreaterThanOrEqual(choice.top + choice.height - EPSILON);
         expect(subtitle.left + subtitle.width, label).toBeLessThanOrEqual(screen.left - WIDE_MARGIN + EPSILON);
         expect(subtitle.left, label).toBeCloseTo(Math.max(WIDE_MARGIN, Math.round(0.06 * viewport.width)), 3);
-        expect(subtitle.width, label).toBeLessThanOrEqual(520 + EPSILON);
-        expect(subtitle.width, label).toBeLessThanOrEqual(Math.max(280, 0.42 * viewport.width) + EPSILON);
+        expect(subtitle.width, label).toBeLessThanOrEqual(760 + EPSILON);
+        expect(subtitle.width, label).toBeLessThanOrEqual(Math.max(280, 0.5 * viewport.width) + EPSILON);
         expect(subtitle.height, label).toBeLessThanOrEqual(SUBTITLE_MAX_HEIGHT + EPSILON);
       }
     }
@@ -182,30 +182,30 @@ describe("callLayout properties", () => {
       // Choices stay in the left column, in the lower half, and keep a minimum width.
       expect(choice.left + choice.width, label).toBeLessThanOrEqual(screen.left - WIDE_MARGIN + EPSILON);
       expect(choice.width, label).toBeGreaterThanOrEqual(280 - EPSILON);
-      expect(choice.width, label).toBeLessThanOrEqual(520 + EPSILON);
+      expect(choice.width, label).toBeLessThanOrEqual(640 + EPSILON);
       // Left edge at 6 percent of the width.
       expect(choice.left, label).toBeCloseTo(inset, 3);
     }
   }, PROPERTY_TIMEOUT_MS);
 
-  it("wide layout: the choice region fits 4 compact cards when the height is at least 600, and never meets the subtitle or the phone", () => {
+  it("wide layout: the choice region fits 4 cards when the height is at least 720, and never meets the subtitle or the phone", () => {
     const seed = 0x4ca2d5;
     const next = createLcg(seed);
     for (let index = 0; index < RUNS; index += 1) {
       const viewport: Viewport = {
         width: randomInt(next, NARROW_BREAKPOINT, MAX_WIDTH),
-        height: randomInt(next, 600, MAX_HEIGHT),
+        height: randomInt(next, 720, MAX_HEIGHT),
       };
       const layout = computeCallLayout(viewport);
       const { choice, subtitle, screen } = layout;
       const label = `seed ${seed.toString(16)} case ${index}, viewport ${JSON.stringify(viewport)}, layout ${JSON.stringify(layout)}`;
-      // 4 cards of 44 px, 3 gaps of 6 px and 8 px of list padding.
-      expect(choice.height, label).toBeGreaterThanOrEqual(4 * 44 + 3 * 6 + 8);
+      // 4 cards of 60 px, 3 gaps of 8 px and 8 px of list padding.
+      expect(choice.height, label).toBeGreaterThanOrEqual(4 * 60 + 3 * 8 + 8);
       expect(rectsIntersectArea(choice, subtitle), label).toBe(0);
       expect(rectsIntersectArea(choice, screen), label).toBe(0);
       expect(choice.top + choice.height, label).toBeLessThanOrEqual(subtitle.top + EPSILON);
-      // Two full subtitle lines plus the pill fit in the region.
-      expect(subtitle.height, label).toBeGreaterThanOrEqual(Math.min(84, viewport.height / 2 - 2 * WIDE_MARGIN));
+      // The speaker name plus about five lines fit in the region.
+      expect(subtitle.height, label).toBeGreaterThanOrEqual(Math.min(180, viewport.height / 2 - 2 * WIDE_MARGIN));
       expect(subtitle.top + subtitle.height, label).toBeLessThanOrEqual(viewport.height - 52 + EPSILON);
     }
   }, PROPERTY_TIMEOUT_MS);

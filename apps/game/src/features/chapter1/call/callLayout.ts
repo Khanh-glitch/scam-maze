@@ -55,10 +55,10 @@ export const NARROW_BREAKPOINT = 640;
 export const MAX_SCREEN_HEIGHT = 720;
 /** The wide layout keeps at least this width for the choice region, in CSS pixels. */
 export const MIN_CHOICE_WIDTH = 280;
-/** The wide subtitle region (name pill plus a bar of two lines) is never taller than this, in CSS pixels. */
-export const SUBTITLE_MAX_HEIGHT = 96;
+/** The wide subtitle region (speaker name plus about five lines) is never taller than this, in CSS pixels. */
+export const SUBTITLE_MAX_HEIGHT = 200;
 /** The narrow layout never gives the subtitle more than this, in CSS pixels (a long line scrolls). */
-export const NARROW_SUBTITLE_MAX_HEIGHT = 140;
+export const NARROW_SUBTITLE_MAX_HEIGHT = 180;
 /** The narrow layout gives the subtitle at least this height when room allows, in CSS pixels. */
 export const SUBTITLE_MIN_HEIGHT = 56;
 /** Share of the space below the screen that the narrow layout offers to the subtitle. */
@@ -80,17 +80,17 @@ export const WIDE_BOTTOM_INSET = 56;
 export const CHOICE_SUBTITLE_GAP = 12;
 /** The wide choice region starts at this share of the height (or lower), so 4 cards always fit. */
 export const WIDE_CHOICE_TOP_RATIO = 0.22;
-/** Height of 4 compact cards (52 px, gap 6 px) plus the list padding (8 px), in CSS pixels. */
-export const FOUR_CARDS_HEIGHT = 4 * 52 + 3 * 6 + 8;
+/** Height of 4 cards (60 px, gap 8 px) plus the list padding (8 px), in CSS pixels. */
+export const FOUR_CARDS_HEIGHT = 4 * 60 + 3 * 8 + 8;
 /** Largest width of the response cards, from `CINE.widthPx.choice` (kept literal: this module imports nothing). */
-export const MAX_CHOICE_WIDTH = 520;
+export const MAX_CHOICE_WIDTH = 640;
 /** Largest width of the bottom-left subtitle, from `CINE.widthPx.subtitle`. */
-export const MAX_SUBTITLE_WIDTH = 520;
+export const MAX_SUBTITLE_WIDTH = 760;
 /** The wide layout keeps the cards and the subtitle this share of the width from the left edge. */
 export const WIDE_LEFT_INSET_RATIO = 0.06;
-/** Share of the width that the response cards and the subtitle try to use (34 to 42 percent). */
-export const CHOICE_WIDTH_RATIO = 0.42;
-export const SUBTITLE_WIDTH_RATIO = 0.42;
+/** Share of the width that the response cards and the subtitle try to use (about half). */
+export const CHOICE_WIDTH_RATIO = 0.5;
+export const SUBTITLE_WIDTH_RATIO = 0.5;
 /** The wide layout leaves this share of the width to the right of the phone. */
 export const WIDE_RIGHT_INSET_RATIO = 0.06;
 /** Guard so the screen anchor can never reach the camera near plane (0.05 m). */
