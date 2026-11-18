@@ -31,6 +31,8 @@ import { describeAction, runSequence } from "../../../test/chapterRuns";
 import { createLcg, pick, randomInt } from "../../../test/seededRandom";
 import { CallPresentation } from "./CallPresentation";
 import { createPhoneScreenSink } from "./phoneScreenSink";
+import { useInstantCallText } from "../../../test/instantCallText";
+useInstantCallText();
 
 const SEED = (CALL_STATE_SEED ^ 0x0000_0001) >>> 0;
 const CASES = 150;

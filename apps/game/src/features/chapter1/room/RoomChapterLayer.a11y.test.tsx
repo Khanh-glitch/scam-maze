@@ -16,6 +16,8 @@ import { DECLINE_ALEX, reachEndingA } from "../../../test/chapterRuns";
 import { mockReducedMotion, restoreMatchMedia } from "../../../test/loadingRuns";
 import { getTabbable } from "../focusTrap";
 import { ALEX_OPEN_MANIFEST, dispatchCore, finishIntro, setupLayer, type LayerRig } from "./testHarness";
+import { useInstantCallText } from "../../../test/instantCallText";
+useInstantCallText();
 
 const ROOM = enRoom.room;
 const PHONE = enPhone.phone;

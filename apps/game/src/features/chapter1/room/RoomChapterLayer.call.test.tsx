@@ -20,6 +20,7 @@ import { createFakeAudioPort, type FakeAudioPort } from "../../../test/fakeAudio
 import type { RoomStoryCommands } from "../../roomv2/game/outside";
 import { RoomChapterLayer } from "./RoomChapterLayer";
 import { RoomStoryBridge } from "./roomStoryBridge";
+import { useInstantCallText } from "../../../test/instantCallText";
 
 const PHONE = enPhone.phone;
 const ALEX_OPEN_LINE = CHAPTER_1_SCENARIO.dialogues["dlg.alex"].lines["line.alex.open"];
@@ -169,6 +170,8 @@ afterEach(() => {
 });
 
 describe("the call on the phone screen", () => {
+  useInstantCallText();
+
   it("shows Accept and Decline while the call rings, with no call controls yet", () => {
     const rig = setup({ restoreActions: [START, RING_ALEX] });
     finishIntro();

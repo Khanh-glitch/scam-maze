@@ -19,6 +19,7 @@ import { selectDialogueView } from "../../../game/narrative/selectors";
 import type { ChapterStore } from "../../../game/narrative/store";
 import type { ChapterState, ScenarioDefinition } from "../../../game/narrative/types";
 import type { VoiceSnapshot } from "../../../game/voice/VoiceDialoguePlayer";
+import { usePrefersReducedMotion } from "../../../components/ui/usePrefersReducedMotion";
 import { CINE } from "../theme";
 import { useChapterState } from "../useChapterState";
 import { deriveCallDialogueView, isSubtitleVisible } from "./callDialogueView";
@@ -30,6 +31,7 @@ import type { CallControlsView } from "./PhoneCallScreen";
 import { PhoneScreenHost } from "./PhoneScreenHost";
 import type { PhoneScreenSink } from "./phoneScreenSink";
 import { PlayerChoiceOverlay } from "./PlayerChoiceOverlay";
+import { useTypewriter } from "./useTypewriter";
 import { useViewport } from "./useViewport";
 
 export type PresentationMode = "pending" | "model" | "fallback";
@@ -219,6 +221,31 @@ export const CallPresentation: React.FC<CallPresentationProps> = ({
     audible: voice?.snapshot.audible,
   });
 
+  // The caller line types out. Replies appear as soon as it is fully revealed; F or a click while it
+  // types shows the rest at once.
+  const reducedMotion = usePrefersReducedMotion();
+  const typedLine =
+    call.status === "active" && subtitleVisible && subtitle.kind === "line" ? subtitle : null;
+  const typing = useTypewriter(
+    typedLine === null ? "" : `${typedLine.nodeKey}:${typedLine.text}`,
+    typedLine === null ? null : typedLine.text,
+    reducedMotion,
+  );
+  const typingActive = typedLine !== null && !typing.complete;
+  const skipTyping = typing.skip;
+  useEffect(() => {
+    if (!typingActive || paused) return undefined;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.code === "KeyF") {
+        event.preventDefault();
+        skipTyping();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [typingActive, paused, skipTyping]);
+
   if (screenView === null) return null;
 
   return (
@@ -229,6 +256,10 @@ export const CallPresentation: React.FC<CallPresentationProps> = ({
       className="fixed inset-0 z-40"
       data-testid="call-presentation"
       data-mode={mode}
+      onClick={(event) => {
+        // A click anywhere (not on a button) shows the rest of the line being typed.
+        if (typingActive && !paused && !(event.target as Element).closest("button")) skipTyping();
+      }}
     >
       {mode !== "model" && <div className="absolute inset-0 bg-[#171521]/70" aria-hidden="true" />}
       {/* Soft vignette over the room behind the 3D phone. CSS only: no per-frame cost. */}
@@ -266,6 +297,7 @@ export const CallPresentation: React.FC<CallPresentationProps> = ({
           visible={subtitleVisible}
           notice={voice !== undefined ? voiceNotice(voice.snapshot) : "none"}
           region={layout.subtitle}
+          revealedChars={typedLine === null ? undefined : typing.count}
         />
       ) : null}
       {call.status === "active" && linkedView !== null ? (
@@ -274,8 +306,7 @@ export const CallPresentation: React.FC<CallPresentationProps> = ({
           narration={narration}
           disabled={paused}
           onSelectOption={onSelectOption}
-          waiting={voice?.optionsWaiting ?? false}
-          onSkipWait={voice?.skipWait}
+          waiting={typingActive}
           region={layout.choice}
           onHoverSound={onHoverSound}
         />
