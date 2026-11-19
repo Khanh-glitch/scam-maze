@@ -6,6 +6,7 @@ import laptop from "./laptop";
 import room from "./room";
 import journalCombine from "./journalCombine";
 import debriefForensic from "./debriefForensic";
+import device from "./device";
 
 /** The `chapter1` namespace, composed from area files with disjoint top-level key groups. */
 const chapter1 = {
@@ -17,6 +18,7 @@ const chapter1 = {
   ...room,
   ...journalCombine,
   ...debriefForensic,
+  ...device,
 };
 
 export default chapter1;

@@ -15,6 +15,7 @@ const laptop: LocaleShape<typeof en> = {
       bank: "Northgate Mobile",
       compare: "So sánh",
       security: "Xem xét bảo mật",
+      thesis: "Khóa luận",
     },
     notification: {
       centerHeading: "Trung tâm thông báo",

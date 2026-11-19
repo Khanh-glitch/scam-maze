@@ -14,6 +14,7 @@ const laptop = {
       bank: "Northgate Mobile",
       compare: "Compare",
       security: "Review Security",
+      thesis: "Thesis",
     },
     notification: {
       centerHeading: "Notification center",

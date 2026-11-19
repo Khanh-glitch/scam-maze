@@ -193,3 +193,37 @@ describe("useCheckpointSaver", () => {
     expect(writeCount(memory)).toBe(before + 1);
   });
 });
+
+describe("free-roam saves", () => {
+  const TICK: CoreAction = { type: "ADVANCE_TIME", minutes: 5 };
+
+  it("saves about every 15 simulated minutes of free roam, not on every tick", () => {
+    const { store, memory } = setup();
+    // The first tick leaves the 15-minute window of the start time, so it saves once.
+    dispatchAll(store, [START, TICK]);
+    const base = writeCount(memory);
+    expect(base).toBeGreaterThan(0);
+    dispatchAll(store, [TICK, TICK]);
+    expect(writeCount(memory)).toBe(base);
+    dispatchAll(store, [TICK, TICK, TICK]);
+    expect(writeCount(memory)).toBe(base + 1);
+    const restored = restoreProgress(memory.saved()!.progress);
+    expect(restored.ok && restored.state.resources.timeMinutes).toBe(72 * 60 - 20); // the state at the last automatic save
+  });
+
+  it("saves the latest state when the room is left, so Continue keeps the time that passed", () => {
+    const { store, memory, hook } = setup();
+    dispatchAll(store, [START, TICK]);
+    const before = writeCount(memory);
+    hook.unmount();
+    expect(writeCount(memory)).toBe(before + 1);
+    const restored = restoreProgress(memory.saved()!.progress);
+    expect(restored.ok && restored.state.resources.timeMinutes).toBe(72 * 60 - 5);
+  });
+
+  it("writes nothing on leaving before the chapter started", () => {
+    const { memory, hook } = setup();
+    hook.unmount();
+    expect(writeCount(memory)).toBe(0);
+  });
+});

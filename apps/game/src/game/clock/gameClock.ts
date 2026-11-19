@@ -4,6 +4,13 @@
 export const GAME_START_SECONDS = 23 * 3600 + 8 * 60;
 
 let elapsedSeconds = 0;
+/** Seconds of the day set by a story host (the simulated clock of the chapter). `null`: the room's own clock. */
+let storySeconds: number | null = null;
+
+/** Lets the chapter show its simulated time everywhere the room clock is read. `null` restores the room clock. */
+export function setGameClockOverride(secondsOfDay: number | null): void {
+  storySeconds = secondsOfDay !== null && Number.isFinite(secondsOfDay) ? secondsOfDay : null;
+}
 
 /** Called by the room engine every frame with the seconds since the room started. */
 export function setGameElapsedSeconds(seconds: number): void {
@@ -20,5 +27,5 @@ export function formatClock(totalSeconds: number): string {
 
 /** The current in-game time as HH:MM. */
 export function gameClockText(): string {
-  return formatClock(GAME_START_SECONDS + elapsedSeconds);
+  return formatClock(storySeconds ?? GAME_START_SECONDS + elapsedSeconds);
 }

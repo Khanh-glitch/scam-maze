@@ -5,15 +5,15 @@
 import type { GameLocale } from "@scammaze/shared-types";
 import type { InteractableId } from "../game/narrative/chapter1/ids";
 import { CHAPTER_1_INTERACTION_PROMPTS } from "../game/narrative/chapter1/interactables";
-import { CHAPTER_1_SCENARIO } from "../game/narrative/chapter1/scenario";
+import { ACTIVE_SCENARIO } from "../game/narrative/activeScenario";
 import { localizeInteractionPrompts, localizeScenario, type NarrativeOverlay } from "../game/narrative/localize";
 import type { ScenarioDefinition } from "../game/narrative/types";
-import { CHAPTER_1_NARRATIVE_VI } from "./narrative/chapter1.vi";
+import { LAST_SUBMISSION_NARRATIVE_VI } from "./narrative/lastSubmission.vi";
 import { useGameLocale } from "./useGameLocale";
 
 export const NARRATIVE_OVERLAYS: Record<GameLocale, NarrativeOverlay> = {
   en: {},
-  vi: CHAPTER_1_NARRATIVE_VI,
+  vi: LAST_SUBMISSION_NARRATIVE_VI,
 };
 
 const scenarioCache = new Map<GameLocale, ScenarioDefinition>();
@@ -21,10 +21,10 @@ const promptsCache = new Map<GameLocale, Record<InteractableId, string>>();
 
 /** Chapter 1 scenario with display text in `locale`. Same object for repeated calls. */
 export function getDisplayScenario(locale: GameLocale): ScenarioDefinition {
-  if (locale === "en") return CHAPTER_1_SCENARIO;
+  if (locale === "en") return ACTIVE_SCENARIO;
   let scenario = scenarioCache.get(locale);
   if (scenario === undefined) {
-    scenario = localizeScenario(CHAPTER_1_SCENARIO, NARRATIVE_OVERLAYS[locale]);
+    scenario = localizeScenario(ACTIVE_SCENARIO, NARRATIVE_OVERLAYS[locale]);
     scenarioCache.set(locale, scenario);
   }
   return scenario;

@@ -24,6 +24,7 @@ import { createWebAudioEngine } from "../../../game/voice/webAudioEngine";
 import { selectCurrentAct, selectDialogueView } from "../../../game/narrative/selectors";
 import type { ChapterStore } from "../../../game/narrative/store";
 import type {
+  ActDef,
   ChapterState,
   DialogueGraph,
   DialogueNode,
@@ -273,7 +274,8 @@ export function useVoicePlayback(options: UseVoicePlaybackOptions): VoiceControl
 
   // --- Prefetch -------------------------------------------------------------------------------
   const act = useChapterState(store, useCallback((state: ChapterState) => selectCurrentAct(state, scenario), [scenario]));
-  const actId = act.id;
+  // A scenario without acts (the chapter foundation) has no current act.
+  const actId = (act as ActDef | undefined)?.id;
   useEffect(() => {
     if (player === null) return;
     // Acts 1 and 2 lead to the first call: warm its opening lines.

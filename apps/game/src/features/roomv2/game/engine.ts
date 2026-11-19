@@ -16,7 +16,7 @@ import { CharacterArmsViewmodel } from '../../player/runtime/CharacterArmsViewmo
 import { dropMaskCanvas, paintDropMask, canvas, toTex } from './textures';
 import { projectCornersToViewport, projectPointToViewport, cornersChanged, anchorMoved, ANCHOR_TOLERANCE_PX, type ScreenCornersPx, type ScreenDeviceId } from './screenProjection';
 import { pickHoverId, laptopInteractRoute, inspectDurationSec } from './storyInteract';
-import { setGameElapsedSeconds } from '../../../game/clock/gameClock';
+import { formatClock, setGameElapsedSeconds } from '../../../game/clock/gameClock';
 import { DOOR_OPEN_AT_S, entranceFrame, HANDOFF } from './entranceShot';
 import { isRoomPropId, type RoomOptions, type RoomStoryCommands } from './outside';
 
@@ -821,6 +821,12 @@ export class Engine implements RoomStoryCommands {
     if (on) this.audio.ring(true); else this.stopVibe();
   }
 
+  /** Time of day from a story host (seconds), or null for the room's own clock. */
+  storyClockSeconds: number | null = null;
+  setStoryClock(secondsOfDay: number | null) {
+    this.storyClockSeconds = secondsOfDay;
+    this.lastAwakeKey = -1; // redraw the screens with the new time
+  }
   setLaptopFrame(frame: LaptopFrame | null) {
     this.laptopFrame = frame;
     // A new card wakes the screen (the existing fade-in and the small screen light) so the laptop
@@ -1222,7 +1228,7 @@ export class Engine implements RoomStoryCommands {
     const a = this.apt;
     const el = this.ui.started ? this.t - this.startT : 0;
     setGameElapsedSeconds(el);
-    const time = clock({ h: 23, m: 8 }, el);
+    const time = this.storyClockSeconds === null ? clock({ h: 23, m: 8 }, el) : formatClock(this.storyClockSeconds);
     // laptop
     if (this.laptopWoken) this.laptopAwake = Math.min(1, this.laptopAwake + dt * 1.8);
     a.laptopScreenMat.color.setScalar(1.0 * this.laptopAwake);
@@ -1309,7 +1315,7 @@ export class Engine implements RoomStoryCommands {
       if (this.fridgeOpenT > 48) { this.fridgeBeepT -= dt; if (this.fridgeBeepT <= 0) { this.fridgeBeepT = 3.6; this.audio.beep(); } }
     }
     // wall clock follows game time
-    const secs = 23 * 3600 + 8 * 60 + el;
+    const secs = this.storyClockSeconds ?? 23 * 3600 + 8 * 60 + el;
     const hh = (secs / 3600) % 12, mmn = (secs / 60) % 60, ss = secs % 60;
     a.clockHands.h.rotation.z = -(hh / 12) * Math.PI * 2;
     a.clockHands.m.rotation.z = -(mmn / 60) * Math.PI * 2;
