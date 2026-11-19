@@ -44,8 +44,8 @@ export const CHAPTERS: readonly ChapterDefinition[] = [
   {
     id: "chapter-1",
     number: 1,
-    title: "The Urgent Call",
-    subtitle: "The notification arrives before breakfast.",
+    title: "LAST SUBMISSION: 72 GIỜ CUỐI",
+    subtitle: "Submit the thesis by Friday, 17:00.",
     startSceneId: "street",
     sceneIds: ["apartment", "street"],
     assets: [

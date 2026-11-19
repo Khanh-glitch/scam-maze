@@ -1,0 +1,83 @@
+/** English source text for the `chapter1` namespace, `device` area: the phone and laptop apps. */
+const device = {
+  device: {
+    apps: {
+      mail: "Mail",
+      messages: "Messages",
+      contacts: "Contacts",
+      bank: "Bank",
+      map: "Map",
+      calendar: "Calendar",
+      housing: "Housing",
+      jobs: "Jobs",
+      files: "Files",
+    },
+    unread_one: "{{number}} unread",
+    unread_other: "{{number}} unread",
+    back: "Back",
+    empty: "Nothing here yet.",
+    unreadMark: "Unread",
+    folders: {
+      all: "All",
+      university: "University",
+      recruitment: "Recruitment",
+      other: "Other",
+    },
+    from: "From: {{name}}",
+    cost: {
+      time: "{{time}}",
+      cash: "{{amount}} VND",
+      both: "{{time}} and {{amount}} VND",
+    },
+    actionWithCost: "{{label}} ({{cost}})",
+    blocked: {
+      done: "Already done",
+      locked: "Not available now",
+      cash: "Not enough cash",
+      time: "No time left",
+      call: "Finish the current call first",
+    },
+    when: "{{day}} {{clock}}",
+    range: "{{start}} to {{end}}",
+    amount: "{{amount}} VND",
+    bank: {
+      balance: "Balance",
+      balanceValue: "{{amount}} VND",
+      security: "Account security level: {{value}}%",
+      ledger: "Transactions",
+      noTransactions: "No transactions yet.",
+      payees: "Payees and services",
+    },
+    map: {
+      here: "You are at: {{place}}",
+      nowhere: "You have not gone anywhere yet.",
+      places: "Places and routes",
+    },
+    calendar: {
+      deadline: "Final deadline: Friday, 17:00",
+      timeLeft: "Time left: {{time}}",
+      thesis: "Thesis progress: {{value}}%",
+      submission: "Submission status: {{status}}",
+      status: {
+        "not-submitted": "Not submitted",
+        submitted: "Submitted",
+      },
+      upcoming: "Upcoming",
+      happeningNow: "Happening now",
+      past: "Past",
+    },
+    files: {
+      backup: "Thesis backup",
+      backupYes: "A backup of the thesis data is available.",
+      backupNo: "No backup of the thesis data is available.",
+      evidence: "Evidence",
+      evidenceValue: "Evidence value: {{value}}",
+      noEvidence: "No evidence saved yet.",
+      files: "Files",
+    },
+    calls: {
+      contacts: "Contacts",
+    },
+  },
+};
+export default device;

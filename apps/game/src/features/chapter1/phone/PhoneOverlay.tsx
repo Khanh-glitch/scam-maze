@@ -13,12 +13,23 @@ import type { PhoneMessageView, PhoneRecordsView } from "../../../game/narrative
 import { ScreenSurface } from "../room/ScreenSurface";
 import { useScreenQuad } from "../room/useScreenQuad";
 import { UI } from "../theme";
+import type { DeviceView } from "../../../game/narrative/device";
+import { DeviceApp } from "../device/DeviceApp";
+import { deviceAppEntries } from "../device/deviceApps";
+import type { Tx } from "../device/deviceFormat";
 import { CallHistoryApp } from "./CallHistoryApp";
 import { MessagesApp } from "./MessagesApp";
 import { PhoneHome, type PhoneAppId } from "./PhoneHome";
 import { VoicemailApp } from "./VoicemailApp";
 
-export type PhoneRoute = "home" | PhoneAppId;
+/** `device:<app>` routes open one of the shared device apps (mail, bank, map, calendar, housing, jobs, files). */
+export type PhoneRoute = "home" | PhoneAppId | `device:${string}`;
+/** The shared device content on the phone, and what the player does with it. */
+export interface PhoneDeviceProps {
+  view: DeviceView;
+  onOpenItem: (itemId: string) => void;
+  onUseItem: (itemId: string, actionId: string) => void;
+}
 
 export interface PhoneOverlayProps {
   /** From `selectPhoneRecords(state, scenario)`. */
@@ -33,6 +44,8 @@ export interface PhoneOverlayProps {
   onCallSavedContact: (claimId: ClaimId) => void;
   /** Dispatch CLOSE_PHONE (and pop the overlay). */
   onClose: () => void;
+  /** Mail, bank, map, calendar, housing, jobs, files, chats and contacts. Absent: only the three original apps. */
+  device?: PhoneDeviceProps;
   /** App shown when the phone opens. Defaults to the home screen. */
   initialRoute?: PhoneRoute;
   /**
@@ -49,6 +62,7 @@ export const PhoneOverlay: React.FC<PhoneOverlayProps> = ({
   onDeviceAction,
   onCallSavedContact,
   onClose,
+  device,
   initialRoute = "home",
   onDecide,
 }) => {
@@ -68,15 +82,34 @@ export const PhoneOverlay: React.FC<PhoneOverlayProps> = ({
     [records.voicemail, ...records.summaries].flatMap((message) => (message === null ? [] : [message.id])),
   );
   const otherMessages = messages.filter((message) => !recordIds.has(message.id));
-  const unreadCount = otherMessages.filter((message) => message.unread).length;
+  const unreadCount = otherMessages.filter((message) => message.unread).length + (device?.view.unread.messages ?? 0);
   const goHome = () => setRoute("home");
-  const title = route === "voicemail" ? t("room.records.tabs.voicemail") : t(`phone.routes.${route}`);
+  const tx = t as unknown as Tx;
+  const deviceApp = route.startsWith("device:") ? route.slice("device:".length) : null;
+  const title: string =
+    deviceApp !== null
+      ? tx(`device.apps.${deviceApp}`)
+      : route === "voicemail"
+        ? tx("room.records.tabs.voicemail")
+        : tx(`phone.routes.${route}`);
 
   let content: ReactNode;
   if (route === "messages") {
-    content = <MessagesApp messages={otherMessages} onInspectEvidence={onInspectEvidence} onBack={goHome} />;
+    content = (
+      <div className="space-y-4">
+        <MessagesApp messages={otherMessages} onInspectEvidence={onInspectEvidence} onBack={goHome} />
+        {device && device.view.apps.messages.length > 0 && (
+          <DeviceApp app="messages" view={device.view} onOpenItem={device.onOpenItem} onUseItem={device.onUseItem} />
+        )}
+      </div>
+    );
+  } else if (deviceApp !== null && device) {
+    content = (
+      <DeviceApp app={deviceApp as never} view={device.view} onOpenItem={device.onOpenItem} onUseItem={device.onUseItem} onExit={goHome} />
+    );
   } else if (route === "calls") {
     content = (
+      <div className="space-y-4">
       <CallHistoryApp
         calls={records.calls}
         deviceActions={records.deviceActions}
@@ -85,6 +118,15 @@ export const PhoneOverlay: React.FC<PhoneOverlayProps> = ({
         onCallSavedContact={onCallSavedContact}
         onBack={goHome}
       />
+      {device && device.view.apps.contacts.length > 0 && (
+        <section aria-labelledby="phone-contacts-heading" className="space-y-2">
+          <h3 id="phone-contacts-heading" className={UI.label}>
+            {t("device.calls.contacts")}
+          </h3>
+          <DeviceApp app="contacts" embedded view={device.view} onOpenItem={device.onOpenItem} onUseItem={device.onUseItem} />
+        </section>
+      )}
+      </div>
     );
   } else if (route === "voicemail") {
     content = (
@@ -97,7 +139,15 @@ export const PhoneOverlay: React.FC<PhoneOverlayProps> = ({
       />
     );
   } else {
-    const home = <PhoneHome unreadCount={unreadCount} onOpenApp={setRoute} />;
+    const home = (
+      <PhoneHome
+        unreadCount={unreadCount}
+        onOpenApp={setRoute}
+        showVoicemail={!device || records.voicemail !== null || records.summaries.length > 0}
+        extraApps={device ? deviceAppEntries(device.view, "phone", tx).map((entry) => ({ id: entry.app, label: entry.label, icon: entry.icon, badge: entry.badge })) : []}
+        onOpenExtra={(id) => setRoute(`device:${id}`)}
+      />
+    );
     content = onDecide ? (
       <div className="space-y-4">
         {home}

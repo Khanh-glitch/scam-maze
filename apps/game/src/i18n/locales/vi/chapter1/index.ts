@@ -8,6 +8,7 @@ import laptop from "./laptop";
 import room from "./room";
 import journalCombine from "./journalCombine";
 import debriefForensic from "./debriefForensic";
+import device from "./device";
 
 const chapter1: LocaleShape<typeof en> = {
   ...hud,
@@ -18,6 +19,7 @@ const chapter1: LocaleShape<typeof en> = {
   ...room,
   ...journalCombine,
   ...debriefForensic,
+  ...device,
 };
 
 export default chapter1;

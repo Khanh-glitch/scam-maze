@@ -3,6 +3,7 @@ import { createChapterLoader, type ChapterLoadSnapshot } from "./chapterLoader";
 import { createFakeFetch, createTestDeps, makeGlb, makePng, TEST_CHAPTER } from "../../test/fakeAssets";
 import type { CoreAction } from "../narrative/types";
 import { restoreProgress } from "../saves/chapterProgress";
+import { ACTIVE_SCENARIO } from "../narrative/activeScenario";
 import { SAVE_CONTENT_VERSION, type SavedGameV3 } from "../saves/saveGame";
 
 const NEW_GAME = { kind: "new-game", chapterId: TEST_CHAPTER.id } as const;
@@ -407,7 +408,7 @@ describe("createChapterLoader", () => {
         loader.start();
         await waitForStage(loader, "ready");
 
-        const expected = restoreProgress(progress);
+        const expected = restoreProgress(progress, ACTIVE_SCENARIO);
         if (!expected.ok) throw new Error("Test setup progress must replay.");
         const session = loader.getSnapshot().session;
         expect(session).toMatchObject({ origin: "saved-game", progress });
@@ -429,7 +430,7 @@ describe("createChapterLoader", () => {
         loader.start();
         await waitForStage(loader, "ready");
 
-        const prefix = restoreProgress({ ...progress, actions });
+        const prefix = restoreProgress({ ...progress, actions }, ACTIVE_SCENARIO);
         if (!prefix.ok) throw new Error("Test setup prefix must replay.");
         const snapshot = loader.getSnapshot();
         expect(snapshot.error).toBeNull();

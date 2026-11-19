@@ -217,6 +217,62 @@ function walkScenario(scenario: ScenarioDefinition, text: TextVisitor): Scenario
       label: text(`deviceActions/${id}/label`, action.label),
     })),
     acts: scenario.acts.map((act) => ({ ...act, title: text(`acts/${act.id}/title`, act.title) })),
+    ...(scenario.events === undefined
+      ? {}
+      : {
+          events: scenario.events.map((event) => ({
+            ...event,
+            title: text(`events/${event.id}/title`, event.title),
+            body: text(`events/${event.id}/body`, event.body),
+            responses: event.responses.map((response) => ({
+              ...response,
+              label: text(`events/${event.id}/responses/${response.id}/label`, response.label),
+            })),
+          })),
+        }),
+    ...(scenario.thesisTasks === undefined
+      ? {}
+      : {
+          thesisTasks: scenario.thesisTasks.map((task) => ({
+            ...task,
+            label: text(`thesis/${task.id}/label`, task.label),
+            ...(task.description !== undefined ? { description: text(`thesis/${task.id}/description`, task.description) } : {}),
+          })),
+        }),
+    ...(scenario.deviceItems === undefined
+      ? {}
+      : {
+          deviceItems: scenario.deviceItems.map((item) => ({
+            ...item,
+            title: text(`device/${item.id}/title`, item.title),
+            ...(item.from !== undefined ? { from: text(`device/${item.id}/from`, item.from) } : {}),
+            ...(item.detail !== undefined ? { detail: text(`device/${item.id}/detail`, item.detail) } : {}),
+            body: text(`device/${item.id}/body`, item.body),
+            ...(item.actions !== undefined
+              ? {
+                  actions: item.actions.map((action) => ({
+                    ...action,
+                    label: text(`device/${item.id}/actions/${action.id}/label`, action.label),
+                  })),
+                }
+              : {}),
+          })),
+        }),
+    ...(scenario.ledgerLabels === undefined
+      ? {}
+      : { ledgerLabels: mapRecord(scenario.ledgerLabels, (label, key) => text(`ledger/${key}`, label)) }),
+    ...(scenario.missions === undefined
+      ? {}
+      : {
+          missions: scenario.missions.map((mission) => ({
+            ...mission,
+            title: text(`missions/${mission.id}/title`, mission.title),
+            paths: mission.paths.map((path) => ({
+              ...path,
+              objective: text(`missions/${mission.id}/paths/${path.id}/objective`, path.objective),
+            })),
+          })),
+        }),
   };
 }
 

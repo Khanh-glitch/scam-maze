@@ -19,6 +19,7 @@ import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import type { GameSettings } from "@scammaze/shared-types";
 import { AFTERMATH_SEQUENCES } from "../../../game/narrative/chapter1/dialogues/aftermath";
 import { buildDebrief } from "../../../game/narrative/debrief";
+import { ACTIVE_SCENARIO } from "../../../game/narrative/activeScenario";
 import { createInitialState } from "../../../game/narrative/reducer";
 import { selectDecisionPanel } from "../../../game/narrative/selectors";
 import type { ChapterStore } from "../../../game/narrative/store";
@@ -168,7 +169,7 @@ export const RoomEndingLayer: React.FC<RoomEndingLayerProps> = ({
     removeOverlay("decision");
     autoOpenedRef.current = false;
     reopenRef.current = false;
-    store.replace(createInitialState());
+    store.replace(createInitialState(ACTIVE_SCENARIO));
     store.dispatch({ type: "START_CHAPTER" });
   }, [removeOverlay, saveSource, store]);
 

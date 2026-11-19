@@ -4,6 +4,7 @@
 
 import type { ContinueAvailability } from "../features/menu/MainMenuOverlay";
 import { getChapter } from "../game/chapters/chapterRegistry";
+import { ACTIVE_SCENARIO } from "../game/narrative/activeScenario";
 import { restoreProgress } from "../game/saves/chapterProgress";
 import type { SaveGameSource } from "../game/saves/saveGame";
 
@@ -25,7 +26,7 @@ export function readContinueAvailability(source: SaveGameSource): ContinueAvaila
   if (result.status === "invalid" || !getChapter(result.save.chapterId)) {
     return { available: false, reasonCode: "invalid", reason: CONTINUE_REASONS.invalid };
   }
-  if (!restoreProgress(result.save.progress).ok) {
+  if (!restoreProgress(result.save.progress, ACTIVE_SCENARIO).ok) {
     return { available: false, reasonCode: "invalid", reason: CONTINUE_REASONS.invalid };
   }
   return { available: true };

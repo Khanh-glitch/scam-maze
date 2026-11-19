@@ -5,7 +5,7 @@
 // Escape and the close button call `onClose`; focus moves in on open and returns to the opener
 // on unmount. No inputs, no forms, no links: addresses are plain text.
 import React, { useEffect, useId, useRef, useState } from "react";
-import { AppWindow, Bell, BellRing, Columns2, Landmark, Laptop, ShieldCheck, X } from "lucide-react";
+import { AppWindow, Bell, BellRing, CalendarDays, Columns2, FolderOpen, GraduationCap, Home, Landmark, Laptop, Mail, ShieldCheck, Briefcase, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { LaptopView } from "../../../../game/narrative/selectors";
 import type { CoreAction } from "../../../../game/narrative/types";
@@ -30,6 +30,10 @@ export interface LaptopOverlayProps {
   onClose: () => void;
   /** Apps added by task 9.3. */
   extraTabs?: readonly LaptopExtraTab[];
+  /** The built-in notification app of the parked story. Default true; the chapter foundation turns it off. */
+  showNotifications?: boolean;
+  /** The time shown in the window bar. Default: the fixed text of the parked story. */
+  clockText?: string;
 }
 
 const NOTIFICATIONS_TAB = "notifications";
@@ -43,6 +47,13 @@ const TAB_ICONS: Readonly<Record<string, TabIcon>> = {
   bank: Landmark,
   compare: Columns2,
   [SECURITY_TAB]: ShieldCheck,
+  thesis: GraduationCap,
+  "device-mail": Mail,
+  "device-bank": Landmark,
+  "device-calendar": CalendarDays,
+  "device-housing": Home,
+  "device-jobs": Briefcase,
+  "device-files": FolderOpen,
 };
 
 /** Index of the tab to select after an arrow, Home or End key, or null for other keys. */
@@ -55,14 +66,14 @@ export function nextTabIndex(key: string, index: number, count: number): number 
   return null;
 }
 
-export const LaptopOverlay: React.FC<LaptopOverlayProps> = ({ view, dispatch, onClose, extraTabs = [] }) => {
+export const LaptopOverlay: React.FC<LaptopOverlayProps> = ({ view, dispatch, onClose, extraTabs = [], showNotifications = true, clockText }) => {
   const { t } = useTranslation("chapter1");
   const baseId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
-  const [active, setActive] = useState<string>(NOTIFICATIONS_TAB);
+  const [active, setActive] = useState<string>(showNotifications ? NOTIFICATIONS_TAB : (extraTabs[0]?.id ?? NOTIFICATIONS_TAB));
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   // On the projected laptop display when the 3D screen is visible; otherwise the flat panel.
   const layout = useScreenQuad("laptop");
@@ -87,7 +98,7 @@ export const LaptopOverlay: React.FC<LaptopOverlayProps> = ({ view, dispatch, on
   }, []);
 
   const tabs: LaptopExtraTab[] = [
-    {
+    ...(showNotifications ? [{
       id: NOTIFICATIONS_TAB,
       label: t("laptop.apps.notifications"),
       content: (
@@ -97,12 +108,12 @@ export const LaptopOverlay: React.FC<LaptopOverlayProps> = ({ view, dispatch, on
           onOpenSecurity={extraTabs.some((tab) => tab.id === SECURITY_TAB) ? () => setActive(SECURITY_TAB) : undefined}
         />
       ),
-    },
+    }] : []),
     ...extraTabs,
   ];
   const current = tabs.find((tab) => tab.id === active) ?? tabs[0];
   const currentIndex = tabs.indexOf(current);
-  const unread = view.notification.state === "new";
+  const unread = showNotifications && view.notification.state === "new";
 
   const onTabKeyDown = (event: React.KeyboardEvent) => {
     const next = nextTabIndex(event.key, currentIndex, tabs.length);
@@ -152,7 +163,7 @@ export const LaptopOverlay: React.FC<LaptopOverlayProps> = ({ view, dispatch, on
             {t("laptop.title")}
           </h2>
           <span className="ml-auto text-sm tabular-nums" style={{ color: CINE.color.textMuted }}>
-            {t("laptop.clock")}
+            {clockText ?? t("laptop.clock")}
           </span>
           <button
             type="button"

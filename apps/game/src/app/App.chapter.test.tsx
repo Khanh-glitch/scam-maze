@@ -237,16 +237,13 @@ describe("App chapter routing", () => {
     expect(continueButton().disabled).toBe(false);
   });
 
-  it("starts a new game with the neighborhood prologue, then can return to the menu", async () => {
+  it("starts a new game in the room, without the parked neighborhood prologue", async () => {
     window.history.replaceState(null, "", "/");
     render(<App />);
     startNewGameAndEnterChapter();
-
-    expect(await screen.findByTestId("prologue-page")).toBeTruthy();
-    act(() => {
-      fireEvent.click(screen.getByRole("button", { name: "Stub prologue back" }));
-    });
-    expect(screen.getByRole("navigation", { name: "Game Main Menu" })).toBeTruthy();
+    expect(await screen.findByTestId("chapter-layer-stub")).toBeTruthy();
+    expect(screen.queryByTestId("prologue-page")).toBeNull();
+    expect(harness.layerProps?.session).toMatchObject({ chapterId: "chapter-1", origin: "new-game" });
   });
 
   it("returns to the menu when the loading flow is left", () => {

@@ -128,6 +128,7 @@ export const RoomChapterPage: React.FC<RoomChapterPageProps> = ({
               bridge={bridge}
               saveSource={saveSource}
               engineReady={engineReady}
+              clockPaused={paused || settingsOpen}
               onReturnToMenu={onReturnToMenu}
               onHoverSound={onHoverSound}
             />

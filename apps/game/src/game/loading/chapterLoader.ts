@@ -5,6 +5,7 @@ import {
   restoreChapterSession,
   type ChapterSession,
 } from "../chapters/chapterSession";
+import { ACTIVE_SCENARIO } from "../narrative/activeScenario";
 import { createLocalStorageSaveSource, type SaveGameSource, type SavedGame } from "../saves/saveGame";
 import { fetchAssetBytes, isAbortError, type FetchLike } from "./assetFetcher";
 import { verifyAsset } from "./assetVerification";
@@ -248,7 +249,7 @@ export function createChapterLoader(request: ChapterLoadRequest, deps: ChapterLo
         session = (restored as { ok: true; session: ChapterSession }).session;
         // Lenient replay: a rejected action trims the save instead of failing it (Req. 13.5).
         // Only damaged data is an invalid save.
-        const applied = applyRestoredProgress(session);
+        const applied = applyRestoredProgress(session, ACTIVE_SCENARIO);
         if (!applied.ok) fail(createLoadingError("invalid-save", applied.reason));
         session = (applied as { ok: true; session: ChapterSession }).session;
       } else {

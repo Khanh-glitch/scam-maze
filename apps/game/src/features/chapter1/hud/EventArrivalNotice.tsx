@@ -1,0 +1,31 @@
+// Small notice that an event arrived. It never takes focus or blocks play; the live region of the
+// layer announces the same text once.
+import React, { useEffect } from "react";
+import { BellRing } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { CINE, cinePanelStyle } from "../theme";
+
+export interface EventArrivalNoticeProps {
+  title: string;
+  onDismiss: () => void;
+  /** Milliseconds before it dismisses itself. */
+  durationMs?: number;
+}
+
+export const EventArrivalNotice: React.FC<EventArrivalNoticeProps> = ({ title, onDismiss, durationMs = 6000 }) => {
+  const { t } = useTranslation("chapter1");
+  useEffect(() => {
+    const id = window.setTimeout(onDismiss, durationMs);
+    return () => window.clearTimeout(id);
+  }, [onDismiss, durationMs, title]);
+  return (
+    <p
+      className="flex items-center gap-2 px-3 py-2"
+      style={{ ...cinePanelStyle(), fontSize: CINE.fontPx.body, maxWidth: CINE.widthPx.toast }}
+      data-testid="event-arrival-notice"
+    >
+      <BellRing className="h-4 w-4 shrink-0" aria-hidden="true" />
+      <span>{t("planner.arrival", { title })}</span>
+    </p>
+  );
+};

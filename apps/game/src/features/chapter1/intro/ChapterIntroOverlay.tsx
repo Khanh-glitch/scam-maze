@@ -42,6 +42,7 @@ const CONTROLS = [
   { id: "interact", keys: ["E"] },
   { id: "phone", keys: ["P"] },
   { id: "journal", keys: ["J"] },
+  { id: "schedule", keys: ["K"] },
   { id: "pause", keys: ["Esc"] },
 ] as const;
 

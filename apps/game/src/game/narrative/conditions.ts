@@ -8,6 +8,7 @@
 
 import type { CallId } from "./chapter1/ids";
 import { discover } from "./evidence";
+import { CHAPTER_1_INITIAL_STATE, clampResource, isPersistentFlagId, isResourceId } from "./resources";
 import type { ChapterState, Condition, Effect, PressureLevel, ScenarioDefinition } from "./types";
 
 /** Highest pressure level (Requirement 10.6). */
@@ -26,7 +27,7 @@ function hasCallEnded(state: ChapterState, callId: CallId): boolean {
 export function evaluateCondition(
   condition: Condition,
   state: ChapterState,
-  _scenario?: ScenarioDefinition,
+  scenario?: ScenarioDefinition,
 ): boolean {
   switch (condition.kind) {
     case "hasEvidence":
@@ -61,6 +62,40 @@ export function evaluateCondition(
       const found = condition.evidenceIds.filter((id) => state.discovered.includes(id)).length;
       return found >= condition.count;
     }
+    case "resourceAtLeast":
+      return isResourceId(condition.resource) && state.resources[condition.resource] >= condition.value;
+    case "resourceAtMost":
+      return isResourceId(condition.resource) && state.resources[condition.resource] <= condition.value;
+    case "persistent":
+      return isPersistentFlagId(condition.flag) && state.persistent[condition.flag] === condition.value;
+    case "elapsedAtLeast": {
+      const start = (scenario?.initial ?? CHAPTER_1_INITIAL_STATE).resources.timeMinutes;
+      return start - state.resources.timeMinutes >= condition.minutes;
+    }
+    case "eventStatus": {
+      const current = Object.hasOwn(state.world.events, condition.eventId) ? state.world.events[condition.eventId] : null;
+      return condition.status === "not-arrived" ? current === null : current?.status === condition.status;
+    }
+    case "eventResponse": {
+      if (!Object.hasOwn(state.world.events, condition.eventId)) return false;
+      return state.world.events[condition.eventId].response === condition.response;
+    }
+    case "missionStatus":
+      return Object.hasOwn(state.world.missions, condition.missionId) && state.world.missions[condition.missionId].status === condition.status;
+    case "itemArrived":
+      return Object.hasOwn(state.device.items, condition.itemId);
+    case "itemOpened":
+      return Object.hasOwn(state.device.items, condition.itemId) && state.device.items[condition.itemId].read;
+    case "itemActionDone":
+      return Object.hasOwn(state.device.items, condition.itemId) && state.device.items[condition.itemId].done.includes(condition.actionId);
+    case "thesisTaskDone":
+      return state.world.thesisTasksDone.includes(condition.taskId);
+    case "atLocation":
+      return state.device.location === condition.placeId;
+    case "submission":
+      return state.device.submission === condition.status;
+    case "missionPath":
+      return Object.hasOwn(state.world.missions, condition.missionId) && state.world.missions[condition.missionId].path === condition.path;
     default:
       return assertNever(condition);
   }
@@ -90,6 +125,11 @@ function clampPressure(value: number): PressureLevel {
  *   effect; `validateScenario` enforces that rule (Requirement 12.6).
  * - `recordDecision`: records the Decision only if none is recorded yet.
  * - `deliverMessage`: appends a known message to the phone inbox and marks it unread, once.
+ * - `adjustResource`: adds a whole-number `delta` to a resource, clamped to its limits.
+ * - `openMission` and `lockMission`: move a mission between locked and open. They never touch
+ *   resources, persistent flags or finished missions, so a consequence is never reset.
+ * - `setPersistent`: sets a persistent flag. Persistent flags are never cleared by later missions
+ *   unless a scenario effect sets them back explicitly.
  */
 export function applyEffect(
   state: ChapterState,
@@ -136,11 +176,87 @@ export function applyEffect(
         },
       };
     }
+    case "adjustResource": {
+      if (!isResourceId(effect.resource) || !Number.isFinite(effect.delta)) return state;
+      const current = state.resources[effect.resource];
+      const next = clampResource(effect.resource, current + Math.trunc(effect.delta));
+      if (next === current) return state;
+      return { ...state, resources: { ...state.resources, [effect.resource]: next } };
+    }
+    case "setPersistent": {
+      if (!isPersistentFlagId(effect.flag)) return state;
+      if (state.persistent[effect.flag] === effect.value) return state;
+      return { ...state, persistent: { ...state.persistent, [effect.flag]: effect.value } };
+    }
+    case "deliverItem": {
+      if (Object.hasOwn(state.device.items, effect.itemId)) return state;
+      if (!scenario.deviceItems?.some((item) => item.id === effect.itemId)) return state;
+      const start = (scenario.initial ?? CHAPTER_1_INITIAL_STATE).resources.timeMinutes;
+      const now = Math.max(0, start - state.resources.timeMinutes);
+      return {
+        ...state,
+        device: { ...state.device, items: { ...state.device.items, [effect.itemId]: { arrivedAtMinute: now, read: false, readAtMinute: null, done: [] } } },
+      };
+    }
+    case "recordTransaction":
+      return recordTransaction(state, scenario, effect.label, effect.amount, effect.counterparty ?? null, null, null);
+    case "setLocation": {
+      if (state.device.location === effect.placeId) return state;
+      return { ...state, device: { ...state.device, location: effect.placeId } };
+    }
+    case "setSubmission": {
+      if (state.device.submission === effect.status) return state;
+      return { ...state, device: { ...state.device, submission: effect.status } };
+    }
+    case "openMission": {
+      if (!Object.hasOwn(state.world.missions, effect.missionId)) return state;
+      const mission = state.world.missions[effect.missionId];
+      if (mission.status !== "locked") return state;
+      const start = (scenario.initial ?? CHAPTER_1_INITIAL_STATE).resources.timeMinutes;
+      const now = Math.max(0, start - state.resources.timeMinutes);
+      return {
+        ...state,
+        world: { ...state.world, missions: { ...state.world.missions, [effect.missionId]: { ...mission, status: "open", openedAtMinute: now } } },
+      };
+    }
+    case "lockMission": {
+      if (!Object.hasOwn(state.world.missions, effect.missionId)) return state;
+      const mission = state.world.missions[effect.missionId];
+      if (mission.status !== "open") return state;
+      return {
+        ...state,
+        world: { ...state.world, missions: { ...state.world.missions, [effect.missionId]: { ...mission, status: "locked" } } },
+      };
+    }
     default:
       return assertNever(effect);
   }
 }
 
+/**
+ * Moves money (cash may go below zero) and adds a bank ledger line. A zero or non-finite amount
+ * changes nothing. `itemId` and `actionId` name the device action that made the payment, if any.
+ */
+export function recordTransaction(
+  state: ChapterState,
+  scenario: ScenarioDefinition,
+  label: string,
+  amount: number,
+  counterparty: string | null,
+  itemId: string | null,
+  actionId: string | null,
+): ChapterState {
+  if (!Number.isFinite(amount) || Math.trunc(amount) === 0) return state;
+  const whole = Math.trunc(amount);
+  const start = (scenario.initial ?? CHAPTER_1_INITIAL_STATE).resources.timeMinutes;
+  const now = Math.max(0, start - state.resources.timeMinutes);
+  const entry = { seq: state.device.ledger.length, atMinute: now, label, amount: whole, counterparty, itemId, actionId };
+  return {
+    ...state,
+    resources: { ...state.resources, cash: clampResource("cash", state.resources.cash + whole) },
+    device: { ...state.device, ledger: [...state.device.ledger, entry] },
+  };
+}
 /** Applies effects in order. Returns the input object when no effect changed anything. */
 export function applyEffects(
   state: ChapterState,

@@ -22,7 +22,7 @@ const story = {
     title: "Journal",
     evidenceHeading: "Evidence",
     claimsHeading: "Claims",
-    emptyState: "You have not found any evidence yet. Look around and check what the caller tells you.",
+    emptyState: "You have not found any evidence yet. Look around and check what you are told.",
     noClaimEvidence: "No evidence about this claim yet.",
     sourceLabel: "Source",
     locationLabel: "Found at",
@@ -42,7 +42,7 @@ const story = {
     claimStatus: {
       unverified: "Not checked yet",
       supported: "Evidence points toward this claim",
-      contradicted: "Contradicted by Northgate's official line",
+      contradicted: "Contradicted by the official line",
       inconclusive: "Checked, but not settled",
     },
     /** Text for each Evidence_Item source. */
