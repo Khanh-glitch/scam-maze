@@ -14,6 +14,14 @@ const harness = vi.hoisted(() => ({
   layerMounts: 0,
   streetMuted: [] as boolean[],
   enterHome: (() => undefined) as () => void,
+  /** ctivate calls of the room engine stub. */
+  activate: [] as unknown[],
+  /** The room stub's onUI (the engine's state callback) and onReady; holdReady delays the room being built. */
+  roomUI: (() => undefined) as (ui: Record<string, unknown>) => void,
+  holdReady: false,
+  releaseRoom: (() => undefined) as () => void,
+  /** Every setInputBlocked value the street stub received. */
+  blocked: [] as boolean[],
 }));
 
 vi.mock("../khupho/KhuphoStoryWorld", () => ({
@@ -25,7 +33,7 @@ vi.mock("../khupho/KhuphoStoryWorld", () => ({
         begin: () => undefined,
         suspend: () => undefined,
         resume: () => undefined,
-        setInputBlocked: () => undefined,
+        setInputBlocked: (b: boolean) => void harness.blocked.push(b),
         setPaused: () => undefined,
         placeAtHome: () => undefined,
         lock: () => undefined,
@@ -52,16 +60,20 @@ vi.mock("../chapter1/intro/ChapterIntroOverlay", () => ({
   ),
 }));
 vi.mock("../roomv2", () => ({
-  RoomV2Page: (props: { story?: unknown; overlay?: React.ReactNode; onReady?: (engine: unknown) => void }) => {
+  RoomV2Page: (props: { story?: unknown; overlay?: React.ReactNode; onReady?: (engine: unknown) => void; onUI?: (ui: Record<string, unknown>) => void }) => {
     harness.roomStory = props.story;
+    harness.roomUI = (ui) => props.onUI?.(ui);
     React.useEffect(() => {
-      props.onReady?.({
-        audio: { setMuted: () => undefined },
-        activate: () => undefined,
-        deactivate: () => undefined,
-        setCursorMode: () => undefined,
-        lock: () => undefined,
-      });
+      const ready = () =>
+        props.onReady?.({
+          audio: { setMuted: () => undefined },
+          activate: (options?: unknown) => void harness.activate.push(options),
+          deactivate: () => undefined,
+          setCursorMode: () => undefined,
+          lock: () => undefined,
+        });
+      if (harness.holdReady) harness.releaseRoom = ready;
+      else ready();
     }, []);
     return <div data-testid="room-v2-stub">{props.overlay}</div>;
   },
@@ -82,6 +94,8 @@ const SESSION: ChapterSession = { chapterId: "chapter-1", chapterNumber: 1, scen
 
 describe("ProloguePage chapter layer", () => {
   it("mounts the chapter layer in the room stage with the engine's bridge", async () => {
+    harness.activate = [];
+    harness.layerMounts = 0;
     render(
       <ProloguePage
         settings={DEFAULT_SETTINGS}
@@ -105,6 +119,10 @@ describe("ProloguePage chapter layer", () => {
     act(() => {
       harness.enterHome();
     });
+    // The room opens with its entrance shot: the chapter layer (and its intro) waits for the shot to end.
+    await waitFor(() => expect(harness.activate).toEqual([{ entrance: true }]), { timeout: 4000 });
+    expect(screen.queryByTestId("chapter-layer-stub")).toBeNull();
+    act(() => harness.roomUI({ started: true, ended: null, locked: true, cursorMode: false, inspecting: null }));
     await waitFor(() => expect(screen.getByTestId("chapter-layer-stub")).toBeTruthy(), { timeout: 4000 });
 
     expect(harness.layerMounts).toBe(1);
@@ -133,9 +151,105 @@ describe("ProloguePage chapter layer", () => {
     act(() => {
       harness.enterHome();
     });
-    await waitFor(() => expect(screen.getByTestId("chapter-layer-stub")).toBeTruthy(), { timeout: 4000 });
+    await waitFor(() => expect(harness.activate.length).toBeGreaterThan(0), { timeout: 4000 });
     // The room is built after the player went home; the sound effect that runs then must not unmute the street.
     expect(harness.streetMuted.at(-1)).toBe(true);
+  });
+  it("enters with no white screen: the cut is the room's entrance shot", async () => {
+    harness.activate = [];
+    render(<ProloguePage settings={DEFAULT_SETTINGS} onUpdateSettings={() => undefined} onBackToMenu={() => undefined} revealed session={SESSION} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Stub begin walk" }));
+    const white = () => screen.getByTestId("prologue-white-out").style.opacity;
+    expect(white()).toBe("0");
+    act(() => {
+      harness.enterHome();
+    });
+    // Nothing whites out, at once or later, and the room is activated with the entrance shot in the same call.
+    expect(white()).toBe("0");
+    await waitFor(() => expect(harness.activate).toEqual([{ entrance: true }]), { timeout: 4000 });
+    expect(white()).toBe("0");
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    expect(white()).toBe("0");
+  });
+  it("enters at once with no overlay when the room is already built", async () => {
+    harness.activate = [];
+    render(<ProloguePage settings={DEFAULT_SETTINGS} onUpdateSettings={() => undefined} onBackToMenu={() => undefined} revealed session={SESSION} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Stub begin walk" }));
+    // The room is built shortly after the walk begins.
+    await waitFor(() => expect(screen.getByTestId("room-v2-stub")).toBeTruthy(), { timeout: 4000 });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    act(() => {
+      harness.enterHome();
+    });
+    // Synchronous: no timer, no cover, no loading screen.
+    expect(harness.activate).toEqual([{ entrance: true }]);
+    expect(screen.queryByTestId("prologue-room-wait")).toBeNull();
+    expect(screen.queryByText(/walking home/i)).toBeNull();
+    expect(screen.queryByRole("progressbar")).toBeNull();
+  });
+  it("covers a room that is still being built with plain black, then enters the moment it is ready", async () => {
+    harness.activate = [];
+    harness.holdReady = true;
+    try {
+      render(<ProloguePage settings={DEFAULT_SETTINGS} onUpdateSettings={() => undefined} onBackToMenu={() => undefined} revealed session={SESSION} />);
+      fireEvent.click(await screen.findByRole("button", { name: "Stub begin walk" }));
+      act(() => {
+        harness.enterHome();
+      });
+      expect(screen.getByTestId("prologue-room-wait")).toBeTruthy();
+      expect(screen.queryByRole("progressbar")).toBeNull();
+      expect(screen.queryByText(/walking home/i)).toBeNull();
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
+      expect(harness.activate).toEqual([]);
+      expect(screen.getByTestId("prologue-white-out").style.opacity).toBe("0");
+      await waitFor(() => expect(harness.releaseRoom).not.toBeUndefined());
+      act(() => harness.releaseRoom());
+      // Same commit: the room is activated and the cover is gone.
+      expect(harness.activate).toEqual([{ entrance: true }]);
+      expect(screen.queryByTestId("prologue-room-wait")).toBeNull();
+      expect(screen.getByTestId("prologue-white-out").style.opacity).toBe("0");
+    } finally {
+      harness.holdReady = false;
+    }
+  });
+  it("gives up after 8 s when the room never builds: input is back and the cover is gone", async () => {
+    harness.activate = [];
+    harness.blocked = [];
+    harness.holdReady = true;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(<ProloguePage settings={DEFAULT_SETTINGS} onUpdateSettings={() => undefined} onBackToMenu={() => undefined} revealed session={SESSION} />);
+      fireEvent.click(await screen.findByRole("button", { name: "Stub begin walk" }));
+      act(() => {
+        harness.enterHome();
+      });
+      expect(screen.getByTestId("prologue-room-wait")).toBeTruthy();
+      expect(harness.blocked.at(-1)).toBe(true);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(7500);
+      });
+      expect(screen.getByTestId("prologue-room-wait")).toBeTruthy();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(screen.queryByTestId("prologue-room-wait")).toBeNull();
+      expect(harness.blocked.at(-1)).toBe(false);
+      expect(harness.activate).toEqual([]);
+      // The player can step into the doorway again.
+      act(() => {
+        harness.enterHome();
+      });
+      expect(screen.getByTestId("prologue-room-wait")).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+      harness.holdReady = false;
+    }
   });
   it("does not mount the layer without a session", async () => {
     harness.layer = null;

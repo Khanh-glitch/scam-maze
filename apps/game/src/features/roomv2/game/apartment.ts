@@ -34,6 +34,8 @@ export interface Apartment {
   fridgeCollider: Collider;
   fridge: { point: THREE.PointLight; spot: THREE.SpotLight; led: THREE.MeshBasicMaterial; mist: THREE.Points };
   chair: THREE.Group;
+  /** The entrance door leaf on its hinge pivot: `rotation.y` 0 is closed, negative opens into the room. */
+  doorLeaf: THREE.Group;
   clockHands: { h: THREE.Object3D; m: THREE.Object3D; s: THREE.Object3D };
   updaters: ((t: number, dt: number) => void)[];
   points: Record<string, THREE.Vector3>;
@@ -785,14 +787,38 @@ export function buildApartment(scene: THREE.Scene, cityTexHook: (panes: THREE.Me
   mesh(rbox(0.06, 2.1, 0.06, 0.006), paintWhite, DXc + 0.48, 1.05, z1 - 0.02, ent);
   mesh(rbox(1.02, 0.06, 0.06, 0.006), paintWhite, DXc, 2.1, z1 - 0.02, ent);
   const doorMat = new THREE.MeshStandardMaterial({ map: dwT.map, color: 0x9a8a78, roughness: 0.5, normalMap: dwT.normalMap, normalScale: new THREE.Vector2(0.3, 0.3) });
-  mesh(rbox(0.9, 2.04, 0.045, 0.006), doorMat, DXc, 1.02, z1 - 0.03, ent);
-  [[0.25, 0.55], [0.25, 1.45]].forEach(([_a, y]) => mesh(rbox(0.7, 0.75, 0.006, 0.004), doorMat, DXc, y, z1 - 0.055, ent));
-  mesh(rbox(0.13, 0.018, 0.02, 0.008), steel, DXc - 0.3, 1.0, z1 - 0.075, ent);
-  mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.012, 20).rotateX(Math.PI / 2), steel, DXc - 0.36, 1.0, z1 - 0.06, ent);
-  mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.012, 12).rotateX(Math.PI / 2), steel, DXc, 1.55, z1 - 0.06, ent);
+  // The leaf (slab, panels, handle, chain) hangs on a hinge pivot at the right jamb and opens into the room.
+  // `leaf` keeps the room-space coordinates below, so closed (rotation 0) it is exactly where it always was.
+  const HINGE_X = DXc + 0.45, HINGE_Z = z1 - 0.03;
+  const doorLeaf = new THREE.Group(); doorLeaf.position.set(HINGE_X, 0, HINGE_Z); ent.add(doorLeaf);
+  const leaf = new THREE.Group(); leaf.position.set(-HINGE_X, 0, -HINGE_Z); doorLeaf.add(leaf);
+  mesh(rbox(0.9, 2.04, 0.045, 0.006), doorMat, DXc, 1.02, z1 - 0.03, leaf);
+  [[0.25, 0.55], [0.25, 1.45]].forEach(([_a, y]) => mesh(rbox(0.7, 0.75, 0.006, 0.004), doorMat, DXc, y, z1 - 0.055, leaf));
+  mesh(rbox(0.13, 0.018, 0.02, 0.008), steel, DXc - 0.3, 1.0, z1 - 0.075, leaf);
+  mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.012, 20).rotateX(Math.PI / 2), steel, DXc - 0.36, 1.0, z1 - 0.06, leaf);
+  mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.012, 12).rotateX(Math.PI / 2), steel, DXc, 1.55, z1 - 0.06, leaf);
   // door chain (hanging, unhooked)
-  mesh(tube([new THREE.Vector3(DXc - 0.42, 1.3, z1 - 0.06), new THREE.Vector3(DXc - 0.4, 1.12, z1 - 0.065), new THREE.Vector3(DXc - 0.38, 1.04, z1 - 0.06)], 0.003, 20, 5), steel, 0, 0, 0, ent);
+  mesh(tube([new THREE.Vector3(DXc - 0.42, 1.3, z1 - 0.06), new THREE.Vector3(DXc - 0.4, 1.12, z1 - 0.065), new THREE.Vector3(DXc - 0.38, 1.04, z1 - 0.06)], 0.003, 20, 5), steel, 0, 0, 0, leaf);
   tag(ent, 'door', hits);
+
+  // Hall stub for the entrance shot: a short dark hall outside the entrance wall and nothing else.
+  // The room's walls are single-sided (they face inward), so from the hall the room would show through
+  // them; the outer wall plane (door-shaped hole) hides everything but the doorway. Seen from inside,
+  // both pieces are behind the inner wall. No collider, no light, no shadow.
+  {
+    const hallMat = new THREE.MeshLambertMaterial({ color: 0x3b2f27, emissive: 0x150f0b, side: THREE.DoubleSide });
+    const HW = 2.4, HD = 2.4;
+    const shell = new THREE.BoxGeometry(HW, h, HD);
+    // BoxGeometry draws +x, -x, +y, -y, +z, -z (6 indices each); the -z face lies on the entrance wall and is left open.
+    shell.setIndex(Array.from(shell.index!.array).slice(0, 30)); shell.clearGroups();
+    mesh(shell, hallMat, HW / 2, h / 2, z1 + HD / 2, root, false).receiveShadow = false;
+    const outer = new THREE.Shape();
+    outer.moveTo(0, 0); outer.lineTo(HW, 0); outer.lineTo(HW, h); outer.lineTo(0, h); outer.lineTo(0, 0);
+    const hole = new THREE.Path();
+    hole.moveTo(DXc - 0.45, 0); hole.lineTo(DXc - 0.45, 2.13); hole.lineTo(DXc + 0.45, 2.13); hole.lineTo(DXc + 0.45, 0); hole.lineTo(DXc - 0.45, 0);
+    outer.holes.push(hole);
+    mesh(new THREE.ShapeGeometry(outer), hallMat, 0, 0, z1 + 0.02, root, false).receiveShadow = false;
+  }
   // light switch
   const sw = new THREE.Group(); sw.position.set(0.52, 1.2, z1 - 0.004); root.add(sw);
   mesh(rbox(0.085, 0.12, 0.01, 0.004), plasticWhite, 0, 0, -0.004, sw);
@@ -982,6 +1008,6 @@ export function buildApartment(scene: THREE.Scene, cityTexHook: (panes: THREE.Me
     lights: { ceilingSpot, ceilingFill, deskSpot, deskFill, bedLamp, kitchen: kitchenLight, phone: phoneLight, laptop: laptopLight },
     emissives: { ceiling: ceilingShade, desk: deskBulb, bed: bedShade, kitchen: kitchenStrip, powerLed, acLed },
     glassPanes, rightSash, phone, phoneScreenMat, laptopScreen, laptopScreenMat, laptopScreenMesh, phoneScreenMesh: scr, phoneScreen, steam,
-    fridgeDoor: fdoor, fridgeCollider, fridge: { point: frPoint, spot: frSpot, led: fridgeLed, mist }, chair, clockHands,
+    fridgeDoor: fdoor, fridgeCollider, fridge: { point: frPoint, spot: frSpot, led: fridgeLed, mist }, chair, doorLeaf, clockHands,
   };
 }

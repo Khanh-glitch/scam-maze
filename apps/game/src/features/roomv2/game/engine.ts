@@ -17,10 +17,22 @@ import { dropMaskCanvas, paintDropMask, canvas, toTex } from './textures';
 import { projectCornersToViewport, projectPointToViewport, cornersChanged, anchorMoved, ANCHOR_TOLERANCE_PX, type ScreenCornersPx, type ScreenDeviceId } from './screenProjection';
 import { pickHoverId, laptopInteractRoute, inspectDurationSec } from './storyInteract';
 import { setGameElapsedSeconds } from '../../../game/clock/gameClock';
+import { DOOR_OPEN_AT_S, entranceFrame, HANDOFF } from './entranceShot';
 import { isRoomPropId, type RoomOptions, type RoomStoryCommands } from './outside';
 
 export type Caption = { text: string; voice?: boolean; id: number };
 export type UIAction = { key: string; label: string };
+/** Engine.activate options. entrance: play the scripted entrance shot (outside the door, the door opens, walk in) instead of appearing at the spawn. */
+export interface ActivateOptions {
+  entrance?: boolean;
+  /** Default: the browser's prefers-reduced-motion setting. Reduced motion is a plain fade up at the spawn. */
+  reducedMotion?: boolean;
+}
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 export interface UIState {
   prompt: string | null;
   /** Story mode: the aimed prop's projected position (container pixels), or null. */
@@ -139,6 +151,8 @@ export class Engine implements RoomStoryCommands {
   exitT = 0;
   exitSent = false;
   visits = 0;
+  /** The entrance shot in progress (input is ignored until it ends and egin() runs), or null. */
+  entrance: null | { t: number; reduced: boolean; clicked: boolean } = null;
 
   // player
   pos = V(1.3, 1.62, 1.55);
@@ -267,17 +281,27 @@ export class Engine implements RoomStoryCommands {
   }
 
   /** Standby -> running: the player steps into the room. */
-  activate() {
+  activate(opts: ActivateOptions = {}) {
     if (this.disposed || this.live) return;
     this.live = true;
     this.t = performance.now() / 1000;
     this.exiting = false; this.exitT = 0; this.exitSent = false;
-    this.pos.set(1.3, 1.62, 1.55); this.vel.set(0, 0, 0); this.yaw = 0.62; this.pitch = -0.08;
+    this.pos.set(HANDOFF.x, HANDOFF.y, HANDOFF.z); this.vel.set(0, 0, 0); this.yaw = HANDOFF.yaw; this.pitch = HANDOFF.pitch;
     this.keys.clear();
-    // the neighborhood's white doorway covers the cut, so no fade up from black
-    this.ui.fade = 0; this.finalPass.uniforms.uFade.value = 1;
-    this.audio.wake();
-    this.begin();
+    if (opts.entrance) {
+      // The cut from the neighborhood lands on the room's own dark frame; the shot fades up from there.
+      this.entrance = { t: 0, reduced: opts.reducedMotion ?? prefersReducedMotion(), clicked: false };
+      this.applyEntranceFrame(entranceFrame(0, this.entrance.reduced));
+      this.audio.wake();
+      this.audio.start();
+      this.lock();
+      this.emit();
+    } else {
+      // the neighborhood's white doorway covers the cut, so no fade up from black
+      this.ui.fade = 0; this.finalPass.uniforms.uFade.value = 1;
+      this.audio.wake();
+      this.begin();
+    }
     cancelAnimationFrame(this.raf);
     this.raf = requestAnimationFrame(this.loop);
   }
@@ -285,11 +309,39 @@ export class Engine implements RoomStoryCommands {
   /** Running -> standby (the player left); the room keeps its state for the next visit. */
   deactivate() {
     this.live = false;
+    this.entrance = null;
+    this.apt.doorLeaf.rotation.y = 0;
     cancelAnimationFrame(this.raf);
     this.keys.clear();
     this.audio.suspend();
     this.ui.started = false; this.ui.locked = false; this.ui.prompt = null; this.ui.anchor = null; this.ui.focus = false;
     this.emit();
+  }
+
+  private applyEntranceFrame(f: ReturnType<typeof entranceFrame>) {
+    this.pos.set(f.x, f.y, f.z); this.yaw = f.yaw; this.pitch = f.pitch;
+    this.apt.doorLeaf.rotation.y = -f.doorAngle;
+    this.ui.fade = 1 - f.fade;
+    this.finalPass.uniforms.uFade.value = f.fade;
+  }
+
+  /** One step of the entrance shot: scripted camera, door and fade; ends with the same hand-over as `begin()`. */
+  private stepEntrance(dt: number) {
+    const e = this.entrance;
+    if (!e) return;
+    e.t += dt;
+    const f = entranceFrame(e.t, e.reduced);
+    if (!e.reduced && !e.clicked && e.t >= DOOR_OPEN_AT_S) { e.clicked = true; this.audio.switchClick('door'); }
+    const speed = dt > 0 ? Math.hypot(f.x - this.pos.x, f.z - this.pos.z) / dt : 0;
+    this.applyEntranceFrame(f);
+    // Walking pace drives the same head-bob and footsteps as `movePlayer`.
+    this.vel.set(f.done ? 0 : speed, 0, 0);
+    if (speed > 0.05 && !f.done) {
+      this.bobPhase += dt * speed * 5.2;
+      const sign = Math.sign(Math.sin(this.bobPhase));
+      if (sign !== this.lastStepSign && sign !== 0) { this.lastStepSign = sign; this.audio.started && this.audio.footstep(Math.min(1, speed / 1.3)); }
+    }
+    if (f.done) { this.entrance = null; this.begin(); }
   }
 
   /** Fades out, then tells the neighborhood the player left (`RoomOptions.onExit`). */
@@ -471,7 +523,7 @@ export class Engine implements RoomStoryCommands {
 
   /* =================== INPUT =================== */
   onMouseMove = (e: MouseEvent) => {
-    if (!this.ui.locked) return;
+    if (!this.ui.locked || this.entrance) return;
     if (this.callHeld()) return;
     if (Math.abs(e.movementX) > MAX_MOUSE_STEP || Math.abs(e.movementY) > MAX_MOUSE_STEP) return;
     const s = 0.0021;
@@ -1292,7 +1344,8 @@ export class Engine implements RoomStoryCommands {
     const dt = Math.min(0.05, rawDt);
     this.t = tNow;
 
-    if (this.ui.started) this.movePlayer(dt);
+    if (this.entrance) this.stepEntrance(dt);
+    else if (this.ui.started) this.movePlayer(dt);
     this.updateSeat(rawDt > 0.05 ? 0.05 : dt);
     this.updateCamera(dt);
     this.updateScreenWatch();
@@ -1308,7 +1361,7 @@ export class Engine implements RoomStoryCommands {
     if (this.ui.started && this.ui.fade > 0) { this.ui.fade = Math.max(0, this.ui.fade - dt / 3.5); }
     const endDim = this.ui.ended ? 0.55 : 1;
     const fu = this.finalPass.uniforms;
-    fu.uFade.value += ((1 - this.ui.fade) * endDim - fu.uFade.value) * Math.min(1, dt * 3);
+    if (!this.entrance) fu.uFade.value += ((1 - this.ui.fade) * endDim - fu.uFade.value) * Math.min(1, dt * 3);
     if (this.exiting) {
       // the neighborhood whites the screen out meanwhile; then it takes over
       this.exitT += dt / EXIT_SECONDS;

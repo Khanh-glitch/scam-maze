@@ -232,12 +232,12 @@ export class House {
   }
 
   /**
-   * Behind the rear bedroom's door of house no. 59 stands a plain white panel, as bright as a
+   * Behind the rear bedroom's door of house no. 59 stands a plain dark panel, the tone of a warm unlit hall, as a
    * portal: opening the door shows it, and stepping into it is the way into the player's room.
    */
   private whiteDoorway(door: Device, x0: number, x1: number, y0: number, height: number) {
-    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, toneMapped: false, fog: false, transparent: false, depthWrite: true });
-    mat.color.setScalar(3); // above the bloom threshold, so the edges glow
+    // Dark warm hall tone, unlit and unfogged, far below the bloom threshold: it must never glow or read as a white panel.
+    const mat = new THREE.MeshBasicMaterial({ color: 0x1b1410, side: THREE.DoubleSide, toneMapped: false, fog: false, transparent: false, depthWrite: true });
     // A block, not a sheet: it fills the doorway to a depth of 0.6 m, so from no angle (nor with the eye
     // right up to it) is anything of the room behind it visible.
     const depth = 0.6;
