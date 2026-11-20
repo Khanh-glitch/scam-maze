@@ -68,7 +68,13 @@ export const TestBusPage: React.FC<TestBusPageProps> = ({ settings, onBackToMenu
   const shadow = { textShadow: "0 1px 6px rgba(0,0,0,.9)" } as const;
 
   return (
-    <div className="fixed inset-0 select-none overflow-hidden bg-black text-stone-100">
+    <div
+      className="fixed inset-0 select-none overflow-hidden bg-black text-stone-100"
+      data-phase={hud?.phase ?? "waiting"}
+      data-onboard={hud?.onboard ?? false}
+      data-seated={hud?.seated ?? false}
+      data-paid={hud?.paid ?? false}
+    >
       <div ref={mountRef} className="absolute inset-0" />
       <button type="button" onClick={onBackToMenu} className={`absolute left-3 top-3 z-50 flex items-center gap-1.5 ${BUTTON}`}>
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
