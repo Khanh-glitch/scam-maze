@@ -31,6 +31,7 @@ const MientayPage = lazy(() => import("../features/mientay").then((module) => ({
 // The new-game prologue (neighborhood, then the apartment) is also its own chunk.
 const ProloguePage = lazy(() => import("../features/prologue").then((module) => ({ default: module.ProloguePage })));
 const KhuphoPage = lazy(() => import("../features/khupho").then((module) => ({ default: module.KhuphoPage })));
+const TestBusPage = lazy(() => import("../features/testbus").then((module) => ({ default: module.TestBusPage })));
 const RoomV2Page = lazy(() => import("../features/roomv2").then((module) => ({ default: module.RoomV2Page })));
 // The rebuilt Chapter 1 page (saved games and ?skip-prologue) is the room plus the chapter layer.
 const RoomChapterPage = lazy(() =>
@@ -58,7 +59,7 @@ function readSavedContinueAvailability(): ContinueAvailability {
   return readContinueAvailability(saveSource);
 }
 
-type AppRoute = "menu" | "testmove" | "ueh" | "hue" | "mientay" | "khupho" | "roomv2";
+type AppRoute = "menu" | "testmove" | "ueh" | "hue" | "mientay" | "khupho" | "roomv2" | "testbus";
 
 function getAppRoute(): AppRoute {
   if (typeof window === "undefined") return "menu";
@@ -70,6 +71,7 @@ function getAppRoute(): AppRoute {
   if (path.startsWith("/mientay") || hash.includes("mientay")) return "mientay";
   if (path.startsWith("/khupho") || hash.includes("khupho")) return "khupho";
   if (path.startsWith("/roomv2") || hash.includes("roomv2")) return "roomv2";
+  if (path.startsWith("/testbus") || hash.includes("testbus")) return "testbus";
   return "menu";
 }
 
@@ -116,7 +118,9 @@ export const App: React.FC = () => {
                   ? "/khupho"
                   : newRoute === "roomv2"
                     ? "/roomv2"
-                    : "/";
+                    : newRoute === "testbus"
+                      ? "/testbus"
+                      : "/";
     window.history.pushState(null, "", targetPath);
     setRoute(newRoute);
   };
@@ -556,6 +560,14 @@ export const App: React.FC = () => {
     );
   }
 
+  // Route: /testbus -> Prototype Saigon bus stop and Route 06 ride with the game's own characters
+  if (route === "testbus") {
+    return (
+      <Suspense fallback={<div className="h-screen w-screen bg-black" aria-busy="true" />}>
+        <TestBusPage settings={settings} onBackToMenu={() => navigateTo("menu")} />
+      </Suspense>
+    );
+  }
   // Route: / -> Original Main Menu Scene & Overlay
   return (
     <div className="relative w-screen h-screen overflow-hidden select-none bg-[#13111f]">
