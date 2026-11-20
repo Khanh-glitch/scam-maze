@@ -10,6 +10,8 @@ import journalCombine from "./journalCombine";
 import debriefForensic from "./debriefForensic";
 import device from "./device";
 import voice from "./voice";
+import ueh from "./ueh";
+import finance from "./finance";
 
 const chapter1: LocaleShape<typeof en> = {
   ...hud,
@@ -22,6 +24,8 @@ const chapter1: LocaleShape<typeof en> = {
   ...debriefForensic,
   ...device,
   ...voice,
+  ...ueh,
+  ...finance,
 };
 
 export default chapter1;

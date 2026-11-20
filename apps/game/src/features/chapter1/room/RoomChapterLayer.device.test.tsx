@@ -226,11 +226,11 @@ describe("the phone with device content", () => {
 });
 
 describe("the laptop with device content", () => {
-  it("shows the same device apps as tabs and no tab of the parked story", () => {
+  it("shows the same device apps as desktop icons and no app of the parked story", () => {
     const rig = mountLayer();
     const laptop = openLaptop(rig);
-    const tabs = within(laptop).getAllByRole("tab").map((tab) => tab.textContent);
-    expect(tabs).toEqual(["Mail", "Bank", "Calendar", "Housing", "Files", "Thesis"]);
+    const icons = within(laptop).getAllByRole("button", { name: /^Open / }).map((icon) => icon.getAttribute("aria-label")?.replace(/^Open /, "").split(",")[0]);
+    expect(icons).toEqual(["Mail", "Browser", "Bank", "Calendar", "Housing", "Files", "Thesis"]);
     expect(within(laptop).queryByText("Northgate Mobile")).toBeNull();
     expect(within(laptop).queryByText("Notifications")).toBeNull();
     expect(laptop.textContent).not.toMatch(/Northgate/i);
@@ -240,22 +240,66 @@ describe("the laptop with device content", () => {
   it("shares state with the phone: a backup made on the laptop shows in Files and in the core state", () => {
     const rig = mountLayer();
     const laptop = openLaptop(rig);
-    fireEvent.click(within(laptop).getByRole("tab", { name: "Files" }));
+    fireEvent.click(within(laptop).getByTestId("desktop-icon-device-files"));
     expect(within(laptop).getByTestId("files-backup").textContent).toContain("No backup");
     fireEvent.click(within(laptop).getByTestId("device-row-file.thesis"));
     fireEvent.click(within(laptop).getByTestId("device-action-file.thesis-backup"));
     expect(rig.store().getState().persistent.backupSecured).toBe(true);
-    fireEvent.click(within(laptop).getByRole("button", { name: "Back" }));
     expect(within(laptop).getByTestId("files-backup").textContent).toContain("A backup of the thesis data is available.");
   });
 
   it("shows the housing listing price and costs time to ask about it", () => {
     const rig = mountLayer();
     const laptop = openLaptop(rig);
-    fireEvent.click(within(laptop).getByRole("tab", { name: "Housing" }));
+    fireEvent.click(within(laptop).getByTestId("desktop-icon-device-housing"));
     expect(within(laptop).getByTestId("device-row-house.room").textContent).toContain("3,000,000 VND");
     fireEvent.click(within(laptop).getByTestId("device-row-house.room"));
     fireEvent.click(within(laptop).getByTestId("device-action-house.room-inquire"));
     expect(rig.store().getState().resources.timeMinutes).toBe(72 * 60 - 15);
+  });
+});
+describe("the laptop desktop", () => {
+  it("does not touch the game state when apps are opened, minimized or closed", () => {
+    const rig = mountLayer();
+    const laptop = openLaptop(rig);
+    const before = rig.store().getState();
+    fireEvent.click(within(laptop).getByTestId("desktop-icon-device-calendar"));
+    fireEvent.click(within(laptop).getByTestId("desktop-minimize"));
+    fireEvent.click(within(laptop).getByTestId("desktop-icon-device-files"));
+    fireEvent.click(within(laptop).getByTestId("desktop-back"));
+    fireEvent.click(within(laptop).getByTestId("desktop-icon-thesis"));
+    fireEvent.click(within(laptop).getByTestId("desktop-close-app"));
+    const after = rig.store().getState();
+    expect(after.events).toHaveLength(before.events.length);
+    expect(after.resources).toEqual(before.resources);
+  });
+
+  it("uses Escape to leave an app first and to close the laptop second, keeping the apps for next time", () => {
+    const rig = mountLayer();
+    const laptop = openLaptop(rig);
+    fireEvent.click(within(laptop).getByTestId("desktop-icon-device-files"));
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeNull();
+    expect(within(screen.getByRole("dialog")).getByTestId("desktop-home")).toBeTruthy();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(rig.bridge.commands?.closeInspect).toHaveBeenCalled();
+    // Reopening: Files is still running.
+    act(() => rig.bridge.onProp("laptop", "inspect-ready"));
+    expect(screen.getByTestId("taskbar-app-device-files").getAttribute("data-status")).toBe("open");
+  });
+
+  it("keeps the gameplay state when the laptop is closed and opened again", () => {
+    const rig = mountLayer();
+    const laptop = openLaptop(rig);
+    fireEvent.click(within(laptop).getByTestId("desktop-icon-device-files"));
+    fireEvent.click(within(laptop).getByTestId("device-row-file.thesis"));
+    fireEvent.click(within(laptop).getByTestId("device-action-file.thesis-backup"));
+    fireEvent.click(within(laptop).getByTestId("desktop-close-laptop"));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(rig.store().getState().persistent.backupSecured).toBe(true);
+    act(() => rig.bridge.onProp("laptop", "inspect-ready"));
+    // The Files window was on screen when the laptop closed, so it is on screen again.
+    expect(screen.getByTestId("files-backup").textContent).toContain("A backup of the thesis data is available.");
   });
 });

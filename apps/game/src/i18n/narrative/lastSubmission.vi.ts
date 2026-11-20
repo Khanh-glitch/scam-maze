@@ -310,4 +310,19 @@ export const LAST_SUBMISSION_NARRATIVE_VI: NarrativeOverlay = {
   "missions/m01.security-breach/paths/code/objective":
     "Báo cáo các giao dịch cho ngân hàng qua đường dây chính thức, rồi bảo vệ các tài khoản.",
   "missions/m01.security-breach/paths/credentials/objective": "Đổi mật khẩu và đăng xuất các thiết bị khác.",
+  // Records saved as evidence (by choice, from the mail, the payment page and the bank statement)
+  "device/mail.clearance/actions/save-record/label": "Lưu email, người gửi và địa chỉ liên kết làm bằng chứng",
+  "device/page.fee/actions/save-address/label": "Lưu địa chỉ trang làm bằng chứng",
+  "device/bank.statement/title": "Sao kê ngân hàng trực tuyến",
+  "device/bank.statement/body": "Sao kê trực tuyến của bạn. Bạn có thể lưu bản ghi của một khoản thanh toán hoặc chuyển tiền làm bằng chứng.",
+  "device/bank.statement/actions/save-fee-record/label": "Lưu bản ghi thanh toán phí xác nhận làm bằng chứng",
+  "device/bank.statement/actions/save-transfer-record/label": "Lưu bản ghi các giao dịch chuyển tiền trái phép làm bằng chứng",
+  "device/file.email-record/title": "Email Graduation Clearance (đã lưu)",
+  "device/file.email-record/body": "Bản sao đã lưu của email Graduation Clearance: địa chỉ người gửi, khoản phí được yêu cầu và địa chỉ liên kết.",
+  "device/file.address-record/title": "Địa chỉ trang thanh toán (đã lưu)",
+  "device/file.address-record/body": "Địa chỉ của trang thanh toán mà email dẫn tới: pay.uni-graduation-office.example.",
+  "device/file.fee-record/title": "Bản ghi ngân hàng: thanh toán phí xác nhận (đã lưu)",
+  "device/file.fee-record/body": "Bản ghi đã lưu của khoản thanh toán thẻ trên trang thanh toán: số tiền, thời điểm và người nhận mà ngân hàng hiển thị.",
+  "device/file.transfer-record/title": "Bản ghi ngân hàng: các giao dịch chuyển tiền trái phép (đã lưu)",
+  "device/file.transfer-record/body": "Bản ghi đã lưu của các khoản tiền rời tài khoản mà bạn không đồng ý: số tiền, thời điểm và người nhận mà ngân hàng hiển thị.",
 };

@@ -5,11 +5,12 @@
 // Escape and the close button call `onClose`; focus moves in on open and returns to the opener
 // on unmount. No inputs, no forms, no links: addresses are plain text.
 import React, { useEffect, useId, useRef, useState } from "react";
-import { AppWindow, Bell, BellRing, CalendarDays, Columns2, FolderOpen, GraduationCap, Home, Landmark, Laptop, Mail, ShieldCheck, Briefcase, X } from "lucide-react";
+import { AppWindow, Bell, BellRing, CalendarDays, Columns2, FolderOpen, GraduationCap, Globe, Home, Landmark, Laptop, Mail, ShieldCheck, Briefcase, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { LaptopView } from "../../../../game/narrative/selectors";
 import type { CoreAction } from "../../../../game/narrative/types";
 import { trapTabKey } from "../../focusTrap";
+import type { BrowserAction, BrowserState } from "../desktop/browser/browserState";
 import { CINE, UI } from "../../theme";
 import { ScreenSurface } from "../ScreenSurface";
 import { useScreenQuad } from "../useScreenQuad";
@@ -20,7 +21,14 @@ export interface LaptopExtraTab {
   id: string;
   /** Already translated tab label. */
   label: string;
+  /** Unread count shown on the desktop icon. Unused by the sidebar layout. */
+  badge?: number;
   content: React.ReactNode;
+  /**
+   * Interactive desktop only: draws the app from the desktop's UI state (for example the Browser
+   * window, which shows the address a link sent it to). When set it replaces `content`.
+   */
+  render?: (context: { browser: BrowserState; dispatchBrowser: (action: BrowserAction) => void }) => React.ReactNode;
 }
 
 export interface LaptopOverlayProps {
@@ -39,15 +47,16 @@ export interface LaptopOverlayProps {
 const NOTIFICATIONS_TAB = "notifications";
 const SECURITY_TAB = "security";
 
-type TabIcon = React.ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" | "false" }>;
+export type TabIcon = React.ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" | "false" }>;
 
 /** Sidebar icon per app id; unknown ids get a generic window icon. */
-const TAB_ICONS: Readonly<Record<string, TabIcon>> = {
+export const TAB_ICONS: Readonly<Record<string, TabIcon>> = {
   [NOTIFICATIONS_TAB]: Bell,
   bank: Landmark,
   compare: Columns2,
   [SECURITY_TAB]: ShieldCheck,
   thesis: GraduationCap,
+  browser: Globe,
   "device-mail": Mail,
   "device-bank": Landmark,
   "device-calendar": CalendarDays,

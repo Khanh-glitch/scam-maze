@@ -69,6 +69,8 @@ export const MISSION_01_CONFIG = {
     bankCall: 5,
     bankReport: 15,
     bankNext: 5,
+    /** Saving a record of the email, the page address or a bank transaction as evidence. */
+    saveRecord: 3,
   },
   /** Change of Digital Security by each step. */
   security: {
@@ -145,7 +147,17 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
       "Pay now to unlock your account: https://pay.uni-graduation-office.example/confirm\n\n" +
       "If the fee is not paid today, your account will stay locked and you may miss the graduation period.\n\nGraduation Office",
     arrives: { atMinute: 10 },
-    actions: [{ id: "open-link", label: "Open the payment link", timeCostMinutes: M.openLink, once: true }],
+    actions: [
+      { id: "open-link", label: "Open the payment link", timeCostMinutes: M.openLink, once: true },
+      // Evidence is saved by choice, never by opening the mail.
+      {
+        id: "save-record",
+        label: "Save the email, the sender and the link address as evidence",
+        timeCostMinutes: M.saveRecord,
+        once: true,
+        effects: [{ kind: "adjustResource", resource: "evidence", delta: 1 }],
+      },
+    ],
   },
   {
     id: "page.fee",
@@ -160,6 +172,13 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
     arrives: { when: [done("mail.clearance", "open-link")] },
     actions: [
       { id: "close", label: "Close the page", timeCostMinutes: M.closePage },
+      {
+        id: "save-address",
+        label: "Save the page address as evidence",
+        timeCostMinutes: M.saveRecord,
+        once: true,
+        effects: [{ kind: "adjustResource", resource: "evidence", delta: 1 }],
+      },
       {
         id: "sign-in",
         label: "Sign in with my student login",
@@ -376,6 +395,64 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
     title: "Bank report reference (saved)",
     body: "Reference: BR-0001. The bank blocked further transfers from your account and will review the earlier ones.",
     arrives: { when: [done("contact.bank", "report-fraud")] },
+  },
+  // --- Records the player can save from the bank statement and the other apps (never saved by looking) ---
+  {
+    id: "bank.statement",
+    app: "files",
+    folder: "bank",
+    title: "Online bank statement",
+    body: "Your online bank statement. You can save a record of a payment or a transfer as evidence.",
+    actions: [
+      {
+        id: "save-fee-record",
+        label: "Save the record of the confirmation fee payment as evidence",
+        visibleWhen: [done("page.fee", "pay-card")],
+        timeCostMinutes: M.saveRecord,
+        once: true,
+        effects: [{ kind: "adjustResource", resource: "evidence", delta: 1 }],
+      },
+      {
+        id: "save-transfer-record",
+        label: "Save the record of the unauthorized transfers as evidence",
+        visibleWhen: [{ kind: "eventStatus", eventId: "m01.transfer-1", status: "resolved" }],
+        timeCostMinutes: M.saveRecord,
+        once: true,
+        effects: [{ kind: "adjustResource", resource: "evidence", delta: 1 }],
+      },
+    ],
+  },
+  {
+    id: "file.email-record",
+    app: "files",
+    folder: "evidence",
+    title: "Graduation Clearance email (saved)",
+    body: "A saved copy of the Graduation Clearance email: the sender address, the fee it asks for and the link address.",
+    arrives: { when: [done("mail.clearance", "save-record")] },
+  },
+  {
+    id: "file.address-record",
+    app: "files",
+    folder: "evidence",
+    title: "Payment page address (saved)",
+    body: "The address of the payment page that the email linked to: pay.uni-graduation-office.example.",
+    arrives: { when: [done("page.fee", "save-address")] },
+  },
+  {
+    id: "file.fee-record",
+    app: "files",
+    folder: "evidence",
+    title: "Bank record: confirmation fee payment (saved)",
+    body: "A saved record of the card payment made on the payment page: the amount, the time and the recipient shown by your bank.",
+    arrives: { when: [done("bank.statement", "save-fee-record")] },
+  },
+  {
+    id: "file.transfer-record",
+    app: "files",
+    folder: "evidence",
+    title: "Bank record: unauthorized transfers (saved)",
+    body: "A saved record of the transfers that left your account without your approval: the amounts, the times and the recipient shown by your bank.",
+    arrives: { when: [done("bank.statement", "save-transfer-record")] },
   },
   {
     id: "mail.login-alert",

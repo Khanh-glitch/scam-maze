@@ -9,7 +9,34 @@ import type { ThesisTaskView } from "../../../game/narrative/world";
 import { UI } from "../theme";
 import { formatDuration, type DurationText } from "./formatDuration";
 
+/** `dark`: the schedule overlay. `paper`: the laptop's Thesis window, a white page like a word processor. */
+export type ThesisTone = "dark" | "paper";
+
+const FOCUS_PAPER = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3a63c2]";
+const TONES = {
+  dark: {
+    card: UI.card,
+    label: UI.label,
+    body: UI.body,
+    text: "text-[#f7f5ff]",
+    muted: "text-[#a9a4c4]",
+    primary: UI.buttonPrimary,
+    secondary: UI.buttonSecondary,
+  },
+  paper: {
+    card: "",
+    label: "text-xs font-semibold uppercase tracking-wider text-[#3a63c2]",
+    body: "text-sm leading-relaxed text-[#4b5563]",
+    text: "text-[#1f2937]",
+    muted: "text-[#6b7280]",
+    primary: `flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#3a63c2] px-5 py-2.5 text-sm font-semibold text-white motion-safe:transition-colors hover:bg-[#2f52a3] disabled:cursor-not-allowed disabled:bg-[#d7deec] disabled:text-[#7b879e] ${FOCUS_PAPER}`,
+    secondary: `flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#c9d3e6] bg-white px-4 py-2 text-left text-sm font-medium text-[#1f2937] motion-safe:transition-colors hover:bg-[#eef2fa] disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS_PAPER}`,
+  },
+} as const;
+
 export interface ThesisPanelProps {
+  /** Look of the panel. Default `dark`. */
+  tone?: ThesisTone;
   progress: number;
   /** Minutes of one session and the percent it adds. */
   sessionMinutes: number;
@@ -27,6 +54,7 @@ export interface ThesisPanelProps {
 }
 
 export const ThesisPanel: React.FC<ThesisPanelProps> = ({
+  tone = "dark",
   progress,
   sessionMinutes,
   sessionPercent,
@@ -44,24 +72,25 @@ export const ThesisPanel: React.FC<ThesisPanelProps> = ({
   const timeUp = timeLeftMinutes <= 0;
   const atLimit = progress >= freeWorkMaxPercent;
   const blocked = complete || timeUp || atLimit || sessionPercent < 1;
+  const k = TONES[tone];
   return (
-    <section aria-labelledby="thesis-panel-heading" data-testid="thesis-panel" className={UI.card}>
-      <h3 id="thesis-panel-heading" className={`${UI.label} flex items-center gap-2`}>
+    <section aria-labelledby="thesis-panel-heading" data-testid="thesis-panel" className={k.card}>
+      <h3 id="thesis-panel-heading" className={`${k.label} flex items-center gap-2`}>
         <GraduationCap className="h-4 w-4" aria-hidden="true" />
         {t("planner.thesis.heading")}
       </h3>
-      <p className="mt-2 text-sm text-[#f7f5ff]" data-testid="thesis-progress">
+      <p className={`mt-2 text-sm ${k.text}`} data-testid="thesis-progress">
         {t("planner.thesis.progress", { value: progress })}
       </p>
-      <p className={`${UI.body} mt-1`}>
+      <p className={`${k.body} mt-1`}>
         {t("planner.thesis.session", { time: formatDuration(text, sessionMinutes), percent: sessionPercent })}
       </p>
-      <p className={`${UI.body} mt-1`} data-testid="thesis-limit">
+      <p className={`${k.body} mt-1`} data-testid="thesis-limit">
         {t("planner.thesis.limit", { percent: freeWorkMaxPercent })}
       </p>
       <button
         type="button"
-        className={`${UI.buttonPrimary} mt-3`}
+        className={`${k.primary} mt-3`}
         disabled={blocked}
         data-testid="thesis-work"
         onClick={() => onWork(sessionMinutes)}
@@ -69,38 +98,38 @@ export const ThesisPanel: React.FC<ThesisPanelProps> = ({
         {t("planner.thesis.work", { time: formatDuration(text, sessionMinutes) })}
       </button>
       {fatigue !== undefined && fatigue.level !== "rested" && (
-        <p className={`${UI.body} mt-2`} data-testid="thesis-fatigue">
+        <p className={`${k.body} mt-2`} data-testid="thesis-fatigue">
           {t(`planner.thesis.fatigueNote.${fatigue.level}`, { percent: fatigue.slowdownPercent })}
         </p>
       )}
-      {complete && <p className={`${UI.body} mt-2`}>{t("planner.thesis.complete")}</p>}
-      {!complete && timeUp && <p className={`${UI.body} mt-2`}>{t("planner.thesis.timeUp")}</p>}
+      {complete && <p className={`${k.body} mt-2`}>{t("planner.thesis.complete")}</p>}
+      {!complete && timeUp && <p className={`${k.body} mt-2`}>{t("planner.thesis.timeUp")}</p>}
 
       {rest !== undefined && (
         <div className="mt-4" data-testid="rest-panel">
-          <h4 className={UI.label}>{t("planner.thesis.restHeading")}</h4>
-          <p className={`${UI.body} mt-1`}>{t("planner.thesis.restHint")}</p>
+          <h4 className={k.label}>{t("planner.thesis.restHeading")}</h4>
+          <p className={`${k.body} mt-1`}>{t("planner.thesis.restHint")}</p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <button type="button" className={UI.buttonSecondary} disabled={timeUp} data-testid="rest-nap" onClick={() => rest.onRest("nap")}>
+            <button type="button" className={k.secondary} disabled={timeUp} data-testid="rest-nap" onClick={() => rest.onRest("nap")}>
               {t("planner.thesis.nap", { time: formatDuration(text, rest.napMinutes) })}
             </button>
-            <button type="button" className={UI.buttonSecondary} disabled={timeUp} data-testid="rest-sleep" onClick={() => rest.onRest("sleep")}>
+            <button type="button" className={k.secondary} disabled={timeUp} data-testid="rest-sleep" onClick={() => rest.onRest("sleep")}>
               {t("planner.thesis.sleep", { time: formatDuration(text, rest.sleepMinutes) })}
             </button>
           </div>
         </div>
       )}
-      <h4 className={`${UI.label} mt-4`}>{t("planner.thesis.tasksHeading")}</h4>
+      <h4 className={`${k.label} mt-4`}>{t("planner.thesis.tasksHeading")}</h4>
       {tasks.length === 0 ? (
-        <p className={`${UI.body} mt-1`}>{t("planner.thesis.noTasks")}</p>
+        <p className={`${k.body} mt-1`}>{t("planner.thesis.noTasks")}</p>
       ) : (
         <ul className="mt-2 space-y-2">
           {tasks.map((task) => (
             <li key={task.id} className="space-y-1">
-              {task.description && <p className={UI.body}>{task.description}</p>}
+              {task.description && <p className={k.body}>{task.description}</p>}
               <button
                 type="button"
-                className={UI.buttonSecondary}
+                className={k.secondary}
                 disabled={task.blocked !== null}
                 aria-describedby={task.blocked === null ? undefined : `thesis-task-${task.id}-blocked`}
                 data-testid={`thesis-task-${task.id}`}
@@ -111,7 +140,7 @@ export const ThesisPanel: React.FC<ThesisPanelProps> = ({
                   : t("planner.thesis.taskGain", { label: task.label, percent: task.progressGain })}
               </button>
               {task.blocked !== null && (
-                <p id={`thesis-task-${task.id}-blocked`} className="text-xs text-[#a9a4c4]">
+                <p id={`thesis-task-${task.id}-blocked`} className={`text-xs ${k.muted}`}>
                   {t(`planner.thesis.blocked.${task.blocked}`)}
                 </p>
               )}

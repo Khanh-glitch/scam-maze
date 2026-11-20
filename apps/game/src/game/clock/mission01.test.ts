@@ -121,7 +121,7 @@ describe("way A: follow the link", () => {
     expect(state.resources.timeMinutes).toBe(CHAPTER_DURATION_MINUTES - 10 - 3);
     // Later steps are not even listed until the earlier one is done.
     const page = selectDeviceView(state, S, "phone").apps.mail.find((item) => item.id === "page.fee")!;
-    expect(page.actions.map((action) => action.id)).toEqual(["close", "sign-in"]);
+    expect(page.actions.map((action) => action.id)).toEqual(["close", "save-address", "sign-in"]);
     // Closing the page changes nothing else.
     const closed = step(state, use("page.fee", "close"));
     expect(closed.persistent).toEqual(state.persistent);
@@ -139,7 +139,7 @@ describe("way A: follow the link", () => {
     expect(path(state, "m01.security-breach")).toBe("credentials");
     expect(path(state, "m01.missing-access")).toBe("breach");
     const page = selectDeviceView(state, S, "phone").apps.mail.find((item) => item.id === "page.fee")!;
-    expect(page.actions.map((action) => action.id)).toEqual(["close", "sign-in", "pay-card"]);
+    expect(page.actions.map((action) => action.id)).toEqual(["close", "save-address", "sign-in", "pay-card"]);
   });
 
   it("with the login only, securing the account in time stops the takeover and closes the breach", () => {

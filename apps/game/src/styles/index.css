@@ -207,3 +207,13 @@ input, textarea, [contenteditable="true"] {
 @media (prefers-reduced-motion: reduce) {
   .quest-fresh { animation: none; }
 }
+
+/* Short fade when the laptop desktop changes window. Opacity only, so it stays cheap. */
+@keyframes appFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
