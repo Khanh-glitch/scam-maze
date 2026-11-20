@@ -6,6 +6,7 @@ import hue from "./hue";
 import mientay from "./mientay";
 import khupho from "./khupho";
 import roomv2 from "./roomv2";
+import testbus from "./testbus";
 import quests from "./quests";
 
 const worlds: LocaleShape<typeof en> = {
@@ -15,6 +16,7 @@ const worlds: LocaleShape<typeof en> = {
   ...mientay,
   ...khupho,
   ...roomv2,
+  ...testbus,
   ...quests,
 };
 
