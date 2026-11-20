@@ -4,6 +4,7 @@
 import React from "react";
 import { GraduationCap } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import type { FatigueLevel, RestMode } from "../../../game/narrative/fatigue";
 import type { ThesisTaskView } from "../../../game/narrative/world";
 import { UI } from "../theme";
 import { formatDuration, type DurationText } from "./formatDuration";
@@ -19,6 +20,10 @@ export interface ThesisPanelProps {
   tasks: readonly ThesisTaskView[];
   onWork: (minutes: number) => void;
   onTask: (taskId: string) => void;
+  /** Present when the scenario has fatigue rules: how tired Alex is and how much longer work takes. */
+  fatigue?: { level: FatigueLevel; slowdownPercent: number };
+  /** Present when the scenario has fatigue rules: the rest options and their length. */
+  rest?: { napMinutes: number; sleepMinutes: number; onRest: (mode: RestMode) => void };
 }
 
 export const ThesisPanel: React.FC<ThesisPanelProps> = ({
@@ -30,6 +35,8 @@ export const ThesisPanel: React.FC<ThesisPanelProps> = ({
   tasks,
   onWork,
   onTask,
+  fatigue,
+  rest,
 }) => {
   const { t } = useTranslation("chapter1");
   const text = t as unknown as DurationText;
@@ -61,9 +68,28 @@ export const ThesisPanel: React.FC<ThesisPanelProps> = ({
       >
         {t("planner.thesis.work", { time: formatDuration(text, sessionMinutes) })}
       </button>
+      {fatigue !== undefined && fatigue.level !== "rested" && (
+        <p className={`${UI.body} mt-2`} data-testid="thesis-fatigue">
+          {t(`planner.thesis.fatigueNote.${fatigue.level}`, { percent: fatigue.slowdownPercent })}
+        </p>
+      )}
       {complete && <p className={`${UI.body} mt-2`}>{t("planner.thesis.complete")}</p>}
       {!complete && timeUp && <p className={`${UI.body} mt-2`}>{t("planner.thesis.timeUp")}</p>}
 
+      {rest !== undefined && (
+        <div className="mt-4" data-testid="rest-panel">
+          <h4 className={UI.label}>{t("planner.thesis.restHeading")}</h4>
+          <p className={`${UI.body} mt-1`}>{t("planner.thesis.restHint")}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" className={UI.buttonSecondary} disabled={timeUp} data-testid="rest-nap" onClick={() => rest.onRest("nap")}>
+              {t("planner.thesis.nap", { time: formatDuration(text, rest.napMinutes) })}
+            </button>
+            <button type="button" className={UI.buttonSecondary} disabled={timeUp} data-testid="rest-sleep" onClick={() => rest.onRest("sleep")}>
+              {t("planner.thesis.sleep", { time: formatDuration(text, rest.sleepMinutes) })}
+            </button>
+          </div>
+        </div>
+      )}
       <h4 className={`${UI.label} mt-4`}>{t("planner.thesis.tasksHeading")}</h4>
       {tasks.length === 0 ? (
         <p className={`${UI.body} mt-1`}>{t("planner.thesis.noTasks")}</p>

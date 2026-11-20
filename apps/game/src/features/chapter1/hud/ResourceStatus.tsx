@@ -2,12 +2,13 @@
 // digital security, support network, evidence). Presentation only: it reads `ChapterState.resources`
 // and never writes. Every value is text, so no status depends on color or an icon alone.
 import React from "react";
-import { Clock, FileSearch, GraduationCap, ShieldCheck, Users, Wallet } from "lucide-react";
+import { Clock, FileSearch, GraduationCap, Moon, ShieldCheck, Users, Wallet } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useGameLocale } from "../../../i18n";
 import { simulatedClock } from "../../../game/narrative/resources";
 import type { ChapterResources } from "../../../game/narrative/resources";
+import type { FatigueLevel } from "../../../game/narrative/fatigue";
 import { UI } from "../theme";
 import { formatSpan, type Tx } from "../device/deviceFormat";
 
@@ -23,6 +24,8 @@ const WEEKDAY_KEYS = [
 
 export interface ResourceStatusProps {
   resources: ChapterResources;
+  /** Present when the scenario has fatigue rules. The level is written as text, not only as a number. */
+  fatigueLevel?: FatigueLevel;
 }
 
 const Item: React.FC<{ icon: LucideIcon; label: string; value: string; testId: string }> = ({
@@ -38,7 +41,7 @@ const Item: React.FC<{ icon: LucideIcon; label: string; value: string; testId: s
   </li>
 );
 
-export const ResourceStatus: React.FC<ResourceStatusProps> = ({ resources }) => {
+export const ResourceStatus: React.FC<ResourceStatusProps> = ({ resources, fatigueLevel }) => {
   const { t } = useTranslation("chapter1");
   const locale = useGameLocale();
   const clock = simulatedClock(resources.timeMinutes);
@@ -72,6 +75,14 @@ export const ResourceStatus: React.FC<ResourceStatusProps> = ({ resources }) => 
         <Item icon={ShieldCheck} testId="resource-security" label={t("hud.status.security")} value={percent(resources.digitalSecurity)} />
         <Item icon={Users} testId="resource-support" label={t("hud.status.support")} value={percent(resources.supportNetwork)} />
         <Item icon={FileSearch} testId="resource-evidence" label={t("hud.status.evidence")} value={String(resources.evidence)} />
+        {fatigueLevel !== undefined && (
+          <Item
+            icon={Moon}
+            testId="resource-fatigue"
+            label={t("hud.status.fatigue")}
+            value={t("hud.status.fatigueValue", { level: t(`hud.status.fatigueLevel.${fatigueLevel}`), value: resources.fatigue })}
+          />
+        )}
       </ul>
     </section>
   );

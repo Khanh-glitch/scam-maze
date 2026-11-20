@@ -33,6 +33,12 @@ export interface ChapterIntroOverlayProps {
   lines?: readonly NarrationLine[];
   /** Called with the index of the line on screen, once the scene is ready and whenever it changes. */
   onLineChange?: (index: number) => void;
+  /**
+   * Cinematic opening: no paragraph and no step bars on screen. The room stays clear while the
+   * character speaks (the subtitles are drawn by the voice layer), a small hint tells the player a
+   * click goes on, and the controls and Continue sit at the edges of the screen.
+   */
+  cinematic?: boolean;
 }
 
 /** Key caps are physical labels and stay the same in every language ("mouse" is translated). */
@@ -57,6 +63,7 @@ export const ChapterIntroOverlay: React.FC<ChapterIntroOverlayProps> = ({
   controlIds,
   lines: customLines,
   onLineChange,
+  cinematic = false,
 }) => {
   const { t } = useTranslation("chapter1");
   const locale = useGameLocale();
@@ -107,6 +114,76 @@ export const ChapterIntroOverlay: React.FC<ChapterIntroOverlayProps> = ({
       advance();
     }
   };
+
+  const controlsList = (
+    <ul className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-[#d6d1ea]">
+      {CONTROLS.filter((control) => !controlIds || controlIds.includes(control.id)).map((control) => (
+        <li key={control.id} className="flex items-center gap-1.5">
+          {control.keys.length === 0 ? (
+            <kbd className="rounded border border-[#4a4466] bg-[#1d1b2b]/90 px-1.5 py-0.5 font-mono text-[11px] text-[#f7f5ff]">{t("intro.controls.mouse")}</kbd>
+          ) : (
+            control.keys.map((key) => (
+              <kbd key={key} className="rounded border border-[#4a4466] bg-[#1d1b2b]/90 px-1.5 py-0.5 font-mono text-[11px] text-[#f7f5ff]">
+                {key}
+              </kbd>
+            ))
+          )}
+          <span>{t(`intro.controls.${control.id}`)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+
+  if (cinematic) {
+    return (
+      <section
+        aria-labelledby="chapter-intro-heading"
+        aria-busy={!ready}
+        data-testid="chapter-intro"
+        onClick={advance}
+        onKeyDown={handleKeyDown}
+        className="absolute inset-0 z-30 cursor-pointer text-[#f7f5ff] select-none"
+      >
+        {/* The room stays visible: a light vignette, and a short shade at the bottom for the subtitles. */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(10,9,16,0.4)_100%)]" />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-[24%] bg-gradient-to-t from-black/45 to-transparent" />
+        <h1 id="chapter-intro-heading" ref={headingRef} tabIndex={-1} className="sr-only outline-none">
+          {t("intro.heading")}
+        </h1>
+        {ready ? (
+          <>
+            <p className="sr-only" aria-live="polite">
+              {text}
+            </p>
+            {mode === "begin" && (
+              <div data-testid="chapter-intro-controls" className="pointer-events-none absolute inset-x-0 top-5 flex flex-col items-center gap-1.5 px-6">
+                {controlsList}
+                <p className="text-[11px] text-[#a9a4c4]">{t("intro.simulation")}</p>
+              </div>
+            )}
+            <p data-testid="chapter-intro-hint" aria-hidden="true" className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-center text-xs text-[#a9a4c4]">
+              {t("intro.next")}
+            </p>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onBegin();
+              }}
+              className="absolute bottom-5 right-8 inline-flex items-center gap-2 rounded-md border border-[#7654d6]/60 bg-[#7654d6]/25 px-4 py-2 text-sm font-medium text-[#f7f5ff] transition-colors hover:bg-[#7654d6]/45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#b9a5f5]"
+            >
+              {t("intro.continue")}
+            </button>
+          </>
+        ) : (
+          <p role="status" className="absolute bottom-6 left-8 flex items-center gap-2 text-sm text-[#a9a4c4]">
+            <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
+            {t("intro.preparing")}
+          </p>
+        )}
+      </section>
+    );
+  }
 
   return (
     <section

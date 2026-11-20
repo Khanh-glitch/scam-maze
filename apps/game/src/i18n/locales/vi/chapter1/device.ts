@@ -16,6 +16,21 @@ const device: LocaleShape<typeof en> = {
     unread_one: "{{number}} chưa đọc",
     unread_other: "{{number}} chưa đọc",
     back: "Quay lại",
+    figures: {
+      heading: "Tiền trên trang này",
+      real: "Tiền thật của bạn (ngân hàng)",
+      shown: "Số dư trang hiển thị (không phải tiền)",
+      withdrawable: "Số tiền bạn có thể rút",
+      locked: "Tiền bạn đã gửi mà trang giữ lại",
+    },
+    conversation: {
+      heading: "Cuộc trò chuyện",
+      you: "Bạn",
+      listen: "Nghe",
+      stop: "Dừng",
+      synthetic: "Các câu thoại được trình duyệt của bạn đọc bằng giọng máy. Đây không phải bản ghi âm.",
+      noVoice: "Trình duyệt của bạn không có giọng đọc cho ngôn ngữ này. Hãy đọc phần chữ.",
+    },
     empty: "Chưa có gì ở đây.",
     unreadMark: "Chưa đọc",
     folders: {
@@ -48,6 +63,12 @@ const device: LocaleShape<typeof en> = {
       ledger: "Giao dịch",
       noTransactions: "Chưa có giao dịch nào.",
       payees: "Người nhận và dịch vụ",
+      finance: {
+        debt: "Khoản nợ",
+        lockedFunds: "Tiền bị khóa trên nền tảng",
+        financialLoss: "Tiền đã mất (gồm cả tiền bị khóa)",
+        displayedProfit: "Lợi nhuận nền tảng hiển thị (không phải tiền)",
+      },
     },
     map: {
       here: "Bạn đang ở: {{place}}",

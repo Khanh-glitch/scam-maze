@@ -15,6 +15,21 @@ const device = {
     unread_one: "{{number}} unread",
     unread_other: "{{number}} unread",
     back: "Back",
+    figures: {
+      heading: "Money on this page",
+      real: "Your real money (bank)",
+      shown: "Balance shown by the page (not money)",
+      withdrawable: "You can withdraw",
+      locked: "Money you sent that the page keeps",
+    },
+    conversation: {
+      heading: "Conversation",
+      you: "You",
+      listen: "Listen",
+      stop: "Stop",
+      synthetic: "Voice lines are read aloud by your browser with a computer voice. They are not recordings.",
+      noVoice: "Your browser has no voice for this language. Read the text instead.",
+    },
     empty: "Nothing here yet.",
     unreadMark: "Unread",
     folders: {
@@ -47,6 +62,12 @@ const device = {
       ledger: "Transactions",
       noTransactions: "No transactions yet.",
       payees: "Payees and services",
+      finance: {
+        debt: "Debt",
+        lockedFunds: "Locked on platforms",
+        financialLoss: "Money lost (locked money included)",
+        displayedProfit: "Profit shown by platforms (not money)",
+      },
     },
     map: {
       here: "You are at: {{place}}",

@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { encodeProgress, restoreProgress } from "../saves/chapterProgress";
 import { CHAPTER_1_SCENARIO } from "../narrative/chapter1/scenario";
-import { LAST_SUBMISSION_SCENARIO } from "../narrative/chapter1/lastSubmission";
+import { FOUNDATION_SCENARIO, LAST_SUBMISSION_SCENARIO } from "../narrative/chapter1/lastSubmission";
 import { selectDeviceView, validateDeviceContent } from "../narrative/device";
 import { localizeScenario, narrativeTextEntries } from "../narrative/localize";
 import { chapterReducer, createInitialState, isCoreAction } from "../narrative/reducer";
@@ -112,7 +112,7 @@ const CONTACT: DeviceItemDef = {
   actions: [{ id: "call", label: "Call", callId: "call.official" }],
 };
 
-function scenarioWith(items: DeviceItemDef[] = ITEMS, base: ScenarioDefinition = LAST_SUBMISSION_SCENARIO): ScenarioDefinition {
+function scenarioWith(items: DeviceItemDef[] = ITEMS, base: ScenarioDefinition = FOUNDATION_SCENARIO): ScenarioDefinition {
   return {
     ...base,
     deviceItems: items,

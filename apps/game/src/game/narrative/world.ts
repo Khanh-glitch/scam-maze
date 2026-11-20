@@ -7,6 +7,7 @@
 // 200 or a deadline at minute 150 reads. It never resets state: it only moves events and missions
 // forward and applies their data-defined effects.
 import { applyEffects, evaluateConditions } from "./conditions";
+import { DEFAULT_FATIGUE_CONFIG, effectiveWorkMinutes } from "./fatigue";
 import { CHAPTER_1_INITIAL_STATE } from "./resources";
 import type {
   ChapterState,
@@ -34,10 +35,12 @@ export const DEFAULT_GAMEPLAY_CONFIG: GameplayConfig = {
   msPerGameMinute: 1000,
   tickMinutes: 5,
   clockRuns: false,
+  fatigue: DEFAULT_FATIGUE_CONFIG,
 };
 
 export function gameplayConfig(scenario: ScenarioDefinition): GameplayConfig {
-  return { ...DEFAULT_GAMEPLAY_CONFIG, ...scenario.gameplay };
+  const merged = { ...DEFAULT_GAMEPLAY_CONFIG, ...scenario.gameplay };
+  return { ...merged, fatigue: { ...DEFAULT_FATIGUE_CONFIG, ...scenario.gameplay?.fatigue } };
 }
 
 /** Upper bound of settle steps per action: a guard against data that keeps re-triggering itself. */
@@ -70,8 +73,50 @@ function has<T>(record: Record<string, T>, key: string): boolean {
 
 /** True when the trigger's time has come (or it has none) and its conditions hold. */
 function triggerHolds(trigger: WorldTrigger, state: ChapterState, scenario: ScenarioDefinition, now: number): boolean {
-  if (trigger.atMinute !== undefined && trigger.atMinute > now) return false;
-  return evaluateConditions(trigger.when, state, scenario);
+  return triggerFiresAt(trigger, state, scenario, now) !== null;
+}
+
+function doneAtOf(state: ChapterState, itemId: string, actionId: string): number | undefined {
+  if (!has(state.device.items, itemId)) return undefined;
+  const record = state.device.items[itemId].doneAt;
+  return record !== undefined && has(record, actionId) ? record[actionId] : undefined;
+}
+
+/**
+ * The simulated minute at which a trigger fires, or null when it does not hold yet. With
+ * `afterAction` that is the scheduled minute, which may be earlier than `now` after a long action.
+ */
+export function triggerFiresAt(trigger: WorldTrigger, state: ChapterState, scenario: ScenarioDefinition, now: number): number | null {
+  let at = trigger.atMinute ?? null;
+  if (at !== null && at > now) return null;
+  if (trigger.afterAction !== undefined) {
+    const done = doneAtOf(state, trigger.afterAction.itemId, trigger.afterAction.actionId);
+    if (done === undefined) return null;
+    const due = done + trigger.afterAction.minutes;
+    if (due > now) return null;
+    at = Math.max(at ?? 0, due);
+  }
+  const firesAt = at ?? now;
+  for (const stop of trigger.cancelledBy ?? []) {
+    const stoppedAt = doneAtOf(state, stop.itemId, stop.actionId);
+    if (stoppedAt !== undefined && stoppedAt <= firesAt) return null;
+  }
+  if (!evaluateConditions(trigger.when, state, scenario)) return null;
+  return firesAt;
+}
+
+/**
+ * Applies effects as if they happened at `minute` (ledger lines, mission opening and item arrival
+ * read the clock), then puts the clock back, keeping any change the effects made to the time itself.
+ */
+function applyEffectsAt(state: ChapterState, effects: Parameters<typeof applyEffects>[1], scenario: ScenarioDefinition, minute: number): ChapterState {
+  const start = (scenario.initial ?? CHAPTER_1_INITIAL_STATE).resources.timeMinutes;
+  const real = state.resources.timeMinutes;
+  const rewound = Math.min(start, Math.max(real, start - minute));
+  if (rewound === real) return applyEffects(state, effects, scenario);
+  const after = applyEffects({ ...state, resources: { ...state.resources, timeMinutes: rewound } }, effects, scenario);
+  const spent = after.resources.timeMinutes - rewound;
+  return { ...after, resources: { ...after.resources, timeMinutes: Math.max(0, real + spent) } };
 }
 
 /** The first path whose conditions hold, or null. */
@@ -104,17 +149,24 @@ function collectSteps(state: ChapterState, scenario: ScenarioDefinition, now: nu
   for (const event of scenario.events ?? []) {
     const current = has(state.world.events, event.id) ? state.world.events[event.id] : null;
     if (current === null) {
-      if (!triggerHolds(event.trigger, state, scenario, now)) continue;
-      const firedAt = event.trigger.atMinute ?? now;
+      const firedAt = triggerFiresAt(event.trigger, state, scenario, now);
+      if (firedAt === null) continue;
       steps.push({
         dueAt: firedAt,
         rank: RANK.fire,
         key: event.id,
         apply: (s) => ({
-          state: applyEffects(
-            withEvent(s, event.id, { status: "pending", firedAtMinute: firedAt, resolvedAtMinute: null, postponed: 0, response: null }),
+          state: applyEffectsAt(
+            withEvent(s, event.id, {
+              status: event.autoResolve === true ? "resolved" : "pending",
+              firedAtMinute: firedAt,
+              resolvedAtMinute: event.autoResolve === true ? firedAt : null,
+              postponed: 0,
+              response: null,
+            }),
             event.onFire,
             scenario,
+            firedAt,
           ),
           tag: `${WORLD_TAG_PREFIX}event:${event.id}:arrived`,
         }),
@@ -136,8 +188,8 @@ function collectSteps(state: ChapterState, scenario: ScenarioDefinition, now: nu
 
   for (const item of scenario.deviceItems ?? []) {
     if (item.arrives === undefined || has(state.device.items, item.id)) continue;
-    if (!triggerHolds(item.arrives, state, scenario, now)) continue;
-    const arrivedAt = item.arrives.atMinute ?? now;
+    const arrivedAt = triggerFiresAt(item.arrives, state, scenario, now);
+    if (arrivedAt === null) continue;
     steps.push({
       dueAt: arrivedAt,
       rank: RANK.fire,
@@ -389,7 +441,7 @@ export const selectThesisView = memo((state, scenario): ThesisView => {
     freeWorkMaxPercent: config.thesisFreeWorkMaxPercent,
     tasks: (scenario.thesisTasks ?? []).map((task): ThesisTaskView => {
       const done = state.world.thesisTasksDone.includes(task.id);
-      const timeCost = task.timeCostMinutes ?? 0;
+      const timeCost = effectiveWorkMinutes(task.timeCostMinutes ?? 0, state.resources.fatigue, config.fatigue);
       const blocked: ThesisTaskView["blocked"] = done
         ? "done"
         : complete
@@ -461,7 +513,7 @@ export function validateWorldContent(scenario: ScenarioDefinition): string[] {
     }
   };
   const checkTrigger = (where: string, trigger: WorldTrigger): void => {
-    if (trigger.atMinute === undefined && (trigger.when === undefined || trigger.when.length === 0)) {
+    if (trigger.atMinute === undefined && trigger.afterAction === undefined && (trigger.when === undefined || trigger.when.length === 0)) {
       problems.push(`${where} has no trigger: it needs a time or a condition.`);
     }
     checkTime(where, trigger.atMinute);
@@ -499,7 +551,7 @@ export function validateWorldContent(scenario: ScenarioDefinition): string[] {
     if (event.deadlineAfterMinutes !== undefined && (!Number.isInteger(event.deadlineAfterMinutes) || event.deadlineAfterMinutes < 1)) {
       problems.push(`${where} has an invalid deadline.`);
     }
-    if (event.responses.length === 0) problems.push(`${where} has no response.`);
+    if (event.responses.length === 0 && event.autoResolve !== true) problems.push(`${where} has no response.`);
     const responseIds = new Set<string>();
     for (const response of event.responses) {
       if (responseIds.has(response.id)) problems.push(`${where} has two responses named "${response.id}".`);

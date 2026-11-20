@@ -56,6 +56,9 @@ const hud = {
       security: "Digital security",
       support: "Support network",
       evidence: "Evidence",
+      fatigue: "Fatigue",
+      fatigueValue: "{{level}}, {{value}}%",
+      fatigueLevel: { rested: "Rested", tired: "Tired", exhausted: "Exhausted" },
       percent: "{{value}}%",
       weekday: {
         "1": "Monday",
@@ -118,6 +121,14 @@ const hud = {
       limit: "Free work stops at {{percent}}%. More progress comes from thesis tasks.",
       tasksHeading: "Thesis tasks",
       noTasks: "No thesis tasks yet.",
+      fatigueNote: {
+        tired: "You are tired. Thesis work takes {{percent}}% longer.",
+        exhausted: "You are exhausted. Thesis work takes {{percent}}% longer.",
+      },
+      restHeading: "Rest",
+      restHint: "Resting takes time. Other deadlines keep running.",
+      nap: "Take a short break ({{time}}, a little less tired)",
+      sleep: "Sleep ({{time}})",
       taskCost: "{{label}} ({{time}}, +{{percent}}%)",
       taskGain: "{{label}} (+{{percent}}%)",
       blocked: {

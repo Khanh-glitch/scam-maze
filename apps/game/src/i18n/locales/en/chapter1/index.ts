@@ -7,6 +7,7 @@ import room from "./room";
 import journalCombine from "./journalCombine";
 import debriefForensic from "./debriefForensic";
 import device from "./device";
+import voice from "./voice";
 
 /** The `chapter1` namespace, composed from area files with disjoint top-level key groups. */
 const chapter1 = {
@@ -19,6 +20,7 @@ const chapter1 = {
   ...journalCombine,
   ...debriefForensic,
   ...device,
+  ...voice,
 };
 
 export default chapter1;

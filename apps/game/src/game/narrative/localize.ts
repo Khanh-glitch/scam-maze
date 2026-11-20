@@ -253,6 +253,14 @@ function walkScenario(scenario: ScenarioDefinition, text: TextVisitor): Scenario
                   actions: item.actions.map((action) => ({
                     ...action,
                     label: text(`device/${item.id}/actions/${action.id}/label`, action.label),
+                    ...(action.transcript !== undefined
+                      ? {
+                          transcript: action.transcript.map((line, index) => ({
+                            ...line,
+                            text: text(`device/${item.id}/actions/${action.id}/transcript/${index}`, line.text),
+                          })),
+                        }
+                      : {}),
                   })),
                 }
               : {}),

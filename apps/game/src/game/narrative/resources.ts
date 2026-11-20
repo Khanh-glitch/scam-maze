@@ -20,6 +20,8 @@ export const RESOURCE_IDS = [
   "supportNetwork",
   /** Verified information that has value for a specific situation (not a screenshot count). */
   "evidence",
+  /** Tiredness, 0 to 100. Slows thesis work. Rules and numbers: `fatigue.ts`. */
+  "fatigue",
 ] as const;
 export type ResourceId = (typeof RESOURCE_IDS)[number];
 export type ChapterResources = Record<ResourceId, number>;
@@ -41,6 +43,40 @@ export const PERSISTENT_FLAG_IDS = [
   "housingDepositLost",
   /** Minh still trusts Alex (relationship flag). */
   "minhTrustsAlex",
+  /** Alex confirmed with the Training Office that the submission account is active and no fee exists. */
+  "schoolAccessVerified",
+  /** Alex entered his student login on a page that was not the school's. */
+  "loginCredentialsExposed",
+  /** Alex gave a verification code to that page. */
+  "verificationCodeExposed",
+  /** An account was compromised at some point, even if access was recovered later. */
+  "accountEverCompromised",
+  /** The draft missed its internal deadline and Alex works through the night. */
+  "overnightWork",
+  /** Money was sent to an online job or investment page. Read by Mission 03 (money and housing) and Mission 05. */
+  "lostMoneyToScam",
+  /** Alex paid at least one deposit to the online job platform. */
+  "easyMoneyDeposited",
+  /** Money is locked on the investment platform and cannot be withdrawn. */
+  "investmentFundsLocked",
+  /** Alex borrowed money to keep paying the online job platform. Read by Mission 03. */
+  "debtFromScam",
+  /** Alex saved the records of a platform (deposits, fee messages, the page address). */
+  "scamEvidenceSaved",
+  /** Alex lost money or has funds locked, so a recovery offer in Mission 05 can refer to that loss. */
+  "recoveryOfferEligible",
+  /** Alex reported to the bank on its official line, which blocked later transfers. */
+  "bankReported",
+  /** Alex started the online job tasks. */
+  "easyMoneyJoined",
+  /** Alex stopped the online job and closed the account. */
+  "easyMoneyStopped",
+  /** Alex invested on the investment platform. */
+  "goldenPlatformJoined",
+  /** Alex paid at least one fee that the investment platform asked for before a withdrawal. */
+  "goldenFeesPaid",
+  /** The full draft was finished (on time or late). */
+  "draftFinished",
 ] as const;
 export type PersistentFlagId = (typeof PERSISTENT_FLAG_IDS)[number];
 export type PersistentFlags = Record<PersistentFlagId, boolean>;
@@ -78,6 +114,7 @@ export const CHAPTER_1_INITIAL_STATE: ChapterInitialState = {
     digitalSecurity: 100,
     supportNetwork: 50,
     evidence: 0,
+    fatigue: 20,
   },
   persistent: {
     accountCompromised: false,
@@ -86,6 +123,23 @@ export const CHAPTER_1_INITIAL_STATE: ChapterInitialState = {
     identityDocumentsExposed: false,
     housingDepositLost: false,
     minhTrustsAlex: true,
+    schoolAccessVerified: false,
+    loginCredentialsExposed: false,
+    verificationCodeExposed: false,
+    accountEverCompromised: false,
+    overnightWork: false,
+    lostMoneyToScam: false,
+    easyMoneyDeposited: false,
+    investmentFundsLocked: false,
+    debtFromScam: false,
+    scamEvidenceSaved: false,
+    recoveryOfferEligible: false,
+    bankReported: false,
+    easyMoneyJoined: false,
+    easyMoneyStopped: false,
+    goldenPlatformJoined: false,
+    goldenFeesPaid: false,
+    draftFinished: false,
   },
 };
 
@@ -97,6 +151,7 @@ export const RESOURCE_LIMITS: Record<ResourceId, { min: number | null; max: numb
   digitalSecurity: { min: 0, max: 100 },
   supportNetwork: { min: 0, max: 100 },
   evidence: { min: 0, max: null },
+  fatigue: { min: 0, max: 100 },
 };
 
 export function isResourceId(value: unknown): value is ResourceId {

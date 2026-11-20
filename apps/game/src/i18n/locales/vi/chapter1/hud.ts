@@ -51,6 +51,9 @@ const hud: LocaleShape<typeof en> = {
       security: "Bảo mật số",
       support: "Mạng lưới hỗ trợ",
       evidence: "Bằng chứng",
+      fatigue: "Mệt mỏi",
+      fatigueValue: "{{level}}, {{value}}%",
+      fatigueLevel: { rested: "Khỏe", tired: "Mệt", exhausted: "Kiệt sức" },
       percent: "{{value}}%",
       weekday: {
         "1": "Thứ Hai",
@@ -113,6 +116,14 @@ const hud: LocaleShape<typeof en> = {
       limit: "Làm tự do chỉ đến {{percent}}%. Muốn tiến thêm cần hoàn thành các nhiệm vụ khóa luận.",
       tasksHeading: "Nhiệm vụ khóa luận",
       noTasks: "Chưa có nhiệm vụ khóa luận nào.",
+      fatigueNote: {
+        tired: "Bạn đang mệt. Làm khóa luận mất thêm {{percent}}% thời gian.",
+        exhausted: "Bạn đã kiệt sức. Làm khóa luận mất thêm {{percent}}% thời gian.",
+      },
+      restHeading: "Nghỉ ngơi",
+      restHint: "Nghỉ ngơi tốn thời gian. Các hạn chót khác vẫn tiếp tục chạy.",
+      nap: "Nghỉ ngắn ({{time}}, đỡ mệt một chút)",
+      sleep: "Ngủ ({{time}})",
       taskCost: "{{label}} ({{time}}, +{{percent}}%)",
       taskGain: "{{label}} (+{{percent}}%)",
       blocked: {

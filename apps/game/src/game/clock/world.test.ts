@@ -2,7 +2,7 @@
 // adaptive mission paths. The fixtures below are test content, not Mission 01.
 import { describe, expect, it } from "vitest";
 import { encodeProgress, restoreProgress } from "../saves/chapterProgress";
-import { LAST_SUBMISSION_SCENARIO } from "../narrative/chapter1/lastSubmission";
+import { FOUNDATION_SCENARIO, LAST_SUBMISSION_SCENARIO } from "../narrative/chapter1/lastSubmission";
 import { chapterReducer, createInitialState, isCoreAction } from "../narrative/reducer";
 import { CHAPTER_DURATION_MINUTES, minutesFromStart } from "../narrative/resources";
 import type { ChapterState, CoreAction, GameEventDef, MissionDef, ScenarioDefinition } from "../narrative/types";
@@ -13,7 +13,7 @@ const advance = (minutes: number): CoreAction => ({ type: "ADVANCE_TIME", minute
 const respond = (eventId: string, response: string): CoreAction => ({ type: "RESPOND_EVENT", eventId, response });
 
 function scenarioWith(events: GameEventDef[], missions: MissionDef[] = [], gameplay?: ScenarioDefinition["gameplay"]): ScenarioDefinition {
-  return { ...LAST_SUBMISSION_SCENARIO, events, missions, ...(gameplay ? { gameplay } : {}) };
+  return { ...FOUNDATION_SCENARIO, events, missions, ...(gameplay ? { gameplay } : {}) };
 }
 
 function event(id: string, def: Partial<GameEventDef> = {}): GameEventDef {
@@ -274,7 +274,7 @@ describe("thesis work and running deadlines", () => {
   });
 
   it("completes a mission before its deadline when its condition holds", () => {
-    const finish = { ...scenario, gameplay: { thesisFreeWorkMaxPercent: 100 }, initial: { ...(scenario.initial ?? LAST_SUBMISSION_SCENARIO.initial!), resources: { ...LAST_SUBMISSION_SCENARIO.initial!.resources, thesisProgress: 98 } } };
+    const finish = { ...scenario, gameplay: { thesisFreeWorkMaxPercent: 100 }, initial: { ...(scenario.initial ?? LAST_SUBMISSION_SCENARIO.initial!), resources: { ...FOUNDATION_SCENARIO.initial!.resources, thesisProgress: 98 } } };
     const state = run(finish, [START, advance(10), { type: "WORK_ON_THESIS", minutes: 120 }, advance(400)]);
     expect(state.world.missions["graduation-check"].status).toBe("completed");
     expect(state.persistent.minhTrustsAlex).toBe(true);
