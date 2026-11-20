@@ -4,7 +4,7 @@
 // action are core actions, so they cost time and cash and can change events, missions and
 // persistent state. The views state facts and costs only: no item or action is marked as safe,
 // unsafe, good or bad, and addresses are plain text, never links.
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { DeviceAppId } from "../../../game/narrative/types";
@@ -12,12 +12,19 @@ import type { DeviceItemView, DeviceView } from "../../../game/narrative/device"
 import { useGameLocale } from "../../../i18n/useGameLocale";
 import { UI } from "../theme";
 import { actionLabel, formatAmount, formatSpan, formatWhen, type Tx } from "./deviceFormat";
+import { ConversationHistory } from "./ConversationHistory";
+import { PlatformFigures } from "./PlatformFigures";
 
 export interface DeviceAppProps {
   app: DeviceAppId;
   view: DeviceView;
   onOpenItem: (itemId: string) => void;
   onUseItem: (itemId: string, actionId: string) => void;
+  /**
+   * Tells which list is on screen (the app and the ids of its items), and null when the list is
+   * closed (an item is open or the app is left). The voice of Alex reacts to what the player sees.
+   */
+  onView?: (view: { app: DeviceAppId; itemIds: readonly string[] } | null) => void;
   /** Shows the app without its header (the contacts section of the calls app). */
   embedded?: boolean;
   /** Adds a Back button to the list that leaves the app (the phone returns to its home screen). */
@@ -41,6 +48,25 @@ const Header: React.FC<{ app: DeviceAppId; view: DeviceView; t: Tx; locale: stri
           {t("device.bank.balanceValue", { amount: formatAmount(locale, view.bank.balance) })}
         </p>
         <p className={`${UI.body} mt-1`}>{t("device.bank.security", { value: view.bank.digitalSecurity })}</p>
+        {(view.bank.finance.debt > 0 || view.bank.finance.lockedFunds > 0 || view.bank.finance.financialLoss > 0 || view.bank.finance.displayedProfit > 0) && (
+          <dl className="mt-3 space-y-1" data-testid="bank-finance">
+            {(
+              [
+                ["debt", view.bank.finance.debt],
+                ["lockedFunds", view.bank.finance.lockedFunds],
+                ["financialLoss", view.bank.finance.financialLoss],
+                ["displayedProfit", view.bank.finance.displayedProfit],
+              ] as const
+            )
+              .filter(([, amount]) => amount > 0)
+              .map(([key, amount]) => (
+                <div key={key} className="flex items-start justify-between gap-3" data-testid={`bank-finance-${key}`}>
+                  <dt className="text-xs text-[#a9a4c4]">{t(`device.bank.finance.${key}`)}</dt>
+                  <dd className="shrink-0 text-sm font-semibold tabular-nums text-[#f7f5ff]">{t("device.amount", { amount: formatAmount(locale, amount) })}</dd>
+                </div>
+              ))}
+          </dl>
+        )}
       </section>
     );
   }
@@ -120,7 +146,7 @@ const Ledger: React.FC<{ view: DeviceView; t: Tx; locale: string }> = ({ view, t
   </section>
 );
 
-export const DeviceApp: React.FC<DeviceAppProps> = ({ app, view, onOpenItem, onUseItem, embedded = false, onExit }) => {
+export const DeviceApp: React.FC<DeviceAppProps> = ({ app, view, onOpenItem, onUseItem, onView, embedded = false, onExit }) => {
   const { t: translate } = useTranslation("chapter1");
   const t = translate as unknown as Tx;
   const locale = useGameLocale();
@@ -130,6 +156,14 @@ export const DeviceApp: React.FC<DeviceAppProps> = ({ app, view, onOpenItem, onU
   const folders = app === "mail" ? Array.from(new Set(items.flatMap((item) => (item.folder === null ? [] : [item.folder])))) : [];
   const shown = folder === "all" ? items : items.filter((item) => item.folder === folder);
   const current = selected === null ? null : (items.find((item) => item.id === selected) ?? null);
+  const onViewRef = useRef(onView);
+  onViewRef.current = onView;
+  const listIds = current === null ? shown.map((item) => item.id).join("|") : null;
+  useEffect(() => {
+    if (listIds === null) return undefined;
+    onViewRef.current?.({ app, itemIds: listIds === "" ? [] : listIds.split("|") });
+    return () => onViewRef.current?.(null);
+  }, [app, listIds]);
 
   const open = (item: DeviceItemView) => {
     setSelected(item.id);
@@ -165,6 +199,8 @@ export const DeviceApp: React.FC<DeviceAppProps> = ({ app, view, onOpenItem, onU
           {current.detail && <p className="mt-1 text-xs text-[#a9a4c4]">{current.detail}</p>}
         </header>
         <p className={`${UI.body} whitespace-pre-line text-[#f7f5ff]`}>{current.body}</p>
+        {current.figures !== null && <PlatformFigures figures={current.figures} />}
+        {current.conversation.length > 0 && <ConversationHistory lines={current.conversation} otherName={current.title} />}
         {current.actions.length > 0 && (
           <ul className="space-y-2">
             {current.actions.map((action) => (
@@ -226,10 +262,10 @@ export const DeviceApp: React.FC<DeviceAppProps> = ({ app, view, onOpenItem, onU
             <li key={item.id}>
               <button type="button" className={ROW} onClick={() => open(item)} data-testid={`device-row-${item.id}`}>
                 <span className="min-w-0 flex-1">
-                  <span className={`block text-sm ${item.read ? "font-medium" : "font-bold"}`}>{item.title}</span>
+                  <span className={`block text-sm ${item.read || !item.tracksUnread ? "font-medium" : "font-bold"}`}>{item.title}</span>
                   {meta(item) && <span className="block text-xs text-[#a9a4c4]">{meta(item)}</span>}
                 </span>
-                {!item.read && (
+                {!item.read && item.tracksUnread && (
                   <>
                     <span aria-hidden="true" className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#f2b24b]" />
                     <span className="sr-only">{t("device.unreadMark")}</span>

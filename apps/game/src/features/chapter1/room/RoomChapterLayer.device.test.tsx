@@ -13,10 +13,10 @@ import { RoomChapterLayer } from "./RoomChapterLayer";
 import { RoomStoryBridge } from "./roomStoryBridge";
 
 vi.mock("../../../game/narrative/activeScenario", async () => {
-  const { LAST_SUBMISSION_SCENARIO } = await import("../../../game/narrative/chapter1/lastSubmission");
+  const { FOUNDATION_SCENARIO } = await import("../../../game/narrative/chapter1/lastSubmission");
   return {
     ACTIVE_SCENARIO: {
-      ...LAST_SUBMISSION_SCENARIO,
+      ...FOUNDATION_SCENARIO,
       gameplay: { clockRuns: false },
       ledgerLabels: { "ledger.fee": "Clearance fee" },
       deviceItems: [

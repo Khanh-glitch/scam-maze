@@ -5,7 +5,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { encodeProgress, restoreProgress } from "../saves/chapterProgress";
 import { parseSaveEnvelopeV3, SAVE_CONTENT_VERSION, SAVE_FORMAT_VERSION_V3 } from "../saves/saveGame";
-import { LAST_SUBMISSION_SCENARIO } from "../narrative/chapter1/lastSubmission";
+import { FOUNDATION_SCENARIO, LAST_SUBMISSION_SCENARIO } from "../narrative/chapter1/lastSubmission";
 import { CHAPTER_1_SCENARIO } from "../narrative/chapter1/scenario";
 import { evaluateCondition } from "../narrative/conditions";
 import { chapterReducer, createInitialState } from "../narrative/reducer";
@@ -29,7 +29,7 @@ function deviceAction(id: DeviceActionDef["id"], def: Partial<DeviceActionDef>):
 
 /** The real foundation scenario plus two test-only device actions that stand in for mission decisions. */
 function fixture(actions: Partial<ScenarioDefinition["deviceActions"]>): ScenarioDefinition {
-  return { ...LAST_SUBMISSION_SCENARIO, deviceActions: actions as ScenarioDefinition["deviceActions"] };
+  return { ...FOUNDATION_SCENARIO, deviceActions: actions as ScenarioDefinition["deviceActions"] };
 }
 
 function run(scenario: ScenarioDefinition, actions: CoreAction[]): ChapterState {
@@ -84,6 +84,23 @@ describe("a new game", () => {
       identityDocumentsExposed: false,
       housingDepositLost: false,
       minhTrustsAlex: true,
+      schoolAccessVerified: false,
+      loginCredentialsExposed: false,
+      verificationCodeExposed: false,
+      accountEverCompromised: false,
+      overnightWork: false,
+      lostMoneyToScam: false,
+      easyMoneyDeposited: false,
+      investmentFundsLocked: false,
+      debtFromScam: false,
+      scamEvidenceSaved: false,
+      recoveryOfferEligible: false,
+      bankReported: false,
+      easyMoneyJoined: false,
+      easyMoneyStopped: false,
+      goldenPlatformJoined: false,
+      goldenFeesPaid: false,
+      draftFinished: false,
     });
   });
 
@@ -105,7 +122,7 @@ describe("a new game", () => {
   });
 
   it("lets a scenario override the unstated start values", () => {
-    const custom = { ...LAST_SUBMISSION_SCENARIO, initial: { ...CHAPTER_1_INITIAL_STATE, resources: { ...CHAPTER_1_INITIAL_STATE.resources, supportNetwork: 70 } } };
+    const custom = { ...FOUNDATION_SCENARIO, initial: { ...CHAPTER_1_INITIAL_STATE, resources: { ...CHAPTER_1_INITIAL_STATE.resources, supportNetwork: 70 } } };
     expect(createInitialState(custom).resources.supportNetwork).toBe(70);
   });
 });
@@ -269,6 +286,6 @@ describe("determinism, save and load", () => {
       progress: { checkpointId: "start", actions: [], playerPose: null },
     });
     expect(parsed).toMatchObject({ status: "invalid", code: "incompatible" });
-    expect(SAVE_CONTENT_VERSION).toBe("ch1-last-submission-1");
+    expect(SAVE_CONTENT_VERSION).toBe("ch1-last-submission-2");
   });
 });

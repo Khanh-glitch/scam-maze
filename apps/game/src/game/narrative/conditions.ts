@@ -9,7 +9,7 @@
 import type { CallId } from "./chapter1/ids";
 import { discover } from "./evidence";
 import { CHAPTER_1_INITIAL_STATE, clampResource, isPersistentFlagId, isResourceId } from "./resources";
-import type { ChapterState, Condition, Effect, PressureLevel, ScenarioDefinition } from "./types";
+import type { ChapterState, Condition, Effect, LedgerCategory, PressureLevel, ScenarioDefinition } from "./types";
 
 /** Highest pressure level (Requirement 10.6). */
 export const MAX_PRESSURE: PressureLevel = 3;
@@ -88,6 +88,19 @@ export function evaluateCondition(
       return Object.hasOwn(state.device.items, condition.itemId) && state.device.items[condition.itemId].read;
     case "itemActionDone":
       return Object.hasOwn(state.device.items, condition.itemId) && state.device.items[condition.itemId].done.includes(condition.actionId);
+    case "anyOf":
+      return condition.conditions.some((inner) => evaluateCondition(inner, state, scenario));
+    case "allOf":
+      return condition.conditions.every((inner) => evaluateCondition(inner, state, scenario));
+    case "not":
+      return !evaluateCondition(condition.condition, state, scenario);
+    case "missionOpenFor": {
+      if (!Object.hasOwn(state.world.missions, condition.missionId)) return false;
+      const mission = state.world.missions[condition.missionId];
+      if (mission.status !== "open" || mission.openedAtMinute === null) return false;
+      const start = (scenario?.initial ?? CHAPTER_1_INITIAL_STATE).resources.timeMinutes;
+      return start - state.resources.timeMinutes - mission.openedAtMinute >= condition.minutes;
+    }
     case "thesisTaskDone":
       return state.world.thesisTasksDone.includes(condition.taskId);
     case "atLocation":
@@ -198,8 +211,11 @@ export function applyEffect(
         device: { ...state.device, items: { ...state.device.items, [effect.itemId]: { arrivedAtMinute: now, read: false, readAtMinute: null, done: [] } } },
       };
     }
-    case "recordTransaction":
-      return recordTransaction(state, scenario, effect.label, effect.amount, effect.counterparty ?? null, null, null);
+    case "recordTransaction": {
+      // `limitToCash`: money that leaves without the player's approval can only take what is there.
+      const amount = effect.limitToCash === true && effect.amount < 0 ? -Math.min(-Math.trunc(effect.amount), Math.max(0, state.resources.cash)) : effect.amount;
+      return recordTransaction(state, scenario, effect.label, amount, effect.counterparty ?? null, null, null, effect.category ?? null);
+    }
     case "setLocation": {
       if (state.device.location === effect.placeId) return state;
       return { ...state, device: { ...state.device, location: effect.placeId } };
@@ -245,12 +261,22 @@ export function recordTransaction(
   counterparty: string | null,
   itemId: string | null,
   actionId: string | null,
+  category: LedgerCategory | null = null,
 ): ChapterState {
   if (!Number.isFinite(amount) || Math.trunc(amount) === 0) return state;
   const whole = Math.trunc(amount);
   const start = (scenario.initial ?? CHAPTER_1_INITIAL_STATE).resources.timeMinutes;
   const now = Math.max(0, start - state.resources.timeMinutes);
-  const entry = { seq: state.device.ledger.length, atMinute: now, label, amount: whole, counterparty, itemId, actionId };
+  const entry = {
+    seq: state.device.ledger.length,
+    atMinute: now,
+    label,
+    amount: whole,
+    counterparty,
+    itemId,
+    actionId,
+    ...(category !== null ? { category } : {}),
+  };
   return {
     ...state,
     resources: { ...state.resources, cash: clampResource("cash", state.resources.cash + whole) },

@@ -41,6 +41,7 @@ import {
   CHAPTER_1_INITIAL_STATE,
   PERSISTENT_FLAG_IDS,
   RESOURCE_IDS,
+  clampResource,
   cloneInitialState,
   type PersistentFlagId,
   type ResourceId,
@@ -48,7 +49,8 @@ import {
 import { applyEffect, applyEffects, evaluateConditions, recordTransaction } from "./conditions";
 import { canRecordDeduction, matchDeduction } from "./deductions";
 import { createInitialDeviceItems, deviceItemDef, itemActionDef } from "./device";
-import { WORLD_TAG_PREFIX, createInitialWorld, eventDef, gameplayConfig, responseFor, settleWorld } from "./world";
+import { WORLD_TAG_PREFIX, createInitialWorld, elapsedMinutes, eventDef, gameplayConfig, responseFor, settleWorld } from "./world";
+import { REST_MODES, effectiveWorkMinutes, restOption, workFatigue } from "./fatigue";
 import { endConversation, selectOption, startConversation } from "./dialogueEngine";
 import { canDiscover, discover, type DiscoveryTrigger } from "./evidence";
 import {
@@ -110,6 +112,7 @@ export const REASONS = {
   thesisComplete: "The thesis is already complete.",
   workTooShort: "That is too little time to make progress.",
   thesisNeedsTasks: "More progress needs a thesis task, such as the supervisor's confirmation.",
+  restUnavailable: "Resting is not part of this scenario.",
   unknownThesisTask: "This thesis task does not exist.",
   thesisTaskDone: "This thesis task is already done.",
   thesisTaskUnavailable: "This thesis task is not available now.",
@@ -198,6 +201,8 @@ export function isCoreAction(value: unknown): value is CoreAction {
       return isWholeMinutes(value.minutes, MAX_ADVANCE_MINUTES);
     case "WORK_ON_THESIS":
       return isWholeMinutes(value.minutes, MAX_WORK_MINUTES);
+    case "REST":
+      return isOneOf(REST_MODES, value.mode);
     case "RESPOND_EVENT":
       return isShortId(value.eventId) && isShortId(value.response);
     case "COMPLETE_THESIS_TASK":
@@ -597,18 +602,42 @@ function applyAction(state: ChapterState, action: CoreAction, scenario: Scenario
       const room = config.thesisFreeWorkMaxPercent - state.resources.thesisProgress;
       if (room < 1) return reject(REASONS.thesisNeedsTasks);
       const minutes = Math.min(action.minutes, state.resources.timeMinutes);
-      const gain = Math.min(room, Math.floor(minutes / config.thesisMinutesPerPercent));
+      // Tiredness makes each percent take longer (`fatigue.ts`).
+      const perPercent = effectiveWorkMinutes(config.thesisMinutesPerPercent, state.resources.fatigue, config.fatigue);
+      const gain = Math.min(room, Math.floor(minutes / perPercent));
       if (gain < 1) return reject(REASONS.workTooShort);
+      const spent = Math.min(minutes, gain * perPercent);
       return accept(
         applyEffects(
           state,
           [
             { kind: "adjustResource", resource: "thesisProgress", delta: gain },
-            { kind: "adjustResource", resource: "timeMinutes", delta: -Math.min(minutes, gain * config.thesisMinutesPerPercent) },
+            { kind: "adjustResource", resource: "timeMinutes", delta: -spent },
+            { kind: "adjustResource", resource: "fatigue", delta: workFatigue(spent, config.fatigue) },
           ],
           scenario,
         ),
       );
+    }
+    case "REST": {
+      if (state.call.current !== null) return reject(REASONS.callInProgress);
+      if (state.conversation !== null) return reject(REASONS.conversationInProgress);
+      const config = gameplayConfig(scenario).fatigue;
+      if (!config.enabled) return reject(REASONS.restUnavailable);
+      if (state.resources.timeMinutes <= 0) return reject(REASONS.timeIsUp);
+      const option = restOption(action.mode, config);
+      const minutes = Math.min(option.minutes, state.resources.timeMinutes);
+      const recovery = Math.round((option.recovery * minutes) / option.minutes);
+      const rested = applyEffects(
+        state,
+        [
+          { kind: "adjustResource", resource: "timeMinutes", delta: -minutes },
+          { kind: "adjustResource", resource: "fatigue", delta: -recovery },
+        ],
+        scenario,
+      );
+      const slept = (rested.world.sleptMinutes ?? 0) + (action.mode === "sleep" ? minutes : 0);
+      return accept({ ...rested, world: { ...rested.world, sleptMinutes: slept } }, [`${WORLD_TAG_PREFIX}rest:${action.mode}`]);
     }
     case "COMPLETE_THESIS_TASK": {
       if (state.call.current !== null) return reject(REASONS.callInProgress);
@@ -618,9 +647,11 @@ function applyAction(state: ChapterState, action: CoreAction, scenario: Scenario
       if (state.world.thesisTasksDone.includes(task.id)) return reject(REASONS.thesisTaskDone);
       if (state.resources.thesisProgress >= 100) return reject(REASONS.thesisComplete);
       if (!evaluateConditions(task.requires, state, scenario)) return reject(REASONS.thesisTaskUnavailable);
-      const timeCost = task.timeCostMinutes ?? 0;
+      const taskConfig = gameplayConfig(scenario);
+      const timeCost = effectiveWorkMinutes(task.timeCostMinutes ?? 0, state.resources.fatigue, taskConfig.fatigue);
       if (timeCost > 0 && state.resources.timeMinutes <= 0) return reject(REASONS.timeIsUp);
       let next: ChapterState = { ...state, world: { ...state.world, thesisTasksDone: [...state.world.thesisTasksDone, task.id] } };
+      next = applyEffect(next, { kind: "adjustResource", resource: "fatigue", delta: workFatigue(timeCost, taskConfig.fatigue) }, scenario);
       next = applyEffect(next, { kind: "adjustResource", resource: "thesisProgress", delta: task.progressGain }, scenario);
       if (timeCost > 0) next = applyEffect(next, { kind: "adjustResource", resource: "timeMinutes", delta: -timeCost }, scenario);
       next = applyEffects(next, task.effects, scenario);
@@ -686,7 +717,9 @@ function applyAction(state: ChapterState, action: CoreAction, scenario: Scenario
       if (def === undefined) return reject(REASONS.unknownItemAction);
       const current = state.device.items[action.itemId];
       if (def.once === true && current.done.includes(def.id)) return reject(REASONS.itemActionDone);
-      if (!evaluateConditions(def.requires, state, scenario)) return reject(REASONS.itemActionUnavailable);
+      if (!evaluateConditions(def.visibleWhen, state, scenario) || !evaluateConditions(def.requires, state, scenario)) {
+        return reject(REASONS.itemActionUnavailable);
+      }
       const cashCost = def.cashCost ?? 0;
       if (cashCost > 0 && def.allowDebt !== true && state.resources.cash < cashCost) return reject(REASONS.notEnoughCash);
       const timeCost = def.timeCostMinutes ?? 0;
@@ -698,18 +731,26 @@ function applyAction(state: ChapterState, action: CoreAction, scenario: Scenario
           return reject(REASONS.unknownCall);
         }
       }
+      const startMinute = (scenario.initial ?? CHAPTER_1_INITIAL_STATE).resources.timeMinutes;
+      const doneAtMinute = Math.max(0, startMinute - Math.max(0, state.resources.timeMinutes - timeCost));
       let next: ChapterState = {
         ...state,
         device: {
           ...state.device,
           items: {
             ...state.device.items,
-            [action.itemId]: { ...current, read: true, readAtMinute: current.readAtMinute ?? 0, done: current.done.includes(def.id) ? current.done : [...current.done, def.id] },
+            [action.itemId]: {
+              ...current,
+              read: true,
+              readAtMinute: current.readAtMinute ?? 0,
+              done: current.done.includes(def.id) ? current.done : [...current.done, def.id],
+              doneAt: { ...current.doneAt, [def.id]: doneAtMinute },
+            },
           },
         },
       };
       if (timeCost > 0) next = applyEffect(next, { kind: "adjustResource", resource: "timeMinutes", delta: -timeCost }, scenario);
-      if (cashCost > 0) next = recordTransaction(next, scenario, def.ledgerLabel ?? def.id, -cashCost, def.counterparty ?? null, item.id, def.id);
+      if (cashCost > 0) next = recordTransaction(next, scenario, def.ledgerLabel ?? def.id, -cashCost, def.counterparty ?? null, item.id, def.id, def.ledgerCategory ?? null);
       if (def.moveTo !== undefined) next = applyEffect(next, { kind: "setLocation", placeId: def.moveTo }, scenario);
       next = applyEffects(next, def.effects, scenario);
       if (def.callId !== undefined) next = startOutgoingCall(next, def.callId as CallId, scenario);
@@ -776,6 +817,32 @@ function applyVerify(
     next = applyEffect(next, { kind: "setClaimStatus", claimId, status: "inconclusive" }, scenario);
   }
   return accept(next);
+}
+
+/**
+ * Night checks (`FatigueConfig.nightChecksAtMinute`): once the clock passes a check, a night with
+ * less sleep than the minimum adds fatigue. Idempotent: each check is made once. Sleep taken in the
+ * action that crosses the check counts for that night.
+ */
+export function applyNightChecks(state: ChapterState, scenario: ScenarioDefinition): ChapterState {
+  const config = gameplayConfig(scenario).fatigue;
+  if (!config.enabled) return state;
+  const now = elapsedMinutes(state, scenario);
+  let checked = state.world.nightsChecked ?? 0;
+  let slept = state.world.sleptMinutes ?? 0;
+  let fatigue = state.resources.fatigue;
+  const before = checked;
+  while (checked < config.nightChecksAtMinute.length && config.nightChecksAtMinute[checked] <= now) {
+    if (slept < config.minSleepMinutes) fatigue += config.missedSleepPenalty;
+    slept = 0;
+    checked += 1;
+  }
+  if (checked === before) return state;
+  return {
+    ...state,
+    resources: { ...state.resources, fatigue: clampResource("fatigue", fatigue) },
+    world: { ...state.world, sleptMinutes: slept, nightsChecked: checked },
+  };
 }
 
 /**
@@ -852,7 +919,7 @@ export function chapterReducer(
   if (!applied.ok) return { state, accepted: false, reason: applied.reason };
 
   // 5. Beats. The fired IDs are tagged in this entry so a beat never fires twice.
-  const beats = applyBeats(applied.state, scenario);
+  const beats = applyBeats(applyNightChecks(applied.state, scenario), scenario);
   // 5b. World clock: events, deadlines and missions that are due at the new simulated time.
   const world = settleWorld(beats.state, scenario);
   const debriefTags = [...applied.debriefTags, ...beats.fired.map(beatTag), ...world.tags];

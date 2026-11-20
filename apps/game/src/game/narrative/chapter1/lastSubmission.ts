@@ -1,19 +1,33 @@
 // Chapter 1 "LAST SUBMISSION: 72 GIỜ CUỐI": the Scenario_Data of the new chapter foundation.
 // Pure TypeScript data.
 //
-// Foundation only. The character, the 72-hour clock and the resources and persistent flags (see
-// `../resources.ts`) exist. Story content does not: no mission, call, message, evidence, decision
-// or ending is defined yet, and each is added with its mission. The empty records below are typed
-// with the legacy ID unions until the missions bring their own IDs; they are empty on purpose.
+// The foundation (character, 72-hour clock, resources and persistent flags, see `../resources.ts`)
+// plus Mission 01 (`./mission01.ts`). Calls, dialogue, decisions and endings are still empty: the
+// later missions add them. The empty records are typed with the legacy ID unions until then.
 import type { NpcDef, ScenarioDefinition } from "../types";
 import { CHAPTER_1_INITIAL_STATE } from "../resources";
+import {
+  MISSION_01_DEVICE_ITEMS,
+  MISSION_01_EVENTS,
+  MISSION_01_LATE_RECOVERY_EVENT,
+  MISSION_01_LEDGER_LABELS,
+  MISSION_01_MISSIONS,
+  MISSION_01_THESIS_TASKS,
+} from "./mission01";
+import {
+  MISSION_01_OFFERS_DEVICE_ITEMS,
+  MISSION_01_OFFERS_EVENTS,
+  MISSION_01_OFFERS_LEDGER_LABELS,
+  MISSION_01_OFFERS_MISSIONS,
+} from "./mission01Offers";
 import type { NpcId } from "./ids";
 
 /** English title and subtitle. The Vietnamese text lives in `i18n/narrative/lastSubmission.vi.ts`. */
 export const LAST_SUBMISSION_TITLE = "LAST SUBMISSION: 72 GIỜ CUỐI";
 export const LAST_SUBMISSION_SUBTITLE = "Submit the thesis by Friday, 17:00.";
 
-export const LAST_SUBMISSION_SCENARIO: ScenarioDefinition = {
+/** The chapter without mission content: character, clock, resources and flags (and the tests' fixture base). */
+export const FOUNDATION_SCENARIO: ScenarioDefinition = {
   id: "chapter-1",
   title: LAST_SUBMISSION_TITLE,
   subtitle: LAST_SUBMISSION_SUBTITLE,
@@ -56,4 +70,16 @@ export const LAST_SUBMISSION_SCENARIO: ScenarioDefinition = {
   deductions: {} as ScenarioDefinition["deductions"],
   deviceActions: {} as ScenarioDefinition["deviceActions"],
   beats: [],
+};
+
+/** The scenario the game routes to: the foundation plus Mission 01 "THE MISSING ACCESS". */
+export const LAST_SUBMISSION_SCENARIO: ScenarioDefinition = {
+  ...FOUNDATION_SCENARIO,
+  // Fatigue rules are on for the playable chapter; the numbers are in `game/narrative/fatigue.ts`.
+  gameplay: { ...FOUNDATION_SCENARIO.gameplay, fatigue: { enabled: true } },
+  events: [...MISSION_01_EVENTS, MISSION_01_LATE_RECOVERY_EVENT, ...MISSION_01_OFFERS_EVENTS],
+  missions: [...MISSION_01_MISSIONS, ...MISSION_01_OFFERS_MISSIONS],
+  thesisTasks: MISSION_01_THESIS_TASKS,
+  deviceItems: [...MISSION_01_DEVICE_ITEMS, ...MISSION_01_OFFERS_DEVICE_ITEMS],
+  ledgerLabels: { ...MISSION_01_LEDGER_LABELS, ...MISSION_01_OFFERS_LEDGER_LABELS },
 };

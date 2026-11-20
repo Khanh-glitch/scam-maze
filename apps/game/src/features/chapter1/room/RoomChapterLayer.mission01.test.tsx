@@ -1,0 +1,149 @@
+// Mission 01 "THE MISSING ACCESS" through the real phone and laptop UI, with the real scenario
+// (no fixture): the email, the three ways to play it and what they leave in the state and the HUD.
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { DEFAULT_SETTINGS } from "../../../app/settingsStorage";
+import type { ChapterSession } from "../../../game/chapters/chapterSession";
+import type { ChapterStore } from "../../../game/narrative/store";
+import type { SaveGameSource } from "../../../game/saves/saveGame";
+import { applyLocale } from "../../../i18n";
+import type { RoomStoryCommands } from "../../roomv2/game/outside";
+import { RoomChapterLayer } from "./RoomChapterLayer";
+import { RoomStoryBridge } from "./roomStoryBridge";
+
+// Load the real routing and the real Vietnamese text instead of the suite-wide parked-story fixture.
+vi.mock("../../../game/narrative/activeScenario", async (importOriginal) => importOriginal());
+vi.mock("../../../i18n/narrative/lastSubmission.vi", async (importOriginal) => importOriginal());
+
+const SESSION: ChapterSession = { chapterId: "chapter-1", chapterNumber: 1, sceneId: "apartment", origin: "new-game" };
+const SAVE_SOURCE: SaveGameSource = { read: () => ({ status: "none" }), write: () => true, clear: () => true };
+
+function mountLayer() {
+  const bridge = new RoomStoryBridge();
+  bridge.commands = {
+    setPhoneMode: vi.fn(),
+    ring: vi.fn(),
+    setLaptopFrame: vi.fn(),
+    chime: vi.fn(),
+    setMood: vi.fn(),
+    closeInspect: vi.fn(),
+    setCursorMode: vi.fn(),
+  } satisfies RoomStoryCommands;
+  let store: ChapterStore | null = null;
+  // Free-roam time is driven by the test, not by the real clock.
+  render(
+    <RoomChapterLayer
+      session={SESSION}
+      settings={DEFAULT_SETTINGS}
+      bridge={bridge}
+      saveSource={SAVE_SOURCE}
+      ringSettleMs={0}
+      clockPaused
+      onStoreReady={(s) => {
+        store = s;
+      }}
+    />,
+  );
+  for (let i = 0; i < 12 && screen.queryByTestId("chapter-intro"); i += 1) fireEvent.click(screen.getByTestId("chapter-intro"));
+  return {
+    bridge,
+    store: () => {
+      if (!store) throw new Error("store not ready");
+      return store;
+    },
+  };
+}
+
+const openPhone = (rig: ReturnType<typeof mountLayer>) => {
+  act(() => rig.bridge.onProp("phone", "inspect-ready"));
+  return screen.getByRole("dialog", { name: /Phone|Điện thoại/ });
+};
+
+describe("Mission 01 in the phone", () => {
+  it("shows the mission objective and the email at 17:10 with a notice", () => {
+    const rig = mountLayer();
+    expect(screen.getByTestId("objective-tracker-slot").textContent).toContain("Finish the draft and confirm that you can reach the submission system.");
+    act(() => void rig.store().dispatch({ type: "ADVANCE_TIME", minutes: 10 }));
+    expect(screen.getByTestId("event-arrival-notice").textContent).toContain("Graduation Clearance — Action Required");
+    const phone = openPhone(rig);
+    expect(within(phone).getByTestId("phone-app-mail").textContent).toContain("4 unread");
+    expect(within(phone).queryByTestId("phone-app-calendar")?.textContent).not.toMatch(/unread/);
+    expect(phone.textContent).not.toMatch(/Northgate/i);
+  });
+
+  it("way A: opening the page loses nothing, the login opens the SECURITY BREACH, the code costs money", () => {
+    const rig = mountLayer();
+    act(() => void rig.store().dispatch({ type: "ADVANCE_TIME", minutes: 10 }));
+    const phone = openPhone(rig);
+    fireEvent.click(within(phone).getByTestId("phone-app-mail"));
+    fireEvent.click(within(phone).getByTestId("device-row-mail.clearance"));
+    fireEvent.click(within(phone).getByTestId("device-action-mail.clearance-open-link"));
+    expect(rig.store().getState().resources.cash).toBe(2_500_000);
+    fireEvent.click(within(phone).getByRole("button", { name: "Back" }));
+    fireEvent.click(within(phone).getByRole("button", { name: "Other" }));
+    fireEvent.click(within(phone).getByTestId("device-row-page.fee"));
+    fireEvent.click(within(phone).getByTestId("device-action-page.fee-sign-in"));
+    expect(rig.store().getState().persistent.loginCredentialsExposed).toBe(true);
+    expect(rig.store().getState().world.missions["m01.security-breach"].status).toBe("open");
+    expect(rig.store().getState().resources.cash).toBe(2_500_000);
+    fireEvent.click(within(phone).getByTestId("device-action-page.fee-pay-card"));
+    fireEvent.click(within(phone).getByTestId("device-action-page.fee-enter-code"));
+    expect(rig.store().getState().resources.cash).toBe(1_700_000);
+    expect(rig.store().getState().persistent.accountCompromised).toBe(true);
+    expect(rig.store().getState().resources.digitalSecurity).toBe(50);
+    // The HUD follows the state, and the objective changes with the mission path.
+    act(() => rig.bridge.onProp("phone", "inspect-end"));
+    expect(screen.getByTestId("resource-cash").textContent).toContain("1,700,000 VND");
+    expect(screen.getByTestId("resource-security").textContent).toContain("50%");
+  });
+
+  it("way B: the portal and the Training Office cost time, create evidence and change the objective", () => {
+    const rig = mountLayer();
+    const phone = openPhone(rig);
+    fireEvent.click(within(phone).getByTestId("phone-app-files"));
+    fireEvent.click(within(phone).getByTestId("device-row-portal.saved"));
+    fireEvent.click(within(phone).getByTestId("device-action-portal.saved-check-account"));
+    fireEvent.click(within(phone).getAllByRole("button", { name: "Back" })[0]);
+    fireEvent.click(within(phone).getAllByRole("button", { name: "Back" })[0]);
+    fireEvent.click(within(phone).getByRole("button", { name: /Calls/ }));
+    fireEvent.click(within(phone).getByTestId("device-row-contact.training-office"));
+    fireEvent.click(within(phone).getByTestId("device-action-contact.training-office-call"));
+    expect(within(phone).getByTestId("conversation-history").textContent).toContain("Training Office, good afternoon.");
+    fireEvent.click(within(phone).getByTestId("device-action-contact.training-office-confirm-fee"));
+    fireEvent.click(within(phone).getByTestId("device-action-contact.training-office-ask-account"));
+    // Every line stays on screen as a subtitle, in order, with no audio needed.
+    expect(within(phone).getAllByTestId(/^conversation-line-/)).toHaveLength(6);
+    const state = rig.store().getState();
+    expect(state.persistent.schoolAccessVerified).toBe(true);
+    expect(state.resources.evidence).toBe(1);
+    expect(state.resources.cash).toBe(2_500_000);
+    expect(state.resources.timeMinutes).toBe(72 * 60 - 55);
+    expect(screen.getByTestId("resource-evidence").textContent).toContain("1");
+    expect(screen.getByTestId("objective-tracker-slot").textContent).toContain("Access is confirmed with the Training Office. Finish the draft.");
+  });
+
+  it("way C: writing the draft with the planner completes the mission and keeps the access unverified", () => {
+    const rig = mountLayer();
+    fireEvent.click(screen.getByTestId("hud-planner-chip"));
+    const planner = screen.getByTestId("planner-overlay");
+    fireEvent.click(within(planner).getByTestId("thesis-task-draft.intro-review"));
+    fireEvent.click(within(planner).getByTestId("thesis-task-draft.findings"));
+    fireEvent.click(within(planner).getByTestId("thesis-task-draft.final"));
+    const state = rig.store().getState();
+    expect(state.resources.thesisProgress).toBe(67);
+    expect(state.world.missions["m01.missing-access"].status).toBe("completed");
+    expect(state.persistent.schoolAccessVerified).toBe(false);
+    expect(state.resources.cash).toBe(2_500_000);
+  });
+
+  it("shows the email in Vietnamese with the Vietnamese amount", () => {
+    applyLocale("vi");
+    const rig = mountLayer();
+    act(() => void rig.store().dispatch({ type: "ADVANCE_TIME", minutes: 10 }));
+    const phone = openPhone(rig);
+    fireEvent.click(within(phone).getByTestId("phone-app-mail"));
+    fireEvent.click(within(phone).getByTestId("device-row-mail.clearance"));
+    expect(phone.textContent).toContain("Phí: 800.000 VNĐ");
+    expect(phone.textContent).toContain("Mở liên kết thanh toán");
+  });
+});

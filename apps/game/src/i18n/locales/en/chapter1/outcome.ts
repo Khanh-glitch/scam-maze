@@ -50,6 +50,7 @@ const outcome = {
     thesisComplete: "The thesis is already complete.",
     workTooShort: "That is too little time to make progress.",
     thesisNeedsTasks: "More progress needs a thesis task, such as the supervisor's confirmation.",
+  restUnavailable: "Resting is not part of this scenario.",
     unknownThesisTask: "This thesis task does not exist.",
     thesisTaskDone: "This thesis task is already done.",
     thesisTaskUnavailable: "This thesis task is not available now.",

@@ -50,6 +50,7 @@ const outcome: LocaleShape<typeof en> = {
     thesisComplete: "Khóa luận đã hoàn thành.",
     workTooShort: "Thời gian quá ngắn để tạo ra tiến độ.",
     thesisNeedsTasks: "Muốn tiến thêm cần hoàn thành một nhiệm vụ khóa luận, ví dụ xác nhận của giảng viên.",
+  restUnavailable: "Kịch bản này không có phần nghỉ ngơi.",
     unknownThesisTask: "Nhiệm vụ khóa luận này không tồn tại.",
     thesisTaskDone: "Nhiệm vụ khóa luận này đã xong.",
     thesisTaskUnavailable: "Hiện chưa thể làm nhiệm vụ khóa luận này.",

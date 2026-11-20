@@ -66,8 +66,10 @@ describe("RoomChapterLayer with LAST SUBMISSION routing", () => {
     expect(rig.store().getState().status).toBe("not-started");
     expect(rig.store().getState().resources).toEqual(CHAPTER_1_INITIAL_STATE.resources);
     const intro = screen.getByTestId("chapter-intro");
-    // The full text of the first paragraph is available to screen readers at once.
-    expect(within(intro).getByText(/You are Alex, 23 years old/)).toBeTruthy();
+    // The opening is cinematic: no paragraph and no goal text on screen. The facts stay in the HUD, the schedule and the journal.
+    expect(within(intro).queryByText(/You are Alex, 23 years old/)).toBeNull();
+    expect(within(intro).queryByText(/72 hours/i)).toBeNull();
+    expect(screen.queryByTestId("chapter-intro-text")).toBeNull();
     expect(screen.queryByText(/bakery/i)).toBeNull();
   });
 

@@ -59,6 +59,9 @@ import { EvidenceNotice } from "../hud/EvidenceNotice";
 import { ObjectiveToast, type ObjectiveChangeKind } from "../hud/ObjectiveToast";
 import { ObjectiveTracker } from "../hud/ObjectiveTracker";
 import { ResourceStatus } from "../hud/ResourceStatus";
+import { Mission01VoiceCaption } from "../voice/Mission01VoiceCaption";
+import { useMission01Voice, type VoiceView } from "../voice/useMission01Voice";
+import { effectiveWorkMinutes, fatigueLevel, workSlowdown } from "../../../game/narrative/fatigue";
 import { EventArrivalNotice } from "../hud/EventArrivalNotice";
 import { PlannerOverlay } from "../world/PlannerOverlay";
 import { DeviceApp } from "../device/DeviceApp";
@@ -366,10 +369,10 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
         progress: initial.resources.thesisProgress,
         hours: Math.round(initial.resources.timeMinutes / 60),
       };
-      return (["intro.last.p1", "intro.last.p2", "intro.last.p3"] as const).map((key) => ({
-        text: text(key, values),
-        src: null,
-      }));
+      void values;
+      // The opening is cinematic: Alex's own voice and subtitles tell it, and nothing is written in the
+      // middle of the screen. The goals stay in the objective tracker, the schedule and the journal.
+      return [{ text: "", src: null }];
     }
     const graph = scenario.dialogues["dlg.intro"];
     const lines: NarrationLine[] = [];
@@ -479,6 +482,20 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
     return () => bridge.commands?.duckForVoice?.(false);
   }, [bridge, engineReady, introNarrating]);
 
+  // --- Alex's Mission 01 voice: one line at a time on the shared engine, once per run, never after a load.
+  // The list a device app shows now (an inbox, the bank app): Alex's email and bank lines wait for it.
+  const [deviceView, setDeviceView] = useState<VoiceView | null>(null);
+  const alexVoice = useMission01Voice({
+    store,
+    scenario,
+    port: engine,
+    locale,
+    settings: { soundEnabled: settings.soundEnabled, voiceVolume: settings.voiceVolume },
+    held: clockPaused,
+    introVisible: introOpen && introMode === "begin" && engineReady,
+    callOpen,
+    viewing: deviceView,
+  });
   // --- Port cache (the bridge reads it on every hover frame) --------------------------------
   const cacheRef = useRef<PortCache>(EMPTY_CACHE);
   const latestRef = useRef({ text, scenario });
@@ -815,10 +832,20 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
     },
     [bridge],
   );
+  // Tiredness makes each percent of thesis work take longer, so a session is whole percents at that rate.
+  const perPercentMinutes = effectiveWorkMinutes(gameplay.thesisMinutesPerPercent, resources.fatigue, gameplay.fatigue);
+  const sessionPercent = Math.floor(gameplay.thesisSessionMinutes / gameplay.thesisMinutesPerPercent);
+  const fatigueOn = gameplay.fatigue.enabled;
   const thesisProps: ThesisPanelProps = {
     progress: resources.thesisProgress,
-    sessionMinutes: gameplay.thesisSessionMinutes,
-    sessionPercent: Math.floor(gameplay.thesisSessionMinutes / gameplay.thesisMinutesPerPercent),
+    sessionMinutes: sessionPercent * perPercentMinutes,
+    sessionPercent,
+    fatigue: fatigueOn
+      ? { level: fatigueLevel(resources.fatigue, gameplay.fatigue), slowdownPercent: Math.round((workSlowdown(resources.fatigue, gameplay.fatigue) - 1) * 100) }
+      : undefined,
+    rest: fatigueOn
+      ? { napMinutes: gameplay.fatigue.nap.minutes, sleepMinutes: gameplay.fatigue.sleep.minutes, onRest: (mode) => void store.dispatch({ type: "REST", mode }) }
+      : undefined,
     freeWorkMaxPercent: gameplay.thesisFreeWorkMaxPercent,
     timeLeftMinutes: resources.timeMinutes,
     tasks: thesisView.tasks,
@@ -1004,7 +1031,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
     ...deviceAppEntries(laptopDevice, "laptop", text).map((entry) => ({
       id: `device-${entry.app}`,
       label: entry.label,
-      content: <DeviceApp app={entry.app} view={laptopDevice} onOpenItem={openDeviceItem} onUseItem={useDeviceItem} />,
+      content: <DeviceApp app={entry.app} view={laptopDevice} onOpenItem={openDeviceItem} onUseItem={useDeviceItem} onView={setDeviceView} />,
     })),
     { id: "thesis", label: text("laptop.apps.thesis"), content: <ThesisPanel {...thesisProps} /> },
     ...(legacyLaptop
@@ -1041,7 +1068,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
             onInspectEvidence={(evidenceId: EvidenceId) => dispatchVoid({ type: "INSPECT_EVIDENCE", evidenceId })}
             onDeviceAction={(deviceActionId: DeviceActionId) => dispatchVoid({ type: "DEVICE_ACTION", deviceActionId })}
             onCallSavedContact={(claimId: ClaimId) => dispatchVoid({ type: "VERIFY_CLAIM", claimId, method: "saved-official-contact" })}
-            device={{ view: phoneDevice, onOpenItem: openDeviceItem, onUseItem: useDeviceItem }}
+            device={{ view: phoneDevice, onOpenItem: openDeviceItem, onUseItem: useDeviceItem, onView: setDeviceView }}
             onClose={closePhone}
           />
         );
@@ -1129,6 +1156,8 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
         <div role="status" aria-live="polite" className="sr-only" data-testid="world-live-region">
           {arrival ? text("planner.arrival", { title: arrival.title }) : ""}
         </div>
+        {/* Outside the HUD: Alex's captions also show over the intro, when the HUD is hidden. */}
+        <Mission01VoiceCaption cue={alexVoice.current} subtitlesEnabled={settings.subtitlesEnabled} getPositionMs={alexVoice.positionMs} />
         {hudVisible && (
           <>
             <div
@@ -1152,7 +1181,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
                 hint={currentHint}
                 hintOn={hintOn}
               />
-              <ResourceStatus resources={resources} />
+        <ResourceStatus resources={resources} fatigueLevel={fatigueOn ? fatigueLevel(resources.fatigue, gameplay.fatigue) : undefined} />
             </div>
 
             {/* Visual only: the live region above announces the same events once. */}
@@ -1354,6 +1383,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
             ready={engineReady}
             mode={introMode}
             lines={introLines}
+            cinematic={!Object.hasOwn(scenario.dialogues, "dlg.intro")}
             onLineChange={goToIntroLine}
             controlIds={INTRO_CONTROLS}
             voiceGain={voiceGain(

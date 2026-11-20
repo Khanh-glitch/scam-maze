@@ -14,7 +14,7 @@ import { ScreenSurface } from "../room/ScreenSurface";
 import { useScreenQuad } from "../room/useScreenQuad";
 import { UI } from "../theme";
 import type { DeviceView } from "../../../game/narrative/device";
-import { DeviceApp } from "../device/DeviceApp";
+import { DeviceApp, type DeviceAppProps } from "../device/DeviceApp";
 import { deviceAppEntries } from "../device/deviceApps";
 import type { Tx } from "../device/deviceFormat";
 import { CallHistoryApp } from "./CallHistoryApp";
@@ -29,6 +29,8 @@ export interface PhoneDeviceProps {
   view: DeviceView;
   onOpenItem: (itemId: string) => void;
   onUseItem: (itemId: string, actionId: string) => void;
+  /** Which list is on screen (see `DeviceApp`). */
+  onView?: DeviceAppProps["onView"];
 }
 
 export interface PhoneOverlayProps {
@@ -99,13 +101,13 @@ export const PhoneOverlay: React.FC<PhoneOverlayProps> = ({
       <div className="space-y-4">
         <MessagesApp messages={otherMessages} onInspectEvidence={onInspectEvidence} onBack={goHome} />
         {device && device.view.apps.messages.length > 0 && (
-          <DeviceApp app="messages" view={device.view} onOpenItem={device.onOpenItem} onUseItem={device.onUseItem} />
+          <DeviceApp app="messages" view={device.view} onOpenItem={device.onOpenItem} onUseItem={device.onUseItem} onView={device.onView} />
         )}
       </div>
     );
   } else if (deviceApp !== null && device) {
     content = (
-      <DeviceApp app={deviceApp as never} view={device.view} onOpenItem={device.onOpenItem} onUseItem={device.onUseItem} onExit={goHome} />
+      <DeviceApp app={deviceApp as never} view={device.view} onOpenItem={device.onOpenItem} onUseItem={device.onUseItem} onView={device.onView} onExit={goHome} />
     );
   } else if (route === "calls") {
     content = (
