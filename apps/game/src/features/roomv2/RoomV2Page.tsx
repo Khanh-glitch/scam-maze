@@ -29,6 +29,12 @@ interface RoomV2PageProps {
    * instead of under the crosshair. Without it, or without an anchor, the crosshair prompt is used.
    */
   renderPrompt?: (prompt: string, anchor: { x: number; y: number }) => React.ReactNode;
+  /**
+   * Story flow only: a room built ahead in standby (see `roomPreloader`). The page adopts it instead of
+   * building a new one, so the room shows at once. `onAdopted` tells the preloader to let go of it.
+   */
+  preloaded?: Engine;
+  onAdopted?: (engine: Engine) => void;
 }
 
 type RoomQuality = "high" | "low";
@@ -53,7 +59,7 @@ const SHADOW = { textShadow: "0 1px 6px rgba(0,0,0,.9)" } as const;
  * Prototype route `/roomv2`: the player's apartment, "After the Rain". It is a standalone engine
  * kept apart from the story chapters until it is integrated.
  */
-export const RoomV2Page: React.FC<RoomV2PageProps> = ({ settings, onBackToMenu, onReady, embedded = false, onUI, options, story, overlay, renderPrompt }) => {
+export const RoomV2Page: React.FC<RoomV2PageProps> = ({ settings, onBackToMenu, onReady, embedded = false, onUI, options, story, overlay, renderPrompt, preloaded, onAdopted }) => {
   const { t } = useTranslation("worlds");
   const mountRef = useRef<HTMLDivElement | null>(null);
   const engineRef = useRef<Engine | null>(null);
@@ -69,6 +75,10 @@ export const RoomV2Page: React.FC<RoomV2PageProps> = ({ settings, onBackToMenu, 
   const hasStory = Boolean(mergedOptions?.story);
   const optionsRef = useRef(mergedOptions);
   optionsRef.current = mergedOptions;
+  const preloadedRef = useRef(preloaded);
+  preloadedRef.current = preloaded;
+  const onAdoptedRef = useRef(onAdopted);
+  onAdoptedRef.current = onAdopted;
   const embeddedRef = useRef(embedded);
   embeddedRef.current = embedded;
 
@@ -80,8 +90,20 @@ export const RoomV2Page: React.FC<RoomV2PageProps> = ({ settings, onBackToMenu, 
     // The engine's prompts, captions and phone screens all read from the active language.
     setTranslator((key, options) => (t as unknown as (k: string, o?: object) => string)(key, options));
     // Let the loading text paint before the heavy texture generation starts.
+    const adopt = preloadedRef.current && !preloadedRef.current.disposed && embeddedRef.current ? preloadedRef.current : null;
     const timer = window.setTimeout(() => {
       try {
+        if (adopt && !adopt.disposed) {
+          // Built ahead on the main menu: move it in and start it. Nothing is built or compiled here.
+          onAdoptedRef.current?.(adopt);
+          adopt.attachTo(el, (next) => { setUI(next); onUIRef.current?.(next); });
+          adopt.goLive();
+          adopt.begin();
+          engineRef.current = adopt;
+          onReadyRef.current?.(adopt);
+          setLoading(false);
+          return;
+        }
         const engine = new Engine(el, (next) => { setUI(next); onUIRef.current?.(next); }, quality, optionsRef.current);
         engineRef.current = engine;
         // In the story the door is already open: the player walks straight in.
@@ -91,7 +113,7 @@ export const RoomV2Page: React.FC<RoomV2PageProps> = ({ settings, onBackToMenu, 
         console.error(err);
       }
       setLoading(false);
-    }, 60);
+    }, adopt ? 0 : 60);
     return () => {
       window.clearTimeout(timer);
       engineRef.current?.dispose();

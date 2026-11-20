@@ -17,6 +17,7 @@ import type {
   DeviceItemState,
   PlatformFigureKind,
   DeviceKind,
+  LedgerCategory,
   LedgerEntry,
   ScenarioDefinition,
   SubmissionStatus,
@@ -124,6 +125,11 @@ export interface LedgerEntryView {
   label: string;
   amount: number;
   counterparty: string | null;
+  /** `loss`: gone for good. `locked`: kept by a platform. Null: ordinary spending. */
+  category: LedgerCategory | null;
+  /** The item action that made the line, or null for a line made by an event (an unauthorized transfer). */
+  itemId: string | null;
+  actionId: string | null;
 }
 
 /**
@@ -280,6 +286,9 @@ function computeDeviceView(state: ChapterState, scenario: ScenarioDefinition, de
           label: ledgerLabel(scenario, entry),
           amount: entry.amount,
           counterparty: entry.counterparty,
+          category: entry.category ?? null,
+          itemId: entry.itemId,
+          actionId: entry.actionId,
         })),
       digitalSecurity: state.resources.digitalSecurity,
       finance: selectFinance(state, scenario),

@@ -28,6 +28,8 @@ const harness = vi.hoisted(() => ({
   roomProps: null as null | { story?: unknown; embedded?: boolean; options?: unknown; hasOverlay: boolean },
   /** Props the RoomChapterLayer stub received (null when it is not mounted). */
   layerProps: null as null | { session: ChapterSession; bridge: unknown; engineReady?: boolean; modelAllowed?: boolean },
+  /** True: a built room is waiting (the background preloader finished). False: preloading is not available. */
+  preloadedRoomReady: false as boolean,
 }));
 
 // The engines cannot run in jsdom: a stub page renders the overlay it is given and reports a fake
@@ -58,7 +60,20 @@ vi.mock("../features/chapter1/room/RoomChapterLayer", () => ({
   },
 }));
 
-vi.mock("../game/core/GameCanvas", () => ({ GameCanvas: () => <div data-testid="menu-canvas" /> }));
+// The background room preloader needs WebGL. Tests either switch it off (the normal loading screen is
+// used) or pretend a finished room is waiting (New Game skips the loading screen).
+vi.mock("../features/chapter1/room/roomPreloader", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../features/chapter1/room/roomPreloader")>();
+  const { RoomStoryBridge: Bridge } = await import("../features/chapter1/room/roomStoryBridge");
+  return {
+    ...original,
+    canPreloadRoom: () => harness.preloadedRoomReady,
+    startRoomPreload: () => undefined,
+    discardRoomPreload: () => undefined,
+    peekReadyRoom: () => (harness.preloadedRoomReady ? { engine: {} as never, bridge: new Bridge() } : null),
+    consumeRoomPreload: () => true,
+  };
+});vi.mock("../game/core/GameCanvas", () => ({ GameCanvas: () => <div data-testid="menu-canvas" /> }));
 vi.mock("../features/loading/MenuStartupLoading", () => ({ MenuStartupLoading: () => null }));
 vi.mock("../features/testmove", () => ({ TestMovePage: () => null }));
 vi.mock("../features/ueh", () => ({ UEHPage: () => null }));
@@ -145,6 +160,7 @@ beforeEach(() => {
   harness.sessionChapterId = "chapter-1";
   harness.loadingRequest = null;
   harness.sessionOrigin = "new-game";
+  harness.preloadedRoomReady = false;
   harness.roomProps = null;
   harness.layerProps = null;
 });
@@ -246,6 +262,16 @@ describe("App chapter routing", () => {
     expect(harness.layerProps?.session).toMatchObject({ chapterId: "chapter-1", origin: "new-game" });
   });
 
+  it("opens the room straight from the menu, with no loading screen, when the room is already built", async () => {
+    harness.preloadedRoomReady = true;
+    window.history.replaceState(null, "", "/");
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: /NEW GAME/ }));
+    expect(screen.queryByTestId("chapter-loading")).toBeNull();
+    expect(await screen.findByTestId("chapter-layer-stub")).toBeTruthy();
+    expect(harness.layerProps?.session).toMatchObject({ chapterId: "chapter-1", origin: "new-game" });
+    expect(harness.layerProps?.session.progress).toBeUndefined();
+  });
   it("returns to the menu when the loading flow is left", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: /NEW GAME/ }));

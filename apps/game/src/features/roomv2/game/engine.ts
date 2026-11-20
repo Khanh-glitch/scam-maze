@@ -260,7 +260,6 @@ export class Engine implements RoomStoryCommands {
     this.dropTex = new THREE.CanvasTexture(this.dropCanvas);
     this.pmrem = new THREE.PMREMGenerator(r);
     this.audio = new AudioEngine(this.camera);
-
     this.build();
     this.setupPost();
     // Dev-only handle for the browser console and automated checks; never set in production builds.
@@ -277,7 +276,59 @@ export class Engine implements RoomStoryCommands {
    */
   private prepare() {
     this.updateEnv();
-    try { void this.renderer.compileAsync(this.scene, this.camera).catch(() => undefined); } catch { /* compile on first draw instead */ }
+    // Nothing plays while the room waits: the audio context stays suspended until `goLive`/`activate`.
+    this.audio.suspend();
+    this.warmed = (async () => {
+      // compileAsync can stall (hidden tab, no parallel-compile support); the warm frame below then compiles what is left.
+      try {
+        await Promise.race([
+          this.renderer.compileAsync(this.scene, this.camera),
+          new Promise<void>((resolve) => window.setTimeout(resolve, 4000)),
+        ]);
+      } catch { /* compile on first draw instead */ }
+      if (!this.disposed) this.renderWarmFrame();
+    })();
+  }
+
+  /** Resolves once the standby room has compiled its shaders and drawn one full frame (textures and shadow maps uploaded). */
+  warmed: Promise<void> = Promise.resolve();
+
+  /** One complete frame, as the loop draws it, so the first visible frame needs no upload or compile. */
+  private renderWarmFrame() {
+    try {
+      const r = this.renderer;
+      this.glassMats.forEach((m) => m.uniforms.uRes.value.set(r.domElement.width, r.domElement.height));
+      this.camera.layers.set(1);
+      r.setRenderTarget(this.cityRT);
+      r.render(this.scene, this.camera);
+      r.setRenderTarget(null);
+      this.camera.layers.set(0);
+      this.camera.layers.enable(1);
+      r.shadowMap.needsUpdate = true;
+      this.composer.render(0);
+    } catch { /* the first live frame draws it instead */ }
+  }
+
+  /**
+   * Preloaded room: move the canvas into the page that adopts it. The room was built in a hidden host
+   * at window size, so it is resized to its new container.
+   */
+  attachTo(container: HTMLElement, onUI: (s: UIState) => void) {
+    if (this.disposed) return;
+    this.container = container;
+    this.onUI = onUI;
+    container.appendChild(this.renderer.domElement);
+    this.onResize();
+  }
+
+  /** Standby -> running for the story chapter: starts the loop where the room stands (no entrance shot). */
+  goLive() {
+    if (this.disposed || this.live) return;
+    this.live = true;
+    this.t = performance.now() / 1000;
+    this.audio.wake();
+    cancelAnimationFrame(this.raf);
+    this.raf = requestAnimationFrame(this.loop);
   }
 
   /** Standby -> running: the player steps into the room. */
@@ -537,7 +588,13 @@ export class Engine implements RoomStoryCommands {
     if (this.seat === 'seated') this.yaw = THREE.MathUtils.clamp(this.yaw, -1.5, 1.5);
     this.pitch = THREE.MathUtils.clamp(this.pitch - e.movementY * s, -1.45, 1.45);
   };
+  /** True while the player types in a text field (for example the browser's address bar): the room ignores those keys. */
+  private static typingInField(e: KeyboardEvent): boolean {
+    const t = e.target;
+    return t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || (t instanceof HTMLElement && t.isContentEditable);
+  }
   onKeyDown = (e: KeyboardEvent) => {
+    if (Engine.typingInField(e)) return;
     if (this.ui.started && !this.ui.ended && (e.key === 'Control' || e.code === 'ControlLeft' || e.code === 'ControlRight')) {
       if (!e.repeat) this.setCursorMode(!this.ui.cursorMode);
       return;

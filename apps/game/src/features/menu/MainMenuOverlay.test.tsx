@@ -49,6 +49,34 @@ describe("MainMenuOverlay keyboard navigation", () => {
     expect(onHoverSound).toHaveBeenCalledTimes(4);
   });
 
+  it("shows a small loader on NEW GAME while the room is prepared, and keeps the menu usable", () => {
+    const onStartNewGame = vi.fn();
+    const { rerender } = render(
+      <MainMenuOverlay
+        settings={DEFAULT_SETTINGS}
+        onUpdateSettings={() => {}}
+        onStartNewGame={onStartNewGame}
+        onContinue={() => {}}
+        continueAvailability={NO_SAVE}
+      />,
+    );
+    expect(screen.queryByTestId("new-game-loader")).toBeNull();
+    rerender(
+      <MainMenuOverlay
+        settings={DEFAULT_SETTINGS}
+        onUpdateSettings={() => {}}
+        onStartNewGame={onStartNewGame}
+        newGameBusy
+        onContinue={() => {}}
+        continueAvailability={NO_SAVE}
+      />,
+    );
+    expect(screen.getByTestId("new-game-loader")).toBeTruthy();
+    const button = screen.getByRole("button", { name: /NEW GAME/ });
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    expect(screen.getByRole("button", { name: /SETTINGS/ })).toBeTruthy();
+  });
+
   it("stops on CONTINUE when a save is available", () => {
     const { current } = renderMenu({ available: true });
     fireEvent.keyDown(window, { key: "ArrowDown" });

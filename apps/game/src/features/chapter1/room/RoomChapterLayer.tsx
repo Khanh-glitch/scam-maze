@@ -89,6 +89,15 @@ import type { VoicePlaybackDeps } from "../voice/useVoicePlayback";
 import { BankApp } from "./laptop/BankApp";
 import { CompareView } from "./laptop/CompareView";
 import { LaptopOverlay, type LaptopExtraTab } from "./laptop/LaptopOverlay";
+import { LaptopDesktop } from "./desktop/LaptopDesktop";
+import { BrowserApp } from "./desktop/browser/BrowserApp";
+import { MailClient } from "./desktop/apps/MailClient";
+import { BankingApp } from "./desktop/banking/BankingApp";
+import { FilesApp } from "./desktop/files/FilesApp";
+import { CalendarApp } from "./desktop/calendar/CalendarApp";
+import { ThesisWindow } from "./desktop/thesis/ThesisWindow";
+import { selectBlockedTransfers } from "../../../game/narrative/blocked";
+import { BROWSER_APP_ID, type DesktopState } from "./desktop/desktopState";
 import { ReviewSecurityPage } from "./laptop/ReviewSecurityPage";
 import { ScreenQuadContext, type ScreenQuadSource } from "./useScreenQuad";
 import { buildBankAppView, buildCompareViewModel, buildReviewSecurityView } from "./laptop/laptopView";
@@ -774,6 +783,20 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
   const laptopDeviceSelector = useCallback((state: ChapterState) => selectDeviceView(state, scenario, "laptop"), [scenario]);
   const phoneDevice = useChapterState(store, phoneDeviceSelector);
   const laptopDevice = useChapterState(store, laptopDeviceSelector);
+  // What the simulated student portal shows about the story. Read-only: the portal never writes state.
+  const portalAccountLocked = useChapterState(store, (state) => state.persistent.accountCompromised);
+  const portalDraftFinished = useChapterState(store, (state) => state.persistent.draftFinished);
+  const portalTasksDone = useChapterState(store, (state) => state.world.thesisTasksDone);
+  // The bank app: transfers the bank blocked (derived, read-only) and what the player reported.
+  const bankDevice = useChapterState(store, (state) => state.device);
+  const bankEvents = useChapterState(store, (state) => state.world.events);
+  const bankReported = useChapterState(store, (state) => state.persistent.bankReported);
+  const blockedTransfers = useMemo(() => selectBlockedTransfers({ device: bankDevice, world: { events: bankEvents } }, scenario), [bankDevice, bankEvents, scenario]);
+  const bankFacts = useMemo(() => ({ bankReported, accountCompromised: portalAccountLocked }), [bankReported, portalAccountLocked]);
+  const portalFacts = useMemo(
+    () => ({ accountLocked: portalAccountLocked, draftFinished: portalDraftFinished, tasksDone: portalTasksDone }),
+    [portalAccountLocked, portalDraftFinished, portalTasksDone],
+  );
   const thesisSelector = useCallback((state: ChapterState) => selectThesisView(state, scenario), [scenario]);
   const thesisView = useChapterState(store, thesisSelector);
   const openMissionsSelector = useCallback((state: ChapterState) => selectOpenMissions(state, scenario), [scenario]);
@@ -869,6 +892,8 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
 
   // --- Keys: Escape (capture), J, H, Tab trap -----------------------------------------------
   const [hintOn, setHintOn] = useState(false);
+  /** Set by the laptop desktop while it is open; see the Escape handler below. */
+  const laptopEscapeRef = useRef<(() => boolean) | null>(null);
   const [decideRequest, setDecideRequest] = useState(0);
   const handleDecide = useCallback(() => {
     onOpenDecision?.();
@@ -908,7 +933,11 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
       if (!current) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      if (!event.repeat && canClose(current)) closeTop();
+      if (event.repeat || !canClose(current)) return;
+      // The laptop's desktop uses Escape first: it leaves an open app for the desktop, and only
+      // closes the laptop when it is already on the desktop.
+      if (current.kind === "laptop" && laptopEscapeRef.current?.()) return;
+      closeTop();
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || isTypingTarget(event.target) || introOpenRef.current) return;
@@ -1009,6 +1038,15 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
 
   // --- Overlay content ----------------------------------------------------------------------
   const closeLaptop = useCallback(() => removeOverlay("laptop"), [removeOverlay]);
+  // Desktop UI state (open apps, active window) is kept here so it survives closing the laptop. It is
+  // not game state and is not saved.
+  const desktopUiRef = useRef<DesktopState | undefined>(undefined);
+  const handleDesktopState = useCallback((next: DesktopState) => {
+    desktopUiRef.current = next;
+  }, []);
+  const registerLaptopEscape = useCallback((handler: (() => boolean) | null) => {
+    laptopEscapeRef.current = handler;
+  }, []);
   const closePhone = useCallback(() => removeOverlay("phone"), [removeOverlay]);
   const closeJournal = useCallback(() => removeOverlay("journal"), [removeOverlay]);
   const closePlanner = useCallback(() => removeOverlay("planner"), [removeOverlay]);
@@ -1028,12 +1066,41 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
           { id: "compare", label: text("laptop.apps.compare"), content: <CompareView view={buildCompareViewModel(laptopView)} dispatch={dispatchVoid} /> },
         ]
       : []),
-    ...deviceAppEntries(laptopDevice, "laptop", text).map((entry) => ({
-      id: `device-${entry.app}`,
-      label: entry.label,
-      content: <DeviceApp app={entry.app} view={laptopDevice} onOpenItem={openDeviceItem} onUseItem={useDeviceItem} onView={setDeviceView} />,
-    })),
-    { id: "thesis", label: text("laptop.apps.thesis"), content: <ThesisPanel {...thesisProps} /> },
+    ...deviceAppEntries(laptopDevice, "laptop", text).flatMap((entry): LaptopExtraTab[] => {
+      const generic: LaptopExtraTab = {
+        id: `device-${entry.app}`,
+        label: entry.label,
+        badge: entry.badge,
+        content: <DeviceApp app={entry.app} view={laptopDevice} onOpenItem={openDeviceItem} onUseItem={useDeviceItem} onView={setDeviceView} />,
+      };
+      // The interactive desktop has its own banking app and file explorer.
+      if (!legacyLaptop && entry.app === "bank") {
+        return [
+          {
+            ...generic,
+            content: <BankingApp view={laptopDevice} phoneView={phoneDevice} blocked={blockedTransfers} facts={bankFacts} onUseItem={useDeviceItem} />,
+          },
+        ];
+      }
+      if (!legacyLaptop && entry.app === "calendar") return [{ ...generic, content: <CalendarApp view={laptopDevice} /> }];
+      if (!legacyLaptop && entry.app === "files") {
+        return [{ ...generic, content: <FilesApp view={laptopDevice} onOpenItem={openDeviceItem} onUseItem={useDeviceItem} /> }];
+      }
+      // The interactive desktop has its own mail client, and a Browser window that mail links open.
+      if (legacyLaptop || entry.app !== "mail") return [generic];
+      return [
+        { ...generic, content: <MailClient view={laptopDevice} onOpenItem={openDeviceItem} onUseItem={useDeviceItem} onView={setDeviceView} /> },
+        {
+          id: BROWSER_APP_ID,
+          label: text("laptop.apps.browser"),
+          content: null,
+          render: ({ browser, dispatchBrowser }) => (
+            <BrowserApp state={browser} dispatch={dispatchBrowser} view={laptopDevice} facts={portalFacts} onOpenItem={openDeviceItem} onUseItem={useDeviceItem} />
+          ),
+        },
+      ];
+    }),
+    { id: "thesis", label: text("laptop.apps.thesis"), content: legacyLaptop ? <ThesisPanel {...thesisProps} /> : <ThesisWindow {...thesisProps} /> },
     ...(legacyLaptop
       ? [
           {
@@ -1048,6 +1115,21 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
   const renderOverlay = (overlay: Overlay): React.ReactNode => {
     switch (overlay.kind) {
       case "laptop":
+        // Chapter 1 has no laptop device actions: its laptop is the interactive desktop. The parked
+        // story keeps the original sidebar overlay.
+        if (!legacyLaptop) {
+          return (
+            <LaptopDesktop
+              key="laptop"
+              apps={laptopTabs}
+              onClose={closeLaptop}
+              clockText={storyClockOn ? clockText : undefined}
+              initialState={desktopUiRef.current}
+              onStateChange={handleDesktopState}
+              registerEscape={registerLaptopEscape}
+            />
+          );
+        }
         return (
           <LaptopOverlay
             key="laptop"
