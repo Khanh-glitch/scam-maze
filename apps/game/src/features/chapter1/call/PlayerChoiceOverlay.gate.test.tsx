@@ -1,8 +1,8 @@
-// PlayerChoiceOverlay reply gate tests (task 18.12). Requirements 5.9 and 8.3.
+// PlayerChoiceOverlay reply gate tests. Requirements 5.9 and 8.3.
 //
-// While `waiting` is true the caller is still speaking: the options and the number keys are off,
-// no status text is shown, only a "continue" hint (F or a click) with focus. When the wait ends
-// focus moves to the first option. Without `waiting` nothing changes.
+// While `waiting` is true the caller line is still typing: the options and the number keys are off
+// and nothing is shown, with no "continue" step. When the wait ends the replies appear and focus
+// moves to the first option. Without `waiting` nothing changes.
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GameLocale } from "@scammaze/shared-types";
@@ -12,11 +12,8 @@ import { selectDialogueView, type DialogueView } from "../../../game/narrative/s
 import type { CoreAction, ScenarioDefinition } from "../../../game/narrative/types";
 import { applyLocale } from "../../../i18n";
 import { getDisplayScenario } from "../../../i18n/narrative";
-import enPhone from "../../../i18n/locales/en/chapter1/phone";
-import viPhone from "../../../i18n/locales/vi/chapter1/phone";
 import { PlayerChoiceOverlay } from "./PlayerChoiceOverlay";
 
-const PHONE = { en: enPhone, vi: viPhone } as const;
 const LOCALES: readonly GameLocale[] = ["en", "vi"];
 const REGION = { left: 16, top: 400, width: 360, height: 300 };
 
@@ -40,7 +37,7 @@ function viewFor(scenario: ScenarioDefinition): DialogueView {
 
 function overlayElement(
   view: DialogueView,
-  props: { waiting?: boolean; onSelectOption?: (id: string) => void; onSkipWait?: () => void },
+  props: { waiting?: boolean; onSelectOption?: (id: string) => void },
 ) {
   return (
     <PlayerChoiceOverlay
@@ -50,7 +47,6 @@ function overlayElement(
       onSelectOption={props.onSelectOption ?? vi.fn()}
       region={REGION}
       waiting={props.waiting}
-      onSkipWait={props.onSkipWait}
     />
   );
 }
@@ -60,10 +56,9 @@ afterEach(() => {
 });
 
 describe.each(LOCALES)("PlayerChoiceOverlay reply gate (%s)", (locale) => {
-  const phone = PHONE[locale].phone.call;
   const scenario = getDisplayScenario(locale);
 
-  it("hides the options and shows no status text and one focused Continue button while waiting", () => {
+  it("hides the options and shows nothing, no Continue step, while waiting", () => {
     applyLocale(locale);
     const view = viewFor(scenario);
     expect(view.options.length).toBeGreaterThan(0);
@@ -75,51 +70,32 @@ describe.each(LOCALES)("PlayerChoiceOverlay reply gate (%s)", (locale) => {
     }
     expect(within(overlay).queryByRole("list")).toBeNull();
     expect(within(overlay).queryByRole("status")).toBeNull();
-    expect(overlay.textContent).not.toMatch(/Listening|Show replies|Đang nghe|Hiện các câu/);
-
-    const buttons = within(overlay).getAllByRole("button");
-    expect(buttons).toHaveLength(1);
-    expect(buttons[0].textContent).toBe(phone.continue);
-    expect(buttons[0].getAttribute("data-testid")).toBe("choice-skip-wait");
-    expect(document.activeElement).toBe(buttons[0]);
+    expect(within(overlay).queryAllByRole("button")).toHaveLength(0);
+    expect(within(overlay).queryByTestId("choice-waiting")).toBeNull();
+    expect(within(overlay).queryByTestId("choice-skip-wait")).toBeNull();
+    expect(overlay.textContent).not.toMatch(/Continue|Tiếp tục|Listening|Show replies|Đang nghe|Hiện các câu/);
   });
 
-  it("calls onSkipWait when the Skip button is activated", () => {
-    applyLocale(locale);
-    const view = viewFor(scenario);
-    const onSkipWait = vi.fn();
-    const onSelectOption = vi.fn();
-    render(overlayElement(view, { waiting: true, onSkipWait, onSelectOption }));
-
-    fireEvent.click(screen.getByTestId("choice-skip-wait"));
-    expect(onSkipWait).toHaveBeenCalledTimes(1);
-    expect(onSelectOption).not.toHaveBeenCalled();
-  });
-
-  it("ignores number keys while waiting, and F continues without picking a reply", () => {
+  it("ignores number keys and F while waiting", () => {
     applyLocale(locale);
     const view = viewFor(scenario);
     const onSelectOption = vi.fn();
-    const onSkipWait = vi.fn();
-    render(overlayElement(view, { waiting: true, onSelectOption, onSkipWait }));
+    render(overlayElement(view, { waiting: true, onSelectOption }));
 
     fireEvent.keyDown(window, { key: "1" });
-    expect(onSkipWait).not.toHaveBeenCalled();
     fireEvent.keyDown(window, { key: "f", code: "KeyF" });
-    expect(onSkipWait).toHaveBeenCalledTimes(1);
     expect(onSelectOption).not.toHaveBeenCalled();
   });
 
-  it("moves focus to the first option and re-enables the F key when the wait ends", () => {
+  it("shows the replies, moves focus to the first option and enables F when the wait ends", () => {
     applyLocale(locale);
     const view = viewFor(scenario);
     const onSelectOption = vi.fn();
     const { rerender } = render(overlayElement(view, { waiting: true, onSelectOption }));
-    expect(document.activeElement).toBe(screen.getByTestId("choice-skip-wait"));
+    expect(screen.queryByTestId(`dialogue-option-${view.options[0].id}`)).toBeNull();
 
     rerender(overlayElement(view, { waiting: false, onSelectOption }));
 
-    expect(screen.queryByTestId("choice-skip-wait")).toBeNull();
     expect(screen.queryByRole("status")).toBeNull();
     expect(document.activeElement).toBe(screen.getByTestId(`dialogue-option-${view.options[0].id}`));
 

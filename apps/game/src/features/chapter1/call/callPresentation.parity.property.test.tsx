@@ -26,6 +26,8 @@ import { createLcg, pick, randomInt } from "../../../test/seededRandom";
 import type { Rect } from "./callLayout";
 import { CallPresentation, type PresentationMode } from "./CallPresentation";
 import { createPhoneScreenSink, type PhoneScreenSink } from "./phoneScreenSink";
+import { useInstantCallText } from "../../../test/instantCallText";
+useInstantCallText();
 
 const SEED = 0x3d9c_0004;
 const CASES = 120;

@@ -94,6 +94,13 @@ describe.each(LOCALES)("CallSubtitleOverlay (%s)", (locale) => {
 });
 
 describe("CallSubtitleOverlay behavior", () => {
+  it("shows only the revealed characters while typing, and keeps the rest invisible", () => {
+    render(<CallSubtitleOverlay {...props({ revealedChars: 4 })} />);
+    expect(screen.getByTestId("call-subtitle-typed").textContent).toBe("Your");
+    expect(screen.getByTestId("call-subtitle-pending").textContent).toBe(" account is locked.");
+    expect(screen.getByTestId("call-subtitle-pending").getAttribute("aria-hidden")).toBe("true");
+  });
+
   it("is empty and transparent when not visible and there is no notice", () => {
     render(<CallSubtitleOverlay {...props({ visible: false })} />);
     const bar = screen.getByTestId("call-subtitle-bar");

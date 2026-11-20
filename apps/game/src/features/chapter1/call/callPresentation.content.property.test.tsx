@@ -31,6 +31,8 @@ import { CallPresentation } from "./CallPresentation";
 import type { CallVoiceProps } from "./CallPresentation";
 import { isSubtitleVisible } from "./callDialogueView";
 import { createPhoneScreenSink } from "./phoneScreenSink";
+import { useInstantCallText } from "../../../test/instantCallText";
+useInstantCallText();
 
 /** Seeded property runs can exceed Vitest's 5 s default when the machine is loaded. */
 const PROPERTY_TIMEOUT_MS = 60_000;
