@@ -217,3 +217,37 @@ input, textarea, [contenteditable="true"] {
     opacity: 1;
   }
 }
+/* Phone screens: an app opens with a short rise and fade, the home screen settles after unlock. Transform and opacity only. */
+@keyframes phoneAppIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes phoneHomeIn {
+  from {
+    opacity: 0;
+    transform: scale(1.05);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* Phone apps: the shared device cards keep their dark card colors, tinted by the app instead of one purple. */
+[data-testid="phone-app-body"] [class*="bg-[#171521]"] {
+  background-color: rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+[data-testid="phone-app-body"] [class*="bg-[#171521]"]:hover {
+  background-color: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.34);
+}
+/* Touch screens: every button in a phone app is at least 40 px tall. Small helpers opt out with data-compact. */
+[data-touch] button:not([data-compact]) {
+  min-height: 40px;
+}

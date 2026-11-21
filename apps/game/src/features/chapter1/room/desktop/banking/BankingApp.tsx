@@ -36,6 +36,13 @@ export interface BankingAppProps {
   blocked: readonly BlockedTransfer[];
   facts: BankFacts;
   onUseItem: (itemId: string, actionId: string) => void;
+  /**
+   * The phone's version: sections in a bar at the bottom, larger touch targets, and no call steps on
+   * the support page. The calls are placed from the phone's Contacts (`onCallBank` opens the official
+   * contact), so a call has one place in the game, not two. Everything else is the same app.
+   */
+  variant?: "desktop" | "mobile";
+  onCallBank?: () => void;
 }
 
 const EM = "#0a7d5a";
@@ -84,7 +91,8 @@ const Card: React.FC<{ title?: string; icon?: React.ReactNode; testId?: string; 
   </section>
 );
 
-export const BankingApp: React.FC<BankingAppProps> = ({ view, phoneView, blocked, facts, onUseItem }) => {
+export const BankingApp: React.FC<BankingAppProps> = ({ view, phoneView, blocked, facts, onUseItem, variant = "desktop", onCallBank }) => {
+  const mobile = variant === "mobile";
   const { t: translate } = useTranslation("chapter1");
   const t = translate as unknown as Tx;
   const locale = useGameLocale();
@@ -530,9 +538,15 @@ export const BankingApp: React.FC<BankingAppProps> = ({ view, phoneView, blocked
                   </p>
                 ) : (
                   <div className="mt-1 space-y-1">
-                    <button type="button" className={BUTTON} disabled={!action.available} data-testid={`device-action-contact.bank-${action.id}`} onClick={() => bankLine && onUseItem(bankLine.id, action.id)}>
-                      {actionLabel(t, locale, action)}
-                    </button>
+                    {mobile ? (
+                      <p className="text-xs" style={{ color: MUTED }} data-testid={`bank-step-hint-${action.id}`}>
+                        {t("phone.mobileBank.callHint")}
+                      </p>
+                    ) : (
+                      <button type="button" className={BUTTON} disabled={!action.available} data-testid={`device-action-contact.bank-${action.id}`} onClick={() => bankLine && onUseItem(bankLine.id, action.id)}>
+                        {actionLabel(t, locale, action)}
+                      </button>
+                    )}
                     {action.blocked !== null && (
                       <p className="text-xs" style={{ color: MUTED }}>
                         {t(`device.blocked.${action.blocked}`)}
@@ -545,6 +559,12 @@ export const BankingApp: React.FC<BankingAppProps> = ({ view, phoneView, blocked
           ))}
         </ol>
       </Card>
+      {mobile && onCallBank !== undefined && (
+        <button type="button" className={`${BUTTON} w-full`} data-testid="bank-call-official" onClick={onCallBank}>
+          <PhoneCall className="h-4 w-4" aria-hidden="true" />
+          {t("phone.mobileBank.callOfficial")}
+        </button>
+      )}
       {bankLine !== null && bankLine.conversation.length > 0 && (
         <Card title={t("banking.conversation")} testId="bank-conversation">
           <ul className="space-y-2">
@@ -592,8 +612,33 @@ export const BankingApp: React.FC<BankingAppProps> = ({ view, phoneView, blocked
     </div>
   );
 
+  const tabBar = (
+    <nav
+      role="tablist"
+      aria-label={t("banking.sections")}
+      className={mobile ? "flex shrink-0 gap-1 border-t px-1 py-1" : "ml-auto flex flex-wrap gap-1"}
+      style={mobile ? { borderColor: LINE, background: "#f2faf6" } : undefined}
+    >
+      {SECTIONS.map(({ id, icon: Icon }) => (
+        <button
+          key={id}
+          type="button"
+          role="tab"
+          aria-selected={section === id}
+          data-testid={`bank-tab-${id}`}
+          onClick={() => setSection(id)}
+          className={`flex cursor-pointer motion-safe:transition-colors ${FOCUS} ${
+            mobile ? "min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1 text-[12px] font-semibold leading-tight" : "items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium"
+          } ${section === id ? "bg-[#0a7d5a] text-white" : "text-[#0f2a22] hover:bg-[#dcefe6]"}`}
+        >
+          <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className={mobile ? "line-clamp-1 break-words" : ""}>{t(`banking.tabs.${id}`)}</span>
+        </button>
+      ))}
+    </nav>
+  );
   return (
-    <div ref={rootRef} className="flex h-full min-h-0 flex-col" data-testid="banking-app" style={{ background: theme.bodyBg, color: INK }}>
+    <div ref={rootRef} className="flex h-full min-h-0 flex-col" data-testid="banking-app" data-touch={mobile ? "" : undefined} style={{ background: theme.bodyBg, color: INK }}>
       <header className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 py-2" style={{ borderColor: LINE, background: "#f2faf6" }}>
         <span className="flex items-center gap-2 text-sm font-bold" style={{ color: EM_DARK }}>
           <span aria-hidden="true" className="flex h-7 w-7 items-center justify-center rounded-lg text-white" style={{ background: EM }}>
@@ -601,24 +646,7 @@ export const BankingApp: React.FC<BankingAppProps> = ({ view, phoneView, blocked
           </span>
           {t("banking.brand")}
         </span>
-        <nav role="tablist" aria-label={t("banking.sections")} className="ml-auto flex flex-wrap gap-1">
-          {SECTIONS.map(({ id, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={section === id}
-              data-testid={`bank-tab-${id}`}
-              onClick={() => setSection(id)}
-              className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium motion-safe:transition-colors ${FOCUS} ${
-                section === id ? "bg-[#0a7d5a] text-white" : "text-[#0f2a22] hover:bg-[#dcefe6]"
-              }`}
-            >
-              <Icon className="h-4 w-4" aria-hidden="true" />
-              {t(`banking.tabs.${id}`)}
-            </button>
-          ))}
-        </nav>
+        {!mobile && tabBar}
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4" role="tabpanel" data-testid="bank-panel" data-section={section} onWheel={(event) => event.stopPropagation()}>
         {section === "overview" && overview}
@@ -626,6 +654,7 @@ export const BankingApp: React.FC<BankingAppProps> = ({ view, phoneView, blocked
         {section === "security" && securityView}
         {section === "support" && supportView}
       </div>
+      {mobile && tabBar}
     </div>
   );
 };

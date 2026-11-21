@@ -54,6 +54,15 @@ export function mission01VoiceUrl(cue: Mission01VoiceCue, locale: GameLocale): s
   return `${MISSION01_VOICE_BASE}/${locale}/${MISSION01_VOICE_STEMS[cue]}_${locale}.mp3`;
 }
 
+/**
+ * The recorded clip of one line of a chat or a phone call, when there is one:
+ * `<MISSION01_VOICE_BASE>/<locale>/lines/<item>.<action>.<index>.mp3`. A line key is
+ * `<item>/<action>/<index>`. When the clip is missing the line is shown as text and can be read
+ * with the browser's computer voice.
+ */
+export function mission01LineVoiceUrl(lineKey: string, locale: GameLocale): string {
+  return `${MISSION01_VOICE_BASE}/${locale}/lines/${lineKey.replaceAll("/", ".")}.mp3`;
+}
 const done = (state: ChapterState, itemId: string, actionId: string): boolean =>
   Object.hasOwn(state.device.items, itemId) && state.device.items[itemId].done.includes(actionId);
 const opened = (state: ChapterState, itemId: string): boolean => Object.hasOwn(state.device.items, itemId) && state.device.items[itemId].read;

@@ -99,6 +99,7 @@ function finishIntro() {
 function openPhone(rig: ReturnType<typeof mountLayer>) {
   finishIntro();
   act(() => rig.bridge.onProp("phone", "inspect-ready"));
+  fireEvent.click(screen.getByTestId("phone-unlock"));
   return screen.getByRole("dialog", { name: "Phone" });
 }
 
@@ -123,7 +124,7 @@ describe("the phone with device content", () => {
     const rig = mountLayer();
     const phone = openPhone(rig);
     fireEvent.click(within(phone).getByTestId("phone-app-mail"));
-    fireEvent.click(within(phone).getByTestId("device-row-mail.registry"));
+    fireEvent.click(within(phone).getByTestId("mail-row-mail.registry"));
     expect(rig.store().getState().device.items["mail.registry"].read).toBe(true);
     expect(rig.store().getState().resources.timeMinutes).toBe(72 * 60);
     const pay = within(phone).getByTestId("device-action-mail.registry-pay-fee");
@@ -135,13 +136,14 @@ describe("the phone with device content", () => {
     expect((within(phone).getByTestId("device-action-mail.registry-pay-fee") as HTMLButtonElement).disabled).toBe(true);
     expect(within(phone).getByText("Already done")).toBeTruthy();
 
-    fireEvent.click(within(phone).getByRole("button", { name: "Back" }));
-    fireEvent.click(within(phone).getByRole("button", { name: "Back" }));
+    fireEvent.click(within(phone).getByTestId("phone-home-indicator"));
     fireEvent.click(within(phone).getByTestId("phone-app-bank"));
     expect(within(phone).getByTestId("bank-balance").textContent).toContain("2,478,000 VND");
-    const entry = within(phone).getByTestId("ledger-entry");
-    expect(entry.textContent).toContain("Clearance fee");
-    expect(entry.textContent).toContain("-22,000 VND");
+    fireEvent.click(within(phone).getByTestId("bank-tab-transactions"));
+    const entries = within(phone).getAllByTestId(/^bank-tx-tx-/);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].textContent).toContain("Clearance fee");
+    expect(entries[0].textContent).toContain("22,000 VND");
   });
 
   it("shows chats inside Messages, the map with the route cost, and the calendar with the deadline", () => {
@@ -174,21 +176,23 @@ describe("the phone with device content", () => {
     act(() => void rig.store().dispatch({ type: "ADVANCE_TIME", minutes: 30 }));
     expect(screen.getByTestId("event-arrival-notice").textContent).toContain("A late email");
     act(() => rig.bridge.onProp("phone", "inspect-ready"));
+    fireEvent.click(screen.getByTestId("phone-unlock"));
     const phone = screen.getByRole("dialog", { name: "Phone" });
     fireEvent.click(within(phone).getByTestId("phone-app-mail"));
-    expect(within(phone).getByTestId("device-row-mail.late")).toBeTruthy();
-    fireEvent.click(within(phone).getByRole("button", { name: "Recruitment" }));
-    expect(within(phone).queryByTestId("device-row-mail.late")).toBeNull();
-    expect(within(phone).getByTestId("device-row-mail.job")).toBeTruthy();
+    expect(within(phone).getByTestId("mail-row-mail.late")).toBeTruthy();
+    fireEvent.click(within(phone).getByTestId("mail-folder-recruitment"));
+    expect(within(phone).queryByTestId("mail-row-mail.late")).toBeNull();
+    expect(within(phone).getByTestId("mail-row-mail.job")).toBeTruthy();
   });
 
-  it("lists the contacts inside the Calls app next to the call history", () => {
+  it("lists the contacts in the Contacts tab of the Calls app and opens a contact card", () => {
     const rig = mountLayer();
     const phone = openPhone(rig);
     fireEvent.click(within(phone).getByRole("button", { name: /Calls/ }));
-    expect(within(phone).getByText("Contacts")).toBeTruthy();
+    fireEvent.click(within(phone).getByTestId("calls-tab-contacts"));
     fireEvent.click(within(phone).getByTestId("device-row-contact.office"));
     expect(within(phone).getByText("+000 555 0101")).toBeTruthy();
+    expect(within(phone).getByTestId("contact-call-contact.office")).toBeTruthy();
   });
 
   it("has no Northgate bank content and no voicemail app, and the home screen has no duplicate empty states", () => {
@@ -198,20 +202,21 @@ describe("the phone with device content", () => {
     for (const name of [/Messages/, /Calls/]) {
       fireEvent.click(within(phone).getByRole("button", { name }));
       expect(phone.textContent).not.toMatch(/Northgate/i);
-      fireEvent.click(within(phone).getByRole("button", { name: "Back" }));
+      fireEvent.click(within(phone).getByTestId("phone-home-indicator"));
     }
-    for (const app of ["mail", "bank", "map", "calendar", "housing", "files"]) {
+    for (const app of ["mail", "bank", "map", "calendar", "housing", "files", "browser"]) {
       fireEvent.click(within(phone).getByTestId(`phone-app-${app}`));
       expect(phone.textContent).not.toMatch(/Northgate/i);
-      fireEvent.click(within(phone).getByRole("button", { name: "Back" }));
+      fireEvent.click(within(phone).getByTestId("phone-home-indicator"));
     }
   });
 
-  it("shows no Messages duplicate empty text when there are no chats", () => {
+  it("shows no empty text in Messages while there are chats", () => {
     const rig = mountLayer();
     const phone = openPhone(rig);
     fireEvent.click(within(phone).getByRole("button", { name: /Messages/ }));
-    expect(within(phone).getAllByText(/No messages|Nothing here yet/)).toHaveLength(1);
+    expect(within(phone).getByTestId("device-row-msg.minh")).toBeTruthy();
+    expect(within(phone).queryAllByText(/No messages|Nothing here yet/)).toHaveLength(0);
   });
 
   it("labels the apps in Vietnamese", () => {
@@ -219,6 +224,7 @@ describe("the phone with device content", () => {
     const rig = mountLayer();
     finishIntro();
     act(() => rig.bridge.onProp("phone", "inspect-ready"));
+    fireEvent.click(screen.getByTestId("phone-unlock"));
     const phone = screen.getByRole("dialog");
     expect(within(phone).getByTestId("phone-app-mail").textContent).toContain("Thư");
     expect(within(phone).getByTestId("phone-app-bank").textContent).toContain("Ngân hàng");

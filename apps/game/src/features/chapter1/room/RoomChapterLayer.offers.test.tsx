@@ -48,6 +48,7 @@ function mountLayer() {
 
 const openPhone = (rig: ReturnType<typeof mountLayer>) => {
   act(() => rig.bridge.onProp("phone", "inspect-ready"));
+  fireEvent.click(screen.getByTestId("phone-unlock"));
   return screen.getByRole("dialog", { name: /Phone|Điện thoại/ });
 };
 /** Presses Back until the phone home (with the Jobs app) is showing. */

@@ -1,6 +1,6 @@
 // Mission 01 "THE MISSING ACCESS" through the real phone and laptop UI, with the real scenario
 // (no fixture): the email, the three ways to play it and what they leave in the state and the HUD.
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS } from "../../../app/settingsStorage";
 import type { ChapterSession } from "../../../game/chapters/chapterSession";
@@ -56,6 +56,7 @@ function mountLayer() {
 
 const openPhone = (rig: ReturnType<typeof mountLayer>) => {
   act(() => rig.bridge.onProp("phone", "inspect-ready"));
+  fireEvent.click(screen.getByTestId("phone-unlock"));
   return screen.getByRole("dialog", { name: /Phone|Điện thoại/ });
 };
 
@@ -71,23 +72,30 @@ describe("Mission 01 in the phone", () => {
     expect(phone.textContent).not.toMatch(/Northgate/i);
   });
 
-  it("way A: opening the page loses nothing, the login opens the SECURITY BREACH, the code costs money", () => {
+  it("way A: opening the page loses nothing, the login opens the SECURITY BREACH, the code costs money", async () => {
     const rig = mountLayer();
     act(() => void rig.store().dispatch({ type: "ADVANCE_TIME", minutes: 10 }));
     const phone = openPhone(rig);
+    // The phone's own Mail and Browser: the link of the email opens the page in the phone browser.
     fireEvent.click(within(phone).getByTestId("phone-app-mail"));
-    fireEvent.click(within(phone).getByTestId("device-row-mail.clearance"));
-    fireEvent.click(within(phone).getByTestId("device-action-mail.clearance-open-link"));
+    fireEvent.click(within(phone).getByTestId("mail-row-mail.clearance"));
+    fireEvent.click(within(phone).getByTestId("mail-link"));
+    await within(phone).findByTestId("fake-step-notice");
     expect(rig.store().getState().resources.cash).toBe(2_500_000);
-    fireEvent.click(within(phone).getByRole("button", { name: "Back" }));
-    fireEvent.click(within(phone).getByRole("button", { name: "Other" }));
-    fireEvent.click(within(phone).getByTestId("device-row-page.fee"));
-    fireEvent.click(within(phone).getByTestId("device-action-page.fee-sign-in"));
+    fireEvent.click(within(phone).getByTestId("clearance-continue"));
+    await within(phone).findByTestId("fake-step-login");
+    fireEvent.click(within(phone).getByTestId("login-fill"));
+    fireEvent.click(within(phone).getByTestId("login-submit"));
+    await within(phone).findByTestId("fake-step-payment");
     expect(rig.store().getState().persistent.loginCredentialsExposed).toBe(true);
     expect(rig.store().getState().world.missions["m01.security-breach"].status).toBe("open");
     expect(rig.store().getState().resources.cash).toBe(2_500_000);
-    fireEvent.click(within(phone).getByTestId("device-action-page.fee-pay-card"));
-    fireEvent.click(within(phone).getByTestId("device-action-page.fee-enter-code"));
+    fireEvent.click(within(phone).getByTestId("pay-fill"));
+    fireEvent.click(within(phone).getByTestId("pay-submit"));
+    await within(phone).findByTestId("fake-step-verify");
+    fireEvent.click(within(phone).getByTestId("verify-fill"));
+    fireEvent.click(within(phone).getByTestId("verify-submit"));
+    await within(phone).findByTestId("fake-step-complete");
     expect(rig.store().getState().resources.cash).toBe(1_700_000);
     expect(rig.store().getState().persistent.accountCompromised).toBe(true);
     expect(rig.store().getState().resources.digitalSecurity).toBe(50);
@@ -95,24 +103,34 @@ describe("Mission 01 in the phone", () => {
     act(() => rig.bridge.onProp("phone", "inspect-end"));
     expect(screen.getByTestId("resource-cash").textContent).toContain("1,700,000 VND");
     expect(screen.getByTestId("resource-security").textContent).toContain("50%");
-  });
+  }, 20_000);
 
-  it("way B: the portal and the Training Office cost time, create evidence and change the objective", () => {
+  it("way B: the portal and the Training Office cost time, create evidence and change the objective", async () => {
     const rig = mountLayer();
     const phone = openPhone(rig);
     fireEvent.click(within(phone).getByTestId("phone-app-files"));
+    fireEvent.click(within(phone).getByTestId("files-folder-bookmarks"));
     fireEvent.click(within(phone).getByTestId("device-row-portal.saved"));
     fireEvent.click(within(phone).getByTestId("device-action-portal.saved-check-account"));
-    fireEvent.click(within(phone).getAllByRole("button", { name: "Back" })[0]);
-    fireEvent.click(within(phone).getAllByRole("button", { name: "Back" })[0]);
+    fireEvent.click(within(phone).getByTestId("phone-home-indicator"));
     fireEvent.click(within(phone).getByRole("button", { name: /Calls/ }));
+    fireEvent.click(within(phone).getByTestId("calls-tab-contacts"));
     fireEvent.click(within(phone).getByTestId("device-row-contact.training-office"));
-    fireEvent.click(within(phone).getByTestId("device-action-contact.training-office-call"));
+    // A real call: it rings first, and nothing has happened in the game until the line picks up.
+    fireEvent.click(within(phone).getByTestId("contact-call-contact.training-office"));
+    expect(within(phone).getByTestId("call-screen").getAttribute("data-phase")).toBe("ringing");
+    expect(rig.store().getState().device.items["contact.training-office"].done).not.toContain("call");
+    // Each turn is one scenario action. The next turn is offered only after the answer was shown.
+    const confirm = await within(phone).findByTestId("device-action-contact.training-office-confirm-fee", {}, { timeout: 9000 });
     expect(within(phone).getByTestId("conversation-history").textContent).toContain("Training Office, good afternoon.");
-    fireEvent.click(within(phone).getByTestId("device-action-contact.training-office-confirm-fee"));
-    fireEvent.click(within(phone).getByTestId("device-action-contact.training-office-ask-account"));
+    expect(within(phone).queryByTestId("device-action-contact.training-office-ask-account")).toBeNull();
+    fireEvent.click(confirm);
+    const ask = await within(phone).findByTestId("device-action-contact.training-office-ask-account", {}, { timeout: 9000 });
+    fireEvent.click(ask);
     // Every line stays on screen as a subtitle, in order, with no audio needed.
-    expect(within(phone).getAllByTestId(/^conversation-line-/)).toHaveLength(6);
+    await waitFor(() => expect(within(phone).getAllByTestId(/^conversation-line-/)).toHaveLength(6), { timeout: 9000 });
+    fireEvent.click(within(phone).getByTestId("call-end"));
+    expect(within(phone).getByTestId("call-screen").getAttribute("data-phase")).toBe("ended");
     const state = rig.store().getState();
     expect(state.persistent.schoolAccessVerified).toBe(true);
     expect(state.resources.evidence).toBe(1);
@@ -120,7 +138,7 @@ describe("Mission 01 in the phone", () => {
     expect(state.resources.timeMinutes).toBe(72 * 60 - 55);
     expect(screen.getByTestId("resource-evidence").textContent).toContain("1");
     expect(screen.getByTestId("objective-tracker-slot").textContent).toContain("Access is confirmed with the Training Office. Finish the draft.");
-  });
+  }, 40_000);
 
   it("way C: writing the draft with the planner completes the mission and keeps the access unverified", () => {
     const rig = mountLayer();
@@ -142,8 +160,9 @@ describe("Mission 01 in the phone", () => {
     act(() => void rig.store().dispatch({ type: "ADVANCE_TIME", minutes: 10 }));
     const phone = openPhone(rig);
     fireEvent.click(within(phone).getByTestId("phone-app-mail"));
-    fireEvent.click(within(phone).getByTestId("device-row-mail.clearance"));
+    fireEvent.click(within(phone).getByTestId("mail-row-mail.clearance"));
     expect(phone.textContent).toContain("Phí: 800.000 VNĐ");
-    expect(phone.textContent).toContain("Mở liên kết thanh toán");
+    // The link is a button with the address written out, in the phone's own Mail.
+    expect(within(phone).getByTestId("mail-link")).toBeTruthy();
   });
 });

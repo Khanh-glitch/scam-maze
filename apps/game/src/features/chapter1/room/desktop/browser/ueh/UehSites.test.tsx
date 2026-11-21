@@ -30,7 +30,7 @@ function item(id: string, extra: Partial<DeviceItemView> = {}): DeviceItemView {
 }
 
 function act1(id: string, extra: Partial<DeviceActionView> = {}): DeviceActionView {
-  return { id, label: id, timeCostMinutes: 2, cashCost: 0, available: true, blocked: null, placesCall: false, ...extra };
+  return { id, label: id, timeCostMinutes: 2, cashCost: 0, available: true, blocked: null, placesCall: false, speaks: false, ...extra };
 }
 
 const doneAction = (id: string) => act1(id, { available: false, blocked: "done" });
