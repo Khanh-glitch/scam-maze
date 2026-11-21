@@ -121,3 +121,52 @@ export function placePrompt(
     top: Math.min(Math.max(top, margin), maxTop),
   };
 }
+/**
+ * Where the task marker of a prop goes on screen. On screen: the projected point. Off screen or
+ * behind the camera: the viewport edge (inset by `margin`) in the direction the player must turn,
+ * with `angle` (radians, 0 = right, clockwise, screen axes) for the arrow. Coordinates are relative
+ * to the viewport's top-left corner.
+ */
+export interface TaskMarkerPlacement {
+  x: number;
+  y: number;
+  onScreen: boolean;
+  angle: number;
+}
+export function placeTaskMarker(
+  viewProjection: ArrayLike<number>,
+  x: number,
+  y: number,
+  z: number,
+  viewportWidth: number,
+  viewportHeight: number,
+  margin: number,
+): TaskMarkerPlacement | null {
+  if (!(viewportWidth > 0) || !(viewportHeight > 0)) return null;
+  const m = viewProjection;
+  const clipX = m[0] * x + m[4] * y + m[8] * z + m[12];
+  const clipY = m[1] * x + m[5] * y + m[9] * z + m[13];
+  const w = m[3] * x + m[7] * y + m[11] * z + m[15];
+  if (!Number.isFinite(clipX) || !Number.isFinite(clipY) || !Number.isFinite(w)) return null;
+  const halfW = viewportWidth / 2;
+  const halfH = viewportHeight / 2;
+  if (w > MIN_W) {
+    const px = halfW + (clipX / w) * halfW;
+    const py = halfH - (clipY / w) * halfH;
+    if (px >= margin && px <= viewportWidth - margin && py >= margin && py <= viewportHeight - margin) {
+      return { x: px, y: py, onScreen: true, angle: Math.PI / 2 };
+    }
+  }
+  // In front of the camera the direction from the center points at the target. Behind it, only the
+  // side matters (turn left or right), so the marker sits at mid-height on that side.
+  let dx = clipX;
+  let dy = -clipY;
+  if (w <= MIN_W) {
+    dx = clipX === 0 ? 1 : Math.sign(clipX);
+    dy = 0;
+  } else if (dx === 0 && dy === 0) dy = 1;
+  const reachX = Math.max(1, halfW - margin);
+  const reachY = Math.max(1, halfH - margin);
+  const scale = Math.min(dx === 0 ? Infinity : reachX / Math.abs(dx), dy === 0 ? Infinity : reachY / Math.abs(dy));
+  return { x: halfW + dx * scale, y: halfH + dy * scale, onScreen: false, angle: Math.atan2(dy, dx) };
+}

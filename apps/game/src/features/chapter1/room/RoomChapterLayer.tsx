@@ -59,6 +59,10 @@ import { EvidenceNotice } from "../hud/EvidenceNotice";
 import { ObjectiveToast, type ObjectiveChangeKind } from "../hud/ObjectiveToast";
 import { ObjectiveTracker } from "../hud/ObjectiveTracker";
 import { ChapterStatusCluster, ChapterTaskButton, ChapterTopBar } from "../hud/ChapterStatusHud";
+import { TaskListPanel } from "../hud/TaskListPanel";
+import { TaskMarker, type TaskMarkerSource } from "../hud/TaskMarker";
+import { TaskTracker } from "../hud/TaskTracker";
+import { SHADOW } from "../../prologue/PrologueHud";
 import { Mission01VoiceCaption } from "../voice/Mission01VoiceCaption";
 import { useMission01Voice, type VoiceView } from "../voice/useMission01Voice";
 import type { BrowserState } from "./desktop/browser/browserState";
@@ -72,7 +76,7 @@ import { deviceAppEntries } from "../device/deviceApps";
 import { selectDeviceView } from "../../../game/narrative/device";
 import { ThesisPanel, type ThesisPanelProps } from "../world/ThesisPanel";
 import { useWorldClock } from "../world/useWorldClock";
-import { gameplayConfig, selectOpenMissions, selectPendingEvents, selectThesisView } from "../../../game/narrative/world";
+import { gameplayConfig, selectClosedMissions, selectOpenMissions, selectPendingEvents, selectThesisView } from "../../../game/narrative/world";
 import { CHAPTER_PROTAGONIST, CHAPTER_1_INITIAL_STATE, simulatedClock } from "../../../game/narrative/resources";
 import { setGameClockOverride } from "../../../game/clock/gameClock";
 import { SaveFailureNotice } from "../hud/SaveFailureNotice";
@@ -325,7 +329,7 @@ function lookup<T>(record: Record<string, T>, id: string, fallback: T): T {
   return Object.hasOwn(record, id) ? record[id] : fallback;
 }
 
-export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
+const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
   session,
   settings,
   bridge,
@@ -815,6 +819,18 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
   const openMissionsSelector = useCallback((state: ChapterState) => selectOpenMissions(state, scenario), [scenario]);
   const pendingEvents = useChapterState(store, pendingEventsSelector);
   const openMissions = useChapterState(store, openMissionsSelector);
+  const closedMissionsSelector = useCallback((state: ChapterState) => selectClosedMissions(state, scenario), [scenario]);
+  const closedMissions = useChapterState(store, closedMissionsSelector);
+  // Task mode: the missions have concrete steps (LAST SUBMISSION). Older content keeps the objective tracker.
+  const taskMode = useMemo(() => (scenario.missions ?? []).some((mission) => mission.paths.some((path) => (path.steps?.length ?? 0) > 0)), [scenario]);
+  // The tracker and the marker follow the mission the player tracks, else the first required one with a step to do.
+  const [trackedMissionId, setTrackedMissionId] = useState<string | null>(null);
+  const trackedMission =
+    openMissions.find((mission) => mission.id === trackedMissionId) ??
+    openMissions.find((mission) => !mission.optional && mission.current !== null) ??
+    openMissions.find((mission) => mission.current !== null) ??
+    openMissions[0] ??
+    null;
   const seenEventsRef = useRef<Set<string> | null>(null);
   if (seenEventsRef.current === null) seenEventsRef.current = new Set(pendingEvents.map((event) => event.id));
   const arrivalCounterRef = useRef(0);
@@ -925,18 +941,21 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
     }
   }, [closeTop, openOverlay, store]);
 
-  // Task button on the map: marked while the schedule holds a mission or event not looked at yet.
-  const [tasksSeen, setTasksSeen] = useState<ReadonlySet<string>>(() => new Set());
-  const tasksUnseen = openMissions.some((mission) => !tasksSeen.has(mission.id)) || pendingEvents.some((event) => !tasksSeen.has(event.id));
   const togglePlanner = useCallback(() => {
     if (introOpenRef.current || store.getState().status !== "playing") return;
     const stack = overlaysRef.current;
+    if (stack.length === 0) openOverlay({ kind: "planner" });
+    else if (top(stack)?.kind === "planner") closeTop();
+  }, [closeTop, openOverlay, store]);
+  // Task button on the map: marked while a mission is open that the task list has not shown yet.
+  const [tasksSeen, setTasksSeen] = useState<ReadonlySet<string>>(() => new Set());
+  const tasksUnseen = openMissions.some((mission) => !tasksSeen.has(mission.id));
+  const toggleTasks = useCallback(() => {
+    if (introOpenRef.current || store.getState().status !== "playing") return;
+    const stack = overlaysRef.current;
     if (stack.length === 0) {
-      if (openOverlay({ kind: "planner" })) {
-        const state = store.getState();
-        setTasksSeen(new Set([...selectOpenMissions(state, scenario).map((m) => m.id), ...selectPendingEvents(state, scenario).map((e) => e.id)]));
-      }
-    } else if (top(stack)?.kind === "planner") closeTop();
+      if (openOverlay({ kind: "tasks" })) setTasksSeen(new Set(selectOpenMissions(store.getState(), scenario).map((mission) => mission.id)));
+    } else if (top(stack)?.kind === "tasks") closeTop();
   }, [closeTop, openOverlay, scenario, store]);
   /** The Notes control of a call: opens the journal on top of the call. The call keeps going. */
   const openJournal = useCallback(() => {
@@ -968,6 +987,9 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
       } else if (event.code === "KeyK") {
         event.preventDefault();
         togglePlanner();
+      } else if (event.code === "KeyT") {
+        event.preventDefault();
+        toggleTasks();
       } else if (event.code === "KeyH") {
         // Hints are a HUD toggle only: no story state changes.
         if (store.getState().status !== "playing" || overlaysRef.current.length > 0) return;
@@ -990,7 +1012,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keydown", onTab);
     };
-  }, [canClose, closeTop, store, toggleJournal, togglePlanner]);
+  }, [canClose, closeTop, store, toggleJournal, togglePlanner, toggleTasks]);
 
   // Focus returns to the element that opened the overlay when it closes (Requirement 22.1).
   const previousOverlaysRef = useRef<OverlayStack>(EMPTY_OVERLAYS);
@@ -1075,6 +1097,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
   }, []);
   const closeJournal = useCallback(() => removeOverlay("journal"), [removeOverlay]);
   const closePlanner = useCallback(() => removeOverlay("planner"), [removeOverlay]);
+  const closeTasks = useCallback(() => removeOverlay("tasks"), [removeOverlay]);
 
   // Device content (mail, bank, calendar, housing, jobs, files) is shared state: the phone and the
   // laptop show the same items. The parked story's bank, compare and security tabs only appear for
@@ -1193,6 +1216,18 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
             onClose={closePlanner}
           />
         );
+      case "tasks":
+        return (
+          <TaskListPanel
+            key="tasks"
+            open={openMissions}
+            closed={closedMissions}
+            trackedId={trackedMission?.id ?? null}
+            onTrack={setTrackedMissionId}
+            onClose={closeTasks}
+            onHoverSound={onHoverSound}
+          />
+        );
       case "journal":
         return (
           <EvidenceJournal
@@ -1227,6 +1262,19 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
 
   const stopMouseDown = useCallback((event: React.MouseEvent) => event.stopPropagation(), []);
   const hudVisible = !introOpen && status === "playing";
+  // The marker over the prop of the current step, while the player walks around (no overlay, call or inspect pose).
+  const markerTarget = taskMode && hudVisible && !trackerHidden && inspecting === null ? (trackedMission?.current?.target ?? null) : null;
+  // The marker moves itself (DOM writes per frame); the layer only keeps the whole-metre distance for the tracker.
+  const [taskDistance, setTaskDistance] = useState<number | null>(null);
+  const markerSource = useCallback<TaskMarkerSource>(
+    (prop, listener) => {
+      const commands = bridge.commands;
+      if (!commands?.watchTaskMarker) return () => undefined;
+      commands.watchTaskMarker(prop, listener);
+      return () => commands.watchTaskMarker?.(null);
+    },
+    [bridge],
+  );
   const journalUnread = Math.max(0, discoveredCount - journalSeen);
   const completedObjective = completed !== null && Object.hasOwn(scenario.objectives, completed) ? scenario.objectives[completed] : null;
   const objectiveText = (id: ObjectiveId): string => (Object.hasOwn(scenario.objectives, id) ? scenario.objectives[id].text : id);
@@ -1270,6 +1318,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
         <Mission01VoiceCaption cue={alexVoice.current} subtitlesEnabled={settings.subtitlesEnabled} getPositionMs={alexVoice.positionMs} />
         {hudVisible && (
           <>
+            {engineReady && markerTarget !== null && <TaskMarker target={markerTarget} source={markerSource} onDistance={setTaskDistance} />}
             {/* Top left, like the neighborhood HUD: the map with the status ring, the clock beside it, the objective under it. */}
             <div
               className="pointer-events-none absolute left-[clamp(1rem,3vw,2.5rem)] top-4 z-10 flex flex-col items-start gap-3"
@@ -1285,17 +1334,33 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
               <ChapterStatusCluster
                 resources={resources}
                 fatigueLevel={fatigueOn ? fatigueLevel(resources.fatigue, gameplay.fatigue) : undefined}
-                mapCorner={<ChapterTaskButton unseen={tasksUnseen} onOpen={togglePlanner} onHoverSound={onHoverSound} />}
+                mapCorner={<ChapterTaskButton unseen={tasksUnseen} onOpen={taskMode ? toggleTasks : togglePlanner} onHoverSound={onHoverSound} />}
               />
-              <ObjectiveTracker
-                objectives={trackerObjectives}
-                store={store}
-                scenario={scenario}
-                announcement={completed === null ? null : text("room.objectiveToast.done", { objective: objectiveText(completed) })}
-                completed={completedObjective ? [completedObjective] : []}
-                hint={currentHint}
-                hintOn={hintOn}
-              />
+              {taskMode && trackedMission ? (
+                <TaskTracker
+                  mission={trackedMission}
+                  others={openMissions.filter((mission) => mission.id !== trackedMission.id)}
+                  distance={markerTarget === null ? null : taskDistance}
+                  onOpenList={toggleTasks}
+                  onHoverSound={onHoverSound}
+                />
+              ) : null}
+              {taskMode && trackedMission && hintOn && (
+                <p role="note" aria-label={text("room.hud.hintPanelLabel")} data-testid="room-hint" className={`pl-[34px] font-menu text-sm italic leading-snug text-zinc-400 ${SHADOW}`}>
+                  {currentHint ?? text("room.hints.none")}
+                </p>
+              )}
+              {taskMode && trackedMission ? null : (
+                <ObjectiveTracker
+                  objectives={trackerObjectives}
+                  store={store}
+                  scenario={scenario}
+                  announcement={completed === null ? null : text("room.objectiveToast.done", { objective: objectiveText(completed) })}
+                  completed={completedObjective ? [completedObjective] : []}
+                  hint={currentHint}
+                  hintOn={hintOn}
+                />
+              )}
             </div>
 
             {/* Top right: cash, then settings. */}
@@ -1524,3 +1589,9 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
     </ScreenQuadContext.Provider>
   );
 };
+/**
+ * Memoized: the host page re-renders on every engine UI update (the aimed prop's prompt moves with
+ * the camera, so that is almost every frame while the player turns). The layer's props stay the
+ * same then, so it skips those renders.
+ */
+export const RoomChapterLayer = React.memo(RoomChapterLayerView);

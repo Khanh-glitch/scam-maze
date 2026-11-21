@@ -1,6 +1,6 @@
 // The chapter layer with the real "LAST SUBMISSION: 72 GIỜ CUỐI" routing (no parked story).
 // jsdom, a fake commands object on a real RoomStoryBridge. No WebGL, no engine.
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS } from "../../../app/settingsStorage";
 import type { ChapterSession } from "../../../game/chapters/chapterSession";
@@ -92,7 +92,7 @@ describe("RoomChapterLayer with LAST SUBMISSION routing", () => {
     expect(screen.queryByTestId("resource-evidence")).toBeNull();
   });
 
-  it("puts cash before settings and opens the schedule from the task icon, which clears its mark", () => {
+  it("puts cash before settings and opens the task list from the task icon, which clears its mark", () => {
     mountLayer();
     finishIntro();
     const bar = screen.getByTestId("chapter-top-bar");
@@ -101,8 +101,35 @@ describe("RoomChapterLayer with LAST SUBMISSION routing", () => {
     const task = within(screen.getByTestId("chapter-status-cluster")).getByRole("button", { name: "Tasks" });
     expect(screen.getByTestId("hud-task-new-mark")).toBeTruthy();
     fireEvent.click(task);
-    expect(screen.getByTestId("planner-overlay")).toBeTruthy();
+    const list = screen.getByTestId("task-list");
+    expect(within(list).getByTestId("task-mission-m01.missing-access").textContent).toContain("THE MISSING ACCESS");
+    expect(within(list).getByTestId("task-step-intro").getAttribute("data-state")).toBe("current");
     expect(screen.queryByTestId("hud-task-new-mark")).toBeNull();
+    // T closes it again, and opens it.
+    fireEvent.keyDown(window, { key: "t", code: "KeyT" });
+    expect(screen.queryByTestId("task-list")).toBeNull();
+    fireEvent.keyDown(window, { key: "t", code: "KeyT" });
+    expect(screen.getByTestId("task-list")).toBeTruthy();
+  });
+
+  it("tracks the current step, marks it new and shows it complete when the thesis task is done", () => {
+    const rig = mountLayer();
+    finishIntro();
+    const tracker = screen.getByTestId("task-tracker");
+    expect(tracker.getAttribute("data-fresh")).toBe("true");
+    expect(within(tracker).getByTestId("task-current").textContent).toBe("Edit the introduction and literature review");
+    act(() => void rig.store().dispatch({ type: "COMPLETE_THESIS_TASK", taskId: "draft.intro-review" }));
+    // The task took 90 minutes, so the email of 17:10 has arrived: reading it is the next step.
+    expect(within(screen.getByTestId("task-tracker")).getByTestId("task-current").textContent).toBe("Read the new email about your submission account");
+    expect(screen.getByTestId("task-step-done").textContent).toContain("Edit the introduction and literature review");
+  });
+
+  it("shows the task tracker in Vietnamese", () => {
+    applyLocale("vi");
+    mountLayer();
+    finishIntro();
+    expect(screen.getByTestId("task-current").textContent).toBe("Chỉnh sửa phần mở đầu và tổng quan tài liệu");
+    expect(screen.getByTestId("task-where").textContent).toContain("Laptop · Khóa luận");
   });
 
   it("shows the HUD in Vietnamese", () => {

@@ -19,7 +19,7 @@
 //   - Money that leaves without approval can only take the cash that is there, and never twice.
 //   - Nothing gives money back: the bank can block and review, it never refunds in the game.
 import { minutesFromStart, type PersistentFlagId } from "../resources";
-import type { Condition, DeviceItemDef, GameEventDef, MissionDef, ThesisTaskDef } from "../types";
+import type { Condition, DeviceItemDef, GameEventDef, MissionDef, MissionStepDef, ThesisTaskDef } from "../types";
 
 /**
  * Every number of Mission 01 that the brief does not state is a placeholder, and all of them live
@@ -641,6 +641,50 @@ export const MISSION_01_LATE_RECOVERY_EVENT: GameEventDef = {
   ],
 };
 
+// --- Task steps (guidance in the task tracker and list; they never change state) -----------------
+const draftStep = (id: string, taskId: string, label: string): MissionStepDef => ({
+  id,
+  label,
+  target: "laptop",
+  app: "thesis",
+  doneWhen: [{ kind: "thesisTaskDone", taskId }],
+});
+const DRAFT_STEPS: MissionStepDef[] = [
+  draftStep("intro", "draft.intro-review", "Edit the introduction and literature review"),
+  draftStep("findings", "draft.findings", "Revise the findings section"),
+  draftStep("final", "draft.final", "Finish the full draft"),
+];
+const READ_MAIL_STEP: MissionStepDef = {
+  id: "read-mail",
+  label: "Read the new email about your submission account",
+  target: "laptop",
+  app: "mail",
+  visibleWhen: [{ kind: "itemArrived", itemId: "mail.clearance" }],
+  doneWhen: [{ kind: "itemOpened", itemId: "mail.clearance" }],
+};
+/** Optional: ignoring the question is one of the three ways to play (it comes back on Friday). */
+const CONFIRM_ACCESS_STEP: MissionStepDef = {
+  id: "confirm-access",
+  label: "Confirm that you can reach the submission system",
+  visibleWhen: [{ kind: "itemOpened", itemId: "mail.clearance" }],
+  doneWhen: [flag("schoolAccessVerified")],
+  optional: true,
+};
+const PASSWORDS_STEP: MissionStepDef = {
+  id: "passwords",
+  label: "Change your passwords and sign out other devices",
+  target: "laptop",
+  app: "files",
+  doneWhen: [done("settings.security", "change-passwords")],
+};
+const BANK_STEP: MissionStepDef = {
+  id: "call-bank",
+  label: "Call your bank on its official line",
+  target: "phone",
+  app: "contacts",
+  doneWhen: [done("contact.bank", "report-fraud")],
+};
+
 export const MISSION_01_MISSIONS: MissionDef[] = [
   {
     id: "m01.missing-access",
@@ -659,16 +703,19 @@ export const MISSION_01_MISSIONS: MissionDef[] = [
         id: "breach",
         when: [CREDENTIALS_GIVEN, { kind: "missionStatus", missionId: "m01.security-breach", status: "open" }],
         objective: "Your accounts are at risk. Secure them first, then finish the draft.",
+        steps: [PASSWORDS_STEP, ...DRAFT_STEPS],
       },
       {
         id: "verified",
         when: [flag("schoolAccessVerified")],
         objective: "Access is confirmed with the Training Office. Finish the draft.",
+        steps: [READ_MAIL_STEP, ...DRAFT_STEPS],
       },
       {
         id: "default",
         when: [],
         objective: "Finish the draft and confirm that you can reach the submission system.",
+        steps: [READ_MAIL_STEP, CONFIRM_ACCESS_STEP, ...DRAFT_STEPS],
       },
     ],
   },
@@ -687,11 +734,13 @@ export const MISSION_01_MISSIONS: MissionDef[] = [
         id: "code",
         when: [CODE_GIVEN],
         objective: "Report the transfers to your bank on its official line, then secure your accounts.",
+        steps: [BANK_STEP, PASSWORDS_STEP],
       },
       {
         id: "credentials",
         when: [],
         objective: "Change your passwords and sign out other devices.",
+        steps: [PASSWORDS_STEP],
       },
     ],
   },
