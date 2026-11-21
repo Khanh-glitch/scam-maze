@@ -29,6 +29,14 @@ export interface DeviceAppProps {
   embedded?: boolean;
   /** Adds a Back button to the list that leaves the app (the phone returns to its home screen). */
   onExit?: () => void;
+  /**
+   * The open item and the mail folder, held by the parent so they survive leaving the app. With
+   * `onSelect` set the open item is controlled; with `onFolder` set the folder is controlled.
+   */
+  selectedId?: string | null;
+  onSelect?: (itemId: string | null) => void;
+  folderId?: string;
+  onFolder?: (folder: string) => void;
 }
 
 const ROW =
@@ -146,13 +154,29 @@ const Ledger: React.FC<{ view: DeviceView; t: Tx; locale: string }> = ({ view, t
   </section>
 );
 
-export const DeviceApp: React.FC<DeviceAppProps> = ({ app, view, onOpenItem, onUseItem, onView, embedded = false, onExit }) => {
+export const DeviceApp: React.FC<DeviceAppProps> = ({
+  app,
+  view,
+  onOpenItem,
+  onUseItem,
+  onView,
+  embedded = false,
+  onExit,
+  selectedId,
+  onSelect,
+  folderId,
+  onFolder,
+}) => {
   const { t: translate } = useTranslation("chapter1");
   const t = translate as unknown as Tx;
   const locale = useGameLocale();
   const items = view.apps[app];
-  const [selected, setSelected] = useState<string | null>(null);
-  const [folder, setFolder] = useState<string>("all");
+  const [localSelected, setLocalSelected] = useState<string | null>(null);
+  const [localFolder, setLocalFolder] = useState<string>("all");
+  const selected = onSelect ? (selectedId ?? null) : localSelected;
+  const setSelected = onSelect ?? setLocalSelected;
+  const folder = onFolder ? (folderId ?? "all") : localFolder;
+  const setFolder = onFolder ?? setLocalFolder;
   const folders = app === "mail" ? Array.from(new Set(items.flatMap((item) => (item.folder === null ? [] : [item.folder])))) : [];
   const shown = folder === "all" ? items : items.filter((item) => item.folder === folder);
   const current = selected === null ? null : (items.find((item) => item.id === selected) ?? null);

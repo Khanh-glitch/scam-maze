@@ -17,7 +17,6 @@ import { useTranslation } from "react-i18next";
 import type { DeviceView } from "../../../../../game/narrative/device";
 import { actionLabel, type Tx } from "../../../device/deviceFormat";
 import { useGameLocale } from "../../../../../i18n/useGameLocale";
-import { hostOf, isWebPageItem } from "../mailModel";
 import { useDesktopEscape } from "../desktopNav";
 import {
   activeTab,
@@ -28,10 +27,10 @@ import {
   type BrowserState,
   type BrowserTab,
 } from "./browserState";
-import { ErrorPage, FOCUS, HistoryPage, INK, LINE, MUTED, NewTabPage, StaticSitePage, pageTitle, ACCENT } from "./BrowserPages";
-import { ClearanceSite } from "./ueh/ClearanceSite";
-import { PortalSite, type PortalFacts } from "./ueh/PortalSite";
-import { isKnownPage, resolveRoute } from "./sites";
+import { BrowserPage, DEFAULT_LOAD_MS, addressSaveAction, useBrowserLoading } from "./BrowserContent";
+import { FOCUS, INK, LINE, MUTED, pageTitle, ACCENT } from "./BrowserPages";
+import type { PortalFacts } from "./ueh/PortalSite";
+import { isKnownPage } from "./sites";
 import { HISTORY_URL, NEW_TAB_URL, displayAddress } from "./urls";
 
 export interface BrowserAppProps {
@@ -46,13 +45,9 @@ export interface BrowserAppProps {
   loadMs?: number;
 }
 
-export const DEFAULT_LOAD_MS = 420;
 
 const TOOL_BUTTON = `flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-[#374151] motion-safe:transition-colors hover:bg-[#e3e6ea] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent ${FOCUS}`;
 
-function prefersReducedMotion(): boolean {
-  return typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
 
 export const BrowserApp: React.FC<BrowserAppProps> = ({ state, dispatch, view, facts, onOpenItem, onUseItem, loadMs = DEFAULT_LOAD_MS }) => {
   const { t: translate } = useTranslation("chapter1");
@@ -60,33 +55,11 @@ export const BrowserApp: React.FC<BrowserAppProps> = ({ state, dispatch, view, f
   const locale = useGameLocale();
   const tab = activeTab(state);
   const url = currentUrl(tab);
-  const route = resolveRoute(url);
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
 
-  // --- Loading: a short progress bar, then the page. The timers belong to one navigation (`loadKey`). ---
-  const loadingKey = state.tabs
-    .filter((entry) => entry.status === "loading")
-    .map((entry) => `${entry.id}:${entry.loadKey}`)
-    .join("|");
-  useEffect(() => {
-    if (loadingKey === "") return undefined;
-    const timers: number[] = [];
-    const wait = prefersReducedMotion() ? 0 : loadMs;
-    for (const key of loadingKey.split("|")) {
-      const tabId = key.slice(0, key.lastIndexOf(":"));
-      if (wait <= 0) {
-        timers.push(window.setTimeout(() => dispatch({ type: "loaded", tabId }), 0));
-      } else {
-        timers.push(window.setTimeout(() => dispatch({ type: "progress", tabId, value: 0.35 }), 0));
-        timers.push(window.setTimeout(() => dispatch({ type: "progress", tabId, value: 0.75 }), wait * 0.55));
-        timers.push(window.setTimeout(() => dispatch({ type: "loaded", tabId }), wait));
-      }
-    }
-    return () => timers.forEach((timer) => window.clearTimeout(timer));
-  }, [loadingKey, loadMs, dispatch]);
-
+  useBrowserLoading(state, dispatch, loadMs);
   // --- Address bar --------------------------------------------------------------------------------
   const [draft, setDraft] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -144,9 +117,9 @@ export const BrowserApp: React.FC<BrowserAppProps> = ({ state, dispatch, view, f
   });
 
   // The page of the story's payment link offers to save its address as evidence: by choice, never by looking.
-  const clearanceHost = route.type === "page" && route.page.kind === "clearance" ? hostOf(route.page.url) : null;
-  const addressItem = clearanceHost === null ? null : (view.apps.mail.find((entry) => isWebPageItem(entry) && (entry.detail ?? "").toLowerCase() === clearanceHost) ?? null);
-  const saveAddress = addressItem?.actions.find((entry) => entry.id === "save-address") ?? null;
+  const saving = addressSaveAction(view, url);
+  const addressItem = saving?.addressItem ?? null;
+  const saveAddress = saving?.saveAddress ?? null;
   const bookmarked = state.bookmarks.includes(url);
   const canBookmark = isKnownPage(url);
   const openHistory = () => {
@@ -208,41 +181,7 @@ export const BrowserApp: React.FC<BrowserAppProps> = ({ state, dispatch, view, f
     window.setTimeout(() => rootRef.current?.querySelector<HTMLElement>(`[data-testid="browser-tab-${state.tabs[next].id}"]`)?.focus(), 0);
   };
 
-  // --- Content ------------------------------------------------------------------------------------
-  let content: React.ReactNode;
-  if (tab.status === "loading") {
-    content = <div className="min-h-full" data-testid="browser-loading" aria-busy="true" />;
-  } else if (route.type === "internal") {
-    content =
-      route.id === "newtab" ? (
-        <NewTabPage bookmarks={state.bookmarks} history={state.history} onOpen={navigate} />
-      ) : (
-        <HistoryPage history={state.history} onOpen={navigate} onClear={() => dispatch({ type: "clearHistory" })} />
-      );
-  } else if (route.type === "page") {
-    const { page } = route;
-    if (page.kind === "portal" && page.section) {
-      content = <PortalSite section={page.section} view={view} facts={facts} go={navigate} onUseItem={onUseItem} />;
-    } else if (page.kind === "clearance" && page.step) {
-      content = (
-        <ClearanceSite
-          page={page}
-          step={page.step}
-          view={view}
-          fields={tab.fields}
-          setFields={(fields) => dispatch({ type: "setFields", tabId: tab.id, fields })}
-          go={navigate}
-          onOpenItem={onOpenItem}
-          onUseItem={onUseItem}
-        />
-      );
-    } else {
-      content = <StaticSitePage page={page} />;
-    }
-  } else {
-    content = <ErrorPage route={route} onRetry={() => dispatch({ type: "reload" })} onHome={() => dispatch({ type: "home" })} />;
-  }
-
+  const content = <BrowserPage state={state} tab={tab} dispatch={dispatch} view={view} facts={facts} navigate={navigate} onOpenItem={onOpenItem} onUseItem={onUseItem} />;
   const tabLabel = (entry: BrowserTab) => (entry.status === "loading" ? t("laptop.browser.loading") : pageTitle(t, currentUrl(entry)));
 
   return (

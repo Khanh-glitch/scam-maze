@@ -61,6 +61,9 @@ import { ObjectiveTracker } from "../hud/ObjectiveTracker";
 import { ResourceStatus } from "../hud/ResourceStatus";
 import { Mission01VoiceCaption } from "../voice/Mission01VoiceCaption";
 import { useMission01Voice, type VoiceView } from "../voice/useMission01Voice";
+import type { BrowserState } from "./desktop/browser/browserState";
+import { setLineVoiceHeld } from "../device/lineVoice";
+import { useLineVoiceActive } from "../device/useLineVoice";
 import { effectiveWorkMinutes, fatigueLevel, workSlowdown } from "../../../game/narrative/fatigue";
 import { EventArrivalNotice } from "../hud/EventArrivalNotice";
 import { PlannerOverlay } from "../world/PlannerOverlay";
@@ -494,6 +497,13 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
   // --- Alex's Mission 01 voice: one line at a time on the shared engine, once per run, never after a load.
   // The list a device app shows now (an inbox, the bank app): Alex's email and bank lines wait for it.
   const [deviceView, setDeviceView] = useState<VoiceView | null>(null);
+  // A line of a chat or a phone call (a clip or the computer voice) is the one voice at that moment:
+  // Alex's story voice waits for it and continues after it. A game hold pauses the line as well.
+  const lineVoiceActive = useLineVoiceActive();
+  useEffect(() => {
+    setLineVoiceHeld(clockPaused);
+    return () => setLineVoiceHeld(false);
+  }, [clockPaused]);
   const alexVoice = useMission01Voice({
     store,
     scenario,
@@ -502,7 +512,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
     settings: { soundEnabled: settings.soundEnabled, voiceVolume: settings.voiceVolume },
     held: clockPaused,
     introVisible: introOpen && introMode === "begin" && engineReady,
-    callOpen,
+    callOpen: callOpen || lineVoiceActive,
     viewing: deviceView,
   });
   // --- Port cache (the bridge reads it on every hover frame) --------------------------------
@@ -1048,6 +1058,11 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
     laptopEscapeRef.current = handler;
   }, []);
   const closePhone = useCallback(() => removeOverlay("phone"), [removeOverlay]);
+  // The phone's browser (tabs, bookmarks, history) is UI state: it survives putting the phone down and is not saved.
+  const phoneBrowserRef = useRef<BrowserState | undefined>(undefined);
+  const handlePhoneBrowser = useCallback((next: BrowserState) => {
+    phoneBrowserRef.current = next;
+  }, []);
   const closeJournal = useCallback(() => removeOverlay("journal"), [removeOverlay]);
   const closePlanner = useCallback(() => removeOverlay("planner"), [removeOverlay]);
 
@@ -1151,6 +1166,9 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
             onDeviceAction={(deviceActionId: DeviceActionId) => dispatchVoid({ type: "DEVICE_ACTION", deviceActionId })}
             onCallSavedContact={(claimId: ClaimId) => dispatchVoid({ type: "VERIFY_CLAIM", claimId, method: "saved-official-contact" })}
             device={{ view: phoneDevice, onOpenItem: openDeviceItem, onUseItem: useDeviceItem, onView: setDeviceView }}
+            mobile={legacyLaptop ? undefined : { blocked: blockedTransfers, bank: bankFacts, portal: portalFacts }}
+            browserState={phoneBrowserRef.current}
+            onBrowserState={handlePhoneBrowser}
             onClose={closePhone}
           />
         );

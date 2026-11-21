@@ -1,87 +1,189 @@
-// Phone home screen with the three apps: Messages, Calls and Voicemail (Requirement 5.5).
-// Each app is a button with an icon and visible text, so it works with mouse and keyboard.
-
+// Phone home screen: the day and time, an app grid and a dock. Each app is a button with its own
+// colored tile and a visible label, so it works with mouse and keyboard. Opening an app only
+// changes the screen; it never dispatches a game action.
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { MessageSquare, Phone, Voicemail, type LucideIcon } from "lucide-react";
+import { Scale } from "lucide-react";
 import { formatNumber } from "../../../i18n/format";
 import { useGameLocale } from "../../../i18n/useGameLocale";
+import { UI } from "../theme";
+import { PhoneAppTile } from "./PhoneAppIcon";
+import { PhoneCloseButton } from "./PhoneChrome";
+import type { PhoneAppId } from "./phoneRoutes";
+import { PHONE_COLORS } from "./phoneTheme";
 
-export type PhoneAppId = "messages" | "calls" | "voicemail";
+export type { PhoneAppId } from "./phoneRoutes";
 
 /** An app of the shared device content (mail, bank, map, calendar, housing, jobs, files). */
 export interface PhoneExtraApp {
   id: string;
   label: string;
-  icon: LucideIcon;
   /** Unread items; the badge is hidden at 0. */
   badge: number;
 }
+
 export interface PhoneHomeProps {
   extraApps?: readonly PhoneExtraApp[];
   /** False hides the Voicemail app (a scenario without voicemail). Default true. */
   showVoicemail?: boolean;
+  /** Shows the Browser app. Default false. */
+  showBrowser?: boolean;
   onOpenExtra?: (id: string) => void;
-  /** Number of unread messages; shown as text on the Messages app. */
+  /** Number of unread messages; shown on the Messages app. */
   unreadCount: number;
   onOpenApp: (app: PhoneAppId) => void;
+  time: string;
+  weekday: string | null;
+  onClose: () => void;
+  /** Opens the decision panel; set only while the decision is offered. */
+  onDecide?: () => void;
+  headingRef: React.RefObject<HTMLHeadingElement | null>;
 }
 
-const APP_BUTTON =
-  "flex w-full items-center gap-3 rounded-xl border border-[#38344f] bg-[#171521] px-4 py-3 text-left text-sm font-medium text-[#f7f5ff] motion-safe:transition-colors hover:border-[#7654d6] hover:bg-[#26233a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b9a5f5] cursor-pointer";
+/** Apps that sit in the dock when the device has them. The rest fill the grid. */
+const DOCK_EXTRA = "mail";
 
-const APP_ICON = "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#7654d6] text-white";
+interface Slot {
+  key: string;
+  /** Theme key of the app. */
+  app: string;
+  label: string;
+  badge: number;
+  /** Text that replaces the plain count in the badge for screen readers. */
+  badgeText: string;
+  testId?: string;
+  onOpen: () => void;
+}
 
-export const PhoneHome: React.FC<PhoneHomeProps> = ({ unreadCount, onOpenApp, extraApps = [], onOpenExtra, showVoicemail = true }) => {
+const Badge: React.FC<{ count: number; text: string }> = ({ count, text }) => (
+  <>
+    <span
+      aria-hidden="true"
+      className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[12px] font-bold leading-none"
+      style={{ background: PHONE_COLORS.badge, color: PHONE_COLORS.badgeText }}
+    >
+      {count}
+    </span>
+    <span className="sr-only">{text}</span>
+  </>
+);
+
+export const PhoneHome: React.FC<PhoneHomeProps> = ({
+  unreadCount,
+  onOpenApp,
+  extraApps = [],
+  onOpenExtra,
+  showVoicemail = true,
+  showBrowser = false,
+  time,
+  weekday,
+  onClose,
+  onDecide,
+  headingRef,
+}) => {
   const { t } = useTranslation("chapter1");
   const locale = useGameLocale();
+  const unreadText = (count: number) => t("phone.home.unread", { count, number: formatNumber(locale, count) });
+  const extraUnreadText = (count: number) => t("device.unread", { count, number: formatNumber(locale, count) });
+
+  const base: Slot[] = [
+    { key: "calls", app: "calls", label: t("phone.home.calls"), badge: 0, badgeText: "", onOpen: () => onOpenApp("calls") },
+    {
+      key: "messages",
+      app: "messages",
+      label: t("phone.home.messages"),
+      badge: unreadCount,
+      badgeText: unreadText(unreadCount),
+      onOpen: () => onOpenApp("messages"),
+    },
+  ];
+  if (showVoicemail) {
+    base.push({ key: "voicemail", app: "voicemail", label: t("room.records.tabs.voicemail"), badge: 0, badgeText: "", onOpen: () => onOpenApp("voicemail") });
+  }
+  const extras: Slot[] = extraApps.map((app) => ({
+    key: app.id,
+    app: app.id,
+    label: app.label,
+    badge: app.badge,
+    badgeText: extraUnreadText(app.badge),
+    testId: `phone-app-${app.id}`,
+    onOpen: () => onOpenExtra?.(app.id),
+  }));
+  const mail = extras.find((slot) => slot.key === DOCK_EXTRA);
+  const dock = mail ? [...base, mail] : base;
+  const browserSlot: Slot[] = showBrowser
+    ? [{ key: "browser", app: "browser", label: t("phone.home.browser"), badge: 0, badgeText: "", testId: "phone-app-browser", onOpen: () => onOpenApp("browser") }]
+    : [];
+  const grid = [...extras.filter((slot) => slot !== mail), ...browserSlot];
+
+  const tile = (slot: Slot, size: number) => (
+    <button
+      key={slot.key}
+      type="button"
+      data-testid={slot.testId}
+      onClick={slot.onOpen}
+      className="group flex w-full flex-col items-center gap-1 rounded-xl py-1 text-center cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8fe0e8]"
+    >
+      <span className="relative motion-safe:transition-transform group-hover:scale-105 group-active:scale-95">
+        <PhoneAppTile app={slot.app} size={size} />
+        {slot.badge > 0 && <Badge count={slot.badge} text={slot.badgeText} />}
+      </span>
+      <span className="line-clamp-2 w-full break-words text-[12px] font-medium leading-tight" style={{ color: PHONE_COLORS.text }}>
+        {slot.label}
+      </span>
+    </button>
+  );
+
   return (
-    <div className="space-y-3">
-      <h3 className="sr-only">{t("phone.home.heading")}</h3>
-      <ul className="space-y-2">
-        <li>
-          <button type="button" className={APP_BUTTON} onClick={() => onOpenApp("messages")}>
-            <span className={APP_ICON}>
-              <MessageSquare className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <span className="flex-1">{t("phone.home.messages")}</span>
-            {unreadCount > 0 && (
-              <span className="rounded-full bg-[#f2b24b] px-2 py-0.5 text-xs font-bold text-[#171521]">
-                {t("phone.home.unread", { count: unreadCount, number: formatNumber(locale, unreadCount) })}
-              </span>
-            )}
+    <div className="flex min-h-0 flex-1 flex-col px-3 pb-2" data-testid="phone-home">
+      <h2 ref={headingRef} tabIndex={-1} className="sr-only">
+        {t("phone.home.heading")}
+      </h2>
+      <div className="flex items-start justify-between gap-2 px-1">
+        <div style={{ color: PHONE_COLORS.text }}>
+          {weekday !== null && (
+            <p className="text-sm font-medium" style={{ color: PHONE_COLORS.textMuted }}>
+              {weekday}
+            </p>
+          )}
+          <p className="text-4xl font-light leading-none tabular-nums" data-testid="phone-home-time">
+            {time}
+          </p>
+        </div>
+        <PhoneCloseButton onClose={onClose} />
+      </div>
+      <div className="mt-5 min-h-0 flex-1 overflow-y-auto">
+        <ul className="grid grid-cols-4 gap-x-1 gap-y-3" data-testid="phone-grid">
+          {grid.map((slot) => (
+            <li key={slot.key}>{tile(slot, 52)}</li>
+          ))}
+        </ul>
+      </div>
+      {onDecide && (
+        <div
+          className="mb-2 space-y-2 rounded-2xl border p-3"
+          style={{ background: PHONE_COLORS.glass, borderColor: PHONE_COLORS.glassBorder }}
+        >
+          <p className="text-sm leading-snug" style={{ color: PHONE_COLORS.text }}>
+            {t("phone.overlay.decidePrompt")}
+          </p>
+          <button type="button" onClick={onDecide} className={`${UI.buttonPrimary} w-full`}>
+            <Scale className="h-4 w-4" aria-hidden="true" />
+            {t("phone.overlay.decide")}
           </button>
-        </li>
-        <li>
-          <button type="button" className={APP_BUTTON} onClick={() => onOpenApp("calls")}>
-            <span className={APP_ICON}>
-              <Phone className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <span className="flex-1">{t("phone.home.calls")}</span>
-          </button>
-        </li>
-        {showVoicemail && <li>
-          <button type="button" className={APP_BUTTON} onClick={() => onOpenApp("voicemail")}>
-            <span className={APP_ICON}>
-              <Voicemail className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <span className="flex-1">{t("room.records.tabs.voicemail")}</span>
-          </button>
-        </li>}
-        {extraApps.map((app) => (
-          <li key={app.id}>
-            <button type="button" className={APP_BUTTON} data-testid={`phone-app-${app.id}`} onClick={() => onOpenExtra?.(app.id)}>
-              <span className={APP_ICON}>
-                <app.icon className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <span className="flex-1">{app.label}</span>
-              {app.badge > 0 && (
-                <span className="rounded-full bg-[#f2b24b] px-2 py-0.5 text-xs font-bold text-[#171521]">
-                  {t("device.unread", { count: app.badge, number: formatNumber(locale, app.badge) })}
-                </span>
-              )}
-            </button>
-          </li>
+        </div>
+      )}
+      <ul
+        className="grid shrink-0 gap-1 rounded-3xl border px-2 py-2"
+        style={{
+          gridTemplateColumns: `repeat(${dock.length}, minmax(0, 1fr))`,
+          background: PHONE_COLORS.glass,
+          borderColor: PHONE_COLORS.glassBorder,
+        }}
+        data-testid="phone-dock"
+      >
+        {dock.map((slot) => (
+          <li key={slot.key}>{tile(slot, 50)}</li>
         ))}
       </ul>
     </div>

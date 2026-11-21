@@ -86,6 +86,8 @@ export interface DeviceActionView {
   blocked: ActionBlock | null;
   /** True when the action places a call. */
   placesCall: boolean;
+  /** True when doing the action adds lines to the conversation (a reply in a chat or a turn of a call). */
+  speaks: boolean;
 }
 
 export interface DeviceItemView {
@@ -186,6 +188,7 @@ function actionView(state: ChapterState, scenario: ScenarioDefinition, itemState
     available: blocked === null,
     blocked,
     placesCall: action.callId !== undefined,
+    speaks: action.transcript !== undefined && action.transcript.length > 0,
   };
 }
 
