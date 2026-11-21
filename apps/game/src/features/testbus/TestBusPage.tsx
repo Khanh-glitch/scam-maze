@@ -15,7 +15,7 @@ const BUTTON =
 
 /**
  * Prototype route `/testbus`: the Saigon bus stop and Route 06 ride, populated with the game's own
- * characters, scooter riders and parked scooters instead of the blocky stand-ins.
+ * characters, scooter riders, parked scooters and the rigged bus driver (Men Le's rebuild).
  */
 export const TestBusPage: React.FC<TestBusPageProps> = ({ settings, onBackToMenu }) => {
   const { t } = useTranslation("worlds");
@@ -33,20 +33,14 @@ export const TestBusPage: React.FC<TestBusPageProps> = ({ settings, onBackToMenu
     let cancelled = false;
     void (async () => {
       try {
-        const [{ createSimulation }, { loadTestBusAssets }] = await Promise.all([import("./sim/runtime"), import("./actors")]);
-        const assets = await loadTestBusAssets();
+        const { createSimulation } = await import("./sim/runtime");
         if (cancelled) return;
-        const sim = createSimulation(
-          el,
-          {
-            onHud: setHud,
-            onPanel: (panel) => { if (panel === "pause") { sim.setPaused(true); setPaused(true); } },
-            onReady: () => setLoading(false),
-            onError: (message) => setError(message),
-          },
-          undefined,
-          assets,
-        );
+        const sim = createSimulation(el, {
+          onHud: setHud,
+          onPanel: (panel) => { if (panel === "pause") { sim.setPaused(true); setPaused(true); } },
+          onReady: () => setLoading(false),
+          onError: (message) => setError(message),
+        });
         simRef.current = sim;
         sim.setMuted(muted);
       } catch (err) {
