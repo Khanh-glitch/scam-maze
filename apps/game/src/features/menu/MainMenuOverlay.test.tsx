@@ -49,9 +49,9 @@ describe("MainMenuOverlay keyboard navigation", () => {
     expect(onHoverSound).toHaveBeenCalledTimes(4);
   });
 
-  it("shows a small loader on NEW GAME while the room is prepared, and keeps the menu usable", () => {
+  it("starts the new game on click, with no loader on the button", () => {
     const onStartNewGame = vi.fn();
-    const { rerender } = render(
+    render(
       <MainMenuOverlay
         settings={DEFAULT_SETTINGS}
         onUpdateSettings={() => {}}
@@ -60,23 +60,12 @@ describe("MainMenuOverlay keyboard navigation", () => {
         continueAvailability={NO_SAVE}
       />,
     );
-    expect(screen.queryByTestId("new-game-loader")).toBeNull();
-    rerender(
-      <MainMenuOverlay
-        settings={DEFAULT_SETTINGS}
-        onUpdateSettings={() => {}}
-        onStartNewGame={onStartNewGame}
-        newGameBusy
-        onContinue={() => {}}
-        continueAvailability={NO_SAVE}
-      />,
-    );
-    expect(screen.getByTestId("new-game-loader")).toBeTruthy();
     const button = screen.getByRole("button", { name: /NEW GAME/ });
-    expect(button.getAttribute("aria-busy")).toBe("true");
-    expect(screen.getByRole("button", { name: /SETTINGS/ })).toBeTruthy();
+    fireEvent.click(button);
+    expect(onStartNewGame).toHaveBeenCalledTimes(1);
+    expect(button.getAttribute("aria-busy")).toBeNull();
+    expect(button.querySelector(".animate-spin")).toBeNull();
   });
-
   it("stops on CONTINUE when a save is available", () => {
     const { current } = renderMenu({ available: true });
     fireEvent.keyDown(window, { key: "ArrowDown" });

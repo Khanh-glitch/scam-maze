@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2, Lock, Volume2, VolumeX } from "lucide-react";
+import { Lock, Volume2, VolumeX } from "lucide-react";
 import type { GameSettings } from "@scammaze/shared-types";
 import { SettingsModal } from "./SettingsModal";
 import { CreditsModal } from "./CreditsModal";
@@ -23,8 +23,6 @@ interface MainMenuOverlayProps {
   onHoverSound?: () => void;
   /** Starts loading the first chapter. */
   onStartNewGame: () => void;
-  /** True while New Game waits for the room to be built in the background: a small loader shows on the button. */
-  newGameBusy?: boolean;
   onContinue: () => void;
   continueAvailability: ContinueAvailability;
 }
@@ -49,7 +47,6 @@ export const MainMenuOverlay: React.FC<MainMenuOverlayProps> = ({
   onToggleSound,
   onHoverSound,
   onStartNewGame,
-  newGameBusy = false,
   onContinue,
   continueAvailability,
 }) => {
@@ -62,7 +59,7 @@ export const MainMenuOverlay: React.FC<MainMenuOverlayProps> = ({
       id: "newGame",
       group: "primary",
       label: t("menu:buttons.newGame.label"),
-      description: newGameBusy ? t("menu:buttons.newGame.preparing") : t("menu:buttons.newGame.sublabel"),
+      description: t("menu:buttons.newGame.sublabel"),
       disabled: false,
       onSelect: onStartNewGame,
     },
@@ -164,7 +161,6 @@ export const MainMenuOverlay: React.FC<MainMenuOverlayProps> = ({
           disabled={entry.disabled}
           aria-describedby={descId}
           aria-current={active ? "true" : undefined}
-          aria-busy={entry.id === "newGame" && newGameBusy ? true : undefined}
           onClick={entry.onSelect}
           onFocus={() => activate(entry.id, false)}
           className={`group relative flex w-full items-center gap-3 text-left font-menu uppercase leading-none outline-none transition-colors duration-150 ${
@@ -192,9 +188,6 @@ export const MainMenuOverlay: React.FC<MainMenuOverlayProps> = ({
           />
           {entry.disabled && <Lock className="relative h-[0.6em] w-[0.6em] shrink-0" aria-hidden="true" />}
           <span className="relative tracking-[0.04em]">{entry.label}</span>
-          {entry.id === "newGame" && newGameBusy && (
-            <Loader2 data-testid="new-game-loader" className="relative h-[0.7em] w-[0.7em] shrink-0 animate-spin" aria-hidden="true" />
-          )}
         </button>
         {/* Not shown on screen; screen readers read it through aria-describedby. */}
         <p id={descId} className="sr-only">
