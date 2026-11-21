@@ -5,7 +5,7 @@ const menu = {
   kicker: "Trust no one. Question everything.",
   hints: { navigate: "Select", select: "Confirm" },
   buttons: {
-    newGame: { label: "NEW GAME", sublabel: "Start a new story" },
+    newGame: { label: "NEW GAME", sublabel: "Start a new story", preparing: "Preparing the room" },
     continue: { label: "CONTINUE", sublabel: "Resume saved progress" },
     settings: { label: "SETTINGS", sublabel: "Graphics quality, camera FOV & audio" },
     credits: { label: "CREDITS & LICENSES", sublabel: "3D city & vehicle pack attribution" },

@@ -7,6 +7,8 @@ import type { InteractableId } from "../../game/narrative/chapter1/ids";
 export type Overlay =
   | { kind: "phone" }
   | { kind: "journal" }
+  /** Schedule: events waiting for an answer, open goals and deadlines, thesis work. */
+  | { kind: "planner" }
   /** Laptop apps in the room chapter (notification, bank app, compare, Review Security). */
   | { kind: "laptop" }
   | { kind: "inspection"; objectId: InteractableId }

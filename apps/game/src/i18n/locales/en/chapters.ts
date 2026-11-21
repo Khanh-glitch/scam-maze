@@ -7,8 +7,8 @@
  */
 const chapters = {
   "chapter-1": {
-    title: "The Urgent Call",
-    subtitle: "The notification arrives before breakfast.",
+    title: "LAST SUBMISSION: 72 GIỜ CUỐI",
+    subtitle: "Submit the thesis by Friday, 17:00.",
     assets: {
       "street-environment": "Loading the street",
       sky: "Loading the sky",

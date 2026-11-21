@@ -31,6 +31,8 @@
 // The solver-based parts of V2, V3 and V4 live in `reachability.ts`.
 
 import { MAX_BEAT_PASSES } from "./beats";
+import { validateDeviceContent } from "./device";
+import { validateWorldContent } from "./world";
 import {
   ACT_IDS,
   FLAG_IDS,
@@ -120,6 +122,8 @@ export function validateScenarioIssues(scenario: ScenarioDefinition): ScenarioIs
   const issues: Issues = [];
   try {
     runChecks(issues, scenario);
+    for (const message of validateWorldContent(scenario)) add(issues, "V1", "World", message);
+    for (const message of validateDeviceContent(scenario)) add(issues, "V1", "Device", message);
   } catch (error) {
     // Bad input must produce an issue, never an exception.
     add(

@@ -37,8 +37,20 @@ import {
   type VerifyMethod,
 } from "./chapter1/ids";
 import { applyBeats, beatTag } from "./beats";
-import { applyEffect, applyEffects, evaluateConditions } from "./conditions";
+import {
+  CHAPTER_1_INITIAL_STATE,
+  PERSISTENT_FLAG_IDS,
+  RESOURCE_IDS,
+  clampResource,
+  cloneInitialState,
+  type PersistentFlagId,
+  type ResourceId,
+} from "./resources";
+import { applyEffect, applyEffects, evaluateConditions, recordTransaction } from "./conditions";
 import { canRecordDeduction, matchDeduction } from "./deductions";
+import { createInitialDeviceItems, deviceItemDef, itemActionDef } from "./device";
+import { WORLD_TAG_PREFIX, createInitialWorld, elapsedMinutes, eventDef, gameplayConfig, responseFor, settleWorld } from "./world";
+import { REST_MODES, effectiveWorkMinutes, restOption, workFatigue } from "./fatigue";
 import { endConversation, selectOption, startConversation } from "./dialogueEngine";
 import { canDiscover, discover, type DiscoveryTrigger } from "./evidence";
 import {
@@ -95,6 +107,26 @@ export const REASONS = {
   deviceActionAlreadyDone: "This action was already done.",
   combinationInvalid: "These items do not combine.",
   deductionAlreadyRecorded: "This deduction is already recorded.",
+  // Reason codes for the world clock actions.
+  timeIsUp: "The deadline has passed.",
+  thesisComplete: "The thesis is already complete.",
+  workTooShort: "That is too little time to make progress.",
+  thesisNeedsTasks: "More progress needs a thesis task, such as the supervisor's confirmation.",
+  restUnavailable: "Resting is not part of this scenario.",
+  unknownThesisTask: "This thesis task does not exist.",
+  thesisTaskDone: "This thesis task is already done.",
+  thesisTaskUnavailable: "This thesis task is not available now.",
+  unknownEvent: "This event does not exist.",
+  eventNotPending: "This event is not waiting for an answer.",
+  unknownResponse: "This response does not exist.",
+  responseUnavailable: "This response is not available now.",
+  // Reason codes for the phone and laptop.
+  unknownItem: "This item does not exist.",
+  itemNotArrived: "This item has not arrived yet.",
+  unknownItemAction: "This action does not exist.",
+  itemActionUnavailable: "This action is not available now.",
+  itemActionDone: "This action was already used.",
+  notEnoughCash: "There is not enough cash for this.",
 } as const;
 
 /** Stable code of a core rejection reason; the UI translates by this code. */
@@ -115,6 +147,16 @@ function isOneOf<T extends string>(list: readonly T[], value: unknown): value is
   return typeof value === "string" && (list as readonly string[]).includes(value);
 }
 
+/** Largest single time step: the whole chapter. */
+export const MAX_ADVANCE_MINUTES = 72 * 60;
+/** Largest single thesis session: one day. */
+export const MAX_WORK_MINUTES = 24 * 60;
+function isWholeMinutes(value: unknown, max: number): boolean {
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= max;
+}
+function isShortId(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 80;
+}
 /** True when `value` has the shape of a known Core_Action with known IDs (Requirement 5.4). */
 export function isCoreAction(value: unknown): value is CoreAction {
   if (!isRecord(value) || typeof value.type !== "string") return false;
@@ -131,7 +173,9 @@ export function isCoreAction(value: unknown): value is CoreAction {
     case "INSPECT_EVIDENCE":
       return isOneOf(EVIDENCE_IDS, value.evidenceId);
     case "RING_CALL":
-      return isOneOf(INCOMING_CALL_IDS, value.callId) && isOneOf(RING_REASONS, value.reason);
+      // Later missions define their own call ids; the reducer rejects ids the scenario does not know.
+      // The parked story's outgoing call is never rung.
+      return (isOneOf(INCOMING_CALL_IDS, value.callId) || (isShortId(value.callId) && !isOneOf(CALL_IDS, value.callId))) && isOneOf(RING_REASONS, value.reason);
     case "TALK_TO_NPC":
       // No NPC exists in this chapter; the reducer rejects it with "This person is not here.".
       return typeof value.npcId === "string";
@@ -153,6 +197,20 @@ export function isCoreAction(value: unknown): value is CoreAction {
         value.evidenceIds.every((id) => isOneOf(EVIDENCE_IDS, id)) &&
         new Set(value.evidenceIds).size === value.evidenceIds.length
       );
+    case "ADVANCE_TIME":
+      return isWholeMinutes(value.minutes, MAX_ADVANCE_MINUTES);
+    case "WORK_ON_THESIS":
+      return isWholeMinutes(value.minutes, MAX_WORK_MINUTES);
+    case "REST":
+      return isOneOf(REST_MODES, value.mode);
+    case "RESPOND_EVENT":
+      return isShortId(value.eventId) && isShortId(value.response);
+    case "COMPLETE_THESIS_TASK":
+      return isShortId(value.taskId);
+    case "OPEN_DEVICE_ITEM":
+      return isShortId(value.itemId);
+    case "USE_DEVICE_ITEM":
+      return isShortId(value.itemId) && isShortId(value.actionId);
     default:
       return false;
   }
@@ -168,8 +226,13 @@ function recordOf<K extends string, V>(keys: readonly K[], value: () => V): Reco
   return record;
 }
 
-/** The state before START_CHAPTER. Every Claim is `unverified` and every flag is false. */
-export function createInitialState(_scenario: ScenarioDefinition = CHAPTER_1_SCENARIO): ChapterState {
+/**
+ * The state before START_CHAPTER. Every Claim is `unverified` and every flag is false. Resources and
+ * persistent flags come from `scenario.initial`, or from `CHAPTER_1_INITIAL_STATE` (72 hours, 60%
+ * thesis, 2,500,000 VND).
+ */
+export function createInitialState(scenario: ScenarioDefinition = CHAPTER_1_SCENARIO): ChapterState {
+  const initial = cloneInitialState(scenario.initial ?? CHAPTER_1_INITIAL_STATE);
   return {
     chapterId: "chapter-1",
     status: "not-started",
@@ -185,6 +248,10 @@ export function createInitialState(_scenario: ScenarioDefinition = CHAPTER_1_SCE
     decision: null,
     deductions: [],
     flags: recordOf<FlagId, boolean>(FLAG_IDS, () => false),
+    resources: initial.resources,
+    persistent: initial.persistent,
+    world: createInitialWorld(scenario),
+    device: { items: createInitialDeviceItems(scenario), ledger: [], location: null, submission: "not-submitted" },
     pressure: 0,
     outcome: null,
     events: [],
@@ -274,6 +341,23 @@ function discoverByTrigger(
   return next;
 }
 
+/** Starts an outgoing call from the phone: an active call linked to the call's dialogue graph. */
+function startOutgoingCall(state: ChapterState, callId: CallId, scenario: ScenarioDefinition): ChapterState {
+  const calling: ChapterState = {
+    ...state,
+    call: {
+      current: callId,
+      status: "active",
+      log: upsertCallRecord(state, callId, (record) => ({
+        ...(record ?? newCallRecord(callId, scenario)),
+        status: "answered",
+        ringCount: (record?.ringCount ?? 0) + 1,
+      })),
+    },
+  };
+  const next = startConversation(calling, scenario.calls[callId].graphId, scenario, { callId });
+  return sweepDialogueEvidence(next, scenario);
+}
 /** Debrief tag recorded when the player hangs up an active call with END_CALL. */
 const HANG_UP_TAG = "hung-up";
 
@@ -504,6 +588,174 @@ function applyAction(state: ChapterState, action: CoreAction, scenario: Scenario
       return accept(next, def.debriefTag ? [def.debriefTag] : []);
     }
 
+    case "ADVANCE_TIME": {
+      if (state.resources.timeMinutes <= 0) return reject(REASONS.timeIsUp);
+      return accept(applyEffect(state, { kind: "adjustResource", resource: "timeMinutes", delta: -action.minutes }, scenario));
+    }
+    case "WORK_ON_THESIS": {
+      if (state.call.current !== null) return reject(REASONS.callInProgress);
+      if (state.conversation !== null) return reject(REASONS.conversationInProgress);
+      if (state.resources.timeMinutes <= 0) return reject(REASONS.timeIsUp);
+      if (state.resources.thesisProgress >= 100) return reject(REASONS.thesisComplete);
+      const config = gameplayConfig(scenario);
+      // Free work gets the thesis only to the configured limit; the rest comes from thesis tasks.
+      const room = config.thesisFreeWorkMaxPercent - state.resources.thesisProgress;
+      if (room < 1) return reject(REASONS.thesisNeedsTasks);
+      const minutes = Math.min(action.minutes, state.resources.timeMinutes);
+      // Tiredness makes each percent take longer (`fatigue.ts`).
+      const perPercent = effectiveWorkMinutes(config.thesisMinutesPerPercent, state.resources.fatigue, config.fatigue);
+      const gain = Math.min(room, Math.floor(minutes / perPercent));
+      if (gain < 1) return reject(REASONS.workTooShort);
+      const spent = Math.min(minutes, gain * perPercent);
+      return accept(
+        applyEffects(
+          state,
+          [
+            { kind: "adjustResource", resource: "thesisProgress", delta: gain },
+            { kind: "adjustResource", resource: "timeMinutes", delta: -spent },
+            { kind: "adjustResource", resource: "fatigue", delta: workFatigue(spent, config.fatigue) },
+          ],
+          scenario,
+        ),
+      );
+    }
+    case "REST": {
+      if (state.call.current !== null) return reject(REASONS.callInProgress);
+      if (state.conversation !== null) return reject(REASONS.conversationInProgress);
+      const config = gameplayConfig(scenario).fatigue;
+      if (!config.enabled) return reject(REASONS.restUnavailable);
+      if (state.resources.timeMinutes <= 0) return reject(REASONS.timeIsUp);
+      const option = restOption(action.mode, config);
+      const minutes = Math.min(option.minutes, state.resources.timeMinutes);
+      const recovery = Math.round((option.recovery * minutes) / option.minutes);
+      const rested = applyEffects(
+        state,
+        [
+          { kind: "adjustResource", resource: "timeMinutes", delta: -minutes },
+          { kind: "adjustResource", resource: "fatigue", delta: -recovery },
+        ],
+        scenario,
+      );
+      const slept = (rested.world.sleptMinutes ?? 0) + (action.mode === "sleep" ? minutes : 0);
+      return accept({ ...rested, world: { ...rested.world, sleptMinutes: slept } }, [`${WORLD_TAG_PREFIX}rest:${action.mode}`]);
+    }
+    case "COMPLETE_THESIS_TASK": {
+      if (state.call.current !== null) return reject(REASONS.callInProgress);
+      if (state.conversation !== null) return reject(REASONS.conversationInProgress);
+      const task = scenario.thesisTasks?.find((candidate) => candidate.id === action.taskId);
+      if (task === undefined) return reject(REASONS.unknownThesisTask);
+      if (state.world.thesisTasksDone.includes(task.id)) return reject(REASONS.thesisTaskDone);
+      if (state.resources.thesisProgress >= 100) return reject(REASONS.thesisComplete);
+      if (!evaluateConditions(task.requires, state, scenario)) return reject(REASONS.thesisTaskUnavailable);
+      const taskConfig = gameplayConfig(scenario);
+      const timeCost = effectiveWorkMinutes(task.timeCostMinutes ?? 0, state.resources.fatigue, taskConfig.fatigue);
+      if (timeCost > 0 && state.resources.timeMinutes <= 0) return reject(REASONS.timeIsUp);
+      let next: ChapterState = { ...state, world: { ...state.world, thesisTasksDone: [...state.world.thesisTasksDone, task.id] } };
+      next = applyEffect(next, { kind: "adjustResource", resource: "fatigue", delta: workFatigue(timeCost, taskConfig.fatigue) }, scenario);
+      next = applyEffect(next, { kind: "adjustResource", resource: "thesisProgress", delta: task.progressGain }, scenario);
+      if (timeCost > 0) next = applyEffect(next, { kind: "adjustResource", resource: "timeMinutes", delta: -timeCost }, scenario);
+      next = applyEffects(next, task.effects, scenario);
+      return accept(next, [`${WORLD_TAG_PREFIX}thesis:${task.id}`]);
+    }
+    case "RESPOND_EVENT": {
+      if (state.call.current !== null) return reject(REASONS.callInProgress);
+      if (state.conversation !== null) return reject(REASONS.conversationInProgress);
+      const def = eventDef(scenario, action.eventId);
+      if (def === undefined || !Object.hasOwn(state.world.events, action.eventId)) return reject(REASONS.unknownEvent);
+      const current = state.world.events[action.eventId];
+      if (current.status !== "pending") return reject(REASONS.eventNotPending);
+      const response = responseFor(def, action.response);
+      if (response === undefined) return reject(REASONS.unknownResponse);
+      if (!evaluateConditions(response.requires, state, scenario)) return reject(REASONS.responseUnavailable);
+      const start = (scenario.initial ?? CHAPTER_1_INITIAL_STATE).resources.timeMinutes;
+      const now = Math.max(0, start - state.resources.timeMinutes);
+      const resolvedAt = response.kind === "postpone" ? null : now;
+      const status = response.kind === "respond" ? "resolved" : response.kind === "ignore" ? "ignored" : "pending";
+      let next: ChapterState = {
+        ...state,
+        world: {
+          ...state.world,
+          events: {
+            ...state.world.events,
+            [action.eventId]: {
+              ...current,
+              status,
+              resolvedAtMinute: resolvedAt,
+              postponed: current.postponed + (response.kind === "postpone" ? 1 : 0),
+              response: response.kind === "postpone" ? current.response : response.id,
+            },
+          },
+        },
+      };
+      if (response.timeCostMinutes !== undefined && response.timeCostMinutes > 0) {
+        next = applyEffect(next, { kind: "adjustResource", resource: "timeMinutes", delta: -response.timeCostMinutes }, scenario);
+      }
+      next = applyEffects(next, response.effects, scenario);
+      return accept(next, [`${WORLD_TAG_PREFIX}response:${action.eventId}:${response.id}`]);
+    }
+    case "OPEN_DEVICE_ITEM": {
+      const item = deviceItemDef(scenario, action.itemId);
+      if (item === undefined) return reject(REASONS.unknownItem);
+      if (!Object.hasOwn(state.device.items, action.itemId)) return reject(REASONS.itemNotArrived);
+      const current = state.device.items[action.itemId];
+      // Opening an item again is allowed and changes nothing.
+      if (current.read) return accept(state);
+      const start = (scenario.initial ?? CHAPTER_1_INITIAL_STATE).resources.timeMinutes;
+      const now = Math.max(0, start - state.resources.timeMinutes);
+      let next: ChapterState = {
+        ...state,
+        device: { ...state.device, items: { ...state.device.items, [action.itemId]: { ...current, read: true, readAtMinute: now } } },
+      };
+      next = applyEffects(next, item.onOpen, scenario);
+      return accept(next, [`${WORLD_TAG_PREFIX}item:${action.itemId}:opened`]);
+    }
+    case "USE_DEVICE_ITEM": {
+      const item = deviceItemDef(scenario, action.itemId);
+      if (item === undefined) return reject(REASONS.unknownItem);
+      if (!Object.hasOwn(state.device.items, action.itemId)) return reject(REASONS.itemNotArrived);
+      const def = itemActionDef(item, action.actionId);
+      if (def === undefined) return reject(REASONS.unknownItemAction);
+      const current = state.device.items[action.itemId];
+      if (def.once === true && current.done.includes(def.id)) return reject(REASONS.itemActionDone);
+      if (!evaluateConditions(def.visibleWhen, state, scenario) || !evaluateConditions(def.requires, state, scenario)) {
+        return reject(REASONS.itemActionUnavailable);
+      }
+      const cashCost = def.cashCost ?? 0;
+      if (cashCost > 0 && def.allowDebt !== true && state.resources.cash < cashCost) return reject(REASONS.notEnoughCash);
+      const timeCost = def.timeCostMinutes ?? 0;
+      if (timeCost > 0 && state.resources.timeMinutes <= 0) return reject(REASONS.timeIsUp);
+      if (def.callId !== undefined) {
+        if (state.call.current !== null) return reject(REASONS.callInProgress);
+        if (state.conversation !== null) return reject(REASONS.conversationInProgress);
+        if (!Object.hasOwn(scenario.calls, def.callId) || scenario.calls[def.callId as CallId].direction !== "outgoing") {
+          return reject(REASONS.unknownCall);
+        }
+      }
+      const startMinute = (scenario.initial ?? CHAPTER_1_INITIAL_STATE).resources.timeMinutes;
+      const doneAtMinute = Math.max(0, startMinute - Math.max(0, state.resources.timeMinutes - timeCost));
+      let next: ChapterState = {
+        ...state,
+        device: {
+          ...state.device,
+          items: {
+            ...state.device.items,
+            [action.itemId]: {
+              ...current,
+              read: true,
+              readAtMinute: current.readAtMinute ?? 0,
+              done: current.done.includes(def.id) ? current.done : [...current.done, def.id],
+              doneAt: { ...current.doneAt, [def.id]: doneAtMinute },
+            },
+          },
+        },
+      };
+      if (timeCost > 0) next = applyEffect(next, { kind: "adjustResource", resource: "timeMinutes", delta: -timeCost }, scenario);
+      if (cashCost > 0) next = recordTransaction(next, scenario, def.ledgerLabel ?? def.id, -cashCost, def.counterparty ?? null, item.id, def.id, def.ledgerCategory ?? null);
+      if (def.moveTo !== undefined) next = applyEffect(next, { kind: "setLocation", placeId: def.moveTo }, scenario);
+      next = applyEffects(next, def.effects, scenario);
+      if (def.callId !== undefined) next = startOutgoingCall(next, def.callId as CallId, scenario);
+      return accept(next, [`${WORLD_TAG_PREFIX}item:${action.itemId}:${def.id}`]);
+    }
     case "COMBINE_EVIDENCE": {
       const ids = action.evidenceIds;
       if (!ids.every((id) => Object.hasOwn(scenario.evidence, id) && state.discovered.includes(id))) {
@@ -567,6 +819,79 @@ function applyVerify(
   return accept(next);
 }
 
+/**
+ * Night checks (`FatigueConfig.nightChecksAtMinute`): once the clock passes a check, a night with
+ * less sleep than the minimum adds fatigue. Idempotent: each check is made once. Sleep taken in the
+ * action that crosses the check counts for that night.
+ */
+export function applyNightChecks(state: ChapterState, scenario: ScenarioDefinition): ChapterState {
+  const config = gameplayConfig(scenario).fatigue;
+  if (!config.enabled) return state;
+  const now = elapsedMinutes(state, scenario);
+  let checked = state.world.nightsChecked ?? 0;
+  let slept = state.world.sleptMinutes ?? 0;
+  let fatigue = state.resources.fatigue;
+  const before = checked;
+  while (checked < config.nightChecksAtMinute.length && config.nightChecksAtMinute[checked] <= now) {
+    if (slept < config.minSleepMinutes) fatigue += config.missedSleepPenalty;
+    slept = 0;
+    checked += 1;
+  }
+  if (checked === before) return state;
+  return {
+    ...state,
+    resources: { ...state.resources, fatigue: clampResource("fatigue", fatigue) },
+    world: { ...state.world, sleptMinutes: slept, nightsChecked: checked },
+  };
+}
+
+/**
+ * Appends the entry. Free-roam ticks (`ADVANCE_TIME`) that changed nothing but the clock merge
+ * into the previous such tick, so a 72-hour chapter does not fill the save with thousands of
+ * actions. The merged action replays to the same state, because neither step had anything due.
+ */
+function appendEntry(events: EventLogEntry[], entry: EventLogEntry): EventLogEntry[] {
+  const last = events[events.length - 1];
+  if (last !== undefined && isQuietTick(last) && isQuietTick(entry)) {
+    const minutes = (last.action as { minutes: number }).minutes + (entry.action as { minutes: number }).minutes;
+    if (minutes <= MAX_ADVANCE_MINUTES) {
+      const timeDelta = (last.derived.resources.timeMinutes ?? 0) + (entry.derived.resources.timeMinutes ?? 0);
+      const merged: EventLogEntry = {
+        ...last,
+        action: { type: "ADVANCE_TIME", minutes },
+        derived: { ...last.derived, resources: timeDelta === 0 ? {} : { timeMinutes: timeDelta } },
+      };
+      return [...events.slice(0, -1), merged];
+    }
+  }
+  return [...events, entry];
+}
+function isQuietTick(entry: EventLogEntry): boolean {
+  const { derived } = entry;
+  return (
+    entry.action.type === "ADVANCE_TIME" &&
+    derived.evidence.length === 0 &&
+    derived.flags.length === 0 &&
+    derived.persistent.length === 0 &&
+    derived.objectivesActivated.length === 0 &&
+    derived.objectivesCompleted.length === 0 &&
+    derived.debriefTags.length === 0 &&
+    Object.keys(derived.resources).every((key) => key === "timeMinutes")
+  );
+}
+/** Net change per resource between two states. Lists only resources that changed. */
+function resourceChanges(before: ChapterState, after: ChapterState): Partial<Record<ResourceId, number>> {
+  const changes: Partial<Record<ResourceId, number>> = {};
+  for (const id of RESOURCE_IDS) {
+    const delta = after.resources[id] - before.resources[id];
+    if (delta !== 0) changes[id] = delta;
+  }
+  return changes;
+}
+/** Persistent flags whose value differs between two states. */
+function persistentChanges(before: ChapterState, after: ChapterState): PersistentFlagId[] {
+  return PERSISTENT_FLAG_IDS.filter((flag) => before.persistent[flag] !== after.persistent[flag]);
+}
 // ---------------------------------------------------------------------------
 // Reducer
 // ---------------------------------------------------------------------------
@@ -594,11 +919,13 @@ export function chapterReducer(
   if (!applied.ok) return { state, accepted: false, reason: applied.reason };
 
   // 5. Beats. The fired IDs are tagged in this entry so a beat never fires twice.
-  const beats = applyBeats(applied.state, scenario);
-  const debriefTags = [...applied.debriefTags, ...beats.fired.map(beatTag)];
+  const beats = applyBeats(applyNightChecks(applied.state, scenario), scenario);
+  // 5b. World clock: events, deadlines and missions that are due at the new simulated time.
+  const world = settleWorld(beats.state, scenario);
+  const debriefTags = [...applied.debriefTags, ...beats.fired.map(beatTag), ...world.tags];
 
   // 6. Objective manager.
-  const manager = runObjectiveManager(state, beats.state, action, scenario);
+  const manager = runObjectiveManager(state, world.state, action, scenario);
   let next = manager.state;
   const objectivesCompleted: ObjectiveId[] = [...manager.completed];
   if (action.type === "COMPLETE_OBJECTIVE" && !objectivesCompleted.includes(action.objectiveId)) {
@@ -620,12 +947,14 @@ export function chapterReducer(
     derived: {
       evidence: next.discovered.filter((id) => !state.discovered.includes(id)),
       flags: FLAG_IDS.filter((flag) => next.flags[flag] === true && state.flags[flag] !== true),
+      resources: resourceChanges(state, next),
+      persistent: persistentChanges(state, next),
       objectivesActivated: [...manager.activated],
       objectivesCompleted,
       debriefTags,
     },
   };
-  next = { ...next, events: [...state.events, entry] };
+  next = { ...next, events: appendEntry(state.events, entry) };
 
   return { state: next, accepted: true };
 }

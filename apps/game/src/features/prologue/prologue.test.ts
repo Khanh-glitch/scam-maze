@@ -1,19 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { shouldPlayPrologue } from "./prologueGate";
+import { PROLOGUE_IN_ROUTING, shouldPlayPrologue } from "./prologueGate";
 import { homeCallClipPath } from "./homeCallClips";
 import en from "../../i18n/locales/en/worlds/khupho";
 import vi from "../../i18n/locales/vi/worlds/khupho";
 
 describe("prologue gate", () => {
-  it("plays for a new game and skips saved games", () => {
-    expect(shouldPlayPrologue({ origin: "new-game" }, "")).toBe(true);
+  it("is out of the routing: a new game starts in the room (LAST SUBMISSION: 72 GIỜ CUỐI)", () => {
+    expect(PROLOGUE_IN_ROUTING).toBe(false);
+    expect(shouldPlayPrologue({ origin: "new-game" }, "")).toBe(false);
     expect(shouldPlayPrologue({ origin: "saved-game" }, "")).toBe(false);
   });
 
   it("never plays for a saved game, with or without the skip flag", () => {
     expect(shouldPlayPrologue({ origin: "saved-game" }, "?skip-prologue")).toBe(false);
     expect(shouldPlayPrologue({ origin: "saved-game" }, "?other=1")).toBe(false);
-    expect(shouldPlayPrologue({ origin: "new-game" }, "?other=1")).toBe(true);
+    expect(shouldPlayPrologue({ origin: "new-game" }, "?other=1")).toBe(false);
   });
 
   it("can be skipped with ?skip-prologue", () => {

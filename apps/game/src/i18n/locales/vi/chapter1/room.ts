@@ -12,6 +12,12 @@ const room: LocaleShape<typeof en> = {
         opened: "Cảnh báo bảo mật: đã mở",
       },
     },
+    // Chú thích khi nhìn vào thiết bị hoặc tờ lịch treo tường trong "LAST SUBMISSION: 72 GIỜ CUỐI".
+    inspect: {
+      phone: "Điện thoại của bạn. Tin nhắn, cuộc gọi, ngân hàng và lịch của bạn đều ở đây.",
+      laptop: "Laptop của bạn. Thư, ngân hàng, lịch và các tệp khóa luận của bạn đều ở đây.",
+      calendar: "Tờ lịch treo tường. Hạn cuối cùng là 17:00 thứ Sáu.",
+    },
     prompt: {
       phoneRinging: "Nghe cuộc gọi",
       phoneDecline: "Từ chối cuộc gọi",
