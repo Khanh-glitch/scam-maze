@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { CHARACTERS_GLB_BASE, STREET_PROPS_MODELS_BASE } from '../../../config/assetPaths';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -8,6 +9,17 @@ const quad = new T.PlaneGeometry();
 const up = new T.Vector3(0, 1, 0);
 
 export const asset = (name: string) => `/assets/testbus/${name}`;
+/**
+ * URL of a model by its file name without `.glb`. The bus scene reuses the game's own optimized
+ * files (scripts/optimize-*.cjs); only the bus driver (`taixe`) is specific to this scene.
+ */
+export function modelUrl(file: string) {
+  const name = `${file}.glb`;
+  if (file === 'taixe') return `/assets/testbus/models/${name}`;
+  if (/^(npc-|juno3|rowan|manvn|banhmi-vendor|accessory-)/.test(file)) return `${CHARACTERS_GLB_BASE}/${name}`;
+  if (/^(bike-(pcx|supercub|cg125|fatboy|bobber)|table-set|stool-)/.test(file)) return `${STREET_PROPS_MODELS_BASE}/${name}`;
+  return `/assets/3d/optimized/${name}`;
+}
 export const material = (color: T.ColorRepresentation, roughness = 0.75, metalness = 0) => new T.MeshStandardMaterial({ color, roughness, metalness });
 export const lamp = (color: T.ColorRepresentation, intensity = 0.75) => new T.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: intensity, roughness: 0.35 });
 
@@ -180,7 +192,7 @@ export function batch(group: T.Group) {
   }
 }
 
-export function disposeScene(scene: T.Scene) {
+export function disposeScene(scene: T.Object3D) {
   const geos = new Set<T.BufferGeometry>(), materials = new Set<T.Material>(), textures = new Set<T.Texture>();
   scene.traverse((object) => {
     if (object instanceof T.Mesh) {
