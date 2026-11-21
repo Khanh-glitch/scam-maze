@@ -60,10 +60,9 @@ import { ObjectiveToast, type ObjectiveChangeKind } from "../hud/ObjectiveToast"
 import { ObjectiveTracker } from "../hud/ObjectiveTracker";
 import { ChapterStatusCluster, ChapterTaskButton, ChapterTopBar } from "../hud/ChapterStatusHud";
 import { TaskListPanel } from "../hud/TaskListPanel";
-import { TaskMarker } from "../hud/TaskMarker";
+import { TaskMarker, type TaskMarkerSource } from "../hud/TaskMarker";
 import { TaskTracker } from "../hud/TaskTracker";
 import { SHADOW } from "../../prologue/PrologueHud";
-import type { TaskMarker as TaskMarkerState } from "../../roomv2/game/outside";
 import { Mission01VoiceCaption } from "../voice/Mission01VoiceCaption";
 import { useMission01Voice, type VoiceView } from "../voice/useMission01Voice";
 import type { BrowserState } from "./desktop/browser/browserState";
@@ -330,7 +329,7 @@ function lookup<T>(record: Record<string, T>, id: string, fallback: T): T {
   return Object.hasOwn(record, id) ? record[id] : fallback;
 }
 
-export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
+const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
   session,
   settings,
   bridge,
@@ -1265,19 +1264,17 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
   const hudVisible = !introOpen && status === "playing";
   // The marker over the prop of the current step, while the player walks around (no overlay, call or inspect pose).
   const markerTarget = taskMode && hudVisible && !trackerHidden && inspecting === null ? (trackedMission?.current?.target ?? null) : null;
-  const [taskMarker, setTaskMarker] = useState<TaskMarkerState | null>(null);
-  useEffect(() => {
-    const commands = bridge.commands;
-    if (!engineReady || markerTarget === null || !commands?.watchTaskMarker) {
-      setTaskMarker(null);
-      return undefined;
-    }
-    commands.watchTaskMarker(markerTarget, setTaskMarker);
-    return () => {
-      commands.watchTaskMarker?.(null);
-      setTaskMarker(null);
-    };
-  }, [bridge, engineReady, markerTarget]);
+  // The marker moves itself (DOM writes per frame); the layer only keeps the whole-metre distance for the tracker.
+  const [taskDistance, setTaskDistance] = useState<number | null>(null);
+  const markerSource = useCallback<TaskMarkerSource>(
+    (prop, listener) => {
+      const commands = bridge.commands;
+      if (!commands?.watchTaskMarker) return () => undefined;
+      commands.watchTaskMarker(prop, listener);
+      return () => commands.watchTaskMarker?.(null);
+    },
+    [bridge],
+  );
   const journalUnread = Math.max(0, discoveredCount - journalSeen);
   const completedObjective = completed !== null && Object.hasOwn(scenario.objectives, completed) ? scenario.objectives[completed] : null;
   const objectiveText = (id: ObjectiveId): string => (Object.hasOwn(scenario.objectives, id) ? scenario.objectives[id].text : id);
@@ -1321,7 +1318,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
         <Mission01VoiceCaption cue={alexVoice.current} subtitlesEnabled={settings.subtitlesEnabled} getPositionMs={alexVoice.positionMs} />
         {hudVisible && (
           <>
-            {taskMarker && <TaskMarker marker={taskMarker} />}
+            {engineReady && markerTarget !== null && <TaskMarker target={markerTarget} source={markerSource} onDistance={setTaskDistance} />}
             {/* Top left, like the neighborhood HUD: the map with the status ring, the clock beside it, the objective under it. */}
             <div
               className="pointer-events-none absolute left-[clamp(1rem,3vw,2.5rem)] top-4 z-10 flex flex-col items-start gap-3"
@@ -1343,7 +1340,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
                 <TaskTracker
                   mission={trackedMission}
                   others={openMissions.filter((mission) => mission.id !== trackedMission.id)}
-                  distance={taskMarker?.distance ?? null}
+                  distance={markerTarget === null ? null : taskDistance}
                   onOpenList={toggleTasks}
                   onHoverSound={onHoverSound}
                 />
@@ -1592,3 +1589,9 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
     </ScreenQuadContext.Provider>
   );
 };
+/**
+ * Memoized: the host page re-renders on every engine UI update (the aimed prop's prompt moves with
+ * the camera, so that is almost every frame while the player turns). The layer's props stay the
+ * same then, so it skips those renders.
+ */
+export const RoomChapterLayer = React.memo(RoomChapterLayerView);
