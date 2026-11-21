@@ -61,11 +61,14 @@ const openPhone = (rig: ReturnType<typeof mountLayer>) => {
 };
 
 describe("Mission 01 in the phone", () => {
-  it("shows the mission objective and the email at 17:10 with a notice", () => {
+  it("shows the current step and the email at 17:10 with a notice", () => {
     const rig = mountLayer();
-    expect(screen.getByTestId("objective-tracker-slot").textContent).toContain("Finish the draft and confirm that you can reach the submission system.");
+    // The tracker names the concrete step and where it happens, not only the mission's goal.
+    expect(screen.getByTestId("task-current").textContent).toBe("Edit the introduction and literature review");
+    expect(screen.getByTestId("task-where").textContent).toContain("Laptop · Thesis");
     act(() => void rig.store().dispatch({ type: "ADVANCE_TIME", minutes: 10 }));
     expect(screen.getByTestId("event-arrival-notice").textContent).toContain("Graduation Clearance — Action Required");
+    expect(screen.getByTestId("task-current").textContent).toBe("Read the new email about your submission account");
     const phone = openPhone(rig);
     expect(within(phone).getByTestId("phone-app-mail").textContent).toContain("4 unread");
     expect(within(phone).queryByTestId("phone-app-calendar")?.textContent).not.toMatch(/unread/);
@@ -136,7 +139,9 @@ describe("Mission 01 in the phone", () => {
     expect(state.resources.evidence).toBe(1);
     expect(state.resources.cash).toBe(2_500_000);
     expect(state.resources.timeMinutes).toBe(72 * 60 - 55);
-    expect(screen.getByTestId("objective-tracker-slot").textContent).toContain("Access is confirmed with the Training Office. Finish the draft.");
+    // The mission moved to its "verified" path. The email is still unread, so the tracker asks for it before the draft.
+    expect(state.world.missions["m01.missing-access"].path).toBe("verified");
+    expect(screen.getByTestId("task-current").textContent).toBe("Read the new email about your submission account");
   }, 40_000);
 
   it("way C: writing the draft with the planner completes the mission and keeps the access unverified", () => {

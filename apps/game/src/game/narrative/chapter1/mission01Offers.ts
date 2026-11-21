@@ -16,7 +16,7 @@
 //   housing), scamEvidenceSaved and recoveryOfferEligible (Mission 05: a recovery offer that refers
 //   to the loss). The ledger lines keep every amount. Nothing here ever gives money back.
 import { minutesFromStart } from "../resources";
-import type { Condition, DeviceItemActionDef, DeviceItemDef, Effect, GameEventDef, MissionDef } from "../types";
+import type { Condition, DeviceItemActionDef, DeviceItemDef, Effect, GameEventDef, MissionDef, MissionStepDef } from "../types";
 
 /** Placeholders for everything the brief does not state. Change them here, not in the data below. */
 export const MISSION_01_OFFERS_CONFIG = {
@@ -531,6 +531,17 @@ const GOLDEN_EVENTS: GameEventDef[] = [
 // The two optional missions
 // ---------------------------------------------------------------------------------------------
 
+// Task steps of the two offers. Neutral wording: the step never says whether an offer is honest.
+const readStep = (itemId: string, label: string): MissionStepDef => ({
+  id: "read",
+  label,
+  target: "phone",
+  app: "messages",
+  doneWhen: [{ kind: "itemOpened", itemId }],
+});
+/** No `doneWhen`: it stays open until the player's choice ends the mission. */
+const decideStep = (label: string, target: MissionStepDef["target"], app: MissionStepDef["app"]): MissionStepDef => ({ id: "decide", label, target, app });
+
 const MISSIONS: MissionDef[] = [
   {
     id: "m01.easy-money",
@@ -543,16 +554,19 @@ const MISSIONS: MissionDef[] = [
         id: "deposited",
         when: [{ kind: "persistent", flag: "easyMoneyDeposited", value: true }],
         objective: "Money has left your account for this job. The balance on the page is not money you can withdraw.",
+        steps: [decideStep("Decide what to do next with the job", "laptop", "jobs")],
       },
       {
         id: "working",
         when: [done(P, "do-task-1")],
         objective: "The job page shows a small reward and asks for a deposit to go on.",
+        steps: [decideStep("Decide whether to go on with the job", "laptop", "jobs")],
       },
       {
         id: "offer",
         when: [],
         objective: "A student told you about an online job. You can ask, check it, try it or say no.",
+        steps: [readStep("msg.easy-money", "Read the message about the online job"), decideStep("Decide what to do with the job offer", "phone", "messages")],
       },
     ],
   },
@@ -567,11 +581,13 @@ const MISSIONS: MissionDef[] = [
         id: "locked",
         when: [{ kind: "persistent", flag: "investmentFundsLocked", value: true }],
         objective: "The money you sent is locked. Every withdrawal asks for a new fee.",
+        steps: [decideStep("Decide what to do about the locked money", "laptop", "mail")],
       },
       {
         id: "offer",
         when: [],
         objective: "An acquaintance invited you to an investment platform. You can ask, check it, join or say no.",
+        steps: [readStep("msg.golden-friend", "Read the invitation to the investment platform"), decideStep("Decide whether to join the platform", "phone", "messages")],
       },
     ],
   },
