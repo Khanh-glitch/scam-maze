@@ -278,6 +278,14 @@ function walkScenario(scenario: ScenarioDefinition, text: TextVisitor): Scenario
             paths: mission.paths.map((path) => ({
               ...path,
               objective: text(`missions/${mission.id}/paths/${path.id}/objective`, path.objective),
+              ...(path.steps === undefined
+                ? {}
+                : {
+                    steps: path.steps.map((step) => ({
+                      ...step,
+                      label: text(`missions/${mission.id}/paths/${path.id}/steps/${step.id}`, step.label),
+                    })),
+                  }),
             })),
           })),
         }),

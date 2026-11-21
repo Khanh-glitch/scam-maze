@@ -1,5 +1,5 @@
 import type { LaptopFrame, PhoneMode } from './screens';
-import type { ScreenCornersPx, ScreenDeviceId } from './screenProjection';
+import type { ScreenCornersPx, ScreenDeviceId, TaskMarkerPlacement } from './screenProjection';
 
 /** Props a story host can listen to. Every other prop keeps the room's own behavior. */
 export const ROOM_PROP_IDS = ['phone', 'laptop', 'note', 'receipts', 'calendar', 'photo', 'mug', 'door'] as const;
@@ -55,6 +55,17 @@ export interface RoomStoryCommands {
    * null when the screen is not visible. null as device stops watching. Optional: hosts fall back to a flat panel.
    */
   watchScreen?(device: ScreenDeviceId | null, listener?: (corners: ScreenCornersPx | null) => void): void;
+  /**
+   * Follows the task marker of the laptop or the phone: the listener gets where to draw it, relative to the room
+   * view (see `placeTaskMarker`), and the distance in metres, whenever that changes; null while the player is not
+   * walking (before the start, in an inspect pose). null as prop stops watching. Optional.
+   */
+  watchTaskMarker?(prop: ScreenDeviceId | null, listener?: (marker: TaskMarker | null) => void): void;
+}
+/** One task-marker report of `watchTaskMarker`. */
+export interface TaskMarker extends TaskMarkerPlacement {
+  /** Metres from the camera, to one decimal. */
+  distance: number;
 }
 
 /**

@@ -144,6 +144,37 @@ const hud = {
       },
     },
   },
+  // Task system: the tracker under the map, the marker over the prop and the task list (key T).
+  taskSystem: {
+    heading: "Task",
+    newTask: "New task",
+    complete: "Complete",
+    optional: "Optional",
+    where: {
+      laptop: "Laptop",
+      phone: "Phone",
+    },
+    distance: "{{meters}} m",
+    due: "Due in {{time}}",
+    openList: "Open the task list",
+    markerLabel: "Task target: {{place}}",
+    list: {
+      title: "Tasks",
+      close: "Close the task list",
+      inProgress: "In progress",
+      completed: "Completed",
+      failed: "Missed",
+      empty: "No tasks yet.",
+      track: "Track",
+      tracking: "Tracking",
+      current: "Current step",
+      done: "Done",
+    },
+    announce: {
+      newStep: "New task: {{step}}",
+      stepDone: "Task complete: {{step}}",
+    },
+  },
   objectives: {
     heading: "Objectives",
     card: "Objective",

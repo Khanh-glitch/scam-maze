@@ -204,8 +204,15 @@ input, textarea, [contenteditable="true"] {
   100% { filter: drop-shadow(0 0 12px rgba(243, 201, 105, 0.7)); }
 }
 .quest-fresh { animation: quest-fresh 1.6s ease-out both; transform-origin: left center; }
+/* Chapter task marker over a prop: a slow bob, so it reads as a game marker and not a sticker. */
+@keyframes task-marker-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.task-marker-bob { animation: task-marker-bob 1.8s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
   .quest-fresh { animation: none; }
+  .task-marker-bob { animation: none; }
 }
 
 /* Short fade when the laptop desktop changes window. Opacity only, so it stays cheap. */
