@@ -21,12 +21,13 @@
  * stops being free, and 0 disables it.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { NotebookText } from "lucide-react";
+import { CalendarClock, NotebookText } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { GameSettings } from "@scammaze/shared-types";
 import { useReducedMotion } from "../../../components/ui/useReducedMotion";
 import type { ChapterSession } from "../../../game/chapters/chapterSession";
 import type { ClaimId, DeductionId, DeviceActionId, EvidenceId, InteractableId, ObjectiveId } from "../../../game/narrative/chapter1/ids";
+import { ACTIVE_SCENARIO } from "../../../game/narrative/activeScenario";
 import { createInitialState } from "../../../game/narrative/reducer";
 import {
   selectActiveObjectives,
@@ -41,7 +42,7 @@ import {
   selectRingableCall,
 } from "../../../game/narrative/selectors";
 import { createChapterStore, type ChapterStore } from "../../../game/narrative/store";
-import type { ChapterState, CoreAction, ScenarioDefinition } from "../../../game/narrative/types";
+import type { ChapterState, CoreAction, Objective, ScenarioDefinition } from "../../../game/narrative/types";
 import { createLocalStorageSaveSource, type SaveGameSource, type SavedPlayerPose } from "../../../game/saves/saveGame";
 import type { AudioPort } from "../../../game/voice/audioPort";
 import { effectivePauseMs, voiceGain } from "../../../game/voice/mixPlan";
@@ -57,6 +58,23 @@ import { focusDialogStart, topDialog, trapTabKey } from "../focusTrap";
 import { EvidenceNotice } from "../hud/EvidenceNotice";
 import { ObjectiveToast, type ObjectiveChangeKind } from "../hud/ObjectiveToast";
 import { ObjectiveTracker } from "../hud/ObjectiveTracker";
+import { ResourceStatus } from "../hud/ResourceStatus";
+import { Mission01VoiceCaption } from "../voice/Mission01VoiceCaption";
+import { useMission01Voice, type VoiceView } from "../voice/useMission01Voice";
+import type { BrowserState } from "./desktop/browser/browserState";
+import { setLineVoiceHeld } from "../device/lineVoice";
+import { useLineVoiceActive } from "../device/useLineVoice";
+import { effectiveWorkMinutes, fatigueLevel, workSlowdown } from "../../../game/narrative/fatigue";
+import { EventArrivalNotice } from "../hud/EventArrivalNotice";
+import { PlannerOverlay } from "../world/PlannerOverlay";
+import { DeviceApp } from "../device/DeviceApp";
+import { deviceAppEntries } from "../device/deviceApps";
+import { selectDeviceView } from "../../../game/narrative/device";
+import { ThesisPanel, type ThesisPanelProps } from "../world/ThesisPanel";
+import { useWorldClock } from "../world/useWorldClock";
+import { gameplayConfig, selectOpenMissions, selectPendingEvents, selectThesisView } from "../../../game/narrative/world";
+import { CHAPTER_PROTAGONIST, CHAPTER_1_INITIAL_STATE, simulatedClock } from "../../../game/narrative/resources";
+import { setGameClockOverride } from "../../../game/clock/gameClock";
 import { SaveFailureNotice } from "../hud/SaveFailureNotice";
 import { SaveTrimmedNotice } from "../hud/SaveTrimmedNotice";
 import { ChapterIntroOverlay } from "../intro/ChapterIntroOverlay";
@@ -74,6 +92,15 @@ import type { VoicePlaybackDeps } from "../voice/useVoicePlayback";
 import { BankApp } from "./laptop/BankApp";
 import { CompareView } from "./laptop/CompareView";
 import { LaptopOverlay, type LaptopExtraTab } from "./laptop/LaptopOverlay";
+import { LaptopDesktop } from "./desktop/LaptopDesktop";
+import { BrowserApp } from "./desktop/browser/BrowserApp";
+import { MailClient } from "./desktop/apps/MailClient";
+import { BankingApp } from "./desktop/banking/BankingApp";
+import { FilesApp } from "./desktop/files/FilesApp";
+import { CalendarApp } from "./desktop/calendar/CalendarApp";
+import { ThesisWindow } from "./desktop/thesis/ThesisWindow";
+import { selectBlockedTransfers } from "../../../game/narrative/blocked";
+import { BROWSER_APP_ID, type DesktopState } from "./desktop/desktopState";
 import { ReviewSecurityPage } from "./laptop/ReviewSecurityPage";
 import { ScreenQuadContext, type ScreenQuadSource } from "./useScreenQuad";
 import { buildBankAppView, buildCompareViewModel, buildReviewSecurityView } from "./laptop/laptopView";
@@ -103,7 +130,7 @@ const PROP_TO_OBJECT: Partial<Record<RoomPropId, InteractableId>> = {
   calendar: "obj.calendar",
 };
 
-const INTRO_CONTROLS = ["move", "look", "interact", "journal"] as const;
+const INTRO_CONTROLS = ["move", "look", "interact", "journal", "schedule"] as const;
 
 /** Small translucent key-cap chip of the cinematic UI (Journal, hints). Colors come from `CINE`. */
 const HUD_CHIP_CLASS =
@@ -165,6 +192,8 @@ export interface RoomChapterLayerProps {
   modelAllowed?: boolean;
   /** Task 10.4: the sink the 3D phone layer publishes to. Default: a private sink. */
   phoneScreenSink?: PhoneScreenSink;
+  /** True while the host shows its own pause menu or settings: the free-roam clock stops. */
+  clockPaused?: boolean;
 }
 
 const INTRO_NARRATION: NarrationSequence = { graphId: "dlg.intro", nodeIds: INTRO_SEQUENCE };
@@ -311,6 +340,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
   voiceDeps: voiceDepsProp,
   modelAllowed: modelAllowedProp,
   phoneScreenSink,
+  clockPaused = false,
 }) => {
   const { t } = useTranslation("chapter1");
   const locale = useGameLocale();
@@ -321,7 +351,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
   const saveSource = saveSourceProp ?? defaultSaveSource;
 
   // Created once per mount: a fresh chapter or the state replayed by the loader.
-  const [store] = useState(() => createChapterStore(session.restored?.state ?? createInitialState()));
+  const [store] = useState(() => createChapterStore(session.restored?.state ?? createInitialState(ACTIVE_SCENARIO), ACTIVE_SCENARIO));
   const onStoreReadyRef = useRef(onStoreReady);
   onStoreReadyRef.current = onStoreReady;
   useEffect(() => {
@@ -330,6 +360,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
 
   const status = useChapterState(store, (state) => state.status);
   const discoveredCount = useChapterState(store, (state) => state.discovered.length);
+  const resources = useChapterState(store, (state) => state.resources);
 
   // --- Intro --------------------------------------------------------------------------------
   // A restored run that already ended has no intro (the ending and debrief belong to task 10.3).
@@ -342,7 +373,19 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
   introOpenRef.current = introOpen;
 
   const introLines = useMemo<NarrationLine[] | undefined>(() => {
-    if (!Object.hasOwn(scenario.dialogues, "dlg.intro")) return undefined;
+    if (!Object.hasOwn(scenario.dialogues, "dlg.intro")) {
+      // "LAST SUBMISSION: 72 GIỜ CUỐI" has no narration graph yet: the opening is text only.
+      const initial = scenario.initial ?? CHAPTER_1_INITIAL_STATE;
+      const values = {
+        age: CHAPTER_PROTAGONIST.age,
+        progress: initial.resources.thesisProgress,
+        hours: Math.round(initial.resources.timeMinutes / 60),
+      };
+      void values;
+      // The opening is cinematic: Alex's own voice and subtitles tell it, and nothing is written in the
+      // middle of the screen. The goals stay in the objective tracker, the schedule and the journal.
+      return [{ text: "", src: null }];
+    }
     const graph = scenario.dialogues["dlg.intro"];
     const lines: NarrationLine[] = [];
     // The voice plays through the narration player; the text is typed over the owner's timing for
@@ -356,7 +399,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
       lines.push({ text: graph.lines[node.lineId], src: null, durationMs: timing[i], delayMs });
     });
     return lines;
-  }, [scenario, locale, settings.reducedStress]);
+  }, [scenario, locale, settings.reducedStress, text]);
 
   const handleBegin = useCallback(() => {
     if (store.getState().status === "not-started") {
@@ -427,7 +470,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
   // reveals the line, the next click moves on) and reports the line index; a call stops it.
   const narration = useNarrationPlayback({
     scenario,
-    sequence: INTRO_NARRATION,
+    sequence: Object.hasOwn(scenario.dialogues, "dlg.intro") ? INTRO_NARRATION : null,
     active: introOpen && introMode === "begin" && engineReady && !callOpen,
     paused: overlays.length > 0,
     autoAdvance: false,
@@ -451,6 +494,27 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
     return () => bridge.commands?.duckForVoice?.(false);
   }, [bridge, engineReady, introNarrating]);
 
+  // --- Alex's Mission 01 voice: one line at a time on the shared engine, once per run, never after a load.
+  // The list a device app shows now (an inbox, the bank app): Alex's email and bank lines wait for it.
+  const [deviceView, setDeviceView] = useState<VoiceView | null>(null);
+  // A line of a chat or a phone call (a clip or the computer voice) is the one voice at that moment:
+  // Alex's story voice waits for it and continues after it. A game hold pauses the line as well.
+  const lineVoiceActive = useLineVoiceActive();
+  useEffect(() => {
+    setLineVoiceHeld(clockPaused);
+    return () => setLineVoiceHeld(false);
+  }, [clockPaused]);
+  const alexVoice = useMission01Voice({
+    store,
+    scenario,
+    port: engine,
+    locale,
+    settings: { soundEnabled: settings.soundEnabled, voiceVolume: settings.voiceVolume },
+    held: clockPaused,
+    introVisible: introOpen && introMode === "begin" && engineReady,
+    callOpen: callOpen || lineVoiceActive,
+    viewing: deviceView,
+  });
   // --- Port cache (the bridge reads it on every hover frame) --------------------------------
   const cacheRef = useRef<PortCache>(EMPTY_CACHE);
   const latestRef = useRef({ text, scenario });
@@ -483,6 +547,12 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
     };
     for (const [prop, objectId] of Object.entries(PROP_TO_OBJECT)) {
       if (objectId && Object.hasOwn(sc.interactables, objectId)) cache.inspect[prop] = [sc.interactables[objectId].inspectionText];
+    }
+    // The device and calendar captions of the new chapter replace the room's own text (a different story).
+    if (Object.keys(sc.deviceActions).length === 0) {
+      cache.inspect.phone = [tr("room.inspect.phone")];
+      cache.inspect.laptop = [tr("room.inspect.laptop")];
+      cache.inspect.calendar = [tr("room.inspect.calendar")];
     }
     cacheRef.current = cache;
   }, [store]);
@@ -716,6 +786,105 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
   const ringableSelector = useCallback((state: ChapterState) => selectRingableCall(state, scenario), [scenario]);
   const ringable = useChapterState(store, ringableSelector);
   const free = engineReady && !introOpen && overlays.length === 0 && inspecting === null && !blocking;
+  // --- World clock: time passes while the player is free in the room -------------------------
+  useWorldClock({ store, scenario, running: free && !clockPaused && status === "playing" });
+  const pendingEventsSelector = useCallback((state: ChapterState) => selectPendingEvents(state, scenario), [scenario]);
+  const phoneDeviceSelector = useCallback((state: ChapterState) => selectDeviceView(state, scenario, "phone"), [scenario]);
+  const laptopDeviceSelector = useCallback((state: ChapterState) => selectDeviceView(state, scenario, "laptop"), [scenario]);
+  const phoneDevice = useChapterState(store, phoneDeviceSelector);
+  const laptopDevice = useChapterState(store, laptopDeviceSelector);
+  // What the simulated student portal shows about the story. Read-only: the portal never writes state.
+  const portalAccountLocked = useChapterState(store, (state) => state.persistent.accountCompromised);
+  const portalDraftFinished = useChapterState(store, (state) => state.persistent.draftFinished);
+  const portalTasksDone = useChapterState(store, (state) => state.world.thesisTasksDone);
+  // The bank app: transfers the bank blocked (derived, read-only) and what the player reported.
+  const bankDevice = useChapterState(store, (state) => state.device);
+  const bankEvents = useChapterState(store, (state) => state.world.events);
+  const bankReported = useChapterState(store, (state) => state.persistent.bankReported);
+  const blockedTransfers = useMemo(() => selectBlockedTransfers({ device: bankDevice, world: { events: bankEvents } }, scenario), [bankDevice, bankEvents, scenario]);
+  const bankFacts = useMemo(() => ({ bankReported, accountCompromised: portalAccountLocked }), [bankReported, portalAccountLocked]);
+  const portalFacts = useMemo(
+    () => ({ accountLocked: portalAccountLocked, draftFinished: portalDraftFinished, tasksDone: portalTasksDone }),
+    [portalAccountLocked, portalDraftFinished, portalTasksDone],
+  );
+  const thesisSelector = useCallback((state: ChapterState) => selectThesisView(state, scenario), [scenario]);
+  const thesisView = useChapterState(store, thesisSelector);
+  const openMissionsSelector = useCallback((state: ChapterState) => selectOpenMissions(state, scenario), [scenario]);
+  const pendingEvents = useChapterState(store, pendingEventsSelector);
+  const openMissions = useChapterState(store, openMissionsSelector);
+  const seenEventsRef = useRef<Set<string> | null>(null);
+  if (seenEventsRef.current === null) seenEventsRef.current = new Set(pendingEvents.map((event) => event.id));
+  const arrivalCounterRef = useRef(0);
+  const [arrival, setArrival] = useState<{ key: number; title: string } | null>(null);
+  useEffect(() => {
+    const seen = seenEventsRef.current;
+    if (seen === null) return;
+    const fresh = pendingEvents.filter((event) => !seen.has(event.id));
+    if (fresh.length === 0) return;
+    for (const event of fresh) seen.add(event.id);
+    arrivalCounterRef.current += 1;
+    setArrival({ key: arrivalCounterRef.current, title: fresh[fresh.length - 1].title });
+  }, [pendingEvents]);
+  // New mail, chats, listings and job offers also arrive with a notice (items that start on the device do not).
+  const arrivedItems = useChapterState(store, (state) => state.device.items);
+  const seenItemsRef = useRef<Set<string> | null>(null);
+  if (seenItemsRef.current === null) seenItemsRef.current = new Set(Object.keys(arrivedItems));
+  useEffect(() => {
+    const seen = seenItemsRef.current;
+    if (seen === null) return;
+    const fresh = Object.keys(arrivedItems).filter((id) => !seen.has(id));
+    if (fresh.length === 0) return;
+    for (const id of fresh) seen.add(id);
+    const notable = (scenario.deviceItems ?? []).filter(
+      (item) => fresh.includes(item.id) && (item.app === "mail" || item.app === "messages" || item.app === "housing" || item.app === "jobs"),
+    );
+    if (notable.length === 0) return;
+    arrivalCounterRef.current += 1;
+    setArrival({ key: arrivalCounterRef.current, title: notable[notable.length - 1].title });
+  }, [arrivedItems, scenario]);
+  const dismissArrival = useCallback(() => setArrival(null), []);
+  const gameplay = gameplayConfig(scenario);
+  // The parked story ("The Urgent Call") has laptop device actions and its own fixed room clock.
+  const legacyLaptop = Object.keys(scenario.deviceActions).length > 0;
+  const storyClockOn = gameplay.clockRuns || !legacyLaptop;
+  // The simulated time of day shows on the wall clock, the 3D screens, the phone status bar and the laptop.
+  const clockMinuteOfDay = useChapterState(store, (state) => {
+    const clock = simulatedClock(state.resources.timeMinutes);
+    return clock.hour * 60 + clock.minute;
+  });
+  const clockText = `${String(Math.floor(clockMinuteOfDay / 60)).padStart(2, "0")}:${String(clockMinuteOfDay % 60).padStart(2, "0")}`;
+  useEffect(() => {
+    if (!storyClockOn) return;
+    setGameClockOverride(clockMinuteOfDay * 60);
+    if (engineReady) bridge.commands?.setStoryClock?.(clockMinuteOfDay * 60);
+  }, [storyClockOn, clockMinuteOfDay, engineReady, bridge]);
+  useEffect(
+    () => () => {
+      setGameClockOverride(null);
+      bridge.commands?.setStoryClock?.(null);
+    },
+    [bridge],
+  );
+  // Tiredness makes each percent of thesis work take longer, so a session is whole percents at that rate.
+  const perPercentMinutes = effectiveWorkMinutes(gameplay.thesisMinutesPerPercent, resources.fatigue, gameplay.fatigue);
+  const sessionPercent = Math.floor(gameplay.thesisSessionMinutes / gameplay.thesisMinutesPerPercent);
+  const fatigueOn = gameplay.fatigue.enabled;
+  const thesisProps: ThesisPanelProps = {
+    progress: resources.thesisProgress,
+    sessionMinutes: sessionPercent * perPercentMinutes,
+    sessionPercent,
+    fatigue: fatigueOn
+      ? { level: fatigueLevel(resources.fatigue, gameplay.fatigue), slowdownPercent: Math.round((workSlowdown(resources.fatigue, gameplay.fatigue) - 1) * 100) }
+      : undefined,
+    rest: fatigueOn
+      ? { napMinutes: gameplay.fatigue.nap.minutes, sleepMinutes: gameplay.fatigue.sleep.minutes, onRest: (mode) => void store.dispatch({ type: "REST", mode }) }
+      : undefined,
+    freeWorkMaxPercent: gameplay.thesisFreeWorkMaxPercent,
+    timeLeftMinutes: resources.timeMinutes,
+    tasks: thesisView.tasks,
+    onWork: (minutes) => void store.dispatch({ type: "WORK_ON_THESIS", minutes }),
+    onTask: (taskId) => void store.dispatch({ type: "COMPLETE_THESIS_TASK", taskId }),
+  };
 
   useEffect(() => {
     if (!free || ringable === null) return;
@@ -733,6 +902,8 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
 
   // --- Keys: Escape (capture), J, H, Tab trap -----------------------------------------------
   const [hintOn, setHintOn] = useState(false);
+  /** Set by the laptop desktop while it is open; see the Escape handler below. */
+  const laptopEscapeRef = useRef<(() => boolean) | null>(null);
   const [decideRequest, setDecideRequest] = useState(0);
   const handleDecide = useCallback(() => {
     onOpenDecision?.();
@@ -751,6 +922,12 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
     }
   }, [closeTop, openOverlay, store]);
 
+  const togglePlanner = useCallback(() => {
+    if (introOpenRef.current || store.getState().status !== "playing") return;
+    const stack = overlaysRef.current;
+    if (stack.length === 0) openOverlay({ kind: "planner" });
+    else if (top(stack)?.kind === "planner") closeTop();
+  }, [closeTop, openOverlay, store]);
   /** The Notes control of a call: opens the journal on top of the call. The call keeps going. */
   const openJournal = useCallback(() => {
     if (introOpenRef.current || store.getState().status !== "playing" || overlaysRef.current.length > 0) return;
@@ -766,7 +943,11 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
       if (!current) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      if (!event.repeat && canClose(current)) closeTop();
+      if (event.repeat || !canClose(current)) return;
+      // The laptop's desktop uses Escape first: it leaves an open app for the desktop, and only
+      // closes the laptop when it is already on the desktop.
+      if (current.kind === "laptop" && laptopEscapeRef.current?.()) return;
+      closeTop();
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || isTypingTarget(event.target) || introOpenRef.current) return;
@@ -774,6 +955,9 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
       if (event.code === "KeyJ") {
         event.preventDefault();
         toggleJournal();
+      } else if (event.code === "KeyK") {
+        event.preventDefault();
+        togglePlanner();
       } else if (event.code === "KeyH") {
         // Hints are a HUD toggle only: no story state changes.
         if (store.getState().status !== "playing" || overlaysRef.current.length > 0) return;
@@ -796,7 +980,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keydown", onTab);
     };
-  }, [canClose, closeTop, store, toggleJournal]);
+  }, [canClose, closeTop, store, toggleJournal, togglePlanner]);
 
   // Focus returns to the element that opened the overlay when it closes (Requirement 22.1).
   const previousOverlaysRef = useRef<OverlayStack>(EMPTY_OVERLAYS);
@@ -852,30 +1036,126 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
   const trackerHidden = callFocused || uiMode === "investigation" || overlays.length > 0;
 
   const { toast, notice, announcements, completed, dismissToast, dismissNotice } = useHudNotices(store);
+  // Open missions show the objective of their current path next to the authored objectives.
+  const trackerObjectives = useMemo(
+    () => [
+      ...activeObjectives,
+      ...openMissions.map((mission): Objective => ({ id: mission.id as ObjectiveId, text: mission.objective, activateWhen: [], completeWhen: [] })),
+    ],
+    [activeObjectives, openMissions],
+  );
   const currentHint = activeObjectives.find((objective) => objective.hint !== undefined)?.hint ?? null;
 
   // --- Overlay content ----------------------------------------------------------------------
   const closeLaptop = useCallback(() => removeOverlay("laptop"), [removeOverlay]);
+  // Desktop UI state (open apps, active window) is kept here so it survives closing the laptop. It is
+  // not game state and is not saved.
+  const desktopUiRef = useRef<DesktopState | undefined>(undefined);
+  const handleDesktopState = useCallback((next: DesktopState) => {
+    desktopUiRef.current = next;
+  }, []);
+  const registerLaptopEscape = useCallback((handler: (() => boolean) | null) => {
+    laptopEscapeRef.current = handler;
+  }, []);
   const closePhone = useCallback(() => removeOverlay("phone"), [removeOverlay]);
+  // The phone's browser (tabs, bookmarks, history) is UI state: it survives putting the phone down and is not saved.
+  const phoneBrowserRef = useRef<BrowserState | undefined>(undefined);
+  const handlePhoneBrowser = useCallback((next: BrowserState) => {
+    phoneBrowserRef.current = next;
+  }, []);
   const closeJournal = useCallback(() => removeOverlay("journal"), [removeOverlay]);
+  const closePlanner = useCallback(() => removeOverlay("planner"), [removeOverlay]);
 
-  const laptopTabs = useMemo<LaptopExtraTab[]>(
-    () => [
-      { id: "bank", label: text("laptop.apps.bank"), content: <BankApp view={buildBankAppView(laptopView)} dispatch={dispatchVoid} /> },
-      { id: "compare", label: text("laptop.apps.compare"), content: <CompareView view={buildCompareViewModel(laptopView)} dispatch={dispatchVoid} /> },
-      {
-        id: "security",
-        label: text("laptop.apps.security"),
-        content: <ReviewSecurityPage view={buildReviewSecurityView(laptopView)} dispatch={dispatchVoid} />,
-      },
-    ],
-    [dispatchVoid, laptopView, text],
+  // Device content (mail, bank, calendar, housing, jobs, files) is shared state: the phone and the
+  // laptop show the same items. The parked story's bank, compare and security tabs only appear for
+  // a scenario that defines laptop device actions.
+  const openDeviceItem = useCallback((itemId: string) => void store.dispatch({ type: "OPEN_DEVICE_ITEM", itemId }), [store]);
+  const useDeviceItem = useCallback(
+    (itemId: string, actionId: string) => void store.dispatch({ type: "USE_DEVICE_ITEM", itemId, actionId }),
+    [store],
   );
+  const laptopTabs: LaptopExtraTab[] = [
+    ...(legacyLaptop
+      ? [
+          { id: "bank", label: text("laptop.apps.bank"), content: <BankApp view={buildBankAppView(laptopView)} dispatch={dispatchVoid} /> },
+          { id: "compare", label: text("laptop.apps.compare"), content: <CompareView view={buildCompareViewModel(laptopView)} dispatch={dispatchVoid} /> },
+        ]
+      : []),
+    ...deviceAppEntries(laptopDevice, "laptop", text).flatMap((entry): LaptopExtraTab[] => {
+      const generic: LaptopExtraTab = {
+        id: `device-${entry.app}`,
+        label: entry.label,
+        badge: entry.badge,
+        content: <DeviceApp app={entry.app} view={laptopDevice} onOpenItem={openDeviceItem} onUseItem={useDeviceItem} onView={setDeviceView} />,
+      };
+      // The interactive desktop has its own banking app and file explorer.
+      if (!legacyLaptop && entry.app === "bank") {
+        return [
+          {
+            ...generic,
+            content: <BankingApp view={laptopDevice} phoneView={phoneDevice} blocked={blockedTransfers} facts={bankFacts} onUseItem={useDeviceItem} />,
+          },
+        ];
+      }
+      if (!legacyLaptop && entry.app === "calendar") return [{ ...generic, content: <CalendarApp view={laptopDevice} /> }];
+      if (!legacyLaptop && entry.app === "files") {
+        return [{ ...generic, content: <FilesApp view={laptopDevice} onOpenItem={openDeviceItem} onUseItem={useDeviceItem} /> }];
+      }
+      // The interactive desktop has its own mail client, and a Browser window that mail links open.
+      if (legacyLaptop || entry.app !== "mail") return [generic];
+      return [
+        { ...generic, content: <MailClient view={laptopDevice} onOpenItem={openDeviceItem} onUseItem={useDeviceItem} onView={setDeviceView} /> },
+        {
+          id: BROWSER_APP_ID,
+          label: text("laptop.apps.browser"),
+          content: null,
+          render: ({ browser, dispatchBrowser }) => (
+            <BrowserApp state={browser} dispatch={dispatchBrowser} view={laptopDevice} facts={portalFacts} onOpenItem={openDeviceItem} onUseItem={useDeviceItem} />
+          ),
+        },
+      ];
+    }),
+    { id: "thesis", label: text("laptop.apps.thesis"), content: legacyLaptop ? <ThesisPanel {...thesisProps} /> : <ThesisWindow {...thesisProps} /> },
+    ...(legacyLaptop
+      ? [
+          {
+            id: "security",
+            label: text("laptop.apps.security"),
+            content: <ReviewSecurityPage view={buildReviewSecurityView(laptopView)} dispatch={dispatchVoid} />,
+          },
+        ]
+      : []),
+  ];
 
   const renderOverlay = (overlay: Overlay): React.ReactNode => {
     switch (overlay.kind) {
       case "laptop":
-        return <LaptopOverlay key="laptop" view={laptopView} dispatch={dispatchVoid} onClose={closeLaptop} extraTabs={laptopTabs} />;
+        // Chapter 1 has no laptop device actions: its laptop is the interactive desktop. The parked
+        // story keeps the original sidebar overlay.
+        if (!legacyLaptop) {
+          return (
+            <LaptopDesktop
+              key="laptop"
+              apps={laptopTabs}
+              onClose={closeLaptop}
+              clockText={storyClockOn ? clockText : undefined}
+              initialState={desktopUiRef.current}
+              onStateChange={handleDesktopState}
+              registerEscape={registerLaptopEscape}
+            />
+          );
+        }
+        return (
+          <LaptopOverlay
+            key="laptop"
+            view={laptopView}
+            dispatch={dispatchVoid}
+            onClose={closeLaptop}
+            extraTabs={laptopTabs}
+            showNotifications={legacyLaptop}
+            clockText={storyClockOn ? clockText : undefined}
+          />
+        );
       case "phone":
         return (
           <PhoneOverlay
@@ -885,7 +1165,22 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
             onInspectEvidence={(evidenceId: EvidenceId) => dispatchVoid({ type: "INSPECT_EVIDENCE", evidenceId })}
             onDeviceAction={(deviceActionId: DeviceActionId) => dispatchVoid({ type: "DEVICE_ACTION", deviceActionId })}
             onCallSavedContact={(claimId: ClaimId) => dispatchVoid({ type: "VERIFY_CLAIM", claimId, method: "saved-official-contact" })}
+            device={{ view: phoneDevice, onOpenItem: openDeviceItem, onUseItem: useDeviceItem, onView: setDeviceView }}
+            mobile={legacyLaptop ? undefined : { blocked: blockedTransfers, bank: bankFacts, portal: portalFacts }}
+            browserState={phoneBrowserRef.current}
+            onBrowserState={handlePhoneBrowser}
             onClose={closePhone}
+          />
+        );
+      case "planner":
+        return (
+          <PlannerOverlay
+            key="planner"
+            events={pendingEvents}
+            missions={openMissions}
+            thesis={thesisProps}
+            onRespond={(eventId, response) => dispatchVoid({ type: "RESPOND_EVENT", eventId, response })}
+            onClose={closePlanner}
           />
         );
       case "journal":
@@ -958,10 +1253,16 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
           ))}
         </div>
 
+        <div role="status" aria-live="polite" className="sr-only" data-testid="world-live-region">
+          {arrival ? text("planner.arrival", { title: arrival.title }) : ""}
+        </div>
+        {/* Outside the HUD: Alex's captions also show over the intro, when the HUD is hidden. */}
+        <Mission01VoiceCaption cue={alexVoice.current} subtitlesEnabled={settings.subtitlesEnabled} getPositionMs={alexVoice.positionMs} />
         {hudVisible && (
           <>
             <div
-              className="pointer-events-none absolute left-4 top-4 z-10"
+              // Below the "No signal" map (about 10 rem tall) in the top-left corner.
+              className="pointer-events-none absolute left-4 top-[11rem] z-10 flex flex-col items-start gap-2"
               data-testid="objective-tracker-slot"
               style={{
                 // The call, its replies, the laptop, the phone records and the journal own the
@@ -972,7 +1273,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
               }}
             >
               <ObjectiveTracker
-                objectives={activeObjectives}
+                objectives={trackerObjectives}
                 store={store}
                 scenario={scenario}
                 announcement={completed === null ? null : text("room.objectiveToast.done", { objective: objectiveText(completed) })}
@@ -980,6 +1281,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
                 hint={currentHint}
                 hintOn={hintOn}
               />
+        <ResourceStatus resources={resources} fatigueLevel={fatigueOn ? fatigueLevel(resources.fatigue, gameplay.fatigue) : undefined} />
             </div>
 
             {/* Visual only: the live region above announces the same events once. */}
@@ -1017,6 +1319,34 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
                       </span>
                       <span className="sr-only">
                         {text("hud.newEntries", { count: journalUnread, number: formatNumber(locale, journalUnread) })}
+                      </span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className={HUD_CHIP_CLASS}
+                  style={HUD_CHIP_STYLE}
+                  aria-pressed={isOpen(overlays, "planner")}
+                  aria-keyshortcuts="K"
+                  data-testid="hud-planner-chip"
+                  onClick={togglePlanner}
+                >
+                  <kbd aria-hidden="true" className="inline-flex items-center justify-center font-mono" style={CINE_KEYCAP_STYLE}>
+                    K
+                  </kbd>
+                  <CalendarClock className="h-4 w-4" aria-hidden="true" />
+                  <span>{text("planner.chip")}</span>
+                  {pendingEvents.length > 0 && (
+                    <>
+                      <span
+                        aria-hidden="true"
+                        className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full bg-[#f2b24b] px-1.5 text-center text-xs font-bold leading-5 text-[#171521]"
+                      >
+                        {pendingEvents.length}
+                      </span>
+                      <span className="sr-only">
+                        {text("planner.pendingCount", { count: pendingEvents.length, number: formatNumber(locale, pendingEvents.length) })}
                       </span>
                     </>
                   )}
@@ -1087,6 +1417,11 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
               </div>
             )}
 
+            {arrival && (
+              <div className="pointer-events-none absolute left-1/2 top-24 z-10 -translate-x-1/2" aria-hidden="true">
+                <EventArrivalNotice key={arrival.key} title={arrival.title} onDismiss={dismissArrival} />
+              </div>
+            )}
             <MovementHints active={uiMode === "exploration" && overlays.length === 0 && !introOpen} />
           </>
         )}
@@ -1148,6 +1483,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
             ready={engineReady}
             mode={introMode}
             lines={introLines}
+            cinematic={!Object.hasOwn(scenario.dialogues, "dlg.intro")}
             onLineChange={goToIntroLine}
             controlIds={INTRO_CONTROLS}
             voiceGain={voiceGain(

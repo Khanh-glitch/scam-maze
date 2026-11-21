@@ -20,6 +20,7 @@ import { PrologueHud, ProloguePauseMenu } from "../../prologue/PrologueHud";
 import type { Engine as RoomEngine, UIState as RoomUI } from "../../roomv2/game/engine";
 import { AnchoredPrompt } from "../hud/AnchoredPrompt";
 import { RoomChapterLayer } from "./RoomChapterLayer";
+import { consumeRoomPreload, discardRoomPreload, peekReadyRoom } from "./roomPreloader";
 import { RoomStoryBridge } from "./roomStoryBridge";
 
 const RoomV2Page = lazy(() => import("../../roomv2").then((module) => ({ default: module.RoomV2Page })));
@@ -45,7 +46,14 @@ export const RoomChapterPage: React.FC<RoomChapterPageProps> = ({
 }) => {
   const { t } = useTranslation("worlds");
   // One bridge per page, created once, so the engine and the layer always share the same port.
-  const [bridge] = useState(() => new RoomStoryBridge());
+  // A room built ahead on the main menu (same quality and language) is adopted; its bridge is the one
+  // the engine was built with. Without one, the page builds the room itself, as before.
+  const [preloaded] = useState(() => peekReadyRoom(settings.graphicsQuality === "high" ? "high" : "low", settings.language));
+  const [bridge] = useState(() => preloaded?.bridge ?? new RoomStoryBridge());
+  useEffect(() => {
+    // Nothing to adopt: cancel a build still in progress so it cannot leave a second renderer behind.
+    if (!preloaded) discardRoomPreload();
+  }, [preloaded]);
   const [engineReady, setEngineReady] = useState(false);
   const [roomUI, setRoomUI] = useState<RoomUI | null>(null);
   const [paused, setPaused] = useState(false);
@@ -118,6 +126,8 @@ export const RoomChapterPage: React.FC<RoomChapterPageProps> = ({
           onBackToMenu={onReturnToMenu}
           embedded
           story={bridge}
+          preloaded={preloaded?.engine}
+          onAdopted={consumeRoomPreload}
           onUI={setRoomUI}
           renderPrompt={(label, anchor) => <AnchoredPrompt label={label} anchor={anchor} />}
           onReady={handleReady}
@@ -128,6 +138,7 @@ export const RoomChapterPage: React.FC<RoomChapterPageProps> = ({
               bridge={bridge}
               saveSource={saveSource}
               engineReady={engineReady}
+              clockPaused={paused || settingsOpen}
               onReturnToMenu={onReturnToMenu}
               onHoverSound={onHoverSound}
             />
@@ -136,7 +147,7 @@ export const RoomChapterPage: React.FC<RoomChapterPageProps> = ({
       </Suspense>
 
       {playing && !paused && (
-        <PrologueHud objective={null} prompt={null} showResume={showResume} cursorMode={cursorMode} crosshair={false} minimap={<NoSignalMinimap label={t("quests.noSignal")} />} />
+        <PrologueHud objective={null} prompt={null} showResume={showResume} cursorMode={cursorMode} crosshair={false} minimap={roomUI?.inspecting ? undefined : <NoSignalMinimap label={t("quests.noSignal")} />} />
       )}
 
       {paused && !settingsOpen && (

@@ -17,7 +17,7 @@ function withActions(state: ChapterState, actions: readonly CoreAction[]): Chapt
     events.push({
       seq: events.length,
       action,
-      derived: { evidence: [], flags: [], objectivesActivated: [], objectivesCompleted: [], debriefTags: [] },
+      derived: { evidence: [], flags: [], resources: {}, persistent: [], objectivesActivated: [], objectivesCompleted: [], debriefTags: [] },
     });
   }
   return { ...state, events };

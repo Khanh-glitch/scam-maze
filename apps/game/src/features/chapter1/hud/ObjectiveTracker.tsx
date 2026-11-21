@@ -109,7 +109,7 @@ export const ObjectiveTracker: React.FC<ObjectiveTrackerProps> = ({
         >
           {t("objectives.card")}
         </h2>
-        {store && scenario && <ActLabel store={store} scenario={scenario} />}
+        {store && scenario && scenario.acts.length > 0 && <ActLabel store={store} scenario={scenario} />}
       </div>
       <div aria-live="polite" aria-atomic="false">
         {objectives.length === 0 ? (

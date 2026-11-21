@@ -8,10 +8,10 @@ import { gameClockText } from "../../../game/clock/gameClock";
  * the dark call screen). The battery art has the level (76) drawn in, so the level is fixed. The
  * clock is live text instead of a `Time.png`, because it must follow the in-game time.
  */
-const ICON_DIR = "/assets/ui/StatusBarLight";
+export const ICON_DIR = "/assets/ui/StatusBarLight";
 
 /** Icon size in CSS px: the art is 3x, so 1/3 of its pixel size. */
-const ICONS = [
+export const ICONS = [
   { file: "Mobile Signal.png", w: 17, h: 11 },
   { file: "Wifi.png", w: 16, h: 11 },
   { file: "Battery.png", w: 24, h: 13 },

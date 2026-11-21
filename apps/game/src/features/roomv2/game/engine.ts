@@ -16,11 +16,23 @@ import { CharacterArmsViewmodel } from '../../player/runtime/CharacterArmsViewmo
 import { dropMaskCanvas, paintDropMask, canvas, toTex } from './textures';
 import { projectCornersToViewport, projectPointToViewport, cornersChanged, anchorMoved, ANCHOR_TOLERANCE_PX, type ScreenCornersPx, type ScreenDeviceId } from './screenProjection';
 import { pickHoverId, laptopInteractRoute, inspectDurationSec } from './storyInteract';
-import { setGameElapsedSeconds } from '../../../game/clock/gameClock';
+import { formatClock, setGameElapsedSeconds } from '../../../game/clock/gameClock';
+import { DOOR_OPEN_AT_S, entranceFrame, HANDOFF } from './entranceShot';
 import { isRoomPropId, type RoomOptions, type RoomStoryCommands } from './outside';
 
 export type Caption = { text: string; voice?: boolean; id: number };
 export type UIAction = { key: string; label: string };
+/** Engine.activate options. entrance: play the scripted entrance shot (outside the door, the door opens, walk in) instead of appearing at the spawn. */
+export interface ActivateOptions {
+  entrance?: boolean;
+  /** Default: the browser's prefers-reduced-motion setting. Reduced motion is a plain fade up at the spawn. */
+  reducedMotion?: boolean;
+}
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 export interface UIState {
   prompt: string | null;
   /** Story mode: the aimed prop's projected position (container pixels), or null. */
@@ -139,6 +151,8 @@ export class Engine implements RoomStoryCommands {
   exitT = 0;
   exitSent = false;
   visits = 0;
+  /** The entrance shot in progress (input is ignored until it ends and egin() runs), or null. */
+  entrance: null | { t: number; reduced: boolean; clicked: boolean } = null;
 
   // player
   pos = V(1.3, 1.62, 1.55);
@@ -246,7 +260,6 @@ export class Engine implements RoomStoryCommands {
     this.dropTex = new THREE.CanvasTexture(this.dropCanvas);
     this.pmrem = new THREE.PMREMGenerator(r);
     this.audio = new AudioEngine(this.camera);
-
     this.build();
     this.setupPost();
     // Dev-only handle for the browser console and automated checks; never set in production builds.
@@ -263,21 +276,83 @@ export class Engine implements RoomStoryCommands {
    */
   private prepare() {
     this.updateEnv();
-    try { void this.renderer.compileAsync(this.scene, this.camera).catch(() => undefined); } catch { /* compile on first draw instead */ }
+    // Nothing plays while the room waits: the audio context stays suspended until `goLive`/`activate`.
+    this.audio.suspend();
+    this.warmed = (async () => {
+      // compileAsync can stall (hidden tab, no parallel-compile support); the warm frame below then compiles what is left.
+      try {
+        await Promise.race([
+          this.renderer.compileAsync(this.scene, this.camera),
+          new Promise<void>((resolve) => window.setTimeout(resolve, 4000)),
+        ]);
+      } catch { /* compile on first draw instead */ }
+      if (!this.disposed) this.renderWarmFrame();
+    })();
+  }
+
+  /** Resolves once the standby room has compiled its shaders and drawn one full frame (textures and shadow maps uploaded). */
+  warmed: Promise<void> = Promise.resolve();
+
+  /** One complete frame, as the loop draws it, so the first visible frame needs no upload or compile. */
+  private renderWarmFrame() {
+    try {
+      const r = this.renderer;
+      this.glassMats.forEach((m) => m.uniforms.uRes.value.set(r.domElement.width, r.domElement.height));
+      this.camera.layers.set(1);
+      r.setRenderTarget(this.cityRT);
+      r.render(this.scene, this.camera);
+      r.setRenderTarget(null);
+      this.camera.layers.set(0);
+      this.camera.layers.enable(1);
+      r.shadowMap.needsUpdate = true;
+      this.composer.render(0);
+    } catch { /* the first live frame draws it instead */ }
+  }
+
+  /**
+   * Preloaded room: move the canvas into the page that adopts it. The room was built in a hidden host
+   * at window size, so it is resized to its new container.
+   */
+  attachTo(container: HTMLElement, onUI: (s: UIState) => void) {
+    if (this.disposed) return;
+    this.container = container;
+    this.onUI = onUI;
+    container.appendChild(this.renderer.domElement);
+    this.onResize();
+  }
+
+  /** Standby -> running for the story chapter: starts the loop where the room stands (no entrance shot). */
+  goLive() {
+    if (this.disposed || this.live) return;
+    this.live = true;
+    this.t = performance.now() / 1000;
+    this.audio.wake();
+    cancelAnimationFrame(this.raf);
+    this.raf = requestAnimationFrame(this.loop);
   }
 
   /** Standby -> running: the player steps into the room. */
-  activate() {
+  activate(opts: ActivateOptions = {}) {
     if (this.disposed || this.live) return;
     this.live = true;
     this.t = performance.now() / 1000;
     this.exiting = false; this.exitT = 0; this.exitSent = false;
-    this.pos.set(1.3, 1.62, 1.55); this.vel.set(0, 0, 0); this.yaw = 0.62; this.pitch = -0.08;
+    this.pos.set(HANDOFF.x, HANDOFF.y, HANDOFF.z); this.vel.set(0, 0, 0); this.yaw = HANDOFF.yaw; this.pitch = HANDOFF.pitch;
     this.keys.clear();
-    // the neighborhood's white doorway covers the cut, so no fade up from black
-    this.ui.fade = 0; this.finalPass.uniforms.uFade.value = 1;
-    this.audio.wake();
-    this.begin();
+    if (opts.entrance) {
+      // The cut from the neighborhood lands on the room's own dark frame; the shot fades up from there.
+      this.entrance = { t: 0, reduced: opts.reducedMotion ?? prefersReducedMotion(), clicked: false };
+      this.applyEntranceFrame(entranceFrame(0, this.entrance.reduced));
+      this.audio.wake();
+      this.audio.start();
+      this.lock();
+      this.emit();
+    } else {
+      // the neighborhood's white doorway covers the cut, so no fade up from black
+      this.ui.fade = 0; this.finalPass.uniforms.uFade.value = 1;
+      this.audio.wake();
+      this.begin();
+    }
     cancelAnimationFrame(this.raf);
     this.raf = requestAnimationFrame(this.loop);
   }
@@ -285,11 +360,39 @@ export class Engine implements RoomStoryCommands {
   /** Running -> standby (the player left); the room keeps its state for the next visit. */
   deactivate() {
     this.live = false;
+    this.entrance = null;
+    this.apt.doorLeaf.rotation.y = 0;
     cancelAnimationFrame(this.raf);
     this.keys.clear();
     this.audio.suspend();
     this.ui.started = false; this.ui.locked = false; this.ui.prompt = null; this.ui.anchor = null; this.ui.focus = false;
     this.emit();
+  }
+
+  private applyEntranceFrame(f: ReturnType<typeof entranceFrame>) {
+    this.pos.set(f.x, f.y, f.z); this.yaw = f.yaw; this.pitch = f.pitch;
+    this.apt.doorLeaf.rotation.y = -f.doorAngle;
+    this.ui.fade = 1 - f.fade;
+    this.finalPass.uniforms.uFade.value = f.fade;
+  }
+
+  /** One step of the entrance shot: scripted camera, door and fade; ends with the same hand-over as `begin()`. */
+  private stepEntrance(dt: number) {
+    const e = this.entrance;
+    if (!e) return;
+    e.t += dt;
+    const f = entranceFrame(e.t, e.reduced);
+    if (!e.reduced && !e.clicked && e.t >= DOOR_OPEN_AT_S) { e.clicked = true; this.audio.switchClick('door'); }
+    const speed = dt > 0 ? Math.hypot(f.x - this.pos.x, f.z - this.pos.z) / dt : 0;
+    this.applyEntranceFrame(f);
+    // Walking pace drives the same head-bob and footsteps as `movePlayer`.
+    this.vel.set(f.done ? 0 : speed, 0, 0);
+    if (speed > 0.05 && !f.done) {
+      this.bobPhase += dt * speed * 5.2;
+      const sign = Math.sign(Math.sin(this.bobPhase));
+      if (sign !== this.lastStepSign && sign !== 0) { this.lastStepSign = sign; this.audio.started && this.audio.footstep(Math.min(1, speed / 1.3)); }
+    }
+    if (f.done) { this.entrance = null; this.begin(); }
   }
 
   /** Fades out, then tells the neighborhood the player left (`RoomOptions.onExit`). */
@@ -471,7 +574,7 @@ export class Engine implements RoomStoryCommands {
 
   /* =================== INPUT =================== */
   onMouseMove = (e: MouseEvent) => {
-    if (!this.ui.locked) return;
+    if (!this.ui.locked || this.entrance) return;
     if (this.callHeld()) return;
     if (Math.abs(e.movementX) > MAX_MOUSE_STEP || Math.abs(e.movementY) > MAX_MOUSE_STEP) return;
     const s = 0.0021;
@@ -485,7 +588,13 @@ export class Engine implements RoomStoryCommands {
     if (this.seat === 'seated') this.yaw = THREE.MathUtils.clamp(this.yaw, -1.5, 1.5);
     this.pitch = THREE.MathUtils.clamp(this.pitch - e.movementY * s, -1.45, 1.45);
   };
+  /** True while the player types in a text field (for example the browser's address bar): the room ignores those keys. */
+  private static typingInField(e: KeyboardEvent): boolean {
+    const t = e.target;
+    return t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || (t instanceof HTMLElement && t.isContentEditable);
+  }
   onKeyDown = (e: KeyboardEvent) => {
+    if (Engine.typingInField(e)) return;
     if (this.ui.started && !this.ui.ended && (e.key === 'Control' || e.code === 'ControlLeft' || e.code === 'ControlRight')) {
       if (!e.repeat) this.setCursorMode(!this.ui.cursorMode);
       return;
@@ -769,6 +878,12 @@ export class Engine implements RoomStoryCommands {
     if (on) this.audio.ring(true); else this.stopVibe();
   }
 
+  /** Time of day from a story host (seconds), or null for the room's own clock. */
+  storyClockSeconds: number | null = null;
+  setStoryClock(secondsOfDay: number | null) {
+    this.storyClockSeconds = secondsOfDay;
+    this.lastAwakeKey = -1; // redraw the screens with the new time
+  }
   setLaptopFrame(frame: LaptopFrame | null) {
     this.laptopFrame = frame;
     // A new card wakes the screen (the existing fade-in and the small screen light) so the laptop
@@ -1170,7 +1285,7 @@ export class Engine implements RoomStoryCommands {
     const a = this.apt;
     const el = this.ui.started ? this.t - this.startT : 0;
     setGameElapsedSeconds(el);
-    const time = clock({ h: 23, m: 8 }, el);
+    const time = this.storyClockSeconds === null ? clock({ h: 23, m: 8 }, el) : formatClock(this.storyClockSeconds);
     // laptop
     if (this.laptopWoken) this.laptopAwake = Math.min(1, this.laptopAwake + dt * 1.8);
     a.laptopScreenMat.color.setScalar(1.0 * this.laptopAwake);
@@ -1257,7 +1372,7 @@ export class Engine implements RoomStoryCommands {
       if (this.fridgeOpenT > 48) { this.fridgeBeepT -= dt; if (this.fridgeBeepT <= 0) { this.fridgeBeepT = 3.6; this.audio.beep(); } }
     }
     // wall clock follows game time
-    const secs = 23 * 3600 + 8 * 60 + el;
+    const secs = this.storyClockSeconds ?? 23 * 3600 + 8 * 60 + el;
     const hh = (secs / 3600) % 12, mmn = (secs / 60) % 60, ss = secs % 60;
     a.clockHands.h.rotation.z = -(hh / 12) * Math.PI * 2;
     a.clockHands.m.rotation.z = -(mmn / 60) * Math.PI * 2;
@@ -1292,7 +1407,8 @@ export class Engine implements RoomStoryCommands {
     const dt = Math.min(0.05, rawDt);
     this.t = tNow;
 
-    if (this.ui.started) this.movePlayer(dt);
+    if (this.entrance) this.stepEntrance(dt);
+    else if (this.ui.started) this.movePlayer(dt);
     this.updateSeat(rawDt > 0.05 ? 0.05 : dt);
     this.updateCamera(dt);
     this.updateScreenWatch();
@@ -1308,7 +1424,7 @@ export class Engine implements RoomStoryCommands {
     if (this.ui.started && this.ui.fade > 0) { this.ui.fade = Math.max(0, this.ui.fade - dt / 3.5); }
     const endDim = this.ui.ended ? 0.55 : 1;
     const fu = this.finalPass.uniforms;
-    fu.uFade.value += ((1 - this.ui.fade) * endDim - fu.uFade.value) * Math.min(1, dt * 3);
+    if (!this.entrance) fu.uFade.value += ((1 - this.ui.fade) * endDim - fu.uFade.value) * Math.min(1, dt * 3);
     if (this.exiting) {
       // the neighborhood whites the screen out meanwhile; then it takes over
       this.exitT += dt / EXIT_SECONDS;
