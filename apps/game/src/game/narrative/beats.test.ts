@@ -26,7 +26,7 @@ function eventWithTag(tag: string): EventLogEntry {
   return {
     seq: 0,
     action: { type: "OPEN_PHONE" },
-    derived: { evidence: [], flags: [], objectivesActivated: [], objectivesCompleted: [], debriefTags: [tag] },
+    derived: { evidence: [], flags: [], resources: {}, persistent: [], objectivesActivated: [], objectivesCompleted: [], debriefTags: [tag] },
   };
 }
 

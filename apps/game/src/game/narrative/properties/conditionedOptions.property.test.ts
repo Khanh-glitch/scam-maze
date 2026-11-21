@@ -141,7 +141,7 @@ describe("Condition-driven dialogue options are deterministic and local", () => 
           {
             seq: 0,
             action: { type: "OPEN_PHONE" },
-            derived: { evidence: [], flags: [], objectivesActivated: [], objectivesCompleted: [], debriefTags: [] },
+            derived: { evidence: [], flags: [], resources: {}, persistent: [], objectivesActivated: [], objectivesCompleted: [], debriefTags: [] },
           },
         ],
         phone: { ...a.phone, open: !a.phone.open },

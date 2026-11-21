@@ -38,6 +38,11 @@ export interface RoomStoryCommands {
   /** Short notification sound at the laptop. */
   chime(): void;
   setMood(mood: 'calm' | 'quiet' | 'tense'): void;
+  /**
+   * Sets the time of day shown by the wall clock and the laptop and phone screens, in seconds. `null` returns to the
+   * room's own clock (23:08 plus the time played). Optional.
+   */
+  setStoryClock?(secondsOfDay: number | null): void;
   /** Lowers the room's ambience under narration (true) or restores it (false). Optional. */
   duckForVoice?(on: boolean): void;
   /** Leaves the inspect pose even when `canLeaveInspect` says no. */

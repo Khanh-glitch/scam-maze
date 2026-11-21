@@ -14,7 +14,7 @@ const story: LocaleShape<typeof en> = {
     title: "Sổ ghi chép",
     evidenceHeading: "Bằng chứng",
     claimsHeading: "Lời khẳng định",
-    emptyState: "Bạn chưa tìm thấy bằng chứng nào. Hãy nhìn quanh và kiểm tra những gì người gọi nói với bạn.",
+    emptyState: "Bạn chưa tìm thấy bằng chứng nào. Hãy nhìn quanh và kiểm tra những gì bạn được cho biết.",
     noClaimEvidence: "Chưa có bằng chứng nào về lời khẳng định này.",
     sourceLabel: "Nguồn",
     locationLabel: "Tìm thấy ở",
@@ -32,7 +32,7 @@ const story: LocaleShape<typeof en> = {
     claimStatus: {
       unverified: "Chưa kiểm tra",
       supported: "Bằng chứng ủng hộ lời khẳng định này",
-      contradicted: "Bị phản bác bởi số điện thoại chính thức của Northgate Bank",
+      contradicted: "Bị phản bác bởi đường dây chính thức",
       inconclusive: "Đã kiểm tra, nhưng chưa có kết luận",
     },
     source: {

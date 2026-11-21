@@ -76,6 +76,7 @@ const Harness: React.FC<{ setup: Setup; spy: (id: DeviceActionId) => void }> = (
       }}
       onCallSavedContact={() => undefined}
       onClose={() => undefined}
+      startLocked={false}
     />
   );
 };
@@ -151,7 +152,8 @@ describe("PhoneOverlay call details and records", () => {
     for (const app of [/Messages/, /Calls/, "Voicemail"]) {
       fireEvent.click(within(dialog()).getByRole("button", { name: app }));
       for (const button of within(dialog()).queryAllByRole("button")) {
-        if (button.getAttribute("aria-label") === "Close phone" || /Back/.test(button.textContent ?? "")) continue;
+        const label = button.getAttribute("aria-label");
+        if (label === "Close phone" || label === "Go home" || /Back/.test(button.textContent ?? "")) continue;
         fireEvent.click(button);
       }
       noAnchors();

@@ -14,12 +14,13 @@ import type { LoadingHold } from "../features/loading/ChapterLoadingFlow";
 import type { ContinueAvailability } from "../features/menu/MainMenuOverlay";
 import { DEFAULT_CHAPTER_ID, getChapter } from "../game/chapters/chapterRegistry";
 import { readContinueAvailability } from "./continueAvailability";
-import type { ChapterSession } from "../game/chapters/chapterSession";
+import { createNewChapterSession, type ChapterSession } from "../game/chapters/chapterSession";
+import { useInstantNewGame } from "./useInstantNewGame";
 import type { ChapterLoadRequest } from "../game/loading/chapterLoader";
 import { checkBasicWebGLSupport } from "../game/loading/deviceCapabilities";
 import { createLocalStorageSaveSource } from "../game/saves/saveGame";
 import type { GameSettings } from "@scammaze/shared-types";
-import { applyLocale } from "../i18n";
+import { applyLocale, i18n } from "../i18n";
 import { loadSettings, saveSettings } from "./settingsStorage";
 
 // The Mekong world is large (its own procedural builders plus the ambient-occlusion pass), so it
@@ -59,6 +60,10 @@ function readSavedContinueAvailability(): ContinueAvailability {
   return readContinueAvailability(saveSource);
 }
 
+/** Translator for the room's own strings (namespace `worlds`), used when the room is built before its page mounts. */
+function translateRoomText(key: string, options?: Record<string, unknown>): string {
+  return (i18n.t as unknown as (k: string, o?: object) => string)(key, { ...options, ns: "worlds" });
+}
 type AppRoute = "menu" | "testmove" | "ueh" | "hue" | "mientay" | "khupho" | "roomv2" | "testbus";
 
 function getAppRoute(): AppRoute {
@@ -151,13 +156,43 @@ export const App: React.FC = () => {
     setScreen((prev) => (prev.kind === "menu" ? { kind: "chapter-loading", request } : prev));
   }, []);
 
-  const handleStartNewGame = useCallback(() => {
+  const startNewGameLoading = useCallback(() => {
     startChapterLoading({ kind: "new-game", chapterId: DEFAULT_CHAPTER_ID });
   }, [startChapterLoading]);
 
+  // The new game opens in the room that was built in the background on the menu, with no loading
+  // screen. Only when the new game goes straight to the apartment (no prologue).
+  const enterNewGameDirect = useCallback(() => {
+    const chapter = getChapter(DEFAULT_CHAPTER_ID);
+    if (!chapter) {
+      startNewGameLoading();
+      return;
+    }
+    setScreen((prev) => (prev.kind === "menu" ? { kind: "chapter", session: createNewChapterSession(chapter) } : prev));
+  }, [startNewGameLoading]);
+
+  const directNewGameAllowed =
+    !!getChapter(DEFAULT_CHAPTER_ID)?.gameplayAvailable &&
+    !shouldPlayPrologue({ origin: "new-game" }, typeof window === "undefined" ? "" : window.location.search);
+  const instantNewGame = useInstantNewGame({
+    enabled: route === "menu" && screen.kind === "menu" && !showLoading && directNewGameAllowed,
+    available: route === "menu" && screen.kind === "menu" && directNewGameAllowed,
+    quality: settings.graphicsQuality === "high" ? "high" : "low",
+    language: settings.language,
+    translate: translateRoomText,
+    onEnterDirect: enterNewGameDirect,
+    onFallback: startNewGameLoading,
+  });
+
+  const handleStartNewGame = useCallback(() => {
+    if (instantNewGame.pending) return;
+    instantNewGame.requestNewGame();
+  }, [instantNewGame]);
+
   const handleContinue = useCallback(() => {
+    instantNewGame.cancelPending();
     startChapterLoading({ kind: "continue" });
-  }, [startChapterLoading]);
+  }, [instantNewGame, startChapterLoading]);
 
   const handleEnterChapter = useCallback((session: ChapterSession) => {
     setScreen((prev) => {
@@ -520,7 +555,7 @@ export const App: React.FC = () => {
     );
   }
 
-  // Route: /hue or /HUE -> Procedural 3D Huế Heritage World (Cố Đô Huế)
+  // Route: /hue or /HUE -> Procedural 3D Huáº¿ Heritage World (Cá»‘ ÄÃ´ Huáº¿)
   if (route === "hue") {
     return (
       <HuePage
@@ -530,7 +565,7 @@ export const App: React.FC = () => {
     );
   }
 
-  // Route: /mientay -> Procedural 3D Mekong Delta world (Miền Tây sông nước)
+  // Route: /mientay -> Procedural 3D Mekong Delta world (Miá»n TÃ¢y sÃ´ng nÆ°á»›c)
   if (route === "mientay") {
     return (
       <Suspense fallback={<div className="h-screen w-screen bg-[#0b0e0c]" aria-busy="true" />}>
@@ -587,6 +622,7 @@ export const App: React.FC = () => {
           onToggleSound={handleToggleSound}
           onHoverSound={playHoverSound}
           onStartNewGame={handleStartNewGame}
+          newGameBusy={instantNewGame.pending}
           onContinue={handleContinue}
           continueAvailability={continueAvailability}
         />

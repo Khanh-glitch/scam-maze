@@ -1,12 +1,8 @@
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { GameSettings } from "@scammaze/shared-types";
-import { LoadingScreen } from "../../components/ui/LoadingScreen";
-import { SceneTransition } from "../../components/ui/SceneTransition";
-import { LOADING_TIP_IDS } from "../../config/loadingTips";
 import { voiceGain } from "../../game/voice/mixPlan";
 import { CharacterAssetCache } from "../player/runtime/CharacterAssetCache";
-import { useMinimumDisplayTime } from "../loading/useMinimumDisplayTime";
 import { ChapterIntroOverlay, type IntroControlId } from "../chapter1/intro/ChapterIntroOverlay";
 import { KhuphoStoryWorld } from "../khupho/KhuphoStoryWorld";
 import { BUILD_STEPS, type BuildStep, type Engine as StreetEngine, type Hud, type StoryEvent } from "../khupho/world/engine";
@@ -66,13 +62,12 @@ interface ProloguePageProps {
   saveSource?: SaveGameSource;
 }
 
-/** White doorway into the room: how long the screen takes to white out, and to clear again on the other side. */
-const WHITE_IN_MS = 150;
+/** Leaving the room by its door: the screen whites out (500 ms, see `onExitStart`) and clears again over this long in the hall. Entering has no white screen: the room plays its own entrance shot. */
 const WHITE_OUT_MS = 700;
 /** The room is built this long after the walk begins (and sooner when the player nears house no. 59). */
-const ROOM_BUILD_DELAY_MS = 1500;
-/** Minimum time the "walking home" screen stays up, so the cut is never a flash. */
-const HOME_LOADING_MIN_MS = 1800;
+const ROOM_BUILD_DELAY_MS = 300;
+/** If the room is still not ready this long after the player stepped in, the black cover is dropped and the doorway works again. */
+const ROOM_WAIT_TIMEOUT_MS = 8000;
 
 /** The neighborhood has no phone, journal or pause menu entry in the intro list yet. */
 const PROLOGUE_CONTROLS: readonly IntroControlId[] = ["move", "look", "interact", "pause"];
@@ -100,14 +95,12 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
   const [dialogue, setDialogue] = useState<DialogueState | null>(null);
   const [toast, setToast] = useState<QuestId | null>(null);
   const [mapData, setMapData] = useState<MapData | null>(null);
-  const [roomChunk, setRoomChunk] = useState(false);
-  const [hands, setHands] = useState(false);
   const [roomBuilt, setRoomBuilt] = useState(false);
   const [roomUI, setRoomUI] = useState<RoomUI | null>(null);
-  /** The room is built in standby (no loop, shaders compiled) once the walk begins, and shown through the white doorway or by "go home". */
+  /** The room is built in standby (no loop, shaders compiled) once the walk begins, and shown by its entrance shot (through the doorway of house no. 59 or by "go home"). */
   const [roomOptions, setRoomOptions] = useState<RoomOptions | null>(null);
   const [waitingRoom, setWaitingRoom] = useState(false);
-  const [white, setWhite] = useState({ on: false, ms: WHITE_IN_MS });
+  const [white, setWhite] = useState({ on: false, ms: WHITE_OUT_MS });
   // One bridge for the room engine and the chapter layer, stable for the life of the page.
   const ownBridge = useRef<RoomStoryBridge | null>(null);
   if (story === undefined && ownBridge.current === null) ownBridge.current = new RoomStoryBridge();
@@ -126,7 +119,17 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
   // The chapter happens in the apartment; checkpoints name that scene.
   const layerSession = useMemo<ChapterSession>(() => ({ ...(session as ChapterSession), sceneId: "apartment" }), [session]);
 
-  const minElapsed = useMinimumDisplayTime(HOME_LOADING_MIN_MS, waitingRoom);
+  // A room that never builds must not strand the player on black: give up and let them step in again.
+  useEffect(() => {
+    if (!waitingRoom) return undefined;
+    const timer = window.setTimeout(() => {
+      pendingEnter.current = false;
+      goneHome.current = false;
+      streetRef.current?.setInputBlocked(false);
+      setWaitingRoom(false);
+    }, ROOM_WAIT_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [waitingRoom]);
 
   // Pointer lock state, for the "click to resume" hint.
   useEffect(() => {
@@ -139,8 +142,8 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
   const prefetchRoom = useCallback(() => {
     if (!prefetchRef.current) {
       prefetchRef.current = Promise.all([
-        loadRoomModule().then(() => setRoomChunk(true)),
-        CharacterAssetCache.loadArmsModel().then(() => setHands(true)),
+        loadRoomModule(),
+        CharacterAssetCache.loadArmsModel(),
       ])
         .then(() => undefined)
         // A failed prefetch is not fatal: the room asks for the same files again when it opens.
@@ -159,7 +162,7 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
     void prefetchRoom();
   }, [prefetchRoom]);
 
-  /** The screen is white: swap the street for the room. False while the room is still being built. */
+  /** Swap the street for the room, which opens with its entrance shot (the room fades up from its own dark frame). False while the room is still being built. */
   const showRoom = useCallback(() => {
     const street = streetRef.current;
     const room = roomRef.current;
@@ -168,9 +171,8 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
     setWaitingRoom(false);
     street.suspend();
     room.audio.setMuted(!soundRef.current);
-    room.activate();
+    room.activate({ entrance: true });
     setStage("room");
-    window.setTimeout(() => setWhite({ on: false, ms: WHITE_OUT_MS }), 60);
     return true;
   }, []);
   const showRoomRef = useRef(showRoom);
@@ -185,13 +187,10 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
     setCallOpen(false);
     setPaused(false);
     mountRoom();
-    setWhite({ on: true, ms: WHITE_IN_MS });
-    window.setTimeout(() => {
-      if (showRoomRef.current()) return;
-      // Pressed before the room was built: the walking-home screen covers the wait.
-      pendingEnter.current = true;
-      setWaitingRoom(true);
-    }, WHITE_IN_MS + 30);
+    if (showRoomRef.current()) return;
+    // Before the room was built: a plain black cover hides the street until the room reports ready.
+    pendingEnter.current = true;
+    setWaitingRoom(true);
   }, [mountRoom]);
 
   /** Out of the room by its door: the player stands in the hall outside it, the screen clears from white. */
@@ -285,8 +284,9 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
     if (npc !== "mai" || dialogueRef.current) return;
     streetRef.current?.hidePath();
     setConversation(startDialogue(MAI_DIALOGUE, maiStart(metMai)));
+    mountRoom();
     holdWorld(true);
-  }, [holdWorld, metMai, setConversation]);
+  }, [holdWorld, metMai, mountRoom, setConversation]);
 
   /** The conversation is over. Finishing it (not leaving early) completes the quest. */
   const finishDialogue = useCallback((completed: boolean) => {
@@ -503,17 +503,6 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
     return () => window.clearInterval(timer);
   }, [stage, started, callOpen, walkActive, homeActive]);
 
-  const tips = LOADING_TIP_IDS.map((id) => t(`loading:tips.${id}`));
-  const done = [roomChunk, hands, roomBuilt].filter(Boolean).length;
-  const roomStage = !roomChunk
-    ? t("loading:prologueHome.stage.room")
-    : !hands
-      ? t("loading:prologueHome.stage.hands")
-      : !roomBuilt
-        ? t("loading:prologueHome.stage.build")
-        : t("loading:prologueHome.stage.ready");
-  const showRoomLoading = waitingRoom && !(roomBuilt && minElapsed);
-
   const streetCursor = !!streetHud?.cursorMode;
   const roomCursor = !!roomUI?.cursorMode;
   const showResume =
@@ -522,7 +511,7 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
   const clock = streetHud
     ? { time: streetHud.time, detail: [streetHud.weather, streetHud.loc].filter(Boolean).join(" · "), raining: streetHud.rain > 0.3 }
     : null;
-  const inGame = (stage === "neighborhood" && revealed && worldReady && started) || (stage === "room" && roomBuilt && !showRoomLoading);
+  const inGame = (stage === "neighborhood" && revealed && worldReady && started) || (stage === "room" && roomBuilt);
 
   return (
     <div className="absolute inset-0 bg-black">
@@ -619,7 +608,7 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
               options={roomOptions}
               story={session ? bridge : undefined}
               overlay={
-                session && stage === "room" ? (
+                session && stage === "room" && !!roomUI?.started ? (
                   <RoomChapterLayer
                     session={layerSession}
                     settings={settings}
@@ -652,20 +641,9 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
       {paused && !settingsOpen && <ProloguePauseMenu note={session && stage === "room" ? null : undefined} onHoverSound={onHoverSound} onResume={resume} onOpenSettings={() => setSettingsOpen(true)} onReturnToMenu={onBackToMenu} />}
       <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} settings={settings} onUpdateSettings={onUpdateSettings} />
 
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[72] bg-white" style={{ opacity: white.on ? 1 : 0, transition: `opacity ${white.ms}ms ease` }} />
+      <div aria-hidden="true" data-testid="prologue-white-out" className="pointer-events-none absolute inset-0 z-[72] bg-white" style={{ opacity: white.on ? 1 : 0, transition: `opacity ${white.ms}ms ease` }} />
 
-      {showRoomLoading && (
-        <SceneTransition visible fadeIn className="z-[70]">
-          <LoadingScreen
-            eyebrow={t("loading:prologueHome.eyebrow")}
-            chapterTitle={t("loading:prologueHome.title")}
-            subtitle={t("loading:prologueHome.subtitle")}
-            loadingStage={roomStage}
-            progress={done / 3}
-            tips={tips}
-          />
-        </SceneTransition>
-      )}
+      {waitingRoom && <div data-testid="prologue-room-wait" aria-hidden="true" className="pointer-events-none absolute inset-0 z-[70] bg-black" />}
     </div>
   );
 };

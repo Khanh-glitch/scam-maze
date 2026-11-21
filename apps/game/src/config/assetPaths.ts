@@ -55,3 +55,5 @@ export const STREET_PROPS_MODELS_BASE = "/assets/3d/optimized/props";
 export const PROLOGUE_VOICE_BASE = "/audio/prologue";
 /** Base URL of Auntie Mai's street conversation clips: `<base>.<locale>/mai.<nodeId>.mp3` (locale is `en` or `vi`). */
 export const MAI_VOICE_BASE = "/assets/audio/mai";
+/** Base URL of the Mission 01 voice of Alex: `<base>/en/alex_<cue>_en.mp3`. Only English clips exist. */
+export const MISSION01_VOICE_BASE = "/audio/mission01";

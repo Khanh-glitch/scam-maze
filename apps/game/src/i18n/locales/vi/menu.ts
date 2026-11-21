@@ -6,7 +6,7 @@ const menu: LocaleShape<typeof en> = {
   kicker: "Đừng tin ai. Nghi ngờ mọi thứ.",
   hints: { navigate: "Chọn", select: "Xác nhận" },
   buttons: {
-    newGame: { label: "TRÒ CHƠI MỚI", sublabel: "Bắt đầu một câu chuyện mới" },
+    newGame: { label: "TRÒ CHƠI MỚI", sublabel: "Bắt đầu một câu chuyện mới", preparing: "Đang chuẩn bị căn phòng" },
     continue: { label: "TIẾP TỤC", sublabel: "Chơi tiếp từ chỗ đã lưu" },
     settings: { label: "CÀI ĐẶT", sublabel: "Chất lượng đồ họa, góc nhìn và âm thanh" },
     credits: { label: "GHI CÔNG & GIẤY PHÉP", sublabel: "Ghi công gói mô hình thành phố và xe 3D" },
