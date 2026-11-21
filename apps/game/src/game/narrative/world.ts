@@ -19,6 +19,9 @@ import type {
   MissionDef,
   MissionPathDef,
   MissionState,
+  MissionStepApp,
+  MissionStepDef,
+  MissionStepTarget,
   ScenarioDefinition,
   WorldState,
   WorldTrigger,
@@ -352,6 +355,27 @@ export interface MissionView {
   path: string | null;
   /** Minutes until the deadline, or null when it has none. */
   minutesLeft: number | null;
+  /** Visible steps of the current path, in order (empty when the path has none). */
+  steps: MissionStepView[];
+  /** The first visible, required step that is not done; null when there is none. */
+  current: MissionStepView | null;
+}
+
+export interface MissionStepView {
+  id: string;
+  label: string;
+  target: MissionStepTarget | null;
+  app: MissionStepApp | null;
+  optional: boolean;
+  done: boolean;
+}
+
+/** A mission that ended, for the "completed" part of the task list. */
+export interface ClosedMissionView {
+  id: string;
+  title: string;
+  optional: boolean;
+  status: "completed" | "failed";
 }
 
 export interface ThesisTaskView {
@@ -421,6 +445,7 @@ export const selectOpenMissions = memo((state, scenario): MissionView[] => {
     const current = state.world.missions[mission.id];
     if (current.status !== "open") continue;
     const path = mission.paths.find((candidate) => candidate.id === current.path);
+    const steps = missionSteps(path?.steps ?? [], state, scenario);
     views.push({
       id: mission.id,
       title: mission.title,
@@ -428,7 +453,32 @@ export const selectOpenMissions = memo((state, scenario): MissionView[] => {
       objective: path?.objective ?? "",
       path: current.path,
       minutesLeft: mission.deadlineAtMinute === undefined ? null : Math.max(0, mission.deadlineAtMinute - now),
+      steps,
+      current: steps.find((step) => !step.done && !step.optional) ?? null,
     });
+  }
+  return views;
+});
+
+/** Steps of a path as the player sees them now: hidden ones are left out, done ones stay listed. */
+function missionSteps(defs: readonly MissionStepDef[], state: ChapterState, scenario: ScenarioDefinition): MissionStepView[] {
+  const views: MissionStepView[] = [];
+  for (const def of defs) {
+    const done = def.doneWhen !== undefined && def.doneWhen.length > 0 && evaluateConditions(def.doneWhen, state, scenario);
+    if (!done && def.visibleWhen !== undefined && !evaluateConditions(def.visibleWhen, state, scenario)) continue;
+    views.push({ id: def.id, label: def.label, target: def.target ?? null, app: def.app ?? null, optional: def.optional === true, done });
+  }
+  return views;
+}
+
+/** Missions that ended (completed or failed), in scenario order. */
+export const selectClosedMissions = memo((state, scenario): ClosedMissionView[] => {
+  const views: ClosedMissionView[] = [];
+  for (const mission of scenario.missions ?? []) {
+    if (!has(state.world.missions, mission.id)) continue;
+    const status = state.world.missions[mission.id].status;
+    if (status !== "completed" && status !== "failed") continue;
+    views.push({ id: mission.id, title: mission.title, optional: mission.optional, status });
   }
   return views;
 });
@@ -579,6 +629,15 @@ export function validateWorldContent(scenario: ScenarioDefinition): string[] {
       pathIds.add(path.id);
       checkConditions(`${where}, path "${path.id}"`, path.when);
       checkEffects(`${where}, path "${path.id}"`, path.onEnter);
+      const stepIds = new Set<string>();
+      for (const step of path.steps ?? []) {
+        const stepWhere = `${where}, path "${path.id}", step "${step.id}"`;
+        if (stepIds.has(step.id)) problems.push(`${where}, path "${path.id}" has two steps named "${step.id}".`);
+        stepIds.add(step.id);
+        if (step.label.trim() === "") problems.push(`${stepWhere} has no label.`);
+        checkConditions(stepWhere, step.visibleWhen);
+        checkConditions(stepWhere, step.doneWhen);
+      }
     }
   }
   return problems;

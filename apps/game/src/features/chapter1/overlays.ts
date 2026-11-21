@@ -9,6 +9,8 @@ export type Overlay =
   | { kind: "journal" }
   /** Schedule: events waiting for an answer, open goals and deadlines, thesis work. */
   | { kind: "planner" }
+  /** Task list: open missions with their steps, and the missions that ended. */
+  | { kind: "tasks" }
   /** Laptop apps in the room chapter (notification, bank app, compare, Review Security). */
   | { kind: "laptop" }
   | { kind: "inspection"; objectId: InteractableId }

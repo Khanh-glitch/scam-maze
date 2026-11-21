@@ -14,11 +14,11 @@ import { clock, type LaptopFrame, type PhoneMode } from './screens';
 import { tr, trLines } from './strings';
 import { CharacterArmsViewmodel } from '../../player/runtime/CharacterArmsViewmodel';
 import { dropMaskCanvas, paintDropMask, canvas, toTex } from './textures';
-import { projectCornersToViewport, projectPointToViewport, cornersChanged, anchorMoved, ANCHOR_TOLERANCE_PX, type ScreenCornersPx, type ScreenDeviceId } from './screenProjection';
+import { projectCornersToViewport, projectPointToViewport, placeTaskMarker, cornersChanged, anchorMoved, ANCHOR_TOLERANCE_PX, type ScreenCornersPx, type ScreenDeviceId } from './screenProjection';
 import { pickHoverId, laptopInteractRoute, inspectDurationSec } from './storyInteract';
 import { formatClock, setGameElapsedSeconds } from '../../../game/clock/gameClock';
 import { DOOR_OPEN_AT_S, entranceFrame, HANDOFF } from './entranceShot';
-import { isRoomPropId, type RoomOptions, type RoomStoryCommands } from './outside';
+import { isRoomPropId, type RoomOptions, type RoomStoryCommands, type TaskMarker } from './outside';
 
 export type Caption = { text: string; voice?: boolean; id: number };
 export type UIAction = { key: string; label: string };
@@ -81,6 +81,11 @@ const STORY_POSES: Record<string, Pose> = {
 
 /** Scratch objects for projecting a device screen to the viewport (story mode, no per-frame allocation). */
 const _scrViewProj = new THREE.Matrix4();
+/** Scratch point and placement of the task marker (story mode). */
+const _taskPoint = new THREE.Vector3();
+/** Height of the task marker above its prop (m), and its inset from the screen edge when off screen (px). */
+const TASK_MARKER_LIFT_M = 0.22;
+const TASK_MARKER_MARGIN_PX = 56;
 const _scrPoint = new THREE.Vector3();
 const _scrWorld = new Array<number>(12).fill(0);
 const _scrOut = new Array<number>(8).fill(0);
@@ -951,6 +956,36 @@ export class Engine implements RoomStoryCommands {
     w.listener([_scrOut[0], _scrOut[1], _scrOut[2], _scrOut[3], _scrOut[4], _scrOut[5], _scrOut[6], _scrOut[7]]);
   }
 
+  private taskWatch: { prop: ScreenDeviceId; listener: (marker: TaskMarker | null) => void; last: TaskMarker | null; reported: boolean } | null = null;
+  /**
+   * Story host: follow the task marker of the laptop or the phone (a point a little above the prop). Reports
+   * when the placement moves by more than half a pixel, crosses the screen edge or the distance changes, and
+   * null while the player is not walking. `null` as prop stops watching.
+   */
+  watchTaskMarker(prop: ScreenDeviceId | null, listener?: (marker: TaskMarker | null) => void) {
+    if (prop === null || !listener) { this.taskWatch = null; return; }
+    this.taskWatch = { prop, listener, last: null, reported: false };
+    this.updateTaskMarker();
+  }
+  private updateTaskMarker() {
+    const w = this.taskWatch;
+    if (!w || !this.opts.story) return;
+    const report = (marker: TaskMarker | null) => { w.last = marker; w.reported = true; w.listener(marker); };
+    if (!this.ui.started || this.inspect || this.entrance) { if (w.last !== null || !w.reported) report(null); return; }
+    if (w.prop === 'phone') this.apt.phone.getWorldPosition(_taskPoint);
+    else _taskPoint.copy(this.apt.points.laptop);
+    _taskPoint.y += TASK_MARKER_LIFT_M;
+    const cam = this.camera;
+    cam.updateMatrixWorld();
+    cam.matrixWorldInverse.copy(cam.matrixWorld).invert();
+    _scrViewProj.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+    const placed = placeTaskMarker(_scrViewProj.elements, _taskPoint.x, _taskPoint.y, _taskPoint.z, this.container.clientWidth, this.container.clientHeight, TASK_MARKER_MARGIN_PX);
+    if (!placed) { if (w.last !== null || !w.reported) report(null); return; }
+    const distance = Math.round(cam.position.distanceTo(_taskPoint) * 10) / 10;
+    const last = w.last;
+    if (last && last.onScreen === placed.onScreen && last.distance === distance && Math.abs(last.x - placed.x) <= 0.5 && Math.abs(last.y - placed.y) <= 0.5) return;
+    report({ ...placed, distance });
+  }
   /** External story: vibration cycle and call timer, the part of `updateStory` the host does not own. */
   private updateExternal(dt: number) {
     if (this.phoneMode === 'call') this.callSec += dt;
@@ -1412,6 +1447,7 @@ export class Engine implements RoomStoryCommands {
     this.updateSeat(rawDt > 0.05 ? 0.05 : dt);
     this.updateCamera(dt);
     this.updateScreenWatch();
+    this.updateTaskMarker();
     this.updateArms(dt);
     this.updateHover();
     this.updateStory(rawDt);

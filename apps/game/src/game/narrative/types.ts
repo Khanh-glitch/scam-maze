@@ -649,6 +649,27 @@ export interface GameEventDef {
   responses: EventResponseDef[];
 }
 /** A way a mission can play out. The first path whose `when` holds is the current path. */
+/** Where a mission step happens in the room: the HUD marker points at this prop. */
+export type MissionStepTarget = "laptop" | "phone";
+/** The app on the target device that a step names ("Laptop · Mail"). `thesis` is the laptop's Thesis window. */
+export type MissionStepApp = DeviceAppId | "thesis";
+/**
+ * One concrete step of a mission path, shown in the task tracker and the task list. Steps are
+ * guidance only: they read state and never change it, and the mission still completes on its own
+ * `completeWhen`. Labels stay neutral: a step never says whether a message is honest.
+ */
+export interface MissionStepDef {
+  id: string;
+  label: string;
+  target?: MissionStepTarget;
+  app?: MissionStepApp;
+  /** Listed only while these hold (or once it is done). Defaults to always. */
+  visibleWhen?: Condition[];
+  /** Done while all hold. Without it the step stays open until the mission ends (a choice to make). */
+  doneWhen?: Condition[];
+  /** Listed, but never the current step: the player may skip it. */
+  optional?: boolean;
+}
 export interface MissionPathDef {
   id: string;
   when: Condition[];
@@ -656,6 +677,8 @@ export interface MissionPathDef {
   objective: string;
   /** Applied the first time the mission enters this path. */
   onEnter?: Effect[];
+  /** Concrete steps in order. The first visible, required step that is not done is the current one. */
+  steps?: MissionStepDef[];
 }
 /** A time-boxed goal whose shape adapts to earlier decisions. Consequences are never reset. */
 export interface MissionDef {
