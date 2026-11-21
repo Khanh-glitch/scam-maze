@@ -1,3 +1,4 @@
+import {driveTexture,exhaust} from "./drive-look";
 import * as T from 'three';
 import { BUS_DOORS, BUS_FLOOR, DOOR_IDS, HALF, seatBase, seats, VALIDATOR, type PassengerSeat } from './boarding';
 import { clamp, smooth, type BusRouteController, type DoorId } from './transit';
@@ -167,7 +168,7 @@ function seatModel(group: T.Group, seat: PassengerSeat, trim: T.Material, blue: 
   const line = box(group, [x, y + 0.46, z - 0.257], [0.25, 0.015, 0.011], accent, false); line.rotation.z = -0.05;
 }
 
-function busInterior(group: T.Group, trim: T.Material, rails: T.Material, yellow: T.Material, rubber: T.Material, shadow: T.Material, realDriver = false) {
+function busInterior(group: T.Group, trim: T.Material, rails: T.Material, yellow: T.Material, rubber: T.Material, shadow: T.Material) {
   const floorMap = granular([78, 82, 80], [3, 4], false, 965);
   const floor = new T.MeshStandardMaterial({ map: floorMap, bumpMap: floorMap, bumpScale: 0.018, roughness: 0.84 });
   const casing = material(0x878c80, 0.74);
@@ -283,31 +284,20 @@ function busInterior(group: T.Group, trim: T.Material, rails: T.Material, yellow
   rounded(group, [-0.709, 1.135, -4.285], [0.86, 0.80, 0.092], 0.039, casing);
   tube(group, [[-1.12, 1.65, -4.288], [-0.92, 1.70, -4.28], [-0.45, 1.70, -4.28], [-0.31, 1.58, -4.28]], 0.028, rails, 13);
   plane(group, [-0.699, 1.252, -4.231], [0.55, 0.143], textLabel('KHU VỰC LÁI XE', '#b6baaa', '#414c44', 512, 128, 56));
-  if (realDriver) return;
-  const shirt = material(0x6c919f, 0.84), skin = material(0xa4775d, 0.76), hair = material(0x292725, 0.91);
-  const torso = rounded(group, [-0.65, 1.368, -4.589], [0.413, 0.473, 0.225], 0.102, shirt); torso.rotation.x = -0.09;
-  rod(group, [-0.65, 1.552, -4.62], [-0.65, 1.687, -4.62], 0.073, skin);
-  const face = rounded(group, [-0.65, 1.752, -4.644], [0.176, 0.230, 0.198], 0.074, skin); face.rotation.x = -0.055;
-  orb(group, [-0.65, 1.83, -4.625], [0.091, 0.063, 0.093], hair, 17);
-  orb(group, [-0.65, 1.746, -4.744], [0.016, 0.021, 0.017], skin, 9);
-  tube(group, [[-0.745, 1.596, -4.636], [-0.685, 1.595, -4.692], [-0.65, 1.55, -4.706], [-0.615, 1.595, -4.692], [-0.555, 1.596, -4.636]], 0.014, trim, 10);
-  for (const s of [-1, 1]) {
-    orb(group, [-0.65 + s * 0.087, 1.734, -4.639], [0.013, 0.025, 0.017], skin, 10);
-    orb(group, [-0.65 + s * 0.041, 1.779, -4.741], [0.013, 0.005, 0.004], hair, 8);
-    rod(group, [-0.65 + s * 0.161, 1.527, -4.592], [-0.65 + s * 0.212, 1.383, -4.730], 0.061, shirt, 0.047);
-    rod(group, [-0.65 + s * 0.212, 1.385, -4.722], [-0.65 + s * 0.163, 1.436, -4.928], 0.042, skin, 0.031);
-    orb(group, [-0.65 + s * 0.164, 1.437, -4.927], [0.040, 0.039, 0.057], skin);
-  }
+
+  return wheel;
 }
 
-export function buildBus(scene: T.Scene, route: BusRouteController, interiorFill = true, realDriver = false) {
+export function buildBus(scene: T.Scene, route: BusRouteController, interiorFill = true) {
   const root = new T.Group(); root.name = 'Route 06 city bus'; scene.add(root);
   const fixed = new T.Group(); root.add(fixed);
-  const paint = new T.MeshPhysicalMaterial({ color: 0x74972c, roughness: 0.37, metalness: 0.37, clearcoat: 0.85, clearcoatRoughness: 0.24, envMapIntensity: 1.03, side: T.DoubleSide });
-  const bright = new T.MeshPhysicalMaterial({ color: 0xa5bb49, roughness: 0.31, metalness: 0.26, clearcoat: 0.62, side: T.DoubleSide });
+  const plume=exhaust(scene);
+  const silk=new T.MeshStandardMaterial({map:driveTexture(new T.TextureLoader(),"bus-print"),roughness:.42,metalness:.18});
+  const paint = new T.MeshPhysicalMaterial({ color: 0x2d7892, roughness: 0.37, metalness: 0.37, clearcoat: 0.85, clearcoatRoughness: 0.24, envMapIntensity: 1.03, side: T.DoubleSide });
+  const bright = new T.MeshPhysicalMaterial({ color: 0x58a684, roughness: 0.31, metalness: 0.26, clearcoat: 0.62, side: T.DoubleSide });
   const darkGreen = new T.MeshPhysicalMaterial({ color: 0x34563f, roughness: 0.42, metalness: 0.36, clearcoat: 0.58, side: T.DoubleSide });
   const glazing = bodyGlass(0.47);
-  const windshield = bodyGlass(0.57);
+  const windshield = bodyGlass(0.30);
   const frame = material(0x242e2e, 0.41, 0.40);
   const black = material(0x202729, 0.66);
   const tireMap = granular([39, 41, 39], [14, 2], false, 448);
@@ -316,7 +306,7 @@ export function buildBus(scene: T.Scene, route: BusRouteController, interiorFill
   const nickel = material(0xa6b7ac, 0.40, 0.52);
   const yellow = material(0xd1ae4c, 0.47, 0.29);
   const headlight = lamp(0xf1f4d8, 1.8);
-  const marker = lamp(0xbe7950, 0.50);
+  const marker = lamp(0xe09932, 0.50),leftMarker=marker.clone();
   const tail = lamp(0xb43b25, 0.72);
   const brake = lamp(0xd03b27, 0.35);
   const shadow = contactMaterial(0.49);
@@ -344,10 +334,11 @@ export function buildBus(scene: T.Scene, route: BusRouteController, interiorFill
     for (const z of [-2.14, -0.34, 2.11, 4.40]) {
       if (side < 0 || Math.abs(z - 1.03) > 0.81) {
         box(fixed, [side * 1.253, 0.831, z], [0.018, 0.523, 0.013], darkGreen, false);
-        rounded(fixed, [side * 1.258, 0.555, z + 0.123], [0.026, 0.053, 0.123], 0.012, marker);
+        rounded(fixed, [side * 1.258, 0.555, z + 0.123], [0.026, 0.053, 0.123], 0.012, side>0?marker:leftMarker);
       }
     }
     for (let i = 0; i < 12; i++) box(fixed, [side * 1.250, 0.768, 4.26 + i * 0.073], [0.013, 0.48, 0.020], black, false);
+    plane(fixed,[side*1.262,.89,side===1?-1.65:0],[side===1?3.87:10.33,.53],silk,side*R);
     const sideName = label(690, 110, (ctx) => {
       ctx.fillStyle = '#36553f'; ctx.fillRect(0, 0, 690, 110);
       write(ctx, 'XE BUÝT ĐIỆN TP.HCM', 345, 71, 52, '#dce9bc', 800, 'center');
@@ -373,7 +364,7 @@ export function buildBus(scene: T.Scene, route: BusRouteController, interiorFill
   const screen = cap(fixed, [[1.306, -5.45, 1.19], [1.569, -5.454, 1.205], [2.49, -5.389, 1.208], [2.83, -5.318, 1.190], [2.915, -5.293, 1.143]], windshield, -1, 0.127); screen.renderOrder = 4;
   cap(fixed, [[2.758, -5.305, 1.211], [2.925, -5.275, 1.201], [3.026, -5.248, 1.136], [3.158, -5.153, 0.98]], bright, -1, 0.138);
   box(fixed, [0, 2.646, -5.477], [1.85, 0.292, 0.075], frame);
-  plane(fixed, [0, 2.65, -5.522], [1.73, 0.224], led('06   CHỢ LỚN'), Math.PI).renderOrder = 5;
+  plane(fixed, [0, 2.65, -5.522], [1.73, 0.224], led('06   CHỢ LỚN', '#ffbb49'), Math.PI).renderOrder = 5;
   for (const s of [-1, 1]) {
     const a: V = [s * 0.67, 1.292, -5.561], b: V = [s * 0.11, 1.422, -5.603];
     rod(fixed, a, b, 0.012, black);
@@ -392,27 +383,37 @@ export function buildBus(scene: T.Scene, route: BusRouteController, interiorFill
   cap(fixed, [[2.805, 5.418, 1.203], [2.932, 5.386, 1.202], [3.121, 5.413, 1.03]], bright, 1, 0.081);
   for (const x of [-1.09, 1.09]) {
     rounded(fixed, [x, 1.086, 5.509], [0.160, 0.678, 0.085], 0.035, frame);
-    for (let i = 0; i < 4; i++) rounded(fixed, [x, 0.85 + i * 0.143, 5.555], [0.101, 0.091, 0.03], 0.020, i === 1 ? marker : i === 0 ? headlight : tail);
+    for (let i = 0; i < 4; i++) rounded(fixed, [x, 0.85 + i * 0.143, 5.555], [0.101, 0.091, 0.03], 0.020, i === 1 ? (x>0?marker:leftMarker) : i === 0 ? headlight : tail);
   }
   rounded(fixed, [0, 2.764, 5.517], [0.45, 0.084, 0.043], 0.014, brake);
   plane(fixed, [0, 0.971, 5.545], [0.378, 0.128], textLabel('50H-317.26', '#d4b34b', '#292b1e', 400, 124, 70));
   plane(fixed, [0, 2.533, 5.53], [0.45, 0.193], led('06', '#d8ea91', 320, 128, 86)).renderOrder = 4;
   for (let i = 0; i < 10; i++) box(fixed, [0, 1.270 + i * 0.036, 5.541], [0.91, 0.015, 0.019], frame, false);
 
-  busInterior(fixed, frame, nickel, yellow, black, shadow, realDriver);
+  const steering=busInterior(fixed, frame, nickel, yellow, black, shadow);root.add(steering);
   batch(fixed);
   if (interiorFill) {
     const interiorLight = new T.PointLight(0xeaf4de, 7.0, 7.5, 2);
     interiorLight.position.set(0, 2.78, 0.20); root.add(interiorLight);
   }
+  const beamGroup=new T.Group();root.add(beamGroup);
+  const beamMap=driveTexture(new T.TextureLoader(),'light-beam'),cone=new T.MeshBasicMaterial({map:beamMap,color:0xffe8b9,transparent:true,depthWrite:false,blending:T.AdditiveBlending,side:T.DoubleSide,opacity:.28});
+  for(const side of [-1,1]){const spill=plane(beamGroup,[side*.93,-.004,-10.4],[2.2,9.6],cone,0,-Math.PI/2);spill.position.y=.034;spill.rotation.z=side*.05;}
+  beamGroup.visible=false;
   const doors = { front: createDoor(root, 'front', frame, paint, yellow, glazing), rear: createDoor(root, 'rear', frame, paint, yellow, glazing) };
   const wheels = wheelZ.flatMap((wz) => [-1, 1].map((s) => buildWheel(root, s * 1.086, wz, s, { rubber, hub: nickel, bright: silver, black })));
   root.position.set(route.x, 0, route.z);
-  return { root, update(dt: number) {
+  let elapsed=0,lastSpeed=0,tilt=0,tiltV=0;
+  return { root, night(value:boolean){beamGroup.visible=value;headlight.emissiveIntensity=value?3.4:1.8;},dispose(){plume.dispose();}, update(dt: number) {
     root.position.set(route.x, 0, route.z);
     root.rotation.y = route.yaw;
     for (const id of DOOR_IDS) doors[id](route.doors[id].amount);
     for (const wheel of wheels) wheel.rotation.x -= route.speed / 0.47 * dt;
+    elapsed+=dt;const blink=Math.sin(elapsed*8)>0?3.4:.2;
+    marker.emissiveIntensity=route.phase==='approaching'?blink:.18;leftMarker.emissiveIntensity=route.phase==='departing'||route.phase==='driving'&&route.progress<.03?blink:.18;
+    const acceleration=T.MathUtils.clamp((route.speed-lastSpeed)/Math.max(.005,dt),-4,4);lastSpeed=route.speed;plume.update(dt,root,route.speed,acceleration);
+    tiltV+=(-32*tilt-9*tiltV+acceleration*.085)*dt;tilt+=tiltV*dt;root.rotation.x=tilt;
+    steering.rotation.z=route.yaw*5+.024*Math.sin(elapsed*.7);
     brake.emissiveIntensity = route.phase === 'approaching' && route.speed < 2 || route.phase === 'departing' || route.phase === 'arrived' ? 2.3 : 0.25;
   } };
 }
