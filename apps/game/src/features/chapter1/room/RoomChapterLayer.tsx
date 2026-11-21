@@ -58,7 +58,7 @@ import { focusDialogStart, topDialog, trapTabKey } from "../focusTrap";
 import { EvidenceNotice } from "../hud/EvidenceNotice";
 import { ObjectiveToast, type ObjectiveChangeKind } from "../hud/ObjectiveToast";
 import { ObjectiveTracker } from "../hud/ObjectiveTracker";
-import { ResourceStatus } from "../hud/ResourceStatus";
+import { ChapterStatusCluster, ChapterTaskButton, ChapterTopBar } from "../hud/ChapterStatusHud";
 import { Mission01VoiceCaption } from "../voice/Mission01VoiceCaption";
 import { useMission01Voice, type VoiceView } from "../voice/useMission01Voice";
 import type { BrowserState } from "./desktop/browser/browserState";
@@ -194,6 +194,8 @@ export interface RoomChapterLayerProps {
   phoneScreenSink?: PhoneScreenSink;
   /** True while the host shows its own pause menu or settings: the free-roam clock stops. */
   clockPaused?: boolean;
+  /** Opens the host's pause menu (with Settings). Shows the settings button in the top-right corner. */
+  onOpenSettings?: () => void;
 }
 
 const INTRO_NARRATION: NarrationSequence = { graphId: "dlg.intro", nodeIds: INTRO_SEQUENCE };
@@ -341,6 +343,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
   modelAllowed: modelAllowedProp,
   phoneScreenSink,
   clockPaused = false,
+  onOpenSettings,
 }) => {
   const { t } = useTranslation("chapter1");
   const locale = useGameLocale();
@@ -922,12 +925,19 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
     }
   }, [closeTop, openOverlay, store]);
 
+  // Task button on the map: marked while the schedule holds a mission or event not looked at yet.
+  const [tasksSeen, setTasksSeen] = useState<ReadonlySet<string>>(() => new Set());
+  const tasksUnseen = openMissions.some((mission) => !tasksSeen.has(mission.id)) || pendingEvents.some((event) => !tasksSeen.has(event.id));
   const togglePlanner = useCallback(() => {
     if (introOpenRef.current || store.getState().status !== "playing") return;
     const stack = overlaysRef.current;
-    if (stack.length === 0) openOverlay({ kind: "planner" });
-    else if (top(stack)?.kind === "planner") closeTop();
-  }, [closeTop, openOverlay, store]);
+    if (stack.length === 0) {
+      if (openOverlay({ kind: "planner" })) {
+        const state = store.getState();
+        setTasksSeen(new Set([...selectOpenMissions(state, scenario).map((m) => m.id), ...selectPendingEvents(state, scenario).map((e) => e.id)]));
+      }
+    } else if (top(stack)?.kind === "planner") closeTop();
+  }, [closeTop, openOverlay, scenario, store]);
   /** The Notes control of a call: opens the journal on top of the call. The call keeps going. */
   const openJournal = useCallback(() => {
     if (introOpenRef.current || store.getState().status !== "playing" || overlaysRef.current.length > 0) return;
@@ -1260,18 +1270,23 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
         <Mission01VoiceCaption cue={alexVoice.current} subtitlesEnabled={settings.subtitlesEnabled} getPositionMs={alexVoice.positionMs} />
         {hudVisible && (
           <>
+            {/* Top left, like the neighborhood HUD: the map with the status ring, the clock beside it, the objective under it. */}
             <div
-              // Below the "No signal" map (about 10 rem tall) in the top-left corner.
-              className="pointer-events-none absolute left-4 top-[11rem] z-10 flex flex-col items-start gap-2"
+              className="pointer-events-none absolute left-[clamp(1rem,3vw,2.5rem)] top-4 z-10 flex flex-col items-start gap-3"
               data-testid="objective-tracker-slot"
               style={{
                 // The call, its replies, the laptop, the phone records and the journal own the
-                // screen: the tracker steps aside, then returns.
+                // screen: the HUD steps aside, then returns.
                 opacity: trackerHidden ? 0 : 1,
                 visibility: trackerHidden ? "hidden" : "visible",
                 transition: `opacity ${CINE.motion.baseMs}ms ${CINE.motion.ease}, visibility ${CINE.motion.baseMs}ms`,
               }}
             >
+              <ChapterStatusCluster
+                resources={resources}
+                fatigueLevel={fatigueOn ? fatigueLevel(resources.fatigue, gameplay.fatigue) : undefined}
+                mapCorner={<ChapterTaskButton unseen={tasksUnseen} onOpen={togglePlanner} onHoverSound={onHoverSound} />}
+              />
               <ObjectiveTracker
                 objectives={trackerObjectives}
                 store={store}
@@ -1281,7 +1296,18 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
                 hint={currentHint}
                 hintOn={hintOn}
               />
-        <ResourceStatus resources={resources} fatigueLevel={fatigueOn ? fatigueLevel(resources.fatigue, gameplay.fatigue) : undefined} />
+            </div>
+
+            {/* Top right: cash, then settings. */}
+            <div
+              className="absolute right-[clamp(1rem,3vw,2.5rem)] top-4 z-10"
+              style={{
+                opacity: trackerHidden ? 0 : 1,
+                visibility: trackerHidden ? "hidden" : "visible",
+                transition: `opacity ${CINE.motion.baseMs}ms ${CINE.motion.ease}, visibility ${CINE.motion.baseMs}ms`,
+              }}
+            >
+              <ChapterTopBar cash={resources.cash} onOpenSettings={onOpenSettings} onHoverSound={onHoverSound} />
             </div>
 
             {/* Visual only: the live region above announces the same events once. */}
@@ -1289,9 +1315,9 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
               {toast && <ObjectiveToast key={toast.key} kind={toast.kind} text={objectiveText(toast.objectiveId)} onDismiss={dismissToast} />}
             </div>
 
-            {/* During a call the chip row rises above the call presentation (z-40) so Notes is reachable. */}
+            {/* Bottom right for now. During a call the chip row rises above the call presentation (z-40) so Notes is reachable. */}
             <div
-              className="absolute right-4 top-4 z-10 flex flex-col items-end gap-2"
+              className="absolute bottom-4 right-[clamp(1rem,3vw,2.5rem)] z-10 flex flex-col-reverse items-end gap-2"
               style={callFocused ? { zIndex: 45 } : undefined}
               data-testid="hud-chip-row"
               onMouseDown={stopMouseDown}
@@ -1407,7 +1433,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
                 aria-hidden="true"
                 data-testid="evidence-notice-slot"
                 className="pointer-events-none absolute right-4"
-                style={{ top: mouseHintPhase !== "hidden" ? 112 : 64, zIndex: CINE.toast.zIndex }}
+                style={{ top: 72, zIndex: CINE.toast.zIndex }}
               >
                 <EvidenceNotice
                   key={notice.key}
@@ -1467,7 +1493,7 @@ export const RoomChapterLayer: React.FC<RoomChapterLayerProps> = ({
         </div>
 
         {saveFailed && (
-          <div className="absolute bottom-4 right-4 z-50" onMouseDown={stopMouseDown}>
+          <div className="absolute bottom-20 right-4 z-50" onMouseDown={stopMouseDown}>
             <SaveFailureNotice onDismiss={() => setSaveFailed(false)} />
           </div>
         )}

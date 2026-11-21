@@ -32,7 +32,7 @@ vi.mock("../features/chapter1/room/roomPreloader", () => ({
   },
 }));
 
-import { ROOM_PRELOAD_DELAY_MS, ROOM_PRELOAD_WAIT_LIMIT_MS, useInstantNewGame } from "./useInstantNewGame";
+import { ROOM_PRELOAD_DELAY_MS, useInstantNewGame } from "./useInstantNewGame";
 
 function setup(overrides: Partial<Parameters<typeof useInstantNewGame>[0]> = {}) {
   const onEnterDirect = vi.fn();
@@ -89,40 +89,23 @@ describe("useInstantNewGame", () => {
     act(() => result.current.requestNewGame());
     expect(onEnterDirect).toHaveBeenCalledTimes(1);
     expect(onFallback).not.toHaveBeenCalled();
-    expect(result.current.pending).toBe(false);
   });
 
-  it("waits on the menu while the room is built, then enters", () => {
+  it("goes to the loading screen at once while the room is still being built", () => {
     const { result, onEnterDirect, onFallback } = setup();
     act(() => result.current.requestNewGame());
-    expect(result.current.pending).toBe(true);
+    expect(onFallback).toHaveBeenCalledTimes(1);
     expect(onEnterDirect).not.toHaveBeenCalled();
     act(() => becomeReady());
-    expect(onEnterDirect).toHaveBeenCalledTimes(1);
-    expect(result.current.pending).toBe(false);
-    expect(onFallback).not.toHaveBeenCalled();
+    expect(onEnterDirect).not.toHaveBeenCalled();
   });
-
-  it("falls back to the loading screen when the room build fails", () => {
+  it("goes to the loading screen when the room build failed", () => {
+    preload.status = "failed";
     const { result, onEnterDirect, onFallback } = setup();
     act(() => result.current.requestNewGame());
-    act(() => {
-      preload.status = "failed";
-      preload.listeners.forEach((l) => l());
-    });
     expect(onFallback).toHaveBeenCalledTimes(1);
     expect(onEnterDirect).not.toHaveBeenCalled();
-    expect(result.current.pending).toBe(false);
   });
-
-  it("falls back after the wait limit", () => {
-    const { result, onFallback } = setup();
-    act(() => result.current.requestNewGame());
-    act(() => void vi.advanceTimersByTime(ROOM_PRELOAD_WAIT_LIMIT_MS));
-    expect(onFallback).toHaveBeenCalledTimes(1);
-    expect(result.current.pending).toBe(false);
-  });
-
   it("uses the normal loading screen when preloading is not allowed", () => {
     preload.canPreload = false;
     const { result, onFallback } = setup();
@@ -139,12 +122,4 @@ describe("useInstantNewGame", () => {
     expect(onFallback).toHaveBeenCalledTimes(1);
   });
 
-  it("cancelPending drops the wait (for example when Continue is chosen)", () => {
-    const { result, onEnterDirect } = setup();
-    act(() => result.current.requestNewGame());
-    act(() => result.current.cancelPending());
-    expect(result.current.pending).toBe(false);
-    act(() => becomeReady());
-    expect(onEnterDirect).not.toHaveBeenCalled();
-  });
 });

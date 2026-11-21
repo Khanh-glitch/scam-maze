@@ -136,7 +136,6 @@ describe("Mission 01 in the phone", () => {
     expect(state.resources.evidence).toBe(1);
     expect(state.resources.cash).toBe(2_500_000);
     expect(state.resources.timeMinutes).toBe(72 * 60 - 55);
-    expect(screen.getByTestId("resource-evidence").textContent).toContain("1");
     expect(screen.getByTestId("objective-tracker-slot").textContent).toContain("Access is confirmed with the Training Office. Finish the draft.");
   }, 40_000);
 

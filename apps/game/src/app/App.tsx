@@ -185,14 +185,12 @@ export const App: React.FC = () => {
   });
 
   const handleStartNewGame = useCallback(() => {
-    if (instantNewGame.pending) return;
     instantNewGame.requestNewGame();
   }, [instantNewGame]);
 
   const handleContinue = useCallback(() => {
-    instantNewGame.cancelPending();
     startChapterLoading({ kind: "continue" });
-  }, [instantNewGame, startChapterLoading]);
+  }, [startChapterLoading]);
 
   const handleEnterChapter = useCallback((session: ChapterSession) => {
     setScreen((prev) => {
@@ -622,7 +620,6 @@ export const App: React.FC = () => {
           onToggleSound={handleToggleSound}
           onHoverSound={playHoverSound}
           onStartNewGame={handleStartNewGame}
-          newGameBusy={instantNewGame.pending}
           onContinue={handleContinue}
           continueAvailability={continueAvailability}
         />
