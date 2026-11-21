@@ -38,6 +38,7 @@ function mountLayer(): { store: () => ChapterStore } {
       bridge={bridge}
       saveSource={SAVE_SOURCE}
       ringSettleMs={0}
+      onOpenSettings={vi.fn()}
       onStoreReady={(s) => {
         store = s;
       }}
@@ -73,25 +74,44 @@ describe("RoomChapterLayer with LAST SUBMISSION routing", () => {
     expect(screen.queryByText(/bakery/i)).toBeNull();
   });
 
-  it("starts the chapter on Begin and shows the status bar with the start values", () => {
+  it("starts the chapter on Begin and shows the HUD with the start values", () => {
     const rig = mountLayer();
     finishIntro();
     expect(rig.store().getState().status).toBe("playing");
-    const bar = screen.getByTestId("resource-status");
-    expect(within(bar).getByTestId("resource-time").textContent).toContain("Tuesday 17:00, 72 h left");
-    expect(within(bar).getByTestId("resource-thesis").textContent).toContain("60%");
-    expect(within(bar).getByTestId("resource-cash").textContent).toContain("2,500,000 VND");
-    expect(within(bar).getByTestId("resource-security").textContent).toContain("100%");
-    expect(within(bar).getByTestId("resource-support").textContent).toContain("50%");
-    expect(within(bar).getByTestId("resource-evidence").textContent).toContain("0");
+    const cluster = screen.getByTestId("chapter-status-cluster");
+    const time = within(cluster).getByTestId("resource-time").textContent;
+    expect(time).toContain("17:00");
+    expect(time).toContain("Tuesday");
+    expect(time).toContain("72 h left to submit the thesis");
+    expect(within(cluster).getByTestId("resource-thesis").textContent).toContain("60%");
+    expect(within(cluster).getByTestId("resource-security").textContent).toContain("100%");
+    expect(within(cluster).getByTestId("resource-support").textContent).toContain("50%");
+    expect(within(cluster).getByTestId("resource-fatigue").textContent).toContain("20%");
+    expect(within(screen.getByTestId("chapter-top-bar")).getByTestId("resource-cash").textContent).toContain("2,500,000 VND");
+    // Evidence is not on the HUD (it will be inventory items).
+    expect(screen.queryByTestId("resource-evidence")).toBeNull();
   });
 
-  it("shows the status bar in Vietnamese", () => {
+  it("puts cash before settings and opens the schedule from the task icon, which clears its mark", () => {
+    mountLayer();
+    finishIntro();
+    const bar = screen.getByTestId("chapter-top-bar");
+    const cash = within(bar).getByTestId("resource-cash");
+    expect(cash.compareDocumentPosition(within(bar).getByTestId("hud-settings")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const task = within(screen.getByTestId("chapter-status-cluster")).getByRole("button", { name: "Tasks" });
+    expect(screen.getByTestId("hud-task-new-mark")).toBeTruthy();
+    fireEvent.click(task);
+    expect(screen.getByTestId("planner-overlay")).toBeTruthy();
+    expect(screen.queryByTestId("hud-task-new-mark")).toBeNull();
+  });
+
+  it("shows the HUD in Vietnamese", () => {
     applyLocale("vi");
     mountLayer();
     finishIntro();
-    const bar = screen.getByTestId("resource-status");
-    expect(within(bar).getByTestId("resource-time").textContent).toContain("Thứ Ba 17:00, còn 72 giờ");
-    expect(within(bar).getByTestId("resource-cash").textContent).toContain("VNĐ");
+    const time = screen.getByTestId("resource-time").textContent;
+    expect(time).toContain("Thứ Ba");
+    expect(time).toContain("Còn 72 giờ để nộp khóa luận");
+    expect(screen.getByTestId("resource-cash").textContent).toContain("VNĐ");
   });
 });
