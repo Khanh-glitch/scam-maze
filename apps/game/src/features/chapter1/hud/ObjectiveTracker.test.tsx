@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { applyLocale } from "../../../i18n";
 import type { Objective } from "../../../game/narrative/types";
 import { CINE } from "../theme";
-import { ObjectiveTracker } from "./ObjectiveTracker";
+import { OBJECTIVE_INDENT_PX, ObjectiveTracker } from "./ObjectiveTracker";
 
 const objective = (id: string, text: string) => ({ id, text }) as unknown as Objective;
 
@@ -35,34 +35,30 @@ describe("ObjectiveTracker idle fade", () => {
 });
 
 describe("ObjectiveTracker card", () => {
-  it("has a letter-spaced caps header and an empty checkbox before the current objective", () => {
+  it("has a letter-spaced caps header and the quest icon before the current objective", () => {
     render(<ObjectiveTracker objectives={[objective("obj.a", "Look around")]} />);
     const heading = screen.getByRole("heading", { name: "Objective" });
     expect(heading.className).toContain("uppercase");
-    expect(heading.style.letterSpacing).not.toBe("");
+    expect(heading.className).toContain("tracking-");
     const current = screen.getByTestId("objective-current");
     expect(current.textContent).toBe("Look around");
-    const box = current.querySelector("[data-testid='objective-checkbox']");
-    expect(box?.getAttribute("data-checked")).toBe("false");
-    expect(box?.getAttribute("aria-hidden")).toBe("true");
+    const icon = current.querySelector("img");
+    expect(icon?.getAttribute("src")).toContain("scammaze-quest-icon");
+    expect(icon?.getAttribute("aria-hidden")).toBe("true");
   });
 
-  it("lists other active objectives dimmer and indented with smaller checkboxes", () => {
+  it("lists other active objectives smaller and indented under the current one", () => {
     render(<ObjectiveTracker objectives={[objective("obj.a", "Look around"), objective("obj.b", "Check the note")]} />);
     const other = screen.getByTestId("objective-other");
     expect(other.textContent).toBe("Check the note");
-    const line = other.querySelector("p") as HTMLElement;
-    expect(line.style.marginLeft).toBe(`${CINE.objective.indentPx}px`);
-    const box = other.querySelector("[data-testid='objective-checkbox']") as HTMLElement;
-    expect(box.style.width).toBe(`${CINE.objective.smallBoxPx}px`);
-    const mainBox = screen.getByTestId("objective-current").querySelector("[data-testid='objective-checkbox']") as HTMLElement;
-    expect(mainBox.style.width).toBe(`${CINE.objective.boxPx}px`);
+    expect(other.style.paddingLeft).toBe(`${OBJECTIVE_INDENT_PX}px`);
+    expect(other.querySelector("img")).toBeNull();
   });
 
-  it("shows a completed objective with a checked checkbox and a screen-reader label", () => {
+  it("shows a completed objective with a check mark and a screen-reader label", () => {
     render(<ObjectiveTracker objectives={[objective("obj.b", "Check the note")]} completed={[objective("obj.a", "Look around")]} />);
     const done = screen.getByTestId("objective-done");
-    expect(done.querySelector("[data-testid='objective-checkbox']")?.getAttribute("data-checked")).toBe("true");
+    expect(done.querySelector("svg")).toBeTruthy();
     expect(done.textContent).toContain("Completed:");
     expect(done.textContent).toContain("Look around");
   });
@@ -75,7 +71,7 @@ describe("ObjectiveTracker card", () => {
     const hint = screen.getByTestId("room-hint");
     expect(hint.textContent).toBe("Try the desk.");
     expect(hint.getAttribute("role")).toBe("note");
-    expect(hint.style.marginLeft).toBe(`${CINE.objective.indentPx}px`);
+    expect(hint.style.paddingLeft).toBe(`${OBJECTIVE_INDENT_PX}px`);
     rerender(<ObjectiveTracker objectives={objectives} hint={null} hintOn />);
     expect(screen.getByTestId("room-hint").textContent).toBe("No hint is available right now.");
   });

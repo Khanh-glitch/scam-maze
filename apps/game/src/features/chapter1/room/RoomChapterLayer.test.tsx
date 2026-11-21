@@ -327,11 +327,11 @@ describe("overlays", () => {
     expect(screen.getByTestId("hud-hints-chip").getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("shows the current objective in the objective card with an unchecked checkbox", () => {
+  it("shows the current objective in the objective card with the quest icon", () => {
     setup({ restoreActions: AFTER_DECLINE });
     finishIntro();
     const current = screen.getByTestId("objective-current");
-    expect(current.querySelector("[data-testid='objective-checkbox']")?.getAttribute("data-checked")).toBe("false");
+    expect(current.querySelector("img")?.getAttribute("src")).toContain("scammaze-quest-icon");
   });
 });
 
