@@ -4,6 +4,7 @@ import hue from "./hue";
 import mientay from "./mientay";
 import khupho from "./khupho";
 import roomv2 from "./roomv2";
+import testbus from "./testbus";
 import quests from "./quests";
 
 /** The `worlds` namespace, composed from area files with disjoint top-level key groups. */
@@ -14,6 +15,7 @@ const worlds = {
   ...mientay,
   ...khupho,
   ...roomv2,
+  ...testbus,
   ...quests,
 };
 
