@@ -11,6 +11,12 @@ const room = {
         opened: "Security alert: opened",
       },
     },
+    // Captions while looking at a device or the wall calendar in "LAST SUBMISSION: 72 GIỜ CUỐI".
+    inspect: {
+      phone: "Your phone. Messages, calls, the bank and your calendar are here.",
+      laptop: "Your laptop. Mail, the bank, your calendar and your thesis files are here.",
+      calendar: "The wall calendar. The final deadline is Friday, 17:00.",
+    },
     prompt: {
       phoneRinging: "Answer the call",
       phoneDecline: "Decline the call",

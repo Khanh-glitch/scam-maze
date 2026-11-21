@@ -44,9 +44,23 @@ export interface CheckpointSaverOptions {
   onWriteFailure?: () => void;
 }
 
-/** Stable comparison key for the objective sets. */
+/** Simulated minutes of free roam between two automatic saves. */
+export const AUTOSAVE_MINUTES = 15;
+/** Stable comparison key of everything a Checkpoint must keep. */
 function objectivesKey(state: ChapterState): string {
-  return JSON.stringify(state.objectives);
+  // Objectives, the world (events and missions), the device state, the persistent flags and the
+  // resources: any of them changing is a reason to save. The clock is bucketed, so free-roam time
+  // saves about every `AUTOSAVE_MINUTES` simulated minutes and not on every tick.
+  const { timeMinutes, ...otherResources } = state.resources;
+  return JSON.stringify([
+    state.status,
+    state.objectives,
+    state.world,
+    state.device,
+    state.persistent,
+    otherResources,
+    Math.floor(timeMinutes / AUTOSAVE_MINUTES),
+  ]);
 }
 
 /** True while a Call is ringing or active, so a Checkpoint must wait. */
@@ -163,8 +177,18 @@ export function useCheckpointSaver({
     const unsubscribe = store.subscribe(check);
     // Catch any change between the first render and this subscription.
     check();
-    return unsubscribe;
+    // Leaving the room (return to menu, closing the tab) keeps the latest state, not only the last
+    // automatic save. `saveNow` writes only while the chapter is playing and no call is active.
+    const onPageHide = (): void => void saveNowRef.current();
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      window.removeEventListener("pagehide", onPageHide);
+      unsubscribe();
+      saveNowRef.current();
+    };
   }, [store, initial, write]);
 
+  const saveNowRef = useRef(saveNow);
+  saveNowRef.current = saveNow;
   return useMemo(() => ({ saveNow }), [saveNow]);
 }

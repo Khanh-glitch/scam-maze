@@ -1,11 +1,11 @@
 import type en from "../en/chapters";
 import type { LocaleShape } from "../../types";
 
-// Title and subtitle match the Chapter 1 narrative overlay (`i18n/narrative/chapter1.vi/core.ts`).
+// Title and subtitle match the Chapter 1 narrative overlay (`i18n/narrative/lastSubmission.vi.ts`).
 const chapters: LocaleShape<typeof en> = {
   "chapter-1": {
-    title: "Cuộc gọi khẩn cấp",
-    subtitle: "Thông báo đến trước cả bữa sáng.",
+    title: "LAST SUBMISSION: 72 GIỜ CUỐI",
+    subtitle: "Nộp khóa luận trước 17:00 thứ Sáu.",
     assets: {
       "street-environment": "Đang tải con phố",
       sky: "Đang tải bầu trời",

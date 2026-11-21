@@ -26,6 +26,8 @@ export interface CallHistoryAppProps {
   onCallSavedContact: (claimId: ClaimId) => void;
   /** Return to the phone home screen. */
   onBack: () => void;
+  /** False when the parent draws the Back button. Default true. */
+  showBack?: boolean;
 }
 
 export const CallHistoryApp: React.FC<CallHistoryAppProps> = ({
@@ -35,6 +37,7 @@ export const CallHistoryApp: React.FC<CallHistoryAppProps> = ({
   onDeviceAction,
   onCallSavedContact,
   onBack,
+  showBack = true,
 }) => {
   const { t } = useTranslation("chapter1");
   // Newest first, like a real phone. The selector returns oldest first.
@@ -44,10 +47,12 @@ export const CallHistoryApp: React.FC<CallHistoryAppProps> = ({
 
   return (
     <div className="space-y-3">
-      <button type="button" className={UI.buttonSecondary} onClick={onBack}>
-        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        {t("phone.calls.back")}
-      </button>
+      {showBack && (
+        <button type="button" className={UI.buttonSecondary} onClick={onBack}>
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          {t("phone.calls.back")}
+        </button>
+      )}
       <h3 className={UI.label}>{t("phone.calls.heading")}</h3>
       {entries.length === 0 ? (
         <p className={UI.body}>{t("phone.calls.empty")}</p>

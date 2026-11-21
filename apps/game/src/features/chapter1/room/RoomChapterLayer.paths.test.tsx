@@ -158,6 +158,7 @@ describe("path 2: verify independently to break-the-chain", () => {
     expect(rig.store().getState().call.status).not.toBe("ringing");
     // The saved contact is called from the call history on the phone.
     openProp(rig, "phone");
+  fireEvent.click(screen.getByTestId("phone-unlock"));
     const phone = screen.getByRole("dialog", { name: PHONE.overlay.name });
     fireEvent.click(within(phone).getByRole("button", { name: PHONE.home.calls }));
     fireEvent.click(within(phone).getByRole("button", { name: enRoom.room.records.callSaved.label }));

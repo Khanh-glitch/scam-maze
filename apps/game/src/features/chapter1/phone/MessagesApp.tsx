@@ -13,14 +13,21 @@ export interface MessagesAppProps {
   onInspectEvidence: (evidenceId: EvidenceId) => void;
   /** Return to the phone home screen. */
   onBack: () => void;
+  /** The open message, held by the parent so it survives leaving the app. */
+  openId?: string | null;
+  onOpen?: (id: string | null) => void;
+  /** False when the parent draws the Back button of the list. Default true. */
+  showBack?: boolean;
 }
 
 const LIST_BUTTON =
   "flex w-full flex-col gap-1 rounded-lg border border-[#38344f] bg-[#171521] p-3 text-left motion-safe:transition-colors hover:border-[#7654d6] hover:bg-[#26233a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b9a5f5] cursor-pointer";
 
-export const MessagesApp: React.FC<MessagesAppProps> = ({ messages, onInspectEvidence, onBack }) => {
+export const MessagesApp: React.FC<MessagesAppProps> = ({ messages, onInspectEvidence, onBack, openId: controlledId, onOpen, showBack = true }) => {
   const { t } = useTranslation("chapter1");
-  const [openId, setOpenId] = useState<MessageId | null>(null);
+  const [localId, setLocalId] = useState<MessageId | null>(null);
+  const openId = (onOpen ? (controlledId ?? null) : localId) as MessageId | null;
+  const setOpenId = (id: MessageId | null) => (onOpen ? onOpen(id) : setLocalId(id));
   const open = openId === null ? null : (messages.find((message) => message.id === openId) ?? null);
 
   const openMessage = (message: PhoneMessageView) => {
@@ -55,10 +62,12 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ messages, onInspectEvi
 
   return (
     <div className="space-y-3">
-      <button type="button" className={UI.buttonSecondary} onClick={onBack}>
-        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        {t("phone.messages.back")}
-      </button>
+      {showBack && (
+        <button type="button" className={UI.buttonSecondary} onClick={onBack}>
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          {t("phone.messages.back")}
+        </button>
+      )}
       <h3 className={UI.label}>{t("phone.messages.heading")}</h3>
       {messages.length === 0 ? (
         <p className={UI.body}>{t("phone.messages.empty")}</p>

@@ -25,6 +25,8 @@ import type {
   WarningSignId,
 } from "./chapter1/ids";
 import type { ProvenanceTrust } from "@scammaze/shared-types";
+import type { FatigueConfig, RestMode } from "./fatigue";
+import type { ChapterInitialState, ChapterResources, PersistentFlagId, PersistentFlags, ResourceId } from "./resources";
 
 // ---------------------------------------------------------------------------
 // Core actions and results
@@ -51,7 +53,21 @@ export type CoreAction =
   /** A laptop or phone action defined by `DeviceActionDef` (opens a record, inspects, compares). */
   | { type: "DEVICE_ACTION"; deviceActionId: DeviceActionId }
   /** Combines 2 to 3 unique evidence items into a deduction. Order does not matter. */
-  | { type: "COMBINE_EVIDENCE"; evidenceIds: EvidenceId[] };
+  | { type: "COMBINE_EVIDENCE"; evidenceIds: EvidenceId[] }
+  /** Lets simulated time pass (free roam). Whole minutes, 1 to 4320. Scheduled events and deadlines run in time order. */
+  | { type: "ADVANCE_TIME"; minutes: number }
+  /** Works on the thesis for `minutes`. Costs that time and adds progress at the configured rate. */
+  | { type: "WORK_ON_THESIS"; minutes: number }
+  /** Rests: a short break or a night of sleep. Costs the time of the option and lowers fatigue. */
+  | { type: "REST"; mode: RestMode }
+  /** Answers a pending event with one of its responses: act on it, postpone it or ignore it. */
+  | { type: "RESPOND_EVENT"; eventId: string; response: string }
+  /** Completes one thesis task (interview, revision, document check, supervisor confirmation, final version). Costs its time and adds its progress. */
+  | { type: "COMPLETE_THESIS_TASK"; taskId: string }
+  /** Opens a message, email, listing, file or appointment on the phone or laptop. The first time it marks it read. Reading costs no time. */
+  | { type: "OPEN_DEVICE_ITEM"; itemId: string }
+  /** Uses one action of a device item: reply, pay, travel, apply, submit, call. Costs time and cash as the item says. */
+  | { type: "USE_DEVICE_ITEM"; itemId: string; actionId: string };
 
 export type CoreActionType = CoreAction["type"];
 
@@ -113,11 +129,90 @@ export interface ChapterState {
   /** Recorded deductions in recording order, no duplicates. */
   deductions: DeductionId[];
   flags: Record<FlagId, boolean>;
+  /** Time, thesis progress, cash, digital security, support network and evidence value. */
+  resources: ChapterResources;
+  /** Event-level state that stays after a mission ends (account, backup, housing, identity, relationships). */
+  persistent: PersistentFlags;
+  /** Scheduled events and time-boxed missions (see `GameEventDef` and `MissionDef`). */
+  world: WorldState;
+  /** Phone and laptop content: what has arrived, what was read or done, the bank ledger, the location, the submission. */
+  device: DeviceState;
   pressure: PressureLevel;
   outcome: OutcomeId | null;
   events: EventLogEntry[];
 }
 
+export type EventStatus = "pending" | "resolved" | "ignored" | "expired";
+export interface EventState {
+  status: EventStatus;
+  /** Elapsed minutes at which the event arrived (its scheduled time when it has one). */
+  firedAtMinute: number;
+  resolvedAtMinute: number | null;
+  /** How many times the player postponed it. */
+  postponed: number;
+  /** The response id that resolved or ignored it, or null. A postponement does not set it. */
+  response: string | null;
+}
+export type MissionStatus = "locked" | "open" | "completed" | "failed";
+export interface MissionState {
+  status: MissionStatus;
+  /** The current path, or null before the mission entered its first path. */
+  path: string | null;
+  /** Every path the mission has been on, in order. Paths already used do not apply their effects again. */
+  pathHistory: string[];
+  openedAtMinute: number | null;
+  closedAtMinute: number | null;
+}
+export interface WorldState {
+  /** Only events that have arrived. */
+  events: Record<string, EventState>;
+  /** Thesis tasks the player completed, in order. */
+  thesisTasksDone: string[];
+  /** Every mission of the scenario. */
+  missions: Record<string, MissionState>;
+  /** Minutes slept since the last night check. Absent in old states (0). */
+  sleptMinutes?: number;
+  /** Night checks already made (see `FatigueConfig.nightChecksAtMinute`). Absent in old states (0). */
+  nightsChecked?: number;
+}
+export type SubmissionStatus = "not-submitted" | "submitted";
+export interface DeviceItemState {
+  arrivedAtMinute: number;
+  read: boolean;
+  readAtMinute: number | null;
+  /** Action ids used on this item, in order. */
+  done: string[];
+  /** Simulated minute at which each action finished (after its time cost). Absent in old states. */
+  doneAt?: Record<string, number>;
+}
+/**
+ * What a ledger line means for the finance summary: `loss` is money that left and is gone (a fee, an
+ * unauthorized transfer), `locked` is money sent to a platform that keeps it. A line with no
+ * category is ordinary spending. Each line is counted once, so the totals never double count.
+ */
+export type LedgerCategory = "loss" | "locked";
+
+export interface LedgerEntry {
+  /** 0-based, contiguous. */
+  seq: number;
+  /** Absent for ordinary spending and in old states. */
+  category?: LedgerCategory;
+  atMinute: number;
+  /** Key into `ScenarioDefinition.ledgerLabels`, or an item action id. */
+  label: string;
+  /** Negative for money out, positive for money in, in VND. */
+  amount: number;
+  counterparty: string | null;
+  itemId: string | null;
+  actionId: string | null;
+}
+export interface DeviceState {
+  items: Record<string, DeviceItemState>;
+  ledger: LedgerEntry[];
+  /** Id of the place Alex is at (from the map app), or null before any travel. */
+  location: string | null;
+  submission: SubmissionStatus;
+}
 export interface EventLogEntry {
   /** 0-based, contiguous. */
   seq: number;
@@ -125,6 +220,10 @@ export interface EventLogEntry {
   derived: {
     evidence: EvidenceId[];
     flags: FlagId[];
+    /** Net change of each resource caused by this action. Only changed resources are listed. */
+    resources: Partial<Record<ResourceId, number>>;
+    /** Persistent flags whose value changed in this action. */
+    persistent: PersistentFlagId[];
     objectivesActivated: ObjectiveId[];
     objectivesCompleted: ObjectiveId[];
     /** For example "shared-code", "challenged-number", "hung-up-to-verify". */
@@ -154,7 +253,34 @@ export type Condition =
   | { kind: "objectiveCompleted"; objectiveId: ObjectiveId }
   | { kind: "outcomeSet" }
   /** At least `count` of the listed evidence items are discovered. */
-  | { kind: "evidenceCountAtLeast"; evidenceIds: EvidenceId[]; count: number };
+  | { kind: "evidenceCountAtLeast"; evidenceIds: EvidenceId[]; count: number }
+  | { kind: "resourceAtLeast"; resource: ResourceId; value: number }
+  | { kind: "resourceAtMost"; resource: ResourceId; value: number }
+  | { kind: "persistent"; flag: PersistentFlagId; value: boolean }
+  /** At least `minutes` of the chapter have passed. */
+  | { kind: "elapsedAtLeast"; minutes: number }
+  | { kind: "eventStatus"; eventId: string; status: EventStatus | "not-arrived" }
+  /** The event was resolved or ignored with this response id. */
+  | { kind: "eventResponse"; eventId: string; response: string }
+  | { kind: "missionStatus"; missionId: string; status: MissionStatus }
+  | { kind: "missionPath"; missionId: string; path: string }
+  /** The item has arrived on a device. */
+  | { kind: "itemArrived"; itemId: string }
+  /** The item was opened. */
+  | { kind: "itemOpened"; itemId: string }
+  /** The action was used on the item. */
+  | { kind: "itemActionDone"; itemId: string; actionId: string }
+  | { kind: "atLocation"; placeId: string }
+  | { kind: "submission"; status: SubmissionStatus }
+  | { kind: "thesisTaskDone"; taskId: string }
+  /** At least one of the conditions holds. */
+  | { kind: "anyOf"; conditions: Condition[] }
+  /** Every one of the conditions holds. */
+  | { kind: "allOf"; conditions: Condition[] }
+  /** The condition does not hold. */
+  | { kind: "not"; condition: Condition }
+  /** The mission is open and has been open for at least `minutes` simulated minutes. */
+  | { kind: "missionOpenFor"; missionId: string; minutes: number };
 
 export type Effect =
   | { kind: "setFlag"; flag: FlagId }
@@ -164,7 +290,21 @@ export type Effect =
   /** Allowed only in graphs with `independentChannel: true` (enforced by the validator). */
   | { kind: "setClaimStatus"; claimId: ClaimId; status: ClaimStatus }
   | { kind: "recordDecision"; decision: DecisionId }
-  | { kind: "deliverMessage"; messageId: MessageId };
+  | { kind: "deliverMessage"; messageId: MessageId }
+  /** Adds `delta` (may be negative) to a resource, clamped to the resource limits. */
+  | { kind: "adjustResource"; resource: ResourceId; delta: number }
+  /** Sets a persistent flag to `value`. */
+  | { kind: "setPersistent"; flag: PersistentFlagId; value: boolean }
+  /** Opens a locked mission now. Does nothing for an open, completed or failed mission. */
+  | { kind: "openMission"; missionId: string }
+  /** Locks an open mission. Does nothing once it is completed or failed. */
+  | { kind: "lockMission"; missionId: string }
+  /** Makes a device item arrive now (a new email, a reply, a listing). Does nothing if it already arrived. */
+  | { kind: "deliverItem"; itemId: string }
+  /** Moves money and adds a bank ledger line. `amount` is negative for money out. Cash may go below zero. */
+  | { kind: "recordTransaction"; label: string; amount: number; counterparty?: string; limitToCash?: boolean; category?: LedgerCategory }
+  | { kind: "setLocation"; placeId: string }
+  | { kind: "setSubmission"; status: SubmissionStatus };
 
 export type DiscoveryCondition =
   | { via: "interact"; objectId: InteractableId }
@@ -464,10 +604,206 @@ export interface BeatDef {
   effects: Effect[];
 }
 
+/** When something starts: at a scheduled time, when conditions hold, or both (both must hold). */
+export interface WorldTrigger {
+  /** Minutes since the chapter started (Tuesday 17:00 is 0). */
+  atMinute?: number;
+  when?: Condition[];
+  /**
+   * Fires `minutes` after a device action finished, at exactly that minute (the ledger and the log
+   * then show the scheduled time, not the time of the next action).
+   */
+  afterAction?: { itemId: string; actionId: string; minutes: number };
+  /**
+   * Device actions that stop the trigger when they finished at or before the minute it would fire.
+   * An action that finishes later does not undo something that already happened.
+   */
+  cancelledBy?: { itemId: string; actionId: string }[];
+}
+/** One way to answer an event. Responses carry no score: the player reads the consequences. */
+export interface EventResponseDef {
+  id: string;
+  label: string;
+  /** `respond` resolves the event, `postpone` keeps it pending, `ignore` closes it without acting. */
+  kind: "respond" | "postpone" | "ignore";
+  requires?: Condition[];
+  /** Simulated minutes this response takes. */
+  timeCostMinutes?: number;
+  effects?: Effect[];
+}
+/** Something that happens to Alex while the clock runs: a message, call, offer or request. */
+export interface GameEventDef {
+  id: string;
+  title: string;
+  body: string;
+  channel: "message" | "call" | "email" | "visit" | "notification";
+  trigger: WorldTrigger;
+  /** An optional event can be ignored with no effect on the main goal. */
+  optional: boolean;
+  /** True: the event resolves as soon as it arrives and waits for no answer (a consequence, such as a bank alert). */
+  autoResolve?: boolean;
+  /** Minutes after it arrives before it expires while still pending. Omit for no expiry. */
+  deadlineAfterMinutes?: number;
+  onFire?: Effect[];
+  onExpire?: Effect[];
+  responses: EventResponseDef[];
+}
+/** A way a mission can play out. The first path whose `when` holds is the current path. */
+export interface MissionPathDef {
+  id: string;
+  when: Condition[];
+  /** Objective text shown while the mission is on this path. */
+  objective: string;
+  /** Applied the first time the mission enters this path. */
+  onEnter?: Effect[];
+}
+/** A time-boxed goal whose shape adapts to earlier decisions. Consequences are never reset. */
+export interface MissionDef {
+  id: string;
+  title: string;
+  optional: boolean;
+  opensWhen: WorldTrigger;
+  /** Minutes since the chapter started. Past it, an open mission fails. */
+  deadlineAtMinute?: number;
+  /** All must hold for the mission to complete. */
+  completeWhen: Condition[];
+  /** Paths in priority order. The last one should have no conditions. */
+  paths: MissionPathDef[];
+  onOpen?: Effect[];
+  onComplete?: Effect[];
+  /** Failing a mission is not game over: these effects can open an alternative mission. */
+  onFail?: Effect[];
+}
+export type DeviceAppId = "mail" | "messages" | "contacts" | "bank" | "map" | "calendar" | "housing" | "jobs" | "files";
+export type DeviceKind = "phone" | "laptop";
+/** One thing a player can do with a device item. No score: the player reads the costs and decides. */
+/** One line of a conversation on a contact: what Alex says or what the other side answers. */
+export interface ConversationLine {
+  speaker: "alex" | "other";
+  text: string;
+}
+
+export interface DeviceItemActionDef {
+  id: string;
+  label: string;
+  /**
+   * Lines added to the conversation history of the item once this action is done (Alex's turn and
+   * the answer). Time and effects belong to the action, so history, cost and state never disagree.
+   */
+  transcript?: ConversationLine[];
+  requires?: Condition[];
+  /** Simulated minutes the action takes. */
+  timeCostMinutes?: number;
+  /** VND taken from cash and written to the bank ledger. Rejected when cash is lower, unless `allowDebt`. */
+  cashCost?: number;
+  allowDebt?: boolean;
+  /** Key into `ScenarioDefinition.ledgerLabels` for the ledger line. Defaults to this action. */
+  ledgerLabel?: string;
+  /** How the finance summary counts the cash this action takes (see `LedgerCategory`). */
+  ledgerCategory?: LedgerCategory;
+  counterparty?: string;
+  /** Moves Alex to this place (map app). */
+  moveTo?: string;
+  /** Places this outgoing call (a key of `ScenarioDefinition.calls`). */
+  callId?: string;
+  /** The action can be used once. */
+  once?: boolean;
+  /** The action is listed only while these hold (a step of a page that appears after the one before). */
+  visibleWhen?: Condition[];
+  effects?: Effect[];
+}
+/**
+ * The four kinds of money an online platform page tells apart:
+ * `real` is Alex's cash in the bank (always read live), `shown` is the balance the page displays and
+ * is not money, `withdrawable` is what can actually leave the platform, `locked` is money Alex sent
+ * that the platform keeps.
+ */
+export type PlatformFigureKind = "real" | "shown" | "withdrawable" | "locked";
+
+/** Figures of a platform page. The first block whose `when` holds is shown (a block with no `when` is the fallback). */
+export interface PlatformFiguresDef {
+  when?: Condition[];
+  rows: Array<{ kind: PlatformFigureKind; amountVnd?: number }>;
+}
+
+/** An email, chat, contact, listing, file, place, appointment or payee on a device. */
+export interface DeviceItemDef {
+  id: string;
+  app: DeviceAppId;
+  /** Devices that show it. Defaults to the app's devices. */
+  devices?: DeviceKind[];
+  title: string;
+  /** Sender, contact, place or listing name. Plain text, never a link. */
+  from?: string;
+  /** Address, number or another plain-text detail. Reserved domains only. */
+  detail?: string;
+  body: string;
+  /** Mail folder (`university`, `recruitment`, `other`) or file folder. */
+  folder?: string;
+  /** When it arrives. Absent: it is there from the start. */
+  arrives?: WorldTrigger;
+  /** Appointments: start and end, minutes since the chapter started. */
+  startsAtMinute?: number;
+  endsAtMinute?: number;
+  /** Listings and payees: an amount in VND. */
+  amount?: number;
+  /** Applied the first time the item is opened. */
+  onOpen?: Effect[];
+  /** Money figures of a platform page (job or investment). Simulated amounts only. */
+  figures?: PlatformFiguresDef[];
+  actions?: DeviceItemActionDef[];
+}
+/**
+ * A piece of thesis work that moves the thesis forward by what it achieves, not by waiting. The brief
+ * lists them: interviews, editing, document checks, the supervisor's confirmation and the final submission.
+ * Each task can be done once.
+ */
+export interface ThesisTaskDef {
+  id: string;
+  label: string;
+  description?: string;
+  requires?: Condition[];
+  /** Simulated minutes the task takes. */
+  timeCostMinutes?: number;
+  /** Percent added to the thesis progress. */
+  progressGain: number;
+  effects?: Effect[];
+}
+/** Pacing values the brief does not state. Placeholders, configurable per scenario. */
+export interface GameplayConfig {
+  /** Thesis work: this many minutes give 1 percent. */
+  thesisMinutesPerPercent: number;
+  /** Length of one "work on the thesis" session offered by the UI. */
+  thesisSessionMinutes: number;
+  /** Real milliseconds for one simulated minute while the player explores. */
+  msPerGameMinute: number;
+  /** Free thesis work (`WORK_ON_THESIS`) stops here. Further progress needs thesis tasks. */
+  thesisFreeWorkMaxPercent: number;
+  /** Simulated minutes added to the clock per tick. */
+  tickMinutes: number;
+  /** True when time passes by itself during free roam. Off for scenarios without a world clock. */
+  clockRuns: boolean;
+  /** Fatigue rules (`fatigue.ts`). Off unless the scenario enables them. */
+  fatigue: FatigueConfig;
+}
 export interface ScenarioDefinition {
   id: "chapter-1";
   title: string;
   subtitle: string;
+  /** Start resources and persistent flags. Defaults to `CHAPTER_1_INITIAL_STATE`. */
+  initial?: ChapterInitialState;
+  /** Scheduled events. Absent in scenarios without a world clock. */
+  events?: GameEventDef[];
+  /** Missions. Absent in scenarios without a world clock. */
+  missions?: MissionDef[];
+  /** Thesis tasks: progress by achievement. */
+  thesisTasks?: ThesisTaskDef[];
+  /** Phone and laptop content (email, chats, contacts, bank payees, places, appointments, listings, files). */
+  deviceItems?: DeviceItemDef[];
+  /** Ledger line texts by key, so bank lines can be translated. */
+  ledgerLabels?: Record<string, string>;
+  /** Overrides `DEFAULT_GAMEPLAY_CONFIG`. */
+  gameplay?: Partial<Omit<GameplayConfig, "fatigue">> & { fatigue?: Partial<FatigueConfig> };
   objectives: Record<ObjectiveId, Objective>;
   interactables: Record<InteractableId, InteractableDef>;
   claims: Record<ClaimId, Claim>;

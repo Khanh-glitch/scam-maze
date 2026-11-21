@@ -9,7 +9,7 @@ function entry(seq: number, action: CoreAction, debriefTags: string[], evidence:
   return {
     seq,
     action,
-    derived: { evidence, flags: [], objectivesActivated: [], objectivesCompleted: [], debriefTags },
+    derived: { evidence, flags: [], resources: {}, persistent: [], objectivesActivated: [], objectivesCompleted: [], debriefTags },
   };
 }
 

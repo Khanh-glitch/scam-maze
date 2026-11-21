@@ -3,7 +3,7 @@ import type { LocaleShape } from "../../../types";
 const hud: LocaleShape<typeof en> = {
   intro: {
     heading: "Chào mừng trở lại",
-    preparing: "Đang quay lại con phố",
+    preparing: "Đang chuẩn bị căn phòng",
     welcome: {
       // One paragraph per voice clip (chapter1_voice1start_vi.mp3 ... chapter1_voice4start_vi.mp3).
       p1: "Ụa! Cậu về rồi nè! Lâu quá trời luôn á! Tớ còn tưởng cậu quên mất chỗ này rồi chứ!",
@@ -12,6 +12,12 @@ const hud: LocaleShape<typeof en> = {
       p4: "Đi thôi nào! Tớ sẽ ở đây đồng hành cùng cậu. Cứ từ từ khám phá, còn nhiều điều hay ho đang chờ phía trước lắm đó!",
     },
     resume: "Chào mừng cậu quay lại! Mình đã giữ chỗ cho cậu rồi. Khi nào sẵn sàng, mình cùng tiếp tục từ chỗ cậu đã dừng nhé.",
+    // Mở đầu của "LAST SUBMISSION: 72 GIỜ CUỐI". Dữ kiện lấy từ bản thiết kế; chưa có clip giọng nói.
+    last: {
+      p1: "Bạn là Alex, {{age}} tuổi, sinh viên quốc tế năm cuối tại Thành phố Hồ Chí Minh. Khóa luận của bạn đã hoàn thành {{progress}}%.",
+      p2: "Bạn còn {{hours}} giờ. Bạn phải hoàn thành bản nghiên cứu, lấy chữ ký giảng viên và nộp bản cuối cùng trước 17:00 thứ Sáu.",
+      p3: "Tiền bạc hạn chế, thời hạn ở ký túc xá sắp hết và bạn chưa có công việc ổn định. Sẽ có những lời mời giúp đỡ xuất hiện. Bạn tự quyết định điều gì cần kiểm tra, điều gì đáng tin và điều gì nên bỏ qua.",
+    },
     skip: "Nhấn chuột để hiện toàn bộ chữ",
     next: "Nhấn chuột để nghe tiếp",
     continue: "Nhấn chuột để tiếp tục",
@@ -22,6 +28,7 @@ const hud: LocaleShape<typeof en> = {
       interact: "Tương tác",
       phone: "Điện thoại",
       journal: "Sổ ghi chép",
+      schedule: "Lịch trình",
       pause: "Tạm dừng",
       mouse: "Chuột",
     },
@@ -33,6 +40,31 @@ const hud: LocaleShape<typeof en> = {
     // Vietnamese has one plural form, so only `_other` is needed.
     unreadMessages_other: "{{number}} tin nhắn chưa đọc",
     newEntries_other: "{{number}} mục mới",
+    // Thanh trạng thái chương: sáu tài nguyên của "LAST SUBMISSION: 72 GIỜ CUỐI".
+    status: {
+      label: "Trạng thái chương",
+      time: "Thời gian",
+      timeValue: "{{day}} {{clock}}, còn {{time}}",
+      thesis: "Khóa luận",
+      cash: "Tiền mặt",
+      cashValue: "{{amount}} VNĐ",
+      security: "Bảo mật số",
+      support: "Mạng lưới hỗ trợ",
+      evidence: "Bằng chứng",
+      fatigue: "Mệt mỏi",
+      fatigueValue: "{{level}}, {{value}}%",
+      fatigueLevel: { rested: "Khỏe", tired: "Mệt", exhausted: "Kiệt sức" },
+      percent: "{{value}}%",
+      weekday: {
+        "1": "Thứ Hai",
+        "2": "Thứ Ba",
+        "3": "Thứ Tư",
+        "4": "Thứ Năm",
+        "5": "Thứ Sáu",
+        "6": "Thứ Bảy",
+        "7": "Chủ nhật",
+      },
+    },
     act: {
       label: "Hồi {{number}}: {{title}}",
     },
@@ -40,6 +72,66 @@ const hud: LocaleShape<typeof en> = {
       message:
         "Tiến trình đã lưu của bạn đã được cập nhật cho phiên bản mới của chương này. Tiến trình được khôi phục về điểm gần nhất vẫn còn phù hợp.",
       dismiss: "Đóng",
+    },
+  },
+  // Lịch trình: sự kiện đang chờ phản hồi, mục tiêu và hạn chót, và làm khóa luận. Không chấm điểm.
+  planner: {
+    heading: "Lịch trình",
+    chip: "Lịch trình",
+    close: "Đóng",
+    pendingCount_one: "{{number}} sự kiện đang chờ",
+    pendingCount_other: "{{number}} sự kiện đang chờ",
+    arrival: "Mới: {{title}}",
+    dismiss: "Bỏ qua thông báo",
+    eventsHeading: "Đang chờ bạn",
+    noEvents: "Không có gì đang chờ phản hồi.",
+    missionsHeading: "Mục tiêu và hạn chót",
+    noMissions: "Chưa có mục tiêu nào đang mở.",
+    optional: "Tùy chọn",
+    due: "Hạn sau {{time}}",
+    expires: "Hết hạn sau {{time}}",
+    noDeadline: "Không có hạn chót",
+    postponed_one: "Đã hoãn {{number}} lần",
+    postponed_other: "Đã hoãn {{number}} lần",
+    responseWithCost: "{{label}} ({{time}})",
+    duration: {
+      hoursMinutes: "{{hours}} giờ {{minutes}} phút",
+      hours: "{{hours}} giờ",
+      minutes: "{{minutes}} phút",
+    },
+    channel: {
+      message: "Tin nhắn",
+      call: "Cuộc gọi",
+      email: "Email",
+      visit: "Gặp trực tiếp",
+      notification: "Thông báo",
+    },
+    thesis: {
+      heading: "Khóa luận",
+      progress: "Tiến độ: {{value}}%",
+      session: "Mỗi lượt làm mất {{time}} và thêm {{percent}}%. Các hạn chót khác vẫn tiếp tục chạy.",
+      work: "Làm khóa luận {{time}}",
+      complete: "Khóa luận đã hoàn thành.",
+      timeUp: "Không còn thời gian.",
+      limit: "Làm tự do chỉ đến {{percent}}%. Muốn tiến thêm cần hoàn thành các nhiệm vụ khóa luận.",
+      tasksHeading: "Nhiệm vụ khóa luận",
+      noTasks: "Chưa có nhiệm vụ khóa luận nào.",
+      fatigueNote: {
+        tired: "Bạn đang mệt. Làm khóa luận mất thêm {{percent}}% thời gian.",
+        exhausted: "Bạn đã kiệt sức. Làm khóa luận mất thêm {{percent}}% thời gian.",
+      },
+      restHeading: "Nghỉ ngơi",
+      restHint: "Nghỉ ngơi tốn thời gian. Các hạn chót khác vẫn tiếp tục chạy.",
+      nap: "Nghỉ ngắn ({{time}}, đỡ mệt một chút)",
+      sleep: "Ngủ ({{time}})",
+      taskCost: "{{label}} ({{time}}, +{{percent}}%)",
+      taskGain: "{{label}} (+{{percent}}%)",
+      blocked: {
+        done: "Đã xong",
+        locked: "Hiện chưa làm được",
+        complete: "Khóa luận đã hoàn thành",
+        time: "Hết thời gian",
+      },
     },
   },
   objectives: {

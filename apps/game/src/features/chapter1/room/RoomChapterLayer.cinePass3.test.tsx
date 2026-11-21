@@ -40,14 +40,14 @@ afterEach(() => {
 });
 
 describe("Notes chip", () => {
-  it("is the third chip of the same row as Journal and Hint, only while a call is active", () => {
+  it("is the last chip of the same row as Journal, Schedule and Hint, only while a call is active", () => {
     setupLayer({ restoreActions: [START, RING_ALEX, ANSWER] });
     finishIntro();
     const row = screen.getByTestId("hud-chip-row");
     const notes = screen.getByTestId("room-call-notes");
     const chips = Array.from(row.querySelectorAll("button"));
-    expect(chips).toHaveLength(3);
-    expect(chips[2]).toBe(notes);
+    expect(chips).toHaveLength(4);
+    expect(chips[3]).toBe(notes);
     expect(notes.parentElement).toBe(screen.getByTestId("hud-hints-chip").parentElement);
     // The row rises above the call presentation (z-40) so the chip is reachable.
     expect(Number((row as HTMLElement).style.zIndex)).toBeGreaterThan(40);
@@ -59,7 +59,7 @@ describe("Notes chip", () => {
     setupLayer({ restoreActions: AFTER_DECLINE });
     finishIntro();
     expect(screen.queryByTestId("room-call-notes")).toBeNull();
-    expect(screen.getByTestId("hud-chip-row").querySelectorAll("button")).toHaveLength(2);
+    expect(screen.getByTestId("hud-chip-row").querySelectorAll("button")).toHaveLength(3);
   });
 });
 

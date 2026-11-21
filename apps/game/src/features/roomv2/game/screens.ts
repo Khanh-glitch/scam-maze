@@ -242,8 +242,6 @@ export class PhoneScreen {
       ctx.fillStyle = '#fff'; ctx.font = `300 34px ${UI}`; ctx.fillText('+000 0000 1234', W / 2, 360);
       ctx.fillStyle = 'rgba(255,255,255,0.65)'; ctx.font = `15px ${UI}`;
       ctx.fillText(mode === 'ringing' ? st('incoming') : st('calling', { sec: String(Math.floor(callSec)).padStart(2, '0') }), W / 2, 392);
-      ctx.fillStyle = 'rgba(255,200,120,0.85)'; ctx.font = `13px ${UI}`;
-      ctx.fillText(st('maybe'), W / 2, 420);
       if (mode === 'ringing') {
         ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(100, 700, 36, 0, 7); ctx.fill();
         ctx.fillStyle = '#22c55e'; ctx.beginPath(); ctx.arc(290, 700, 36, 0, 7); ctx.fill();
