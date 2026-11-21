@@ -617,6 +617,7 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
                     engineReady={roomCommands}
                     onReturnToMenu={onBackToMenu}
                     onHoverSound={onHoverSound}
+                    onOpenSettings={openPause}
                   />
                 ) : undefined
               }
@@ -632,7 +633,7 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
           </Suspense>
         </div>
       )}
-      {stage === "room" && playingRoom && !paused && <PrologueHud objective={null} prompt={null} showResume={showResume} cursorMode={roomCursor} crosshair={false} minimap={<NoSignalMinimap label={t("worlds:quests.noSignal")} />} />}
+      {stage === "room" && playingRoom && !paused && <PrologueHud objective={null} prompt={null} showResume={showResume} cursorMode={roomCursor} crosshair={false} minimap={session ? undefined : <NoSignalMinimap label={t("worlds:quests.noSignal")} />} />}
 
       {inGame && !callOpen && !paused && !(session && stage === "room") && (
         <PrologueTopBar soundEnabled={soundOn} onToggleSound={toggleSound} onOpenSettings={openPause} onHoverSound={onHoverSound} />

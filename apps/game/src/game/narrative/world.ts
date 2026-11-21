@@ -33,7 +33,8 @@ export const DEFAULT_GAMEPLAY_CONFIG: GameplayConfig = {
   thesisSessionMinutes: 60,
   thesisFreeWorkMaxPercent: 90,
   msPerGameMinute: 1000,
-  tickMinutes: 5,
+  // One tick per real second, so the HUD clock moves every second.
+  tickMinutes: 1,
   clockRuns: false,
   fatigue: DEFAULT_FATIGUE_CONFIG,
 };
