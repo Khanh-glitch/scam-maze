@@ -1,3 +1,4 @@
+import { passages } from './q10-plan';
 import { clamp, type BusRouteController, type DoorId } from './transit';
 
 export type Point = { x: number; z: number };
@@ -54,7 +55,8 @@ export const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.z - b.z)
 export const isInside = (p: Point) => Math.abs(p.x) < HALF - 0.012 && Math.abs(p.z) < LENGTH;
 export const deck = (z: number) => z > 2.40 ? 0.92 : z > 2.03 ? 0.77 : BUS_FLOOR;
 export const seatBase = (z: number) => deck(z) + (z < -2.70 ? 0.32 : 0);
-export const sidewalkAt = (p: Point) => p.x >= 0 || p.x <= -11.65;
+export const ROAD_WIDTH = 12.8;
+export const sidewalkAt = (p: Point) => p.x >= 0 || p.x <= -ROAD_WIDTH;
 export const inDoorArc = (p: Point, door: DoorId) => {
   const { min, max } = BUS_DOORS[door];
   return p.x > 0.79 && p.x < 1.65 && p.z > min - 0.14 && p.z < max + 0.14;
@@ -124,7 +126,9 @@ export class BusBoardingController {
   private tryMove(x: number, z: number) {
     if (!x && !z) return;
     const next = { x: this.position.x + x, z: this.position.z + z };
-    if (next.x < -16 || next.x > 6.2 || next.z < -161 || next.z > 41) return;
+    // Local access only inside the two residential passages (party-wall colliders still apply).
+    const passage = passages.find(p => next.z > p.start && next.z < p.end);
+    if (next.x < -ROAD_WIDTH - (passage?.side===-1?10.9:4.3) || next.x > (passage?.side===1?11.75:6.2) || next.z < -161 || next.z > 41) return;
     if (!this.onboard && (!this.trafficClear(next) || this.street.some((solid) => hits(next, solid)))) return;
     if (blocksBus(toLocal(next, this.route), this.route)) return;
     this.position = next;

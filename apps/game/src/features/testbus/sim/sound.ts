@@ -3,6 +3,8 @@ export class TransitAudio {
   private mix?: GainNode;
   private street?: GainNode;
   private motor?: GainNode;
+  private rain?: GainNode;
+  private insects?: GainNode;
   private oscillator?: OscillatorNode;
   private noise?: AudioBuffer;
   private muted = true;
@@ -27,6 +29,10 @@ export class TransitAudio {
       const filter = audio.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 350;
       const street = audio.createGain(); street.gain.value = 0.19; this.street = street;
       wind.connect(filter); filter.connect(street); street.connect(mix); wind.start();
+      const white=audio.createBuffer(1,length,audio.sampleRate);const samples=white.getChannelData(0);for(let i=0;i<length;i++)samples[i]=Math.random()*2-1;
+      const bed=audio.createBufferSource();bed.buffer=white;bed.loop=true;
+      const rain=audio.createBiquadFilter();rain.type='highpass';rain.frequency.value=2350;this.rain=audio.createGain();this.rain.gain.value=0;bed.connect(rain).connect(this.rain).connect(mix);
+      const band=audio.createBiquadFilter();band.type='bandpass';band.frequency.value=4850;band.Q.value=8;this.insects=audio.createGain();this.insects.gain.value=0;bed.connect(band).connect(this.insects).connect(mix);bed.start();
       const oscillator = audio.createOscillator(); oscillator.type = 'triangle'; oscillator.frequency.value = 63;
       const motor = audio.createGain(); motor.gain.value = 0; oscillator.connect(motor); motor.connect(mix); oscillator.start();
       this.motor = motor; this.oscillator = oscillator;
@@ -41,9 +47,11 @@ export class TransitAudio {
     if (this.audio && this.mix) this.mix.gain.setTargetAtTime(this.paused || this.muted ? 0 : 0.55, this.audio.currentTime, 0.13);
   }
 
-  update(speed: number, distance: number, aboard: boolean) {
+  update(speed: number, distance: number, aboard: boolean, rainy:boolean) {
     if (!this.audio || this.muted) return;
     const now = this.audio.currentTime;
+    this.rain?.gain.setTargetAtTime(rainy?(aboard?.045:.13):0,now,.3);
+    this.insects?.gain.setTargetAtTime(rainy?0:(.026+.016*Math.sin(now*80))*(aboard?.28:1),now,.025);
     this.street?.gain.setTargetAtTime(aboard ? 0.075 : 0.22, now, 0.36);
     this.motor?.gain.setTargetAtTime((0.006 + speed * 0.010) * (aboard ? 0.82 : Math.max(0, 1 - distance / 17)), now, 0.17);
     this.oscillator?.frequency.setTargetAtTime(57 + speed * 11.4, now, 0.19);
