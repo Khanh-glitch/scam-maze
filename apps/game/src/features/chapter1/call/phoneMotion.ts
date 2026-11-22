@@ -54,3 +54,15 @@ export function phoneMotionOffset(input: MotionInput): number {
   const amplitude = VIBRATION_AMPLITUDE_RATIO * input.layout.screen.height;
   return amplitude * Math.sin(2 * Math.PI * VIBRATION_FREQUENCY_HZ * (elapsed / 1000));
 }
+
+/**
+ * Vertical offset in CSS px to add to `layout.screen.top` for the phone brought up with P: it rises
+ * from below the view into the hand's place (owner), starting with its top just under the bottom edge.
+ */
+export function heldPhoneRiseOffset(input: Pick<MotionInput, "elapsedMs" | "animateEntry" | "reducedMotion" | "layout" | "viewport">): number {
+  if (input.reducedMotion || !input.animateEntry) return 0;
+  const elapsed = Number.isFinite(input.elapsedMs) ? Math.max(0, input.elapsedMs) : 0;
+  if (elapsed >= ENTRY_DURATION_MS) return 0;
+  const start = input.viewport.height - input.layout.screen.top;
+  return start * (1 - easeOutCubic(elapsed / ENTRY_DURATION_MS));
+}

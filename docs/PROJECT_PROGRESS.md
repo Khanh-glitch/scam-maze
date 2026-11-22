@@ -177,6 +177,15 @@ Resolved:
 - The 3D model licenses of some owner-supplied riders, bikes and the Bao Thu model are "not stated" in
   their `SOURCE.md` files; confirm before a public release.
 ## Task History
+### 2026-11-22 — Held phone in a GTA-style right hand
+- **Objective:** owner request: hold the P phone in the right hand like GTA, using the existing arms and phone models; the thumb beside the screen, not on it; the phone where the right hand holds it; the phone slides up from below.
+- **Completed:**
+  - `HeldHand.tsx`: the existing first-person arms (`first_person_animations.glb`) frozen at `rig|Idle` t = 0.5 (fingers wrap the left edge), placed in the phone's own canvas under the phone rig so the screen page covers it; the left arm is hidden by scaling its shoulder bones to zero; the thumb bone is turned to stand beside the right edge; skin uses a dimmed reflection map so it matches the phone.
+  - Placement: the held phone's center sits at 0.66 of the viewport width (right hand), not the middle.
+  - Motion: the held phone rises from below (`heldPhoneRiseOffset`); the call phone keeps its slide from the right.
+- **Files:** new `apps/game/src/features/chapter1/call/HeldHand.tsx`; modified `chapter1/call/{PhoneModel3D.tsx,callLayout.ts,phoneMotion.ts,heldPhoneLayout.test.ts}`, this file.
+- **Validation:** `tsc -b --noEmit` clean; targeted `vitest run` (`chapter1/call`, `RoomPhoneModelLayer`, `RoomChapterLayer.foundation`): 251 tests passed (owner asked to skip unrelated tests, so the full suite was not run); `pnpm build:game` passed. Headless Chrome with the Apple M4 GPU: the phone rises from the bottom right, the thumb stands beside the right edge, the fingers wrap the left edge.
+- **Limitations:** static pose (no finger motion when tapping); the hand is lit by the phone canvas, not by the room lights; the player cannot walk while the phone is up.
 ### 2026-11-22 — Scam realism rule, unskippable opening, held phone without Close
 - **Objective:** owner feedback: (1) rule: a scam must imitate its real target with only a few details wrong; (2) in a new game Alex's opening cannot be skipped; (3) the held phone has no Close button (P puts it away), turns in toward the view, and is a little bigger.
 - **Completed:**
