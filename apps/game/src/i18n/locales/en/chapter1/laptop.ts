@@ -12,6 +12,7 @@ const laptop = {
     desktop: {
       homeLabel: "Desktop",
       appsGroup: "Applications",
+      taskTarget: "current task",
       launch: "Open {{app}}",
       windowLabel: "{{app}} window",
       backToDesktop: "Back to desktop",

@@ -61,6 +61,11 @@ export interface RoomStoryCommands {
    * walking (before the start, in an inspect pose). null as prop stops watching. Optional.
    */
   watchTaskMarker?(prop: ScreenDeviceId | null, listener?: (marker: TaskMarker | null) => void): void;
+  /**
+   * Takes the phone off the nightstand (true) or puts it back (false). The story host does this when the
+   * player carries the phone and brings it up with a key instead. Hidden, it is not drawn, lit or aimed at. Optional.
+   */
+  setPhoneCarried?(carried: boolean): void;
 }
 /** One task-marker report of `watchTaskMarker`. */
 export interface TaskMarker extends TaskMarkerPlacement {

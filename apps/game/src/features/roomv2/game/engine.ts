@@ -909,6 +909,18 @@ export class Engine implements RoomStoryCommands {
   duckForVoice(on: boolean) { this.audio.duckForVoice(on); }
   /** Leaves the inspect pose even when the host would keep the player there. */
   closeInspect() { this.endInspect(true); }
+  private phoneCarried = false;
+  /** Story host: the player carries the phone, so the one on the nightstand goes (not drawn, lit or aimed at). */
+  setPhoneCarried(carried: boolean) {
+    if (carried === this.phoneCarried) return;
+    this.phoneCarried = carried;
+    const phone = this.apt.phone;
+    phone.visible = !carried;
+    const index = this.apt.hits.indexOf(phone);
+    if (carried && index >= 0) this.apt.hits.splice(index, 1);
+    else if (!carried && index < 0) this.apt.hits.push(phone);
+    if (carried && this.hovered === 'phone') { this.hovered = null; this.ui.prompt = null; this.ui.anchor = null; this.ui.focus = false; this.emit(); }
+  }
 
   /**
    * Story host: follow the projected screen of a device. While the matching inspect pose is reached the
@@ -1336,7 +1348,7 @@ export class Engine implements RoomStoryCommands {
     const bright = this.phoneMode === 'aod' ? 0.55 : this.phoneMode === 'dark' ? 0 : 1.1;
     const pc = a.phoneScreenMat.color.r + (bright - a.phoneScreenMat.color.r) * Math.min(1, dt * 6);
     a.phoneScreenMat.color.setScalar(pc);
-    a.lights.phone.intensity = (this.phoneMode === 'aod' ? 0.0 : ringing ? 0.22 + Math.sin(this.t * 6) * 0.06 : 0.14) * (pc / 1.1);
+    a.lights.phone.intensity = this.phoneCarried ? 0 : (this.phoneMode === 'aod' ? 0.0 : ringing ? 0.22 + Math.sin(this.t * 6) * 0.06 : 0.14) * (pc / 1.1);
     // Only the ringing and call screens animate; the others change with the minute or the mode, so a
     // 390x844 canvas is no longer redrawn and re-uploaded twice a second for nothing.
     const animated = ringing || this.phoneMode === 'call';

@@ -15,6 +15,10 @@ import { clockAtMinute, type DeviceView } from "../../../game/narrative/device";
 import type { PhoneMessageView, PhoneRecordsView } from "../../../game/narrative/selectors";
 import type { BlockedTransfer } from "../../../game/narrative/blocked";
 import { ScreenSurface } from "../room/ScreenSurface";
+import { PhoneScreenHost } from "../call/PhoneScreenHost";
+import { heldPhoneLayout } from "../call/callLayout";
+import type { PhoneScreenSink } from "../call/phoneScreenSink";
+import { useViewport } from "../call/useViewport";
 import { MailClient } from "../room/desktop/apps/MailClient";
 import { BankingApp, type BankFacts } from "../room/desktop/banking/BankingApp";
 import { browserReducer, INITIAL_BROWSER_STATE, type BrowserState } from "../room/desktop/browser/browserState";
@@ -93,6 +97,12 @@ export interface PhoneOverlayProps {
    * the home screen then shows a "Decide" button.
    */
   onDecide?: () => void;
+  /**
+   * The phone brought up with P (like in GTA): low on the right of the screen, on the 3D phone model
+   * when it is there (`model`), else on a flat frame in the same place (`fallback`). No backdrop:
+   * the room stays visible around it.
+   */
+  held?: { screenSink: PhoneScreenSink; mode: "model" | "fallback" };
 }
 
 const WEEKDAY_KEYS = [
@@ -126,8 +136,11 @@ export const PhoneOverlay: React.FC<PhoneOverlayProps> = ({
   browserState,
   onBrowserState,
   onDecide,
+  held,
 }) => {
   const { t } = useTranslation("chapter1");
+  const viewport = useViewport();
+  const heldLayout = useMemo(() => heldPhoneLayout(viewport), [viewport]);
   const [route, setRoute] = useState<PhoneRoute>(initialRoute);
   const [locked, setLocked] = useState<boolean>(startLocked ?? initialRoute === "home");
   const [openItems, setOpenItems] = useState<Readonly<Record<string, string | null>>>({});
@@ -355,6 +368,26 @@ export const PhoneOverlay: React.FC<PhoneOverlayProps> = ({
     );
   }
 
+  if (held) {
+    return (
+      <div className="pointer-events-none fixed inset-0 z-40" data-testid="held-phone" data-screen-mode="held" data-held-mode={held.mode}>
+        <PhoneScreenHost mode={held.mode} layout={heldLayout} screenSink={held.screenSink}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("phone.overlay.name")}
+            className="pointer-events-auto flex h-full w-full flex-col overflow-hidden text-[#f2f7fb]"
+            style={{ background: PHONE_COLORS.wallpaper, borderRadius: "inherit" }}
+            data-phone-frame
+            data-phone-locked={locked ? "true" : "false"}
+          >
+            <PhoneTopBar time={time} island={held.mode === "fallback"} />
+            {screen}
+          </div>
+        </PhoneScreenHost>
+      </div>
+    );
+  }
   return (
     <ScreenSurface layout={layout} device="phone" panelWrapperClassName="fixed inset-0 z-40 flex items-center justify-center bg-[#0a1220]/70 sm:p-4">
       <div

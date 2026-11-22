@@ -45,7 +45,11 @@ export interface LaptopDesktopProps {
    * back to the desktop (the key is used up), false when the laptop should close.
    */
   registerEscape?: (handler: (() => boolean) | null) => void;
+  /** The app the current task step happens in: its icon and taskbar button carry the task marker. */
+  taskAppId?: string | null;
 }
+
+const ICON_TASK_TARGET = "/assets/ui/hud/scammaze-quest-icon-512.png";
 
 function iconFor(id: string): TabIcon {
   return Object.hasOwn(TAB_ICONS, id) ? TAB_ICONS[id] : AppWindow;
@@ -54,7 +58,7 @@ function iconFor(id: string): TabIcon {
 const FOCUS_RING = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8fe0e8]";
 const BAR_BUTTON = `relative flex h-8 cursor-pointer items-center gap-2 rounded-md border px-2.5 text-xs font-medium motion-safe:transition-colors ${FOCUS_RING}`;
 
-export const LaptopDesktop: React.FC<LaptopDesktopProps> = ({ apps, onClose, clockText, initialState, onStateChange, registerEscape }) => {
+export const LaptopDesktop: React.FC<LaptopDesktopProps> = ({ apps, onClose, clockText, initialState, onStateChange, registerEscape, taskAppId = null }) => {
   const { t } = useTranslation("chapter1");
   const baseId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -225,14 +229,17 @@ export const LaptopDesktop: React.FC<LaptopDesktopProps> = ({ apps, onClose, clo
                       const theme = themeFor(app.id);
                       const running = isRunning(state, app.id);
                       const unread = app.badge ?? 0;
+                      const target = app.id === taskAppId;
                       return (
                         <button
                           key={app.id}
                           type="button"
                           data-desktop-icon
                           data-testid={`desktop-icon-${app.id}`}
+                          data-task-target={target ? "true" : undefined}
                           aria-label={[
                             t("laptop.desktop.launch", { app: app.label }),
+                            target ? t("laptop.desktop.taskTarget") : "",
                             unread > 0 ? t("laptop.desktop.unread", { count: unread }) : "",
                             running ? statusText(app.id) : "",
                           ]
@@ -251,6 +258,17 @@ export const LaptopDesktop: React.FC<LaptopDesktopProps> = ({ apps, onClose, clo
                             }}
                           >
                             <Icon className="h-6 w-6 text-white" aria-hidden="true" />
+                            {target && (
+                              <>
+                                <span className="task-target-pulse pointer-events-none absolute -inset-1 rounded-[17px]" />
+                                <img
+                                  src={ICON_TASK_TARGET}
+                                  alt=""
+                                  draggable={false}
+                                  className="task-marker-bob pointer-events-none absolute -left-2.5 -top-3 h-6 w-6 select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]"
+                                />
+                              </>
+                            )}
                             {unread > 0 && (
                               <span
                                 data-testid={`desktop-badge-${app.id}`}
@@ -396,10 +414,13 @@ export const LaptopDesktop: React.FC<LaptopDesktopProps> = ({ apps, onClose, clo
                 >
                   <span
                     aria-hidden="true"
-                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded"
+                    className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded"
                     style={{ background: `linear-gradient(150deg, ${theme.tileFrom}, ${theme.tileTo})` }}
                   >
                     <Icon className="h-3 w-3 text-white" aria-hidden="true" />
+                    {app.id === taskAppId && status !== "active" && (
+                      <img src={ICON_TASK_TARGET} alt="" draggable={false} data-testid={`taskbar-task-${app.id}`} className="pointer-events-none absolute -right-2 -top-2 h-3.5 w-3.5 select-none" />
+                    )}
                   </span>
                   <span className="max-w-24 truncate" aria-hidden="true">
                     {app.label}

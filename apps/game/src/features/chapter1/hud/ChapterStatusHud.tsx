@@ -90,10 +90,18 @@ export interface ChapterStatusClusterProps {
   fatigueLevel?: FatigueLevel;
   /** Placed on the map's lower-left corner (the task button). */
   mapCorner?: React.ReactNode;
+  /**
+   * One row for the band above the open laptop: the ring at a small size (no map label, no hover box)
+   * and the clock with the weekday and the time left on one line.
+   */
+  compact?: boolean;
 }
 
+/** Size of the ring box in the compact row (px). */
+const COMPACT_SIZE = 52;
+
 /** Top-left cluster: the map disc with the status ring, and the clock beside it. */
-export const ChapterStatusCluster: React.FC<ChapterStatusClusterProps> = ({ resources, fatigueLevel, mapCorner }) => {
+export const ChapterStatusCluster: React.FC<ChapterStatusClusterProps> = ({ resources, fatigueLevel, mapCorner, compact = false }) => {
   const { t } = useTranslation(["chapter1", "worlds"]);
   const text = t as unknown as Tx;
   const [focus, setFocus] = useState<StatId | null>(null);
@@ -136,11 +144,16 @@ export const ChapterStatusCluster: React.FC<ChapterStatusClusterProps> = ({ reso
 
   const clock = simulatedClock(resources.timeMinutes);
   const clockText = `${String(clock.hour).padStart(2, "0")}:${String(clock.minute).padStart(2, "0")}`;
-  const focused = stats.find((stat) => stat.id === focus) ?? null;
+  const focused = compact ? null : (stats.find((stat) => stat.id === focus) ?? null);
 
   return (
-    <div className={`pointer-events-none relative flex items-start gap-4 ${mapCorner ? "pb-7" : ""}`} data-testid="chapter-status-cluster">
-      <div className="relative shrink-0" style={{ width: SIZE, height: SIZE }}>
+    <div
+      className={`pointer-events-none relative flex gap-4 ${compact ? "items-center gap-3" : "items-start"} ${mapCorner && !compact ? "pb-7" : ""}`}
+      data-testid="chapter-status-cluster"
+      data-compact={compact ? "true" : undefined}
+    >
+      <div className="relative shrink-0" style={compact ? { width: COMPACT_SIZE, height: COMPACT_SIZE } : { width: SIZE, height: SIZE }}>
+      <div className="relative" style={compact ? { width: SIZE, height: SIZE, transform: `scale(${COMPACT_SIZE / SIZE})`, transformOrigin: "0 0" } : { width: SIZE, height: SIZE }}>
         <div className="absolute" style={{ left: PAD, top: PAD }}>
           <NoSignalMinimap label={t("worlds:quests.noSignal")} size={DISC} />
         </div>
@@ -194,9 +207,18 @@ export const ChapterStatusCluster: React.FC<ChapterStatusClusterProps> = ({ reso
             );
           })}
         </svg>
-        {mapCorner}
+        {!compact && mapCorner}
+      </div>
       </div>
 
+      {compact ? (
+        <div className={`flex items-baseline gap-2.5 whitespace-nowrap ${SHADOW}`} data-testid="resource-time" role="group" aria-label={t("chapter1:hud.status.clock")}>
+          <span className="font-menu text-2xl font-bold leading-none tracking-[0.04em] text-[#f3efe4] tabular-nums">{clockText}</span>
+          <span className="font-menu text-xs font-semibold uppercase tracking-[0.18em] text-zinc-300">{t(`chapter1:${WEEKDAY_KEYS[clock.isoWeekday - 1]}`)}</span>
+          <span className="font-menu text-xs font-semibold tracking-[0.04em] text-[#c9bbf7]">{t("chapter1:hud.status.timeLeft", { time: formatSpan(text, resources.timeMinutes) })}</span>
+          <span className="sr-only" data-testid="resource-thesis">{t("chapter1:hud.status.thesisShort", { value: resources.thesisProgress })}</span>
+        </div>
+      ) : (
       <div className={`pt-5 ${SHADOW}`} style={{ width: CLOCK_COLUMN_PX }} data-testid="resource-time" role="group" aria-label={t("chapter1:hud.status.clock")}>
         <p className="font-menu text-4xl font-bold leading-none tracking-[0.04em] text-[#f3efe4] tabular-nums">{clockText}</p>
         <p className="mt-1 font-menu text-xs font-semibold uppercase tracking-[0.18em] text-zinc-300">{t(`chapter1:${WEEKDAY_KEYS[clock.isoWeekday - 1]}`)}</p>
@@ -207,6 +229,7 @@ export const ChapterStatusCluster: React.FC<ChapterStatusClusterProps> = ({ reso
           {t("chapter1:hud.status.thesisShort", { value: resources.thesisProgress })}
         </p>
       </div>
+      )}
 
       {focused && (
         <div
