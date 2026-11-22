@@ -13,7 +13,7 @@
  * This file imports nothing from the narrative store, the selectors or `useChapterState`: the
  * call status reaches it only as the `ringing` prop.
  */
-import { Component, useEffect, useMemo, useRef, type ErrorInfo, type FC, type ReactNode } from "react";
+import { Component, Suspense, useEffect, useMemo, useRef, type ErrorInfo, type FC, type ReactNode } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
@@ -28,7 +28,8 @@ import {
   type Rect,
 } from "./callLayout";
 import { applyPhoneReflections, createPhoneReflectionMap } from "./phoneReflections";
-import { phoneMotionOffset } from "./phoneMotion";
+import { heldPhoneRiseOffset, phoneMotionOffset } from "./phoneMotion";
+import { HeldHand } from "./HeldHand";
 import { quadBounds, type Point } from "./screenQuad";
 import type { PhoneScreenSink } from "./phoneScreenSink";
 
@@ -194,15 +195,19 @@ export const PhoneModel3D: FC<PhoneModel3DProps> = ({ live, ringing, reducedMoti
     const layout = props.placement === "held" ? heldPhoneLayout(viewport) : computeCallLayout(viewport);
     // The held phone leaves the room as it is; only a call dims it.
     dimming.visible = props.placement !== "held";
-    const offset = phoneMotionOffset({
+    const motion = {
       elapsedMs: now - firstFrameAtRef.current,
       animateEntry: animateEntryRef.current,
       ringing: props.ringing,
       reducedMotion: props.reducedMotion,
       layout,
       viewport,
-    });
-    const target: Rect = { ...layout.screen, left: layout.screen.left + offset };
+    };
+    // The held phone rises from below into the hand; the call phone slides in from the right.
+    const held = props.placement === "held";
+    const offset = held ? 0 : phoneMotionOffset(motion);
+    const rise = held ? heldPhoneRiseOffset(motion) : 0;
+    const target: Rect = { ...layout.screen, left: layout.screen.left + offset, top: layout.screen.top + rise };
     const pose = solveScreenPose(target, viewport, fov);
 
     // Copy the camera pose (read only) into the rig, then move along the camera axes.
@@ -254,6 +259,12 @@ export const PhoneModel3D: FC<PhoneModel3DProps> = ({ live, ringing, reducedMoti
       <group rotation={[0, Math.PI, 0]}>
         <primitive object={model} />
       </group>
+      {/* The hand that holds the phone brought up with P; it loads on its own and never holds back the phone. */}
+      {placement === "held" && (
+        <Suspense fallback={null}>
+          <HeldHand />
+        </Suspense>
+      )}
       <group ref={anchorRef} position={[0, 0, SCREEN_FRONT_OFFSET_M]} />
       <mesh
         ref={dimmingRef}

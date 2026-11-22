@@ -105,9 +105,11 @@ export const HELD_BOTTOM_INSET = 72;
 /** Height of the held phone's screen as a share of the viewport height, and its maximum in CSS pixels. */
 export const HELD_SCREEN_HEIGHT_RATIO = 0.74;
 export const HELD_MAX_SCREEN_HEIGHT = 700;
+/** Center of the held phone's screen as a share of the viewport width. */
+export const HELD_CENTER_X_RATIO = 0.66;
 
 /**
- * Where the held phone's screen goes (the phone brought up with P, like in GTA): low on the right,
+ * Where the held phone's screen goes (the phone brought up with P, like in GTA): low, right of center,
  * clear of the chip row, so the room stays visible. Narrow viewports keep the call layout's screen.
  */
 export function heldPhoneLayout(viewport: Viewport): CallLayout {
@@ -117,8 +119,9 @@ export function heldPhoneLayout(viewport: Viewport): CallLayout {
   const H = viewport.height;
   const height = Math.min(HELD_SCREEN_HEIGHT_RATIO * H, HELD_MAX_SCREEN_HEIGHT, H - HELD_BOTTOM_INSET - WIDE_MARGIN);
   const width = height * SCREEN_ASPECT;
-  const right = Math.max(WIDE_MARGIN, 0.05 * W);
-  const screen = screenRectOfHeight(height, W - right - width, H - HELD_BOTTOM_INSET - height);
+  // Where the right hand holds a phone in front of the player: right of center, not at the edge (owner).
+  const left = Math.min(W - WIDE_MARGIN - width, HELD_CENTER_X_RATIO * W - width / 2);
+  const screen = screenRectOfHeight(height, left, H - HELD_BOTTOM_INSET - height);
   return { ...call, screen, screenCornerRadius: SCREEN_CORNER_RATIO * width };
 }
 
