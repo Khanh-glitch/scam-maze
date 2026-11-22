@@ -60,6 +60,8 @@ export interface Mission01VoiceState {
   current: Mission01VoiceCue | null;
   /** Where the clip of that line is now, in milliseconds. The subtitles follow it. */
   positionMs: () => number;
+  /** Alex's opening line is playing (its clip, or its caption when the clip cannot load). The new-game intro waits for it (owner). */
+  introSpeaking: boolean;
 }
 
 interface Playing {
@@ -305,5 +307,5 @@ export function useMission01Voice(options: UseMission01VoiceOptions): Mission01V
   }, []);
 
   const positionMs = useRef(() => playing.current?.handle.positionMs() ?? 0).current;
-  return { current, positionMs };
+  return { current, positionMs, introSpeaking: current === "intro" };
 }

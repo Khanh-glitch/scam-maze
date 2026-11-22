@@ -59,6 +59,8 @@ const ENTRY_ANIMATION_WINDOW_MS = 150;
  */
 const PHONE_TILT_Y = -0.16;
 const PHONE_TILT_X = -0.07;
+/** Turn of the held phone (P) toward the view center (radians), against the off-axis view of its side. */
+const HELD_TILT_Y = -0.22;
 /** Fallback vertical field of view (degrees) if the camera is not a perspective camera. */
 const DEFAULT_FOV_DEG = 70;
 
@@ -209,9 +211,10 @@ export const PhoneModel3D: FC<PhoneModel3DProps> = ({ live, ringing, reducedMoti
     rig.translateX(pose.x);
     rig.translateY(pose.y);
     rig.translateZ(pose.z - SCREEN_FRONT_OFFSET_M);
-    // The held phone stays square to the view: off the view axis, a turn toward the center would
-    // stretch it wider than an iPhone (owner). The call keeps its turn.
-    if (props.placement !== "held") {
+    // The held phone turns its face in toward the view center, so its outer side does not show
+    // (owner); the call keeps its own turn.
+    if (props.placement === "held") rig.rotateY(HELD_TILT_Y);
+    else {
       rig.rotateY(PHONE_TILT_Y);
       rig.rotateX(PHONE_TILT_X);
     }

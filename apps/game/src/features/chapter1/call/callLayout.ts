@@ -103,8 +103,8 @@ function screenRectOfHeight(height: number, left: number, top: number): Rect {
 /** The held phone (P) stays clear of the bottom-right chip row by this much, in CSS pixels. */
 export const HELD_BOTTOM_INSET = 72;
 /** Height of the held phone's screen as a share of the viewport height, and its maximum in CSS pixels. */
-export const HELD_SCREEN_HEIGHT_RATIO = 0.6;
-export const HELD_MAX_SCREEN_HEIGHT = 560;
+export const HELD_SCREEN_HEIGHT_RATIO = 0.74;
+export const HELD_MAX_SCREEN_HEIGHT = 700;
 
 /**
  * Where the held phone's screen goes (the phone brought up with P, like in GTA): low on the right,

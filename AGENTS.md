@@ -9,7 +9,7 @@ authoritative for their topics:
 | `.kiro/steering/safety.md` | Never call a URL "safe"; string-only URL analysis; no live links |
 | `.kiro/steering/icons.md` | No emoji as icons |
 | `.kiro/steering/language.md` | All repository content in English; game UI localized (en default/fallback, vi) |
-| `.kiro/steering/audience.md` | Vietnam and worldwide with equal weight; fictional brands and reserved domains |
+| `.kiro/steering/audience.md` | Vietnam and worldwide with equal weight; scams imitate their real target with small, findable differences |
 
 Key documents: **[product positioning](docs/product/PRODUCT_POSITIONING.md) (canonical product
 definition)** · [master plan](SCAMMAZE_KIROWEEN_2026_FULL_PLAN.md) ·
@@ -47,8 +47,10 @@ definition)** · [master plan](SCAMMAZE_KIROWEEN_2026_FULL_PLAN.md) ·
   verified unless you verified it in this task.
 - Avoid unnecessary architecture complexity (plan section 4.1: no microservices, Kubernetes,
   vector databases, etc. without a measured need).
-- Respect safety and privacy: fictional brands, reserved domains (`.test`, `.example`,
-  `.invalid`), no real credentials, OTPs or banking data, ever. AI scammer dialogue stays
+- Respect safety and privacy: a scam imitates its real target with small, findable differences
+  (owner rule, see `audience.md`); real and look-alike domains only from `approvedDomains.ts`,
+  never as live links; other content keeps reserved domains (`.test`, `.example`, `.invalid`);
+  no real credentials, OTPs, banking data or phone numbers, ever. AI scammer dialogue stays
   fictional and defensive and must never contain instructions usable for real fraud.
 - The core game must work without AI and without the backend (offline once assets and scenarios
   are loaded).

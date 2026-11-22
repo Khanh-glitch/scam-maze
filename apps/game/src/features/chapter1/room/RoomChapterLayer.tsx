@@ -1670,6 +1670,7 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
             mode={introMode}
             lines={introLines}
             cinematic={!Object.hasOwn(scenario.dialogues, "dlg.intro")}
+            holdForVoice={alexVoice.introSpeaking}
             onLineChange={goToIntroLine}
             controlIds={INTRO_CONTROLS}
             voiceGain={voiceGain(
