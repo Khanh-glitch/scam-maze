@@ -12,7 +12,7 @@ const blocked: BlockedTransfer = { eventId: "m01.transfer-2", atMinute: 55, amou
 describe("buildTransactions", () => {
   it("lists newest first, with completed lines and blocked transfers apart", () => {
     // The device view gives the ledger newest first.
-    const ledger = [line(2, { itemId: "page.fee", actionId: "pay-card", category: "loss" }), line(1), line(0, { amount: 5000 })];
+    const ledger = [line(2, { itemId: "page.fee", actionId: "enter-code", category: "loss" }), line(1), line(0, { amount: 5000 })];
     const list = buildTransactions(ledger, [blocked]);
     expect(list.map((tx) => tx.id)).toEqual(["blocked-m01.transfer-2", "tx-2", "tx-1", "tx-0"]);
     expect(list.find((tx) => tx.id === "blocked-m01.transfer-2")).toMatchObject({ status: "blocked", amount: -500000, kind: "transfer", reference: "BL-0001" });
@@ -24,14 +24,14 @@ describe("buildTransactions", () => {
       line(3, { amount: 2000 }),
       line(2, { category: "locked", itemId: "msg.job", actionId: "deposit-1" }),
       line(1),
-      line(0, { itemId: "page.fee", actionId: "pay-card", category: "loss" }),
+      line(0, { itemId: "page.fee", actionId: "enter-code", category: "loss" }),
     ];
     const kinds = Object.fromEntries(buildTransactions(ledger, []).map((tx) => [tx.id, tx.kind]));
     expect(kinds).toEqual({ "tx-3": "income", "tx-2": "deposit", "tx-1": "transfer", "tx-0": "payment" });
   });
 
   it("links the fee to its email, page and evidence, and each transfer to its own alert", () => {
-    const ledger = [line(2), line(1), line(0, { itemId: "page.fee", actionId: "pay-card", category: "loss" })];
+    const ledger = [line(2), line(1), line(0, { itemId: "page.fee", actionId: "enter-code", category: "loss" })];
     const list = buildTransactions(ledger, []);
     const fee = list.find((tx) => tx.id === "tx-0")!;
     expect(fee.relatedItemIds).toEqual(["mail.clearance", "page.fee"]);

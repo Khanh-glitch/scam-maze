@@ -265,13 +265,15 @@ describe("the in-game browser from Mail", () => {
     expect(rig.store().getState().resources.cash).toBe(start.resources.cash);
     fireEvent.click(within(laptop).getByTestId("pay-submit"));
     state = rig.store().getState();
-    expect(state.resources.cash).toBe(start.resources.cash - 800_000);
+    // The card details alone take nothing: the bank asks for its code first.
+    expect(state.resources.cash).toBe(start.resources.cash);
     expect(state.persistent.accountCompromised).toBeFalsy();
     await within(laptop).findByTestId("fake-step-verify");
     // On the laptop the code is read on the phone and typed in.
     fireEvent.change(within(laptop).getByTestId("verify-code"), { target: { value: "481206" } });
     fireEvent.click(within(laptop).getByTestId("verify-submit"));
     state = rig.store().getState();
+    expect(state.resources.cash).toBe(start.resources.cash - 800_000);
     expect(state.persistent.verificationCodeExposed).toBe(true);
     expect(state.persistent.accountCompromised).toBe(true);
     await within(laptop).findByTestId("fake-step-complete");

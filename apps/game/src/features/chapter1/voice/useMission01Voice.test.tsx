@@ -258,8 +258,9 @@ describe("what the player sees and does", () => {
     const fake = fakePort();
     const store = createChapterStore(started([advance(10), use("mail.clearance", "open-link"), use("page.fee", "sign-in"), use("page.fee", "pay-card")]), S);
     const view = mount(store, fake.port, { viewing: null });
-    const before = store.getState().resources.cash;
     await dispatch(store, use("page.fee", "enter-code"));
+    // The fee leaves with the code; the transfer comes after it.
+    const before = store.getState().resources.cash;
     await dispatch(store, advance(MISSION_01_CONFIG.unauthorizedTransfers[0].afterMinutes));
     // The money left on time, and Alex said nothing about it.
     expect(store.getState().resources.cash).toBe(before - MISSION_01_CONFIG.unauthorizedTransfers[0].amountVnd);

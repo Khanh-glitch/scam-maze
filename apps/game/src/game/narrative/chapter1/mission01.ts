@@ -202,17 +202,18 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
         label: "Pay the fee by card",
         visibleWhen: [done("page.fee", "sign-in")],
         timeCostMinutes: M.payCard,
-        cashCost: MISSION_01_CONFIG.clearanceFeeVnd,
-        ledgerLabel: "ledger.clearance-fee",
-        ledgerCategory: "loss",
-        counterparty: "Payment page",
         once: true,
       },
+      // As with a real card payment, the money leaves only when the bank's code is entered.
       {
         id: "enter-code",
         label: "Enter the verification code from my phone",
         visibleWhen: [done("page.fee", "pay-card")],
         timeCostMinutes: M.enterCode,
+        cashCost: MISSION_01_CONFIG.clearanceFeeVnd,
+        ledgerLabel: "ledger.clearance-fee",
+        ledgerCategory: "loss",
+        counterparty: "Payment page",
         once: true,
         effects: [
           { kind: "setPersistent", flag: "verificationCodeExposed", value: true },
@@ -415,7 +416,7 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
       {
         id: "save-fee-record",
         label: "Download the receipt of the confirmation fee payment",
-        visibleWhen: [done("page.fee", "pay-card")],
+        visibleWhen: [done("page.fee", "enter-code")],
         timeCostMinutes: M.saveRecord,
         once: true,
         effects: [{ kind: "adjustResource", resource: "evidence", delta: 1 }],

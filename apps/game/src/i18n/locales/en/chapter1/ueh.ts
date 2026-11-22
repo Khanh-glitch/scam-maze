@@ -175,7 +175,7 @@ const ueh = {
       needPaymentBody: "The verification step comes after the payment.",
       back: "Go back",
       verifyTitle: "Verify the payment",
-      verifyBody: "A verification code was sent to your phone. Enter it to finish.",
+      verifyBody: "Your bank sent a verification code to your phone. The payment of {{amount}} VND goes through only after you enter it.",
       code: "Verification code",
       codeSuggestion: "Code {{code}}",
       codeWrong: "This code is not correct. Check the text message and try again.",
