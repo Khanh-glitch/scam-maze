@@ -29,6 +29,11 @@ export const MISSION_01_CONFIG = {
   /** The amount the fake email asks for. */
   clearanceFeeVnd: 800_000,
   /**
+   * The one-time code the bank texts after the card payment on the fake page. Fictional; the player
+   * reads it on the phone and types it on the page, like the real thing.
+   */
+  paymentCode: "481206",
+  /**
    * Unauthorized transfers after the verification code was given: minutes after the code was
    * entered, and the amount. A transfer can only take the cash that is there.
    */
@@ -129,6 +134,8 @@ export const MISSION_01_LEDGER_LABELS: Record<string, string> = {
   "ledger.unauthorized-3": "Transfer to an unknown recipient",
 };
 
+/** The bank's one-time code text (English); the code itself is `MISSION_01_CONFIG.paymentCode`. */
+const MISSION_01_CODE_TEXT = `${MISSION_01_CONFIG.paymentCode} is your code to approve a card payment of ${FEE} VND to UNI GRADUATION OFFICE. Never share this code with anyone. The bank will never ask you for it.`;
 /** The alert never repeats an amount: the ledger is the one place that shows what actually left. */
 const TRANSFER_ALERT =
   "A transfer from your account to an account you do not know was approved. The amount is in your bank app. If this was not you, call the bank's official line.";
@@ -149,10 +156,11 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
     arrives: { atMinute: 10 },
     actions: [
       { id: "open-link", label: "Open the payment link", timeCostMinutes: M.openLink, once: true },
-      // Evidence is saved by choice, never by opening the mail.
+      // Reporting is a choice, never a side effect of opening the mail. The report keeps a copy of the
+      // email, the sender and the link address (the "evidence" of this mission).
       {
         id: "save-record",
-        label: "Save the email, the sender and the link address as evidence",
+        label: "Report to the IT help desk",
         timeCostMinutes: M.saveRecord,
         once: true,
         effects: [{ kind: "adjustResource", resource: "evidence", delta: 1 }],
@@ -174,7 +182,7 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
       { id: "close", label: "Close the page", timeCostMinutes: M.closePage },
       {
         id: "save-address",
-        label: "Save the page address as evidence",
+        label: "Report this site",
         timeCostMinutes: M.saveRecord,
         once: true,
         effects: [{ kind: "adjustResource", resource: "evidence", delta: 1 }],
@@ -402,11 +410,11 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
     app: "files",
     folder: "bank",
     title: "Online bank statement",
-    body: "Your online bank statement. You can save a record of a payment or a transfer as evidence.",
+    body: "Your online bank statement. You can download the receipt of a payment or a statement of transfers.",
     actions: [
       {
         id: "save-fee-record",
-        label: "Save the record of the confirmation fee payment as evidence",
+        label: "Download the receipt of the confirmation fee payment",
         visibleWhen: [done("page.fee", "pay-card")],
         timeCostMinutes: M.saveRecord,
         once: true,
@@ -414,7 +422,7 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
       },
       {
         id: "save-transfer-record",
-        label: "Save the record of the unauthorized transfers as evidence",
+        label: "Download a statement of the unauthorized transfers",
         visibleWhen: [{ kind: "eventStatus", eventId: "m01.transfer-1", status: "resolved" }],
         timeCostMinutes: M.saveRecord,
         once: true,
@@ -426,32 +434,32 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
     id: "file.email-record",
     app: "files",
     folder: "evidence",
-    title: "Graduation Clearance email (saved)",
-    body: "A saved copy of the Graduation Clearance email: the sender address, the fee it asks for and the link address.",
+    title: "Report sent: Graduation Clearance email",
+    body: "You reported the Graduation Clearance email to the university IT help desk. The report keeps a copy of the email: the sender address, the fee it asks for and the link address.",
     arrives: { when: [done("mail.clearance", "save-record")] },
   },
   {
     id: "file.address-record",
     app: "files",
     folder: "evidence",
-    title: "Payment page address (saved)",
-    body: "The address of the payment page that the email linked to: pay.uni-graduation-office.example.",
+    title: "Report sent: payment page address",
+    body: "You reported the payment page to the university IT help desk. The report keeps the address that the email linked to: pay.uni-graduation-office.example.",
     arrives: { when: [done("page.fee", "save-address")] },
   },
   {
     id: "file.fee-record",
     app: "files",
     folder: "evidence",
-    title: "Bank record: confirmation fee payment (saved)",
-    body: "A saved record of the card payment made on the payment page: the amount, the time and the recipient shown by your bank.",
+    title: "Receipt: confirmation fee payment",
+    body: "The downloaded receipt of the card payment made on the payment page: the amount, the time and the recipient shown by your bank.",
     arrives: { when: [done("bank.statement", "save-fee-record")] },
   },
   {
     id: "file.transfer-record",
     app: "files",
     folder: "evidence",
-    title: "Bank record: unauthorized transfers (saved)",
-    body: "A saved record of the transfers that left your account without your approval: the amounts, the times and the recipient shown by your bank.",
+    title: "Statement: unauthorized transfers",
+    body: "The downloaded statement of the transfers that left your account without your approval: the amounts, the times and the recipient shown by your bank.",
     arrives: { when: [done("bank.statement", "save-transfer-record")] },
   },
   {
@@ -462,6 +470,16 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
     from: "Account Security <no-reply@university.example>",
     body: "A sign-in to your student account from a device we do not know was recorded. If this was not you, change your password.",
     arrives: { afterAction: { itemId: "page.fee", actionId: "sign-in", minutes: MISSION_01_CONFIG.loginAlertAfterMinutes } },
+  },
+  // The bank's one-time code for the card payment on the page. The text says what the code approves
+  // and that nobody should ask for it: the same words a real bank uses, and the lesson of this step.
+  {
+    id: "msg.bank-code",
+    app: "messages",
+    title: "Bank alerts",
+    from: "Bank",
+    body: `${MISSION_01_CODE_TEXT}`,
+    arrives: { when: [done("page.fee", "pay-card")] },
   },
   ...([1, 2, 3] as const).map(
     (index): DeviceItemDef => ({

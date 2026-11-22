@@ -231,6 +231,7 @@ describe("the in-game browser from Mail", () => {
     const before = rig.store().getState();
     fireEvent.click(within(laptop).getByTestId("clearance-continue"));
     await within(laptop).findByTestId("fake-step-login");
+    fireEvent.focus(within(laptop).getByTestId("login-id"));
     fireEvent.click(within(laptop).getByTestId("login-fill"));
     fireEvent.click(within(laptop).getByRole("tab").parentElement!.querySelector("[data-testid^=browser-tab-close-]")!);
     await within(laptop).findByTestId("browser-newtab");
@@ -246,6 +247,7 @@ describe("the in-game browser from Mail", () => {
     const start = rig.store().getState();
     fireEvent.click(within(laptop).getByTestId("clearance-continue"));
     await within(laptop).findByTestId("fake-step-login");
+    fireEvent.focus(within(laptop).getByTestId("login-id"));
     fireEvent.click(within(laptop).getByTestId("login-fill"));
     expect(rig.store().getState().persistent.loginCredentialsExposed).toBeFalsy();
     fireEvent.click(within(laptop).getByTestId("login-submit"));
@@ -256,14 +258,18 @@ describe("the in-game browser from Mail", () => {
     expect(state.persistent.verificationCodeExposed).toBeFalsy();
     expect(state.world.missions["m01.security-breach"].status).toBe("open");
     await within(laptop).findByTestId("fake-step-payment");
+    fireEvent.focus(within(laptop).getByTestId("pay-number"));
     fireEvent.click(within(laptop).getByTestId("pay-fill"));
+    // The saved card leaves the security code to the player, as the browser does.
+    for (const key of "123") fireEvent.keyDown(within(laptop).getByTestId("pay-cvc"), { key });
     expect(rig.store().getState().resources.cash).toBe(start.resources.cash);
     fireEvent.click(within(laptop).getByTestId("pay-submit"));
     state = rig.store().getState();
     expect(state.resources.cash).toBe(start.resources.cash - 800_000);
     expect(state.persistent.accountCompromised).toBeFalsy();
     await within(laptop).findByTestId("fake-step-verify");
-    fireEvent.click(within(laptop).getByTestId("verify-fill"));
+    // On the laptop the code is read on the phone and typed in.
+    fireEvent.change(within(laptop).getByTestId("verify-code"), { target: { value: "481206" } });
     fireEvent.click(within(laptop).getByTestId("verify-submit"));
     state = rig.store().getState();
     expect(state.persistent.verificationCodeExposed).toBe(true);

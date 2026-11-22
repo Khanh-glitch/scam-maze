@@ -46,7 +46,10 @@ const laptop = {
       linkAddress: "Link address: {{url}}",
       linkUnavailable: "Links cannot be opened here.",
       folderLabel: "Folders",
-    },
+      toolbar: "Message actions",
+      actionDone: "{{label}}: done",
+    },
+
     browser: {
       address: "Address",
       addressPlaceholder: "Enter an address",

@@ -47,7 +47,10 @@ const laptop: LocaleShape<typeof en> = {
       linkAddress: "Địa chỉ liên kết: {{url}}",
       linkUnavailable: "Không thể mở liên kết ở đây.",
       folderLabel: "Thư mục",
-    },
+      toolbar: "Thao tác với thư",
+      actionDone: "{{label}}: đã xong",
+    },
+
     browser: {
       address: "Địa chỉ",
       addressPlaceholder: "Nhập một địa chỉ",

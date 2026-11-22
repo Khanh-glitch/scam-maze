@@ -86,11 +86,16 @@ describe("the phone's own apps show the same game state as the laptop", () => {
     fireEvent.click(within(phone).getByTestId("mail-link"));
     await within(phone).findByTestId("fake-step-notice");
     fireEvent.click(within(phone).getByTestId("clearance-continue"));
-    fireEvent.click(await within(phone).findByTestId("login-fill"));
+    fireEvent.focus(await within(phone).findByTestId("login-id"));
+    fireEvent.click(within(phone).getByTestId("login-fill"));
     fireEvent.click(within(phone).getByTestId("login-submit"));
-    fireEvent.click(await within(phone).findByTestId("pay-fill"));
+    fireEvent.focus(await within(phone).findByTestId("pay-number"));
+    fireEvent.click(within(phone).getByTestId("pay-fill"));
+    // The saved card leaves the security code to the player, as the browser does.
+    for (const key of "123") fireEvent.keyDown(within(phone).getByTestId("pay-cvc"), { key });
     fireEvent.click(within(phone).getByTestId("pay-submit"));
-    fireEvent.click(await within(phone).findByTestId("verify-fill"));
+    fireEvent.focus(await within(phone).findByTestId("verify-code"));
+    fireEvent.click(within(phone).getByTestId("verify-fill"));
     fireEvent.click(within(phone).getByTestId("verify-submit"));
     await within(phone).findByTestId("fake-step-complete");
     const state = rig.store().getState();

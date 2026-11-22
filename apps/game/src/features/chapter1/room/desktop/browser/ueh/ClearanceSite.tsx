@@ -9,8 +9,8 @@
 // separate pages, each after the player filled the form with the game's fictional details. Filling a
 // form and moving between pages change nothing in the story. No value typed or filled here leaves the
 // game, and no password, card or code is ever real.
-import React, { useEffect, useRef } from "react";
-import { ArrowRight, CircleUserRound, CreditCard, KeyRound, ShieldAlert } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { ArrowRight, CircleUserRound, CreditCard, KeyRound, MessageSquare, ShieldAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { DeviceActionView, DeviceItemView, DeviceView } from "../../../../../../game/narrative/device";
 import { MISSION_01_CONFIG } from "../../../../../../game/narrative/chapter1/mission01";
@@ -43,6 +43,8 @@ export const ClearanceSite: React.FC<ClearanceSiteProps> = ({ page, step, view, 
   const { t: translate } = useTranslation("chapter1");
   const t = translate as unknown as Tx;
   const locale = useGameLocale();
+  // A wrong one-time code shows an error under the field, like the real page would.
+  const [codeWrong, setCodeWrong] = useState(false);
 
   // The story's page item and the mail that links to it.
   const host = hostOf(page.url);
@@ -112,8 +114,26 @@ export const ClearanceSite: React.FC<ClearanceSiteProps> = ({ page, step, view, 
     </ol>
   );
 
-  const fill = (values: Record<string, string>) => setFields(values);
+  const fill = (values: Record<string, string>) => setFields({ ...fields, ...values });
   const field = (key: string) => fields[key] ?? "";
+  const setField = (key: string) => (value: string) => fill({ [key]: value });
+  const fillLogin = () => fill({ "login.id": GAME_PROFILE.studentId, "login.password": GAME_PROFILE.passwordMask });
+  const loginSuggestions = [{ testId: "login-fill", primary: GAME_PROFILE.studentId, secondary: GAME_PROFILE.passwordMask, onPick: fillLogin }];
+  const fillCard = () => fill({ "pay.holder": GAME_PROFILE.cardHolder, "pay.number": GAME_PROFILE.cardNumber, "pay.expiry": GAME_PROFILE.cardExpiry });
+  const cardSuggestions = [
+    {
+      testId: "pay-fill",
+      primary: t("ueh.clearance.cardSuggestion", { brand: GAME_PROFILE.cardBrand, last4: GAME_PROFILE.cardLast4 }),
+      secondary: t("ueh.clearance.cardSuggestionDetail", { holder: GAME_PROFILE.cardHolder, expiry: GAME_PROFILE.cardExpiry }),
+      onPick: fillCard,
+    },
+  ];
+  const code = MISSION_01_CONFIG.paymentCode;
+  // The bank's text has arrived: the browser offers its code, as it does with a phone nearby.
+  const codeArrived = Object.values(view.apps).some((items) => items.some((entry) => entry.id === "msg.bank-code"));
+  const codeSuggestions = codeArrived
+    ? [{ testId: "verify-fill", primary: t("ueh.clearance.codeSuggestion", { code }), onPick: () => { setCodeWrong(false); fill({ "verify.code": code }); } }]
+    : [];
 
   let body: React.ReactNode;
   if (step === "notice") {
@@ -164,18 +184,31 @@ export const ClearanceSite: React.FC<ClearanceSiteProps> = ({ page, step, view, 
             {t("ueh.clearance.loginBody")}
           </p>
           <div className="space-y-3">
-            <GameField colors={C} id="login-id" label={t("ueh.clearance.studentId")} value={field("login.id")} placeholder={t("ueh.clearance.fillHint")} />
-            <GameField colors={C} id="login-password" label={t("ueh.clearance.password")} value={field("login.password")} placeholder={t("ueh.clearance.fillHint")} />
+            <GameField
+              colors={C}
+              id="login-id"
+              label={t("ueh.clearance.studentId")}
+              value={field("login.id")}
+              onChange={setField("login.id")}
+              typesAs={GAME_PROFILE.studentId}
+              suggestionsLabel={t("ueh.clearance.savedPasswords")}
+              suggestionsIcon={<KeyRound className="h-3 w-3" aria-hidden="true" />}
+              suggestions={loginSuggestions}
+            />
+            <GameField
+              colors={C}
+              id="login-password"
+              label={t("ueh.clearance.password")}
+              value={field("login.password")}
+              onChange={setField("login.password")}
+              typesAs={GAME_PROFILE.passwordMask}
+              secret
+              suggestionsLabel={t("ueh.clearance.savedPasswords")}
+              suggestionsIcon={<KeyRound className="h-3 w-3" aria-hidden="true" />}
+              suggestions={loginSuggestions.map((entry) => ({ ...entry, testId: "login-fill-password" }))}
+            />
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              className={siteButtonClass("quiet")}
-              data-testid="login-fill"
-              onClick={() => fill({ "login.id": GAME_PROFILE.studentId, "login.password": GAME_PROFILE.passwordMask })}
-            >
-              {t("ueh.clearance.useSavedLogin")}
-            </button>
             {signedIn ? (
               <button type="button" className={siteButtonClass("primary")} data-testid="login-next" onClick={() => go(urlOfPage("fee-payment"))}>
                 {t("ueh.clearance.continue")}
@@ -218,7 +251,7 @@ export const ClearanceSite: React.FC<ClearanceSiteProps> = ({ page, step, view, 
         </Card>
       );
     } else {
-      const ready = field("pay.holder") !== "" && field("pay.number") !== "" && field("pay.expiry") !== "";
+      const ready = field("pay.holder") !== "" && field("pay.number") !== "" && field("pay.expiry") !== "" && field("pay.cvc") !== "";
       const reason = blockedText(payCard);
       body = (
         <div className="space-y-4" data-testid="fake-step-payment">
@@ -228,19 +261,25 @@ export const ClearanceSite: React.FC<ClearanceSiteProps> = ({ page, step, view, 
               {t("ueh.clearance.paymentBody", { amount: fee })}
             </p>
             <div className="space-y-3">
-              <GameField colors={C} id="pay-holder" label={t("ueh.clearance.cardHolder")} value={field("pay.holder")} placeholder={t("ueh.clearance.fillHint")} />
-              <GameField colors={C} id="pay-number" label={t("ueh.clearance.cardNumber")} value={field("pay.number")} placeholder={t("ueh.clearance.fillHint")} />
-              <GameField colors={C} id="pay-expiry" label={t("ueh.clearance.cardExpiry")} value={field("pay.expiry")} placeholder={t("ueh.clearance.fillHint")} />
+              <GameField
+                colors={C}
+                id="pay-number"
+                label={t("ueh.clearance.cardNumber")}
+                value={field("pay.number")}
+                onChange={setField("pay.number")}
+                typesAs={GAME_PROFILE.cardNumber}
+                placeholder="1234 5678 9012 3456"
+                suggestionsLabel={t("ueh.clearance.savedCards")}
+                suggestionsIcon={<CreditCard className="h-3 w-3" aria-hidden="true" />}
+                suggestions={cardSuggestions}
+              />
+              <GameField colors={C} id="pay-holder" label={t("ueh.clearance.cardHolder")} value={field("pay.holder")} onChange={setField("pay.holder")} typesAs={GAME_PROFILE.cardHolder} />
+              <div className="grid grid-cols-2 gap-3">
+                <GameField colors={C} id="pay-expiry" label={t("ueh.clearance.cardExpiry")} value={field("pay.expiry")} onChange={setField("pay.expiry")} typesAs={GAME_PROFILE.cardExpiry} placeholder="MM/YY" />
+                <GameField colors={C} id="pay-cvc" label={t("ueh.clearance.cardCvc")} value={field("pay.cvc")} onChange={setField("pay.cvc")} typesAs={GAME_PROFILE.cardCvc} secret placeholder="CVC" />
+              </div>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                className={siteButtonClass("quiet")}
-                data-testid="pay-fill"
-                onClick={() => fill({ "pay.holder": GAME_PROFILE.cardHolder, "pay.number": GAME_PROFILE.cardNumber, "pay.expiry": GAME_PROFILE.cardExpiry })}
-              >
-                {t("ueh.clearance.useDemoCard")}
-              </button>
               {paid ? (
                 <button type="button" className={siteButtonClass("primary")} data-testid="pay-next" onClick={() => go(urlOfPage("fee-verify"))}>
                   {t("ueh.clearance.continue")}
@@ -284,7 +323,7 @@ export const ClearanceSite: React.FC<ClearanceSiteProps> = ({ page, step, view, 
         </Card>
       );
     } else {
-      const ready = field("verify.code") !== "";
+      const ready = field("verify.code").length === code.length;
       body = (
         <div className="space-y-4" data-testid="fake-step-verify">
           {stepper}
@@ -292,11 +331,23 @@ export const ClearanceSite: React.FC<ClearanceSiteProps> = ({ page, step, view, 
             <p className="mb-3 text-xs" style={{ color: C.muted }}>
               {t("ueh.clearance.verifyBody")}
             </p>
-            <GameField colors={C} id="verify-code" label={t("ueh.clearance.code")} value={field("verify.code")} placeholder={t("ueh.clearance.fillHint")} />
+            <GameField
+              colors={C}
+              id="verify-code"
+              label={t("ueh.clearance.code")}
+              value={field("verify.code")}
+              onChange={(value) => {
+                setCodeWrong(false);
+                fill({ "verify.code": value });
+              }}
+              freeDigits={code.length}
+              placeholder={"\u2022".repeat(code.length)}
+              suggestionsLabel={t("ueh.clearance.fromMessages")}
+              suggestionsIcon={<MessageSquare className="h-3 w-3" aria-hidden="true" />}
+              suggestions={codeSuggestions}
+              invalid={codeWrong ? t("ueh.clearance.codeWrong") : null}
+            />
             <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" className={siteButtonClass("quiet")} data-testid="verify-fill" onClick={() => fill({ "verify.code": GAME_PROFILE.code })}>
-                {t("ueh.clearance.useCode")}
-              </button>
               {verified ? (
                 <button type="button" className={siteButtonClass("primary")} data-testid="verify-next" onClick={() => go(urlOfPage("fee-complete"))}>
                   {t("ueh.clearance.continue")}
@@ -310,6 +361,11 @@ export const ClearanceSite: React.FC<ClearanceSiteProps> = ({ page, step, view, 
                   data-testid="verify-submit"
                   onClick={() => {
                     if (enterCode === null) return;
+                    // Only the code from the bank's text goes through, as on a real page.
+                    if (field("verify.code") !== code) {
+                      setCodeWrong(true);
+                      return;
+                    }
                     onUseItem(item.id, enterCode.id);
                     go(urlOfPage("fee-complete"));
                   }}
