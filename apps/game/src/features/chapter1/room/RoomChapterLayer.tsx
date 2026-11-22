@@ -596,6 +596,8 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
   /** Closing the laptop or the phone leaves the inspect pose too. */
   const leaveInspect = useCallback(
     (kind: OverlayKind) => {
+      // The phone put away over the open laptop leaves the laptop where it is.
+      if (kind === "phone" && isOpen(overlaysRef.current, "laptop")) return;
       if (kind === "laptop" || kind === "phone") bridge.commands?.closeInspect();
     },
     [bridge],
@@ -963,6 +965,8 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
     if (state.status !== "playing" || callInProgress(state)) return;
     const stack = overlaysRef.current;
     if (stack.length === 0) openOverlay({ kind: "phone" });
+    // At the laptop the phone comes up over it, so the bank's code can be read (owner).
+    else if (stack.length === 1 && stack[0].kind === "laptop") openOverlay({ kind: "phone" }, { stack: true });
     else if (top(stack)?.kind === "phone") closeTop();
   }, [closeTop, openOverlay, phoneCarried, store]);
   // Task button on the map: marked while a mission is open that the task list has not shown yet.
@@ -1088,7 +1092,8 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
   const callFocused = uiMode === "call" || uiMode === "decision";
   // On the laptop (and nothing on top of it) the HUD stays: the map, the clock, cash and the task.
   // (Task mode only; the parked story keeps its earlier rule of hiding the HUD there.)
-  const hudOverLaptop = taskMode && !callFocused && overlays.length === 1 && overlays[0].kind === "laptop";
+  const laptopWithPhone = overlays.length === 2 && overlays[0].kind === "laptop" && overlays[1].kind === "phone";
+  const hudOverLaptop = taskMode && !callFocused && ((overlays.length === 1 && overlays[0].kind === "laptop") || laptopWithPhone);
   // The phone brought up with P sits low on the right: the HUD stays as it is, like in GTA.
   const hudWithPhone = taskMode && !callFocused && overlays.length === 1 && overlays[0].kind === "phone";
   const trackerHidden = !hudOverLaptop && !hudWithPhone && (callFocused || uiMode === "investigation" || overlays.length > 0);
@@ -1304,6 +1309,14 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
     commands?.setPhoneCarried?.(true);
     return () => commands?.setPhoneCarried?.(false);
   }, [bridge, engineReady, phoneCarried]);
+  // The open laptop covers the room: the room behind it holds still and draws fewer frames.
+  const laptopOpen = isOpen(overlays, "laptop");
+  useEffect(() => {
+    if (!engineReady || !laptopOpen) return undefined;
+    const commands = bridge.commands;
+    commands?.setBackdrop?.(true);
+    return () => commands?.setBackdrop?.(false);
+  }, [bridge, engineReady, laptopOpen]);
   // The marker over the prop of the current step, while the player walks around (no overlay, call or inspect pose).
   const markerTarget = taskMode && hudVisible && !trackerHidden && inspecting === null ? (trackedMission?.current?.target ?? null) : null;
   // The marker moves itself (DOM writes per frame); the layer only keeps the whole-metre distance for the tracker.

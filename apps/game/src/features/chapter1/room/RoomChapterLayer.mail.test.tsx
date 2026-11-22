@@ -16,7 +16,7 @@ vi.mock("../../../i18n/narrative/lastSubmission.vi", async (importOriginal) => i
 
 const SESSION: ChapterSession = { chapterId: "chapter-1", chapterNumber: 1, sceneId: "apartment", origin: "new-game" };
 const SAVE_SOURCE: SaveGameSource = { read: () => ({ status: "none" }), write: () => true, clear: () => true };
-const URL = "https://pay.uni-graduation-office.example/confirm";
+const URL = "https://payment-ueh.vn/confirm";
 
 function mountLayer() {
   const bridge = new RoomStoryBridge();
@@ -106,10 +106,10 @@ describe("the laptop Mail client", () => {
     const rig = mountLayer();
     const laptop = openMail(rig);
     fireEvent.click(within(laptop).getByTestId("mail-row-mail.clearance"));
-    expect(within(laptop).getByTestId("mail-sender-address").textContent).toBe("clearance@uni-graduation-office.example");
+    expect(within(laptop).getByTestId("mail-sender-address").textContent).toBe("clearance@payment-ueh.vn");
     expect(within(laptop).queryByTestId("mail-sender-details")).toBeNull();
     fireEvent.click(within(laptop).getByTestId("mail-sender-toggle"));
-    expect(within(laptop).getByTestId("mail-detail-domain").textContent).toBe("uni-graduation-office.example");
+    expect(within(laptop).getByTestId("mail-detail-domain").textContent).toBe("payment-ueh.vn");
     expect(within(laptop).getByTestId("mail-sender-toggle").getAttribute("aria-expanded")).toBe("true");
   });
 
@@ -199,7 +199,7 @@ describe("the in-game browser from Mail", () => {
     await within(laptop).findByTestId("browser-newtab");
     // A new tab, then a saved bookmark.
     fireEvent.click(within(laptop).getByTestId("browser-new-tab"));
-    fireEvent.click(await within(laptop).findByTestId("newtab-bookmark-https://library.university.example/hours"));
+    fireEvent.click(await within(laptop).findByTestId("newtab-bookmark-https://lib.ueh.edu.vn/hours"));
     await within(laptop).findByTestId("browser-site-library");
     fireEvent.click(within(laptop).getByTestId("browser-star"));
     fireEvent.click(within(laptop).getByTestId("browser-history-button"));
@@ -286,7 +286,7 @@ describe("the in-game browser from Mail", () => {
     fireEvent.click(within(laptop).getByTestId("desktop-back"));
     fireEvent.click(within(laptop).getByTestId("desktop-icon-browser"));
     fireEvent.click(within(laptop).getByTestId("browser-bookmarks"));
-    fireEvent.click(within(laptop).getByTestId("menu-bookmark-https://portal.university.example/"));
+    fireEvent.click(within(laptop).getByTestId("menu-bookmark-https://student.ueh.edu.vn/"));
     await within(laptop).findByTestId("portal-site");
     expect(within(laptop).getByTestId("portal-access-dashboard").textContent).toBe("Active");
     // Services: the published fees and the Training Office number saved in the phone.

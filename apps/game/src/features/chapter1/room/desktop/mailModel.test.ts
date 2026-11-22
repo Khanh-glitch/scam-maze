@@ -3,10 +3,10 @@ import { hostOf, isWebPageItem, linksOf, mailFolders, mailPreview, messagesIn, M
 
 describe("parseSender", () => {
   it("reads the name and the address of 'Name <address>'", () => {
-    expect(parseSender("Graduation Office <clearance@uni-graduation-office.example>")).toEqual({
+    expect(parseSender("Graduation Office <clearance@payment-ueh.vn>")).toEqual({
       name: "Graduation Office",
-      address: "clearance@uni-graduation-office.example",
-      domain: "uni-graduation-office.example",
+      address: "clearance@payment-ueh.vn",
+      domain: "payment-ueh.vn",
       initials: "GO",
     });
   });
@@ -41,12 +41,12 @@ describe("mailPreview", () => {
 });
 
 describe("splitBody and links", () => {
-  const body = "Pay now: https://pay.uni-graduation-office.example/confirm\n\nIf not, wait (see https://a.example/x).";
+  const body = "Pay now: https://payment-ueh.vn/confirm\n\nIf not, wait (see https://a.example/x).";
 
   it("splits plain text from addresses and drops trailing punctuation", () => {
     const segments = splitBody(body);
     expect(segments.filter((segment) => segment.kind === "link")).toEqual([
-      { kind: "link", url: "https://pay.uni-graduation-office.example/confirm" },
+      { kind: "link", url: "https://payment-ueh.vn/confirm" },
       { kind: "link", url: "https://a.example/x" },
     ]);
     expect(segments.map((segment) => (segment.kind === "text" ? segment.text : segment.url)).join("")).toBe(body);

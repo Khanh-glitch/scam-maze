@@ -209,8 +209,12 @@ export const PhoneModel3D: FC<PhoneModel3DProps> = ({ live, ringing, reducedMoti
     rig.translateX(pose.x);
     rig.translateY(pose.y);
     rig.translateZ(pose.z - SCREEN_FRONT_OFFSET_M);
-    rig.rotateY(PHONE_TILT_Y);
-    rig.rotateX(PHONE_TILT_X);
+    // The held phone stays square to the view: off the view axis, a turn toward the center would
+    // stretch it wider than an iPhone (owner). The call keeps its turn.
+    if (props.placement !== "held") {
+      rig.rotateY(PHONE_TILT_Y);
+      rig.rotateX(PHONE_TILT_X);
+    }
 
     // Dimming plane: centered on the camera axis, behind the screen, covering the frustum.
     const dimmingDistance = -pose.z + DIMMING_DISTANCE_BEHIND_M;

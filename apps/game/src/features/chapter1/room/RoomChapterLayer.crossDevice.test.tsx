@@ -119,7 +119,7 @@ describe("the phone's own apps show the same game state as the laptop", () => {
     // Verify on the laptop portal by bookmark.
     const laptop = openLaptop(rig, "browser");
     fireEvent.click(within(laptop).getByTestId("browser-bookmarks"));
-    fireEvent.click(within(laptop).getByTestId("menu-bookmark-https://portal.university.example/"));
+    fireEvent.click(within(laptop).getByTestId("menu-bookmark-https://student.ueh.edu.vn/"));
     await within(laptop).findByTestId("portal-site");
     closeLaptop(rig);
     // The phone browser starts on its own New Tab, not the laptop's portal tab.

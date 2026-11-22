@@ -105,7 +105,7 @@ const laptop = {
           title: "University Library",
           heading: "Opening hours",
           p1: "During the exam period the library opens one hour earlier and closes one hour later.",
-          p2: "Questions: library@university.example",
+          p2: "Questions: library@ueh.edu.vn",
         },
       },
     },

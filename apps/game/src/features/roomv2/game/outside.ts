@@ -66,6 +66,11 @@ export interface RoomStoryCommands {
    * player carries the phone and brings it up with a key instead. Hidden, it is not drawn, lit or aimed at. Optional.
    */
   setPhoneCarried?(carried: boolean): void;
+  /**
+   * A page covers most of the view (the laptop): the room holds still and draws fewer frames, so
+   * the page stays smooth. Optional.
+   */
+  setBackdrop?(on: boolean): void;
 }
 /** One task-marker report of `watchTaskMarker`. */
 export interface TaskMarker extends TaskMarkerPlacement {

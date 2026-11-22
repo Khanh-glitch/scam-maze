@@ -97,6 +97,8 @@ const _anchorOut = new Array<number>(2).fill(0);
 const CAPTION_COUNTS: Record<string, number> = {
   window: 2, laptop: 1, note: 1, receipts: 1, mug: 1, phone: 1, calendar: 1, photo: 1, fridge: 3, bed: 2, jacket: 1, umbrella: 1, door: 1,
 };
+/** Behind the laptop page the settled room draws one frame in this many (about 20 per second at 60 Hz). */
+const BACKDROP_FRAME_STEP = 3;
 const captionLines = (id: string): string[] => trLines(`inspect.${id}`, CAPTION_COUNTS[id] ?? 0);
 const typedText = () => tr('typed');
 /** Small objects the player picks up or looks over closely: the hands play the take animation. */
@@ -238,6 +240,8 @@ export class Engine implements RoomStoryCommands {
     this.onUI = onUI;
     this.quality = quality;
     const r = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+    // Reading the shader logs after every link waits for the driver; keep that check for development.
+    r.debug.checkShaderErrors = import.meta.env.DEV;
     r.setPixelRatio(Math.min(window.devicePixelRatio, quality === 'high' ? 1.5 : 1));
     r.setSize(container.clientWidth, container.clientHeight);
     r.shadowMap.enabled = true;
@@ -674,9 +678,11 @@ export class Engine implements RoomStoryCommands {
   /** True while a hosted phone call is on screen: its dialogue owns the arrow keys, so the view stays put. */
   callHeld(): boolean { return !!this.opts.story && this.phoneMode === 'call'; }
 
-  say(text: string, voice = false, dur?: number) {
+  say(text: string, voice = false, dur?: number, hosted = false) {
     // The call dialogue has its own captions; a room remark must not overlap it.
     if (!voice && this.callHeld()) return;
+    // With a story host, only the story speaks: the room's own remarks stay quiet (owner).
+    if (!voice && !hosted && this.opts.story) return;
     const id = ++this.captionId;
     this.ui.captions = [...this.ui.captions.slice(-1), { text, voice, id }];
     this.emit();
@@ -791,7 +797,8 @@ export class Engine implements RoomStoryCommands {
     if (id === 'note' || id === 'receipts') this.audio.paper('desk');
     if (id === 'bed') this.audio.bedRustle();
     const lines = this.inspectLines(id);
-    lines.forEach((l, i) => this.later(0.9 + i * 4.2, () => { if (this.inspect?.id === id && this.inspect.dir === 1) this.say(l); }));
+    const hosted = !!this.opts.story?.inspectLines(id);
+    lines.forEach((l, i) => this.later(0.9 + i * 4.2, () => { if (this.inspect?.id === id && this.inspect.dir === 1) this.say(l, false, undefined, hosted); }));
     this.ui.inspecting = { title: titleOf(id), actions: this.actionsFor(id) };
     this.emit();
   }
@@ -911,6 +918,15 @@ export class Engine implements RoomStoryCommands {
   closeInspect() { this.endInspect(true); }
   private phoneCarried = false;
   /** Story host: the player carries the phone, so the one on the nightstand goes (not drawn, lit or aimed at). */
+  /** See `RoomCommands.setBackdrop`: while on and the camera is settled, the room draws every `BACKDROP_FRAME_STEP`th frame. */
+  backdrop = false;
+  private backdropFrame = 0;
+  setBackdrop(on: boolean) {
+    this.backdrop = on;
+    this.backdropFrame = 0;
+  }
+  /** The arms load after the warm-up compile; their shaders are built once they arrive, before they first rise into view. */
+  private armsCompiled = false;
   setPhoneCarried(carried: boolean) {
     if (carried === this.phoneCarried) return;
     this.phoneCarried = carried;
@@ -1213,7 +1229,9 @@ export class Engine implements RoomStoryCommands {
       const k = ins.t < 0.5 ? 4 * ins.t ** 3 : 1 - (-2 * ins.t + 2) ** 3 / 2;
       let toPos: THREE.Vector3, toQ: THREE.Quaternion, toFov: number;
       if (ins.dir === 1) {
-        toPos = ins.to.pos.clone().add(V(0, Math.sin(this.t * 1.1) * 0.002, 0));
+        // The laptop holds still under its page (owner); other props keep a little breathing.
+        const still = ins.id === 'laptop' && !!this.opts.story;
+        toPos = still ? ins.to.pos.clone() : ins.to.pos.clone().add(V(0, Math.sin(this.t * 1.1) * 0.002, 0));
         const m = new THREE.Matrix4().lookAt(ins.to.pos, ins.to.look, V(0, 1, 0));
         toQ = new THREE.Quaternion().setFromRotationMatrix(m);
         const off = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.lookOffset.y, this.lookOffset.x, 0, 'YXZ'));
@@ -1483,8 +1501,18 @@ export class Engine implements RoomStoryCommands {
     fu.uVig.value += ((0.85 + tension * 0.35) - fu.uVig.value) * dt * 0.8;
     fu.uDesat.value += ((tension * 0.18) - fu.uDesat.value) * dt * 0.6;
 
-    // pass 1: the city alone, for the glass to refract
     const r = this.renderer;
+    if (!this.armsCompiled && this.arms.loaded) {
+      this.armsCompiled = true;
+      void r.compileAsync(this.scene, this.camera).catch(() => undefined);
+    }
+    // Behind a page (the laptop) the settled room draws fewer frames; the canvas keeps the last one.
+    const settled = this.inspect !== null && this.inspect.dir === 1 && this.inspect.t >= 1;
+    if (this.backdrop && settled && this.shadowFrames <= 0) {
+      this.backdropFrame = (this.backdropFrame + 1) % BACKDROP_FRAME_STEP;
+      if (this.backdropFrame !== 0) return;
+    }
+    // pass 1: the city alone, for the glass to refract
     this.glassMats.forEach((m) => m.uniforms.uRes.value.set(r.domElement.width, r.domElement.height));
     this.camera.layers.set(1);
     r.setRenderTarget(this.cityRT);

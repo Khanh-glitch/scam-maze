@@ -28,16 +28,16 @@ export const LAST_SUBMISSION_NARRATIVE_VI: NarrativeOverlay = {
 
   // The email and the page it leads to
   "device/mail.clearance/title": "Graduation Clearance — Action Required",
-  "device/mail.clearance/from": "Văn phòng Tốt nghiệp <clearance@uni-graduation-office.example>",
+  "device/mail.clearance/from": "Văn phòng Tốt nghiệp <clearance@payment-ueh.vn>",
   "device/mail.clearance/body":
     "Chào bạn,\n\nTài khoản nộp luận văn của bạn đã bị khóa vì chưa thanh toán phí xác nhận sinh viên quốc tế.\n\n" +
     "Phí: 800.000 VNĐ\nHạn: trong hôm nay\n\n" +
-    "Thanh toán ngay để mở khóa tài khoản: https://pay.uni-graduation-office.example/confirm\n\n" +
+    "Thanh toán ngay để mở khóa tài khoản: https://payment-ueh.vn/confirm\n\n" +
     "Nếu không thanh toán trong hôm nay, tài khoản sẽ tiếp tục bị khóa và bạn có thể lỡ đợt tốt nghiệp.\n\nVăn phòng Tốt nghiệp",
   "device/mail.clearance/actions/open-link/label": "Mở liên kết thanh toán",
   "device/page.fee/title": "Trang thanh toán: phí xác nhận sinh viên quốc tế",
   "device/page.fee/from": "Trang thanh toán",
-  "device/page.fee/detail": "pay.uni-graduation-office.example",
+  "device/page.fee/detail": "payment-ueh.vn",
   "device/page.fee/body":
     "Phí xác nhận sinh viên quốc tế: 800.000 VNĐ.\nĐăng nhập bằng tài khoản sinh viên để tiếp tục.\n\n" +
     "Đây là trang mô phỏng. Trò chơi không dùng thông tin đăng nhập, thẻ hay mã thật.",
@@ -48,7 +48,7 @@ export const LAST_SUBMISSION_NARRATIVE_VI: NarrativeOverlay = {
 
   // The saved portal and the Training Office
   "device/portal.saved/title": "Cổng sinh viên (đã lưu)",
-  "device/portal.saved/detail": "portal.university.example",
+  "device/portal.saved/detail": "student.ueh.edu.vn",
   "device/portal.saved/body": "Đường dẫn bạn đã lưu cho cổng nộp luận văn từ lúc đăng ký.",
   "device/portal.saved/actions/check-account/label": "Đăng nhập cổng đã lưu và kiểm tra tài khoản của tôi",
   "device/file.portal-status/title": "Trạng thái cổng (đã lưu)",
@@ -69,7 +69,7 @@ export const LAST_SUBMISSION_NARRATIVE_VI: NarrativeOverlay = {
   "device/contact.training-office/actions/ask-account/transcript/1":
     "Có. Tài khoản của bạn đang hoạt động và bạn không nợ khoản nào. Chúng tôi sẽ gửi một thư trả lời ngắn để bạn lưu lại.",
   "device/mail.office-reply/title": "Re: Câu hỏi về khoản phí xác nhận",
-  "device/mail.office-reply/from": "Phòng Đào tạo <training-office@university.example>",
+  "device/mail.office-reply/from": "Phòng Đào tạo <training@ueh.edu.vn>",
   "device/mail.office-reply/body":
     "Chào bạn,\n\nKhông có khoản phí xác nhận sinh viên quốc tế nào cho việc nộp luận văn. Tài khoản nộp luận văn của bạn đang hoạt động và bạn không nợ khoản nào.\n\n" +
     "Hãy viết lại cho chúng tôi nếu bạn nhận được thêm tin nhắn nào về phí.\n\nPhòng Đào tạo",
@@ -102,7 +102,7 @@ export const LAST_SUBMISSION_NARRATIVE_VI: NarrativeOverlay = {
   "device/file.bank-report/body":
     "Mã: BR-0001. Ngân hàng đã chặn các giao dịch chuyển tiếp từ tài khoản của bạn và sẽ xem xét các giao dịch trước đó.",
   "device/mail.login-alert/title": "Đăng nhập mới vào tài khoản sinh viên của bạn",
-  "device/mail.login-alert/from": "Bảo mật tài khoản <no-reply@university.example>",
+  "device/mail.login-alert/from": "Bảo mật tài khoản <no-reply@ueh.edu.vn>",
   "device/mail.login-alert/body":
     "Hệ thống ghi nhận một lần đăng nhập vào tài khoản sinh viên từ thiết bị chưa quen. Nếu không phải bạn, hãy đổi mật khẩu.",
   "device/msg.bank-alert-1/title": "Thông báo ngân hàng",
@@ -120,13 +120,13 @@ export const LAST_SUBMISSION_NARRATIVE_VI: NarrativeOverlay = {
   "device/msg.minh/from": "Minh (nhóm khóa luận)",
   "device/msg.minh/body": "Bạn xong phần phương pháp chưa? Xong thì gửi mình nhé.",
   "device/mail.supervisor/title": "Nhận xét bản thảo: mời xem các góp ý ở chương 3",
-  "device/mail.supervisor/from": "Giảng viên hướng dẫn <supervisor@university.example>",
+  "device/mail.supervisor/from": "Giảng viên hướng dẫn <supervisor@ueh.edu.vn>",
   "device/mail.supervisor/body": "Chào Alex,\n\nTôi đã thêm góp ý ở chương 3. Em hãy xem lại khi hoàn thành bản thảo.\n\nTrân trọng",
   "device/mail.library/title": "Giờ mở cửa trong mùa thi",
-  "device/mail.library/from": "Thư viện trường <library@university.example>",
+  "device/mail.library/from": "Thư viện trường <library@ueh.edu.vn>",
   "device/mail.library/body": "Trong mùa thi, thư viện mở cửa sớm hơn một giờ và đóng cửa muộn hơn một giờ.",
   "device/mail.print-shop/title": "Đơn in của bạn đã sẵn sàng để nhận",
-  "device/mail.print-shop/from": "Tiệm in <orders@print-shop.example>",
+  "device/mail.print-shop/from": "Tiệm in <orders@inkhoaluan.vn>",
   "device/mail.print-shop/body": "Đơn của bạn đã sẵn sàng. Tiệm mở cửa đến 21:00.",
   "device/file.draft/title": "thesis-draft.docx",
   "device/file.draft/body": "Bản thảo khóa luận của bạn. Hãy chỉnh sửa trên laptop, ở tab Khóa luận.",
@@ -145,7 +145,7 @@ export const LAST_SUBMISSION_NARRATIVE_VI: NarrativeOverlay = {
   "device/msg.easy-money/from": "Linh (sinh viên khoa khác)",
   "device/msg.easy-money/body":
     "Chào Alex! Mình tìm được một việc online. Bạn chấm điểm các trang sản phẩm ngắn, mỗi việc khoảng 5 phút, và tiền hiện trong ứng dụng ngay. " +
-    "Hôm nay mình nhận phần thưởng đầu tiên rồi. Bạn thử đi, đây là tiền dễ kiếm cho sinh viên: tasks.quickpay-tasks.example",
+    "Hôm nay mình nhận phần thưởng đầu tiên rồi. Bạn thử đi, đây là tiền dễ kiếm cho sinh viên: quickpay-tasks.vn",
   "device/msg.easy-money/actions/ask-linh/label": "Hỏi Linh xem bạn ấy được trả tiền thế nào",
   "device/msg.easy-money/actions/ask-linh/transcript/0": "Hay quá! Bạn được trả tiền thế nào? Bạn có phải trả khoản nào không?",
   "device/msg.easy-money/actions/ask-linh/transcript/1":
@@ -156,7 +156,7 @@ export const LAST_SUBMISSION_NARRATIVE_VI: NarrativeOverlay = {
   "device/msg.easy-money/actions/decline/transcript/1": "Ừ, không sao. Chúc bạn làm khóa luận thuận lợi nhé!",
   "device/job.platform/title": "Việc online: chấm điểm trang sản phẩm",
   "device/job.platform/from": "QuickPay Tasks",
-  "device/job.platform/detail": "tasks.quickpay-tasks.example",
+  "device/job.platform/detail": "quickpay-tasks.vn",
   "device/job.platform/body":
     "Kiếm tiền từ điện thoại. Chấm điểm các trang sản phẩm và được trả cho từng việc.\n\n" +
     "Cấp 1: việc miễn phí. Các cấp cao hơn cần nạp tiền và trả nhiều hơn.\n\n" +
@@ -204,7 +204,7 @@ export const LAST_SUBMISSION_NARRATIVE_VI: NarrativeOverlay = {
   "device/msg.golden-friend/from": "Hùng (bạn của anh họ Minh)",
   "device/msg.golden-friend/body":
     "Chào Alex, mình là Hùng. Bạn mình kiếm khoảng 8% mỗi tuần với Golden Platform. Tháng trước mình bỏ tiền vào và đã rút lãi ra rồi. " +
-    "Tham gia bằng mã của mình để nhận quà thành viên mới. Trang: golden-platform-invest.example",
+    "Tham gia bằng mã của mình để nhận quà thành viên mới. Trang: golden-platform-invest.com",
   "device/msg.golden-friend/actions/ask-hung/label": "Hỏi Hùng nền tảng có được cấp phép không và lợi nhuận từ đâu ra",
   "device/msg.golden-friend/actions/ask-hung/transcript/0": "Nền tảng có được cấp phép không? Lợi nhuận từ đâu ra vậy?",
   "device/msg.golden-friend/actions/ask-hung/transcript/1":
@@ -225,7 +225,7 @@ export const LAST_SUBMISSION_NARRATIVE_VI: NarrativeOverlay = {
     "Không có đơn vị nào tên đó trong danh sách công khai của chúng tôi. Lợi nhuận cao cố định và không có rủi ro là một dấu hiệu cảnh báo. Đừng chuyển tiền cho đơn vị không có trong danh sách. Bạn có thể báo cho chúng tôi và cho ngân hàng.",
   "device/page.golden/title": "Golden Platform: bảng điều khiển thành viên",
   "device/page.golden/from": "Golden Platform",
-  "device/page.golden/detail": "golden-platform-invest.example",
+  "device/page.golden/detail": "golden-platform-invest.com",
   "device/page.golden/body":
     "Làm tiền của bạn sinh lời mỗi tuần. Tham gia ngay để nhận quà thành viên mới.\n\n" +
     "Đây là trang mô phỏng. Trò chơi không dùng tiền, tài khoản hay khoản đầu tư thật.",
@@ -348,7 +348,7 @@ export const LAST_SUBMISSION_NARRATIVE_VI: NarrativeOverlay = {
   "device/msg.bank-code/body":
     "481206 là mã để duyệt khoản thanh toán thẻ 800.000 VND cho UNI GRADUATION OFFICE. Không chia sẻ mã này với bất kỳ ai. Ngân hàng không bao giờ hỏi bạn mã này.",
   "device/file.address-record/title": "Đã gửi báo cáo: địa chỉ trang thanh toán",
-  "device/file.address-record/body": "Bạn đã báo cáo trang thanh toán cho bộ phận hỗ trợ IT của trường. Báo cáo giữ địa chỉ mà email dẫn tới: pay.uni-graduation-office.example.",
+  "device/file.address-record/body": "Bạn đã báo cáo trang thanh toán cho bộ phận hỗ trợ IT của trường. Báo cáo giữ địa chỉ mà email dẫn tới: payment-ueh.vn.",
   "device/file.fee-record/title": "Biên lai: thanh toán phí xác nhận",
   "device/file.fee-record/body": "Biên lai đã tải của khoản thanh toán thẻ trên trang thanh toán: số tiền, thời điểm và người nhận mà ngân hàng hiển thị.",
   "device/file.transfer-record/title": "Sao kê: các giao dịch chuyển tiền trái phép",

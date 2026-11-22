@@ -106,7 +106,7 @@ const laptop: LocaleShape<typeof en> = {
           title: "Thư viện trường",
           heading: "Giờ mở cửa",
           p1: "Trong mùa thi, thư viện mở cửa sớm hơn một giờ và đóng cửa muộn hơn một giờ.",
-          p2: "Câu hỏi: library@university.example",
+          p2: "Câu hỏi: library@ueh.edu.vn",
         },
       },
     },

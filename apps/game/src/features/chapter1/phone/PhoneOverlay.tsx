@@ -381,7 +381,7 @@ export const PhoneOverlay: React.FC<PhoneOverlayProps> = ({
             data-phone-frame
             data-phone-locked={locked ? "true" : "false"}
           >
-            <PhoneTopBar time={time} island={held.mode === "fallback"} />
+            <PhoneTopBar time={time} island />
             {screen}
           </div>
         </PhoneScreenHost>
