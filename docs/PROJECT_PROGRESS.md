@@ -177,6 +177,13 @@ Resolved:
 - The 3D model licenses of some owner-supplied riders, bikes and the Bao Thu model are "not stated" in
   their `SOURCE.md` files; confirm before a public release.
 ## Task History
+### 2026-11-22 — Held phone: slim wrist, forearm straight down
+- **Objective:** owner feedback: the forearm stretched out to the right and looked long and swollen; the wrist should go straight down below the phone, like in GTA.
+- **Root cause:** not the mesh. The pose's forearm pointed right, and the later attempt pointed it toward the camera; the phone canvas is close to the camera, so the near forearm was magnified by perspective and looked inflated. The large wrist-bone bend (`DEF-hand.R` 1.4 rad) also stretched the wrist skin.
+- **Completed:** `HeldHand.tsx`: the `DEF-hand.R` bend is removed. A new `pointForearm` turns the arm about the wrist so the forearm points along `FOREARM_TOWARD [0.15, -1, 0]` (down, in the screen plane), and turns the joints back so the hand stays put. The roll part goes to `DEF-forearm.R` and `DEF-forearm.R.001` (half each), and only the bend stays at the wrist (measured: about 35°, roll about 0.1°). Hand: `PALM_AT [0.032, -0.052, -0.024]`, `FINGERS_ALONG [-0.7, 0.7, 0]`, thumb turn `[-0.2, 0.3, -0.22]`.
+- **Files:** `apps/game/src/features/chapter1/call/HeldHand.tsx`, this file.
+- **Validation:** `tsc -b --noEmit` clean; no test run (owner asked to skip tests and test himself); headless Chrome at 1440 × 810: slim wrist, short forearm leaving the frame straight down, fingers on the left edge.
+- **Limitations:** the thumb now sits behind the phone's right edge and barely shows; static pose.
 ### 2026-11-22 — Held phone: straight wrist, phone rolled and closer to the center
 - **Objective:** owner feedback with a GTA reference: the wrist stuck out after the four fingers came back; move the phone and hand a little toward the center.
 - **Completed:** `PhoneModel3D.tsx`: the held phone rolls 0.12 rad (`HELD_ROLL_Z`, top leans left). `callLayout.ts`: `HELD_CENTER_X_RATIO` 0.66 → 0.58. `HeldHand.tsx`: `PALM_AT [0.036, -0.05, -0.024]`, wrist bend `DEF-hand.R [0, 1.4, 0]` (chosen from four variants rendered side by side), so the forearm runs straight to the bottom right. `heldPhoneLayout.test.ts`: checks that the screen center (not its left edge) is right of the viewport center.
