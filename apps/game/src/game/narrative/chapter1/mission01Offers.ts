@@ -201,7 +201,7 @@ const EASY_MONEY_ITEMS: DeviceItemDef[] = [
       { id: "try-withdraw-4", label: "Try to withdraw once more", visibleWhen: [{ kind: "anyOf", conditions: [done(P, "deposit-3"), done(P, "deposit-3-borrow")] }], timeCostMinutes: T.tryWithdraw, once: true },
       {
         id: "save-records",
-        label: "Save the deposit history, the messages and the page address",
+        label: "Take screenshots of the deposit history, the messages and the page address",
         visibleWhen: [done(P, "try-withdraw-1")],
         timeCostMinutes: T.saveRecords,
         once: true,
@@ -448,7 +448,7 @@ const GOLDEN_ITEMS: DeviceItemDef[] = [
       { id: "withdraw-4", label: "Try to withdraw after the last fee", visibleWhen: [done(G, "pay-fee-3")], timeCostMinutes: GT.withdraw, once: true },
       {
         id: "save-records",
-        label: "Save the dashboard, the fee messages and the page address",
+        label: "Take screenshots of the dashboard, the fee messages and the page address",
         visibleWhen: [done(G, "withdraw-1")],
         timeCostMinutes: GT.saveRecords,
         once: true,

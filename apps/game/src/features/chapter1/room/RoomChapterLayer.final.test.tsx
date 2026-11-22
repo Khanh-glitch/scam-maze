@@ -117,13 +117,18 @@ describe("the mistake path: Mail, Fake Clearance, Banking, Security Breach, File
     // The chain, one step per page.
     fireEvent.click(within(laptop).getByTestId("clearance-continue"));
     await within(laptop).findByTestId("fake-step-login");
+    fireEvent.focus(within(laptop).getByTestId("login-id"));
     fireEvent.click(within(laptop).getByTestId("login-fill"));
     fireEvent.click(within(laptop).getByTestId("login-submit"));
     await within(laptop).findByTestId("fake-step-payment");
+    fireEvent.focus(within(laptop).getByTestId("pay-number"));
     fireEvent.click(within(laptop).getByTestId("pay-fill"));
+    // The saved card leaves the security code to the player, as the browser does.
+    for (const key of "123") fireEvent.keyDown(within(laptop).getByTestId("pay-cvc"), { key });
     fireEvent.click(within(laptop).getByTestId("pay-submit"));
     await within(laptop).findByTestId("fake-step-verify");
-    fireEvent.click(within(laptop).getByTestId("verify-fill"));
+    // On the laptop the code is read on the phone and typed in.
+    fireEvent.change(within(laptop).getByTestId("verify-code"), { target: { value: "481206" } });
     fireEvent.click(within(laptop).getByTestId("verify-submit"));
     await within(laptop).findByTestId("fake-step-complete");
     let state = rig.store().getState();

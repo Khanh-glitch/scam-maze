@@ -275,6 +275,7 @@ describe("the look-alike clearance site", () => {
     await screen.findByTestId("fake-step-login");
     expect(onUseItem).not.toHaveBeenCalled();
     expect(screen.getByTestId("login-submit").hasAttribute("disabled")).toBe(true);
+    fireEvent.focus(screen.getByTestId("login-id"));
     fireEvent.click(screen.getByTestId("login-fill"));
     expect((screen.getByTestId("login-id") as HTMLInputElement).value).toBe("ALEX-0001");
     expect(onUseItem).not.toHaveBeenCalled();
@@ -287,6 +288,7 @@ describe("the look-alike clearance site", () => {
     const { onUseItem, probe } = mount({ view: viewOf([source, page]) });
     act(() => probe.dispatch({ type: "openLink", url: "https://pay.uni-graduation-office.example/login" }));
     await screen.findByTestId("fake-step-login");
+    fireEvent.focus(screen.getByTestId("login-id"));
     fireEvent.click(screen.getByTestId("login-fill"));
     expect(probe.state().tabs.find((tab) => tab.id === probe.state().activeTabId)?.fields["login.id"]).toBe("ALEX-0001");
     fireEvent.click(screen.getByTestId(`browser-tab-close-${probe.state().activeTabId}`));
