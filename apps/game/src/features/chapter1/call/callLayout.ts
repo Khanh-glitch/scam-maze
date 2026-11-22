@@ -100,6 +100,28 @@ function screenRectOfHeight(height: number, left: number, top: number): Rect {
   return { left, top, width: height * SCREEN_ASPECT, height };
 }
 
+/** The held phone (P) stays clear of the bottom-right chip row by this much, in CSS pixels. */
+export const HELD_BOTTOM_INSET = 72;
+/** Height of the held phone's screen as a share of the viewport height, and its maximum in CSS pixels. */
+export const HELD_SCREEN_HEIGHT_RATIO = 0.6;
+export const HELD_MAX_SCREEN_HEIGHT = 560;
+
+/**
+ * Where the held phone's screen goes (the phone brought up with P, like in GTA): low on the right,
+ * clear of the chip row, so the room stays visible. Narrow viewports keep the call layout's screen.
+ */
+export function heldPhoneLayout(viewport: Viewport): CallLayout {
+  const call = computeCallLayout(viewport);
+  if (call.kind === "narrow") return call;
+  const W = viewport.width;
+  const H = viewport.height;
+  const height = Math.min(HELD_SCREEN_HEIGHT_RATIO * H, HELD_MAX_SCREEN_HEIGHT, H - HELD_BOTTOM_INSET - WIDE_MARGIN);
+  const width = height * SCREEN_ASPECT;
+  const right = Math.max(WIDE_MARGIN, 0.05 * W);
+  const screen = screenRectOfHeight(height, W - right - width, H - HELD_BOTTOM_INSET - height);
+  return { ...call, screen, screenCornerRadius: SCREEN_CORNER_RATIO * width };
+}
+
 /** Computes the target phone screen rectangle and the choice region for a viewport. */
 export function computeCallLayout(viewport: Viewport): CallLayout {
   const W = viewport.width;

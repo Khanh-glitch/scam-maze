@@ -13,6 +13,7 @@ const laptop: LocaleShape<typeof en> = {
     desktop: {
       homeLabel: "Màn hình chính",
       appsGroup: "Ứng dụng",
+      taskTarget: "nhiệm vụ hiện tại",
       launch: "Mở {{app}}",
       windowLabel: "Cửa sổ {{app}}",
       backToDesktop: "Quay lại màn hình chính",

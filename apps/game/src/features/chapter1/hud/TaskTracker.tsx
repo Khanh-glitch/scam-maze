@@ -27,9 +27,11 @@ export interface TaskTrackerProps {
   distance?: number | null;
   onOpenList: () => void;
   onHoverSound?: () => void;
+  /** One line (the band above the open laptop): the step and where it happens; no title, deadline or other missions. */
+  compact?: boolean;
 }
 
-export const TaskTracker: React.FC<TaskTrackerProps> = ({ mission, others = [], distance = null, onOpenList, onHoverSound }) => {
+export const TaskTracker: React.FC<TaskTrackerProps> = ({ mission, others = [], distance = null, onOpenList, onHoverSound, compact = false }) => {
   const { t } = useTranslation("chapter1");
   const text = t as unknown as Tx;
   const step = mission.current;
@@ -64,6 +66,41 @@ export const TaskTracker: React.FC<TaskTrackerProps> = ({ mission, others = [], 
   const place = step ? stepPlace(text, step) : null;
   const where = [place, distance !== null && step?.target ? formatMeters(text, distance) : null].filter(Boolean).join(" · ");
 
+  if (compact) {
+    return (
+      <section aria-label={mission.title} data-testid="task-tracker" data-compact="true" className={`pointer-events-auto flex min-w-0 items-center gap-2 ${SHADOW}`}>
+        <button
+          type="button"
+          onMouseDown={stop}
+          onClick={onOpenList}
+          onPointerEnter={onHoverSound}
+          aria-keyshortcuts={TASK_LIST_KEY}
+          title={t("taskSystem.openList")}
+          className={`group flex min-w-0 items-center gap-2 text-left outline-none cursor-pointer ${fresh ? "quest-fresh" : ""}`}
+        >
+          <img src={ICON_QUEST} alt="" width={20} height={20} draggable={false} className="h-5 w-5 shrink-0 select-none drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]" />
+          <span data-testid="task-current" className="truncate font-menu text-sm font-semibold uppercase tracking-[0.04em] text-[#f3efe4] underline decoration-[#b9a5f5]/70 underline-offset-4 group-hover:decoration-[#f3efe4]">
+            {step ? step.label : mission.objective}
+          </span>
+          {place && (
+            <span data-testid="task-where" className="shrink-0 font-menu text-xs font-semibold tracking-[0.08em] text-[#c9bbf7]">
+              {place}
+            </span>
+          )}
+        </button>
+        {finished !== null && (
+          <span data-testid="task-step-done" className="flex shrink-0 items-center gap-1 font-menu text-xs font-bold uppercase tracking-[0.06em] text-[#6fe0a8]">
+            <Check className="h-3.5 w-3.5" aria-hidden="true" strokeWidth={3} />
+            {t("taskSystem.complete")}
+          </span>
+        )}
+        <p className="sr-only" aria-live="polite">
+          {step ? t("taskSystem.announce.newStep", { step: step.label }) : ""}
+          {finished !== null ? ` ${t("taskSystem.announce.stepDone", { step: finished })}` : ""}
+        </p>
+      </section>
+    );
+  }
   return (
     <section aria-labelledby="task-tracker-heading" data-testid="task-tracker" data-fresh={fresh ? "true" : undefined} className={`pointer-events-auto max-w-sm ${SHADOW}`}>
       <h2 id="task-tracker-heading" className="flex items-center gap-2.5 font-menu text-xs font-semibold uppercase tracking-[0.3em] text-[#c9bbf7]">

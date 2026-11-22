@@ -210,9 +210,16 @@ input, textarea, [contenteditable="true"] {
   50% { transform: translateY(-4px); }
 }
 .task-marker-bob { animation: task-marker-bob 1.8s ease-in-out infinite; }
+/* The laptop app of the current task step: a soft ring that breathes around its icon. */
+@keyframes task-target-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(201, 187, 247, 0.9), 0 0 10px 2px rgba(185, 165, 245, 0.45); }
+  50% { box-shadow: 0 0 0 2px rgba(201, 187, 247, 0.5), 0 0 18px 6px rgba(185, 165, 245, 0.2); }
+}
+.task-target-pulse { animation: task-target-pulse 1.8s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
   .quest-fresh { animation: none; }
   .task-marker-bob { animation: none; }
+  .task-target-pulse { animation: none; box-shadow: 0 0 0 2px rgba(201, 187, 247, 0.9); }
 }
 
 /* Short fade when the laptop desktop changes window. Opacity only, so it stays cheap. */
