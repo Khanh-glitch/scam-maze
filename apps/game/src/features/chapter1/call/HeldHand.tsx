@@ -15,10 +15,10 @@ import { createPhoneReflectionMap } from "./phoneReflections";
 /** The pose: a clip and the time it is frozen at (the relaxed idle hand curls its fingers). */
 const POSE_CLIP = "rig|Idle";
 const POSE_TIME_S = 0.5;
-/** Extra bone turns (radians, local XYZ) on top of the pose: the thumb stands up beside the right edge, off the screen; the wrist bends so the forearm comes up from the bottom right while all four fingers still wrap the left edge (owner). */
+/** Extra bone turns (radians, local XYZ) on top of the pose: the thumb stands up beside the right edge, off the screen; the wrist bends so the forearm runs straight down to the bottom right, without a kink, while all four fingers still wrap the left edge (owner). */
 const BONE_TURNS: Readonly<Record<string, readonly [number, number, number]>> = {
   "DEF-thumb.01.R": [-0.2, 0.9, -0.75],
-  "DEF-hand.R": [0, 1.1, 0],
+  "DEF-hand.R": [0, 1.4, 0],
 };
 /** Bones scaled to nothing: the left arm is not in the picture. */
 const HIDDEN_BONES = ["DEF-shoulder.L", "DEF-upper_arm.L"] as const;
@@ -27,7 +27,7 @@ const HIDDEN_BONES = ["DEF-shoulder.L", "DEF-upper_arm.L"] as const;
  * and below the screen center, behind the phone. The fingers point left and a little up, the palm
  * faces the back of the phone, and the hand measures `HAND_SIZE_M` from the wrist to the knuckles.
  */
-const PALM_AT: readonly [number, number, number] = [0.038, -0.042, -0.024];
+const PALM_AT: readonly [number, number, number] = [0.036, -0.05, -0.024];
 const FINGERS_ALONG: readonly [number, number, number] = [-1, 0.3, 0];
 const PALM_FACING: readonly [number, number, number] = [0, 0, 1];
 const HAND_SIZE_M = 0.082;

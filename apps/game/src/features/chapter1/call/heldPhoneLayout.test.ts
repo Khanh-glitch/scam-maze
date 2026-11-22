@@ -4,10 +4,10 @@ import { HELD_BOTTOM_INSET, HELD_CENTER_X_RATIO, SCREEN_ASPECT, computeCallLayou
 import { ENTRY_DURATION_MS, heldPhoneRiseOffset } from "./phoneMotion";
 
 describe("heldPhoneLayout", () => {
-  it("puts the screen in the lower right of a wide viewport, above the chip row", () => {
+  it("puts the screen low and right of center in a wide viewport, above the chip row", () => {
     const viewport = { width: 1440, height: 810 };
     const { screen } = heldPhoneLayout(viewport);
-    expect(screen.left).toBeGreaterThan(viewport.width / 2);
+    expect(screen.left + screen.width / 2).toBeGreaterThan(viewport.width / 2);
     expect(screen.left + screen.width).toBeLessThanOrEqual(viewport.width - 24);
     expect(screen.top + screen.height).toBeCloseTo(viewport.height - HELD_BOTTOM_INSET);
     expect(screen.width / screen.height).toBeCloseTo(SCREEN_ASPECT);

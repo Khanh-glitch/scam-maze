@@ -62,6 +62,8 @@ const PHONE_TILT_Y = -0.16;
 const PHONE_TILT_X = -0.07;
 /** Turn of the held phone (P) toward the view center (radians), against the off-axis view of its side. */
 const HELD_TILT_Y = -0.22;
+/** Roll of the held phone (radians, counterclockwise): its top leans left, in line with a forearm from the bottom right, like in GTA (owner). */
+const HELD_ROLL_Z = 0.12;
 /** Fallback vertical field of view (degrees) if the camera is not a perspective camera. */
 const DEFAULT_FOV_DEG = 70;
 
@@ -218,8 +220,10 @@ export const PhoneModel3D: FC<PhoneModel3DProps> = ({ live, ringing, reducedMoti
     rig.translateZ(pose.z - SCREEN_FRONT_OFFSET_M);
     // The held phone turns its face in toward the view center, so its outer side does not show
     // (owner); the call keeps its own turn.
-    if (props.placement === "held") rig.rotateY(HELD_TILT_Y);
-    else {
+    if (props.placement === "held") {
+      rig.rotateY(HELD_TILT_Y);
+      rig.rotateZ(HELD_ROLL_Z);
+    } else {
       rig.rotateY(PHONE_TILT_Y);
       rig.rotateX(PHONE_TILT_X);
     }
