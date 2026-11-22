@@ -329,7 +329,7 @@ export const ClearanceSite: React.FC<ClearanceSiteProps> = ({ page, step, view, 
           {stepper}
           <Card colors={C} title={t("ueh.clearance.verifyTitle")} icon={<KeyRound className="h-4 w-4" aria-hidden="true" />}>
             <p className="mb-3 text-xs" style={{ color: C.muted }}>
-              {t("ueh.clearance.verifyBody")}
+              {t("ueh.clearance.verifyBody", { amount: fee })}
             </p>
             <GameField
               colors={C}

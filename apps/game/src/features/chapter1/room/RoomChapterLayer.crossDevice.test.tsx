@@ -102,7 +102,7 @@ describe("the phone's own apps show the same game state as the laptop", () => {
     expect(state.resources.cash).toBe(startCash - FEE);
     expect(state.persistent.accountCompromised).toBe(true);
     // One ledger line for the fee, not two.
-    const feeLines = state.device.ledger.filter((entry) => entry.itemId === "page.fee" && entry.actionId === "pay-card");
+    const feeLines = state.device.ledger.filter((entry) => entry.itemId === "page.fee" && entry.actionId === "enter-code");
     expect(feeLines).toHaveLength(1);
     // The laptop bank shows that one payment.
     closePhone(rig);

@@ -172,7 +172,7 @@ const ueh: LocaleShape<typeof en> = {
       needPaymentBody: "Bước xác minh diễn ra sau khi thanh toán.",
       back: "Quay lại",
       verifyTitle: "Xác minh khoản thanh toán",
-      verifyBody: "Một mã xác minh đã được gửi đến điện thoại của bạn. Hãy nhập mã để hoàn tất.",
+      verifyBody: "Ngân hàng đã gửi mã xác minh đến điện thoại của bạn. Khoản thanh toán {{amount}} VNĐ chỉ được thực hiện sau khi bạn nhập mã.",
       code: "Mã xác minh",
       codeSuggestion: "Mã {{code}}",
       codeWrong: "Mã này không đúng. Hãy xem lại tin nhắn và thử lại.",
