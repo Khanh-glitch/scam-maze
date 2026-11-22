@@ -177,6 +177,12 @@ Resolved:
 - The 3D model licenses of some owner-supplied riders, bikes and the Bao Thu model are "not stated" in
   their `SOURCE.md` files; confirm before a public release.
 ## Task History
+### 2026-11-22 — Held phone: four fingers back, forearm from below by bending the wrist
+- **Objective:** owner feedback: after the previous fix two fingers were missing (the ring and little fingers ended behind the phone).
+- **Completed:** `HeldHand.tsx`: the hand placement is back to the one where all four fingers wrap the left edge (`PALM_AT [0.038, -0.042, -0.024]`, `FINGERS_ALONG [-1, 0.3, 0]`, thumb turn `[-0.2, 0.9, -0.75]`); instead of turning the whole hand, the wrist bone `DEF-hand.R` bends 1.1 rad (local Y), so the forearm comes up from the bottom right. Axis found by trying X, Y and Z bends in the browser.
+- **Files:** `apps/game/src/features/chapter1/call/HeldHand.tsx`, this file.
+- **Validation:** `tsc -b --noEmit` clean; `vitest run src/features/chapter1/call` 237 tests passed (scoped per the owner); `pnpm build:game` passed; headless Chrome (Apple M4 GPU) at 1440 × 810: four fingers on the left edge, the thumb along the right edge, the forearm runs to the bottom right.
+- **Limitations:** the bent wrist is a little thin where it bends (skinning of the model); static pose.
 ### 2026-11-22 — Held phone: the forearm comes up from below
 - **Objective:** owner feedback: the wrist looked fake; at this angle the right arm should come from below, not from the right side.
 - **Completed:** `HeldHand.tsx`: the fingers point up and left (`FINGERS_ALONG [-0.6, 0.8, 0]`), the palm sits lower on the back (`PALM_AT [0.036, -0.062, -0.024]`), so the forearm leaves the frame at the bottom right; the thumb turn is smaller (`[-0.2, 0.3, -0.22]`) so the thumb lies along the right edge.
