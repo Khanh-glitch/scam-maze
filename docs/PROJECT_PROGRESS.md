@@ -177,6 +177,12 @@ Resolved:
 - The 3D model licenses of some owner-supplied riders, bikes and the Bao Thu model are "not stated" in
   their `SOURCE.md` files; confirm before a public release.
 ## Task History
+### 2026-11-22 — Held phone: the forearm comes up from below
+- **Objective:** owner feedback: the wrist looked fake; at this angle the right arm should come from below, not from the right side.
+- **Completed:** `HeldHand.tsx`: the fingers point up and left (`FINGERS_ALONG [-0.6, 0.8, 0]`), the palm sits lower on the back (`PALM_AT [0.036, -0.062, -0.024]`), so the forearm leaves the frame at the bottom right; the thumb turn is smaller (`[-0.2, 0.3, -0.22]`) so the thumb lies along the right edge.
+- **Files:** `apps/game/src/features/chapter1/call/HeldHand.tsx`, this file.
+- **Validation:** `tsc -b --noEmit` clean; `vitest run src/features/chapter1/call` 237 tests passed (scoped per the owner); `pnpm build:game` passed; headless Chrome (Apple M4 GPU) screenshots at 1440 × 810: the fingers wrap the left edge, the thumb lies beside the right edge, the forearm runs down to the bottom right.
+- **Limitations:** unchanged (static pose, not lit by the room).
 ### 2026-11-22 — Held phone in a GTA-style right hand
 - **Objective:** owner request: hold the P phone in the right hand like GTA, using the existing arms and phone models; the thumb beside the screen, not on it; the phone where the right hand holds it; the phone slides up from below.
 - **Completed:**
