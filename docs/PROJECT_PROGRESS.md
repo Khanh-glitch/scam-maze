@@ -177,6 +177,12 @@ Resolved:
 - The 3D model licenses of some owner-supplied riders, bikes and the Bao Thu model are "not stated" in
   their `SOURCE.md` files; confirm before a public release.
 ## Task History
+### 2026-11-22 — Held phone: straight wrist, phone rolled and closer to the center
+- **Objective:** owner feedback with a GTA reference: the wrist stuck out after the four fingers came back; move the phone and hand a little toward the center.
+- **Completed:** `PhoneModel3D.tsx`: the held phone rolls 0.12 rad (`HELD_ROLL_Z`, top leans left). `callLayout.ts`: `HELD_CENTER_X_RATIO` 0.66 → 0.58. `HeldHand.tsx`: `PALM_AT [0.036, -0.05, -0.024]`, wrist bend `DEF-hand.R [0, 1.4, 0]` (chosen from four variants rendered side by side), so the forearm runs straight to the bottom right. `heldPhoneLayout.test.ts`: checks that the screen center (not its left edge) is right of the viewport center.
+- **Files:** `apps/game/src/features/chapter1/call/{HeldHand.tsx,PhoneModel3D.tsx,callLayout.ts,heldPhoneLayout.test.ts}`, this file.
+- **Validation:** `tsc -b --noEmit` clean; `vitest run src/features/chapter1/call` 237 tests passed (scoped per the owner); `pnpm build:game` passed; headless Chrome at 1440 × 810: four fingers on the left edge, thumb beside the right edge, forearm straight to the bottom right.
+- **Limitations:** static pose; skin slightly thin at the bend (model skinning).
 ### 2026-11-22 — Held phone: four fingers back, forearm from below by bending the wrist
 - **Objective:** owner feedback: after the previous fix two fingers were missing (the ring and little fingers ended behind the phone).
 - **Completed:** `HeldHand.tsx`: the hand placement is back to the one where all four fingers wrap the left edge (`PALM_AT [0.038, -0.042, -0.024]`, `FINGERS_ALONG [-1, 0.3, 0]`, thumb turn `[-0.2, 0.9, -0.75]`); instead of turning the whole hand, the wrist bone `DEF-hand.R` bends 1.1 rad (local Y), so the forearm comes up from the bottom right. Axis found by trying X, Y and Z bends in the browser.

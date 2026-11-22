@@ -106,7 +106,7 @@ export const HELD_BOTTOM_INSET = 72;
 export const HELD_SCREEN_HEIGHT_RATIO = 0.74;
 export const HELD_MAX_SCREEN_HEIGHT = 700;
 /** Center of the held phone's screen as a share of the viewport width. */
-export const HELD_CENTER_X_RATIO = 0.66;
+export const HELD_CENTER_X_RATIO = 0.58;
 
 /**
  * Where the held phone's screen goes (the phone brought up with P, like in GTA): low, right of center,
