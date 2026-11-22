@@ -52,7 +52,7 @@ vi.mock("../../../game/narrative/activeScenario", async () => {
 const SESSION: ChapterSession = { chapterId: "chapter-1", chapterNumber: 1, sceneId: "apartment", origin: "new-game" };
 const SAVE_SOURCE: SaveGameSource = { read: () => ({ status: "none" }), write: () => true, clear: () => true };
 
-function mountLayer(props: { clockPaused?: boolean } = {}): { store: () => ChapterStore; rerender: (next: { clockPaused?: boolean }) => void } {
+function mountLayer(props: { clockPaused?: boolean; soundEnabled?: boolean } = {}): { store: () => ChapterStore; rerender: (next: { clockPaused?: boolean }) => void } {
   const bridge = new RoomStoryBridge();
   bridge.commands = {
     setPhoneMode: vi.fn(),
@@ -67,7 +67,7 @@ function mountLayer(props: { clockPaused?: boolean } = {}): { store: () => Chapt
   const element = (clockPaused?: boolean) => (
     <RoomChapterLayer
       session={SESSION}
-      settings={DEFAULT_SETTINGS}
+      settings={{ ...DEFAULT_SETTINGS, soundEnabled: props.soundEnabled ?? DEFAULT_SETTINGS.soundEnabled }}
       bridge={bridge}
       saveSource={SAVE_SOURCE}
       ringSettleMs={0}
@@ -100,7 +100,8 @@ const timeLeft = (rig: { store: () => ChapterStore }) => rig.store().getState().
 
 describe("RoomChapterLayer with a running world clock", () => {
   it("does not run the clock during the intro, then runs it in free roam", async () => {
-    const rig = mountLayer();
+    // Sound off: Alex's opening does not play, so the intro does not wait for it.
+    const rig = mountLayer({ soundEnabled: false });
     await new Promise((resolve) => setTimeout(resolve, 150));
     expect(timeLeft(rig)).toBe(72 * 60);
     finishIntro();

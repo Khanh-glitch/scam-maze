@@ -6,9 +6,16 @@ import { PHONE_COLORS } from "./phoneTheme";
 
 const FOCUS = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8fe0e8]";
 
+/**
+ * True on the phone held with P: it has no Close button, because P (or Escape) puts it away, as on
+ * a phone in the hand (owner).
+ */
+export const PhoneCloseHiddenContext = React.createContext(false);
 /** Closes the phone (the player puts it down). The accessible name stays "Close phone". */
 export const PhoneCloseButton: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const { t } = useTranslation("chapter1");
+  const hidden = React.useContext(PhoneCloseHiddenContext);
+  if (hidden) return null;
   return (
     <button
       type="button"

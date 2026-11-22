@@ -29,6 +29,18 @@ describe("the cinematic intro", () => {
     expect(screen.queryByRole("button")).toBeNull();
     expect(screen.getByTestId("chapter-intro-hint").textContent).toBe("Click to continue");
   });
+  it("cannot be skipped while Alex speaks: no hint, and clicks and Enter do nothing until the line ends", () => {
+    const onBegin = vi.fn();
+    const view = render(<ChapterIntroOverlay {...props} holdForVoice onBegin={onBegin} />);
+    expect(screen.queryByTestId("chapter-intro-hint")).toBeNull();
+    fireEvent.click(screen.getByTestId("chapter-intro"));
+    fireEvent.keyDown(screen.getByTestId("chapter-intro"), { key: "Enter" });
+    expect(onBegin).not.toHaveBeenCalled();
+    view.rerender(<ChapterIntroOverlay {...props} holdForVoice={false} onBegin={onBegin} />);
+    expect(screen.getByTestId("chapter-intro-hint").textContent).toBe("Click to continue");
+    fireEvent.click(screen.getByTestId("chapter-intro"));
+    expect(onBegin).toHaveBeenCalledTimes(1);
+  });
   it("waits for the scene: nothing goes on while it loads", () => {
     const onBegin = vi.fn();
     render(<ChapterIntroOverlay {...props} ready={false} onBegin={onBegin} />);

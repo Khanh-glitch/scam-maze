@@ -155,6 +155,10 @@ describe("RoomChapterLayer with LAST SUBMISSION routing", () => {
     expect(screen.getByTestId("hud-phone-chip").getAttribute("aria-pressed")).toBe("true");
     // The HUD stays while the phone is up.
     expect(screen.getByTestId("objective-tracker-slot").style.visibility).toBe("visible");
+    // No Close button on the held phone: P puts it away.
+    expect(within(held).queryByTestId("phone-close")).toBeNull();
+    fireEvent.click(within(held).getByTestId("phone-unlock"));
+    expect(within(held).queryByTestId("phone-close")).toBeNull();
     fireEvent.keyDown(window, { key: "p", code: "KeyP" });
     expect(screen.queryByTestId("held-phone")).toBeNull();
   });

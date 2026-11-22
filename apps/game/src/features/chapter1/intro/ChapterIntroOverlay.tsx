@@ -39,6 +39,11 @@ export interface ChapterIntroOverlayProps {
    * click goes on, and the controls and Continue sit at the edges of the screen.
    */
   cinematic?: boolean;
+  /**
+   * Cinematic only: Alex is still speaking the opening. Clicks and keys do nothing and no hint is
+   * shown until the line ends, so the opening cannot be skipped (owner).
+   */
+  holdForVoice?: boolean;
 }
 
 /** Key caps are physical labels and stay the same in every language ("mouse" is translated). */
@@ -64,6 +69,7 @@ export const ChapterIntroOverlay: React.FC<ChapterIntroOverlayProps> = ({
   lines: customLines,
   onLineChange,
   cinematic = false,
+  holdForVoice = false,
 }) => {
   const { t } = useTranslation("chapter1");
   const locale = useGameLocale();
@@ -101,8 +107,9 @@ export const ChapterIntroOverlay: React.FC<ChapterIntroOverlayProps> = ({
    * First click shows the whole paragraph; the next one moves to the next paragraph (cutting the
    * voice), and after the last paragraph it starts the story. Ignored while the scene loads.
    */
+  const held = cinematic && holdForVoice;
   const advance = () => {
-    if (!ready) return;
+    if (!ready || held) return;
     if (narration.advance() === "finished") onBegin();
   };
 
@@ -142,7 +149,7 @@ export const ChapterIntroOverlay: React.FC<ChapterIntroOverlayProps> = ({
         data-testid="chapter-intro"
         onClick={advance}
         onKeyDown={handleKeyDown}
-        className="absolute inset-0 z-30 cursor-pointer text-[#f7f5ff] select-none"
+        className={`absolute inset-0 z-30 text-[#f7f5ff] select-none ${held ? "cursor-default" : "cursor-pointer"}`}
       >
         {/* The room stays visible: a light vignette, and a short shade at the bottom for the subtitles. */}
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(10,9,16,0.4)_100%)]" />
@@ -162,9 +169,11 @@ export const ChapterIntroOverlay: React.FC<ChapterIntroOverlayProps> = ({
               </div>
             )}
             {/* One instruction only (owner): the click goes on, and on the last part it starts the story. */}
-            <p data-testid="chapter-intro-hint" aria-hidden="true" className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-center text-xs text-[#a9a4c4]">
-              {isLast && lineDone ? t("intro.continue") : t("intro.next")}
-            </p>
+            {!held && (
+              <p data-testid="chapter-intro-hint" aria-hidden="true" className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-center text-xs text-[#a9a4c4]">
+                {isLast && lineDone ? t("intro.continue") : t("intro.next")}
+              </p>
+            )}
           </>
         ) : (
           <p role="status" className="absolute bottom-6 left-8 flex items-center gap-2 text-sm text-[#a9a4c4]">

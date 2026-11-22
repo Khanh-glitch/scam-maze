@@ -177,6 +177,16 @@ Resolved:
 - The 3D model licenses of some owner-supplied riders, bikes and the Bao Thu model are "not stated" in
   their `SOURCE.md` files; confirm before a public release.
 ## Task History
+### 2026-11-22 — Scam realism rule, unskippable opening, held phone without Close
+- **Objective:** owner feedback: (1) rule: a scam must imitate its real target with only a few details wrong; (2) in a new game Alex's opening cannot be skipped; (3) the held phone has no Close button (P puts it away), turns in toward the view, and is a little bigger.
+- **Completed:**
+  - Rules: `.kiro/steering/audience.md` replaces "fictional companies and reserved addresses only" with "scam content imitates its real target" (real name, logo, layout and address shape; small, findable differences; DNS check before adding a look-alike; the `approvedDomains.ts` list; phone numbers stay `+000`; no real credentials). `safety.md` and `AGENTS.md` follow.
+  - Opening: `useMission01Voice` reports `introSpeaking` while the opening line plays (clip or caption); the cinematic intro ignores clicks and keys and hides its hint until then. With sound off, or without an audio engine, nothing plays and the intro is not held.
+  - Held phone: `PhoneCloseHiddenContext` hides every Close button on the held phone (lock screen, home, apps); P and Escape put it away. The 3D phone turns 0.22 rad in toward the view center. Screen height 0.74 of the viewport, at most 700 px (was 0.6 and 560).
+- **Files:** `.kiro/steering/{audience,safety}.md`, `AGENTS.md`, `chapter1/voice/useMission01Voice.ts`, `chapter1/intro/ChapterIntroOverlay.tsx`, `chapter1/room/RoomChapterLayer.tsx`, `chapter1/phone/{PhoneChrome,PhoneOverlay}.tsx`, `chapter1/call/{PhoneModel3D.tsx,callLayout.ts}`, tests (`useMission01Voice`, `ChapterIntroOverlay.cinematic`, `RoomChapterLayer.{foundation,world}`), this file.
+- **Validation:** `tsc -b --noEmit` clean; full `vitest run` 234 files, 2177 tests passed; `pnpm build:game` passed. Headless Chrome with the Apple M4 GPU: 5 clicks during the opening did not close it and no hint showed; it closed at about 36 s; P brought up the 3D phone with no Close button on the lock screen or the home screen, the home icons fit on one row, the screen is about 305 × 620 px at 1440 × 810, and P put it away.
+- **Limitations:** the intro waits only while the line plays; a click in the moment before the clip starts (about 0.1 s) still goes on. Older scam content (Northgate chapter) still uses fictional brands and reserved domains, which the new rule allows for content without a real target.
+
 ### 2026-11-22 — Chapter 1 room: quieter room, real-looking addresses, phone at the laptop, smoother frames
 - **Objective:** owner feedback: remove the room's own remarks, keep one intro instruction, stop the laptop view lagging, keep the real browser's saved logins out of the game fields, allow the phone over the open laptop (to read the code), iPhone proportions with a Dynamic Island, smoother room, and real-looking addresses (`payment-ueh.vn` imitating `payment.ueh.edu.vn`).
 - **Completed:**

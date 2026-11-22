@@ -34,7 +34,7 @@ import type { Tx } from "../device/deviceFormat";
 import { CallsApp, type CallsTab } from "./calls/CallsApp";
 import { MessagesHub } from "./messages/MessagesHub";
 import { PhoneAppTile } from "./PhoneAppIcon";
-import { PhoneCloseButton, PhoneHomeIndicator } from "./PhoneChrome";
+import { PhoneCloseButton, PhoneCloseHiddenContext, PhoneHomeIndicator } from "./PhoneChrome";
 import { PhoneHome } from "./PhoneHome";
 import { PhoneLockScreen } from "./PhoneLockScreen";
 import { PhoneTopBar } from "./PhoneTopBar";
@@ -382,7 +382,7 @@ export const PhoneOverlay: React.FC<PhoneOverlayProps> = ({
             data-phone-locked={locked ? "true" : "false"}
           >
             <PhoneTopBar time={time} island />
-            {screen}
+            <PhoneCloseHiddenContext.Provider value={true}>{screen}</PhoneCloseHiddenContext.Provider>
           </div>
         </PhoneScreenHost>
       </div>
