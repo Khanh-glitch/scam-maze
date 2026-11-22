@@ -17,17 +17,17 @@ const POSE_CLIP = "rig|Idle";
 const POSE_TIME_S = 0.5;
 /** Extra bone turns (radians, local XYZ) on top of the pose: the thumb stands up beside the right edge, off the screen (owner). */
 const BONE_TURNS: Readonly<Record<string, readonly [number, number, number]>> = {
-  "DEF-thumb.01.R": [-0.2, 0.9, -0.75],
+  "DEF-thumb.01.R": [-0.2, 0.3, -0.22],
 };
 /** Bones scaled to nothing: the left arm is not in the picture. */
 const HIDDEN_BONES = ["DEF-shoulder.L", "DEF-upper_arm.L"] as const;
 /**
- * Where the palm goes in the phone rig's space (meters; the screen faces +z): a little right of
- * and below the screen center, behind the phone. The fingers point left and a little up, the palm
+ * Where the palm goes in the phone rig's space (meters; the screen faces +z): low on the back,
+ * right of center. The fingers point up and left (the forearm comes up from the bottom right, owner), the palm
  * faces the back of the phone, and the hand measures `HAND_SIZE_M` from the wrist to the knuckles.
  */
-const PALM_AT: readonly [number, number, number] = [0.038, -0.042, -0.024];
-const FINGERS_ALONG: readonly [number, number, number] = [-1, 0.3, 0];
+const PALM_AT: readonly [number, number, number] = [0.036, -0.062, -0.024];
+const FINGERS_ALONG: readonly [number, number, number] = [-0.6, 0.8, 0];
 const PALM_FACING: readonly [number, number, number] = [0, 0, 1];
 const HAND_SIZE_M = 0.082;
 /** The studio reflections are bright for skin in a dark room: lower, and the skin a little darker. */
