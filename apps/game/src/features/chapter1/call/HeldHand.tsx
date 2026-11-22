@@ -15,22 +15,23 @@ import { createPhoneReflectionMap } from "./phoneReflections";
 /** The pose: a clip and the time it is frozen at (the relaxed idle hand curls its fingers). */
 const POSE_CLIP = "rig|Idle";
 const POSE_TIME_S = 0.5;
-/** Extra bone turns (radians, local XYZ) on top of the pose: the thumb stands up beside the right edge, off the screen; the wrist bends so the forearm runs straight down to the bottom right, without a kink, while all four fingers still wrap the left edge (owner). */
+/** Extra bone turns (radians, local XYZ) on top of the pose: the thumb stands up beside the right edge, off the screen (owner). */
 const BONE_TURNS: Readonly<Record<string, readonly [number, number, number]>> = {
-  "DEF-thumb.01.R": [-0.2, 0.9, -0.75],
-  "DEF-hand.R": [0, 1.4, 0],
+  "DEF-thumb.01.R": [-0.2, 0.3, -0.22],
 };
 /** Bones scaled to nothing: the left arm is not in the picture. */
 const HIDDEN_BONES = ["DEF-shoulder.L", "DEF-upper_arm.L"] as const;
 /**
  * Where the palm goes in the phone rig's space (meters; the screen faces +z): a little right of
- * and below the screen center, behind the phone. The fingers point left and a little up, the palm
+ * and below the screen center, behind the phone. The hand points up and left (fingers wrap the left edge), the palm
  * faces the back of the phone, and the hand measures `HAND_SIZE_M` from the wrist to the knuckles.
  */
-const PALM_AT: readonly [number, number, number] = [0.036, -0.05, -0.024];
-const FINGERS_ALONG: readonly [number, number, number] = [-1, 0.3, 0];
+const PALM_AT: readonly [number, number, number] = [0.032, -0.052, -0.024];
+const FINGERS_ALONG: readonly [number, number, number] = [-0.7, 0.7, 0];
 const PALM_FACING: readonly [number, number, number] = [0, 0, 1];
 const HAND_SIZE_M = 0.082;
+/** Where the forearm goes from the wrist (rig space): straight down in the screen plane, out of the frame below the phone, like in GTA (owner). Pointing it toward the camera made the near forearm look swollen in perspective. */
+const FOREARM_TOWARD: readonly [number, number, number] = [0.3,-1,0.15];
 /** The studio reflections are bright for skin in a dark room: lower, and the skin a little darker. */
 const SKIN_ENV_INTENSITY = 0.3;
 const SKIN_TINT = 0.72;
@@ -75,6 +76,39 @@ export function heldHandTransform(arms: THREE.Object3D): THREE.Matrix4 | null {
   return target.multiply(hand.invert()).multiply(new THREE.Matrix4().makeScale(scale, scale, scale));
 }
 
+/**
+ * Turns the arm about the wrist so the forearm points along `FOREARM_TOWARD`, then turns the joints
+ * back so the hand does not move. The roll part of that correction goes to the two forearm bones
+ * (how a real forearm turns, radius over ulna) and only the bend stays at the wrist: a whole roll
+ * at the wrist bone collapses and swells the wrist skin.
+ */
+function pointForearm(arms: THREE.Object3D): void {
+  const hand = findBone(arms, "DEF-hand.R");
+  const lower = findBone(arms, "DEF-forearm.R.001");
+  const upper = findBone(arms, "DEF-forearm.R");
+  if (!hand?.parent || !lower || !upper) return;
+  arms.updateMatrixWorld(true);
+  const wrist = new THREE.Vector3().setFromMatrixPosition(hand.matrixWorld);
+  const along = new THREE.Vector3().setFromMatrixPosition(upper.matrixWorld).sub(wrist).normalize();
+  const turn = new THREE.Quaternion().setFromUnitVectors(along, new THREE.Vector3(...FOREARM_TOWARD).normalize());
+  // The wrist correction in the lower forearm's space: parent⁻¹ · turn⁻¹ · parent.
+  const parent = hand.parent.getWorldQuaternion(new THREE.Quaternion());
+  const fix = parent.clone().invert().multiply(turn.clone().invert()).multiply(parent);
+  // Split it into a roll about the forearm (the hand bone's offset in its parent) and a bend.
+  const axis = hand.position.clone().normalize();
+  const v = new THREE.Vector3(fix.x, fix.y, fix.z);
+  const p = axis.clone().multiplyScalar(v.dot(axis));
+  const roll = new THREE.Quaternion(p.x, p.y, p.z, fix.w).normalize();
+  const bend = fix.clone().multiply(roll.clone().invert());
+  // Half the roll on each forearm bone; the hand gets the bend, seen from the rolled forearm.
+  const half = new THREE.Quaternion().slerp(roll, 0.5);
+  upper.quaternion.multiply(half);
+  lower.quaternion.multiply(half);
+  hand.quaternion.premultiply(roll.clone().invert().multiply(bend).multiply(roll));
+  arms.position.sub(wrist).applyQuaternion(turn).add(wrist);
+  arms.quaternion.premultiply(turn);
+}
+
 export const HeldHand: FC = () => {
   const gltf = useGLTF(ARMS_MODEL_PATH);
   const gl = useThree((state) => state.gl);
@@ -102,6 +136,7 @@ export const HeldHand: FC = () => {
     for (const name of HIDDEN_BONES) findBone(clone, name)?.scale.setScalar(1e-4);
     const transform = heldHandTransform(clone);
     if (transform) transform.decompose(clone.position, clone.quaternion, clone.scale);
+    pointForearm(clone);
     return clone;
   }, [gltf]);
   // Own materials, with the phone's studio reflections at a lower strength.
