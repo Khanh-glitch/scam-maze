@@ -63,7 +63,7 @@ describe("the scenario", () => {
     state = step(state, advance(10));
     const email = selectDeviceView(state, S, "phone").apps.mail.find((item) => item.id === "mail.clearance")!;
     expect(email.title).toBe("Graduation Clearance — Action Required");
-    expect(email.from).toContain("uni-graduation-office.example");
+    expect(email.from).toContain("payment-ueh.vn");
     expect(email.body).toContain("international student confirmation fee");
     expect(email.read).toBe(false);
   });

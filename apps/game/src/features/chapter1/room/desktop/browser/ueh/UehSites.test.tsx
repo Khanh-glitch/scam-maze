@@ -104,7 +104,7 @@ describe("UEH Student Portal", () => {
     expect(screen.getByTestId("portal-fee-transcript").textContent).toContain("30,000 VND");
     expect(screen.getByTestId("portal-fees").textContent).not.toMatch(/confirmation/i);
     expect(screen.getByTestId("portal-training-phone").textContent).toBe("+000 100 0200");
-    expect(screen.getByTestId("portal-training-email").textContent).toBe("training-office@university.example");
+    expect(screen.getByTestId("portal-training-email").textContent).toBe("training@ueh.edu.vn");
   });
 
   it("checks the account only when the player asks, through the story's saved-portal action", () => {
@@ -135,12 +135,12 @@ describe("UEH Student Portal", () => {
 });
 
 describe("the look-alike clearance site", () => {
-  const FEE = "https://pay.uni-graduation-office.example/confirm";
+  const FEE = "https://payment-ueh.vn/confirm";
   const source = item("mail.src", { body: `Pay: ${FEE}`, actions: [act1("open-link")] });
 
   function pageItem(done: { signIn?: boolean; pay?: boolean; code?: boolean } = {}, extra: Partial<DeviceItemView> = {}) {
     return item("page.fee", {
-      detail: "pay.uni-graduation-office.example",
+      detail: "payment-ueh.vn",
       actions: [
         act1("close"),
         done.signIn ? doneAction("sign-in") : act1("sign-in"),
@@ -185,8 +185,8 @@ describe("the look-alike clearance site", () => {
     const footer = screen.getByTestId("clearance-footer").textContent ?? "";
     expect(footer).toContain("Graduation Clearance Office");
     expect(footer).not.toContain("+000 100 0200");
-    expect(footer).toContain("uni-graduation-office.example");
-    expect(footer).not.toContain("training-office@university.example");
+    expect(footer).toContain("payment-ueh.vn");
+    expect(footer).not.toContain("training@ueh.edu.vn");
   });
 
   it("moves between pages without touching the story", () => {

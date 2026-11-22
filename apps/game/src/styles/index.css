@@ -265,3 +265,8 @@ input, textarea, [contenteditable="true"] {
 [data-touch] button:not([data-compact]) {
   min-height: 40px;
 }
+
+/* The drawn caret of a game form field (the field itself is read-only to the browser). */
+@keyframes game-caret-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+.game-caret { animation: game-caret-blink 1s step-end infinite; }
+@media (prefers-reduced-motion: reduce) { .game-caret { animation: none; } }

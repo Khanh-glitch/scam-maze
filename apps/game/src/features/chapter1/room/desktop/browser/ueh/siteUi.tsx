@@ -110,20 +110,33 @@ export const GameField: React.FC<{
   const block = (event: React.SyntheticEvent) => {
     if (freeDigits === undefined) event.preventDefault();
   };
+  // The real browser must never offer the player's own saved logins or cards here (owner): a field
+  // that types the game's value is read-only to the browser (no autofill on read-only fields), and a
+  // secret is drawn as dots instead of being a password field (which wakes the password manager).
+  const scripted = freeDigits === undefined && onChange !== undefined;
+  const shown = secret ? "\u2022".repeat(value.length) : value;
   return (
     <div className="relative">
       <label htmlFor={id} className="block text-xs font-semibold" style={{ color: colors.muted }}>
         {label}
       </label>
+      <div className="relative mt-1">
       <input
         id={id}
         data-testid={id}
-        type={secret ? "password" : "text"}
+        type="text"
+        name={`game-${id}`}
         inputMode={freeDigits !== undefined ? "numeric" : undefined}
         autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
         spellCheck={false}
-        readOnly={onChange === undefined}
-        value={value}
+        data-1p-ignore=""
+        data-lpignore="true"
+        data-form-type="other"
+        readOnly={onChange === undefined || scripted}
+        aria-readonly={onChange === undefined ? true : undefined}
+        value={shown}
         placeholder={placeholder}
         aria-invalid={invalid ? true : undefined}
         aria-describedby={invalid ? `${id}-error` : undefined}
@@ -135,9 +148,17 @@ export const GameField: React.FC<{
         onChange={(event) => {
           if (freeDigits !== undefined) typed(event.target.value.replace(/\D/g, "").slice(0, freeDigits));
         }}
-        className="mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm tabular-nums outline-none read-only:cursor-default focus:border-[#f47a38] focus-visible:ring-2 focus-visible:ring-[#f47a38]/40"
+        className={`w-full rounded-lg border bg-white px-3 py-2 text-sm tabular-nums outline-none focus:border-[#f47a38] focus-visible:ring-2 focus-visible:ring-[#f47a38]/40 ${onChange === undefined ? "cursor-default" : "cursor-text"}`}
         style={{ borderColor: invalid ? "#b42318" : colors.line, color: colors.ink, letterSpacing: freeDigits !== undefined ? "0.3em" : undefined }}
       />
+      {scripted && focused && (
+        // A read-only field draws no caret, so the page draws one after the text.
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center overflow-hidden px-[13px] text-sm tabular-nums">
+          <span className="invisible whitespace-pre">{shown}</span>
+          <span data-testid={`${id}-caret`} className="game-caret ml-px inline-block h-4 w-px" style={{ background: colors.ink }} />
+        </div>
+      )}
+      </div>
       {invalid && (
         <p id={`${id}-error`} className="mt-1 text-xs" style={{ color: "#b42318" }}>
           {invalid}

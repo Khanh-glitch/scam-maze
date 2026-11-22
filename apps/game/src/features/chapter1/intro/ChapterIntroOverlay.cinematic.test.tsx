@@ -15,7 +15,7 @@ describe("the cinematic intro", () => {
     expect(text).not.toMatch(/72 h|hours left|Friday|signature|chữ ký|72 giờ/i);
   });
 
-  it("keeps the hint, the controls and Continue at the edges, and a click goes on once", () => {
+  it("keeps the hint and the controls at the edges, and a click goes on once", () => {
     const onBegin = vi.fn();
     render(<ChapterIntroOverlay {...props} onBegin={onBegin} />);
     expect(screen.getByTestId("chapter-intro-hint").className).toContain("bottom-6");
@@ -24,13 +24,11 @@ describe("the cinematic intro", () => {
     expect(onBegin).toHaveBeenCalledTimes(1);
   });
 
-  it("starts the story with the Continue button", () => {
-    const onBegin = vi.fn();
-    render(<ChapterIntroOverlay {...props} onBegin={onBegin} />);
-    fireEvent.click(screen.getByRole("button"));
-    expect(onBegin).toHaveBeenCalledTimes(1);
+  it("shows one instruction and no second Continue button", () => {
+    render(<ChapterIntroOverlay {...props} onBegin={() => undefined} />);
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.getByTestId("chapter-intro-hint").textContent).toBe("Click to continue");
   });
-
   it("waits for the scene: nothing goes on while it loads", () => {
     const onBegin = vi.fn();
     render(<ChapterIntroOverlay {...props} ready={false} onBegin={onBegin} />);

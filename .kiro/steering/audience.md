@@ -32,6 +32,12 @@ Never design for one audience and "adapt" for the other.
   examples: `.test`, `.example`, `.invalid`, `example.com`, and documentation
   IPs `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`. Never use a real
   company name or a domain that someone could register.
+  - **Owner exception (2026-11-22):** the Chapter 1 "Last Submission"
+    mission keeps the real UEH name and logo and uses the real-looking
+    domains listed in `apps/game/src/game/narrative/approvedDomains.ts`
+    (UEH's own `ueh.edu.vn` and look-alikes such as `payment-ueh.vn`). They
+    stay display text, never live links. Do not add domains to that list
+    without the owner.
 - **Plain English** that works for non-native readers and for translation:
   short sentences, common words, no idioms or culture-specific references,
   explain acronyms once, complete sentences (no string concatenation).

@@ -3,12 +3,12 @@ import { HISTORY_URL, NEW_TAB_URL, canonicalAddress, displayAddress, isInternalU
 
 describe("parseAddress", () => {
   it("makes a canonical address: lower-case host, a path, no fragment", () => {
-    expect(parseAddress("HTTPS://Portal.University.Example")?.url).toBe("https://portal.university.example/");
+    expect(parseAddress("HTTPS://Student.UEH.edu.VN")?.url).toBe("https://student.ueh.edu.vn/");
     expect(parseAddress("https://a.example/x/y?q=1#top")?.url).toBe("https://a.example/x/y?q=1");
   });
 
   it("adds https to a bare host", () => {
-    expect(parseAddress("library.university.example/hours")).toMatchObject({ url: "https://library.university.example/hours", host: "library.university.example", path: "/hours" });
+    expect(parseAddress("lib.ueh.edu.vn/hours")).toMatchObject({ url: "https://lib.ueh.edu.vn/hours", host: "lib.ueh.edu.vn", path: "/hours" });
   });
 
   it("rejects text that cannot be an address, other schemes and credentials", () => {

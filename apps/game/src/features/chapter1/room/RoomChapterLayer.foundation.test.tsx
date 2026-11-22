@@ -159,6 +159,22 @@ describe("RoomChapterLayer with LAST SUBMISSION routing", () => {
     expect(screen.queryByTestId("held-phone")).toBeNull();
   });
 
+  it("brings the phone up over the open laptop with P, and putting it away leaves the laptop open", () => {
+    const rig = mountLayer();
+    finishIntro();
+    act(() => rig.bridge.onProp("laptop", "inspect-ready"));
+    expect(screen.getByTestId("desktop-icon-device-mail")).toBeTruthy();
+    fireEvent.keyDown(window, { key: "p", code: "KeyP" });
+    expect(screen.getByTestId("held-phone")).toBeTruthy();
+    expect(screen.getByTestId("desktop-icon-device-mail")).toBeTruthy();
+    expect(screen.getByTestId("objective-tracker-slot").getAttribute("data-over-laptop")).toBe("true");
+    const closes = vi.mocked(rig.bridge.commands!.closeInspect).mock.calls.length;
+    fireEvent.keyDown(window, { key: "p", code: "KeyP" });
+    expect(screen.queryByTestId("held-phone")).toBeNull();
+    expect(screen.getByTestId("desktop-icon-device-mail")).toBeTruthy();
+    expect(vi.mocked(rig.bridge.commands!.closeInspect).mock.calls.length).toBe(closes);
+  });
+
   it("shows the task tracker in Vietnamese", () => {
     applyLocale("vi");
     mountLayer();

@@ -46,7 +46,7 @@ export const CLEARANCE_COLORS: SiteColors = {
 export const GAME_PROFILE = {
   name: "Alex",
   studentId: "ALEX-0001",
-  email: "alex@student.example",
+  email: "alex.nguyen@st.ueh.edu.vn",
   /** Shown as dots; the password itself is never stored or typed. */
   passwordMask: "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022",
   /** Fictional, and only ever shown masked: the browser's saved card, like Chrome shows it. */
