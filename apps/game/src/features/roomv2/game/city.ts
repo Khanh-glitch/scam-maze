@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { facadeTexture, neonTexture, wetRoadTexture, rng, canvas, toTex } from './textures';
+import { mergeStaticCity } from './cityMerge';
 
 export const STREET_Y = -17.5;
 
@@ -123,6 +124,7 @@ export function buildCity(scene: THREE.Scene) {
     b.rotation.y = r() * 0.6;
     if (h > 120 && r() < 0.7) {
       const beacon = add(new THREE.Mesh(new THREE.SphereGeometry(0.9, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 0.2, 0.15) })));
+      beacon.userData.dynamic = true;
       beacon.position.set(b.position.x, STREET_Y + h - 2.5, b.position.z);
       const ph = r() * 6;
       updaters.push((t) => { beacon.visible = Math.sin(t * 1.4 + ph) > 0.6; });
@@ -189,6 +191,7 @@ export function buildCity(scene: THREE.Scene) {
     const refl = add(new THREE.Mesh(new THREE.PlaneGeometry(w * 0.6, 14), new THREE.MeshBasicMaterial({ map: streak, color: c.clone().multiplyScalar(0.45), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })));
     refl.rotation.x = -Math.PI / 2; refl.position.set(pos.x, STREET_Y + 0.05, -15);
     if (flicker) {
+      p.userData.dynamic = true; refl.userData.dynamic = true;
       let next = 0, on = true;
       updaters.push((t) => {
         if (t > next) { on = !on || Math.random() < 0.6; next = t + (on ? 0.5 + Math.random() * 6 : 0.04 + Math.random() * 0.12); }
@@ -248,6 +251,7 @@ export function buildCity(scene: THREE.Scene) {
 
   /* ---------- a plane blinking slowly across the cloud deck ---------- */
   const plane = add(new THREE.Mesh(new THREE.SphereGeometry(0.8, 6, 4), new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 5, 5) })));
+  plane.userData.dynamic = true;
   updaters.push((t) => {
     const u = (t * 0.004) % 1;
     plane.position.set(-300 + u * 600, 110, -340);
@@ -288,6 +292,8 @@ export function buildCity(scene: THREE.Scene) {
     dg.attributes.position.needsUpdate = true;
   });
 
+  // One draw per look instead of one per shop, lamp and building face (see cityMerge.ts).
+  mergeStaticCity(city);
   city.traverse((o) => o.layers.set(1));
   scene.add(city);
   void sky;

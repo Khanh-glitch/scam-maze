@@ -134,7 +134,7 @@ describe("the phone with device content", () => {
     expect(rig.store().getState().resources.cash).toBe(2_478_000);
     // A once-only action cannot be used again, and the screen says why.
     expect((within(phone).getByTestId("device-action-mail.registry-pay-fee") as HTMLButtonElement).disabled).toBe(true);
-    expect(within(phone).getByText("Already done")).toBeTruthy();
+    expect(within(phone).getByTestId("device-action-mail.registry-pay-fee").textContent).toBe("Pay the fee: done");
 
     fireEvent.click(within(phone).getByTestId("phone-home-indicator"));
     fireEvent.click(within(phone).getByTestId("phone-app-bank"));

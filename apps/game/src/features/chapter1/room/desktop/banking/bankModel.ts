@@ -65,7 +65,7 @@ export function buildTransactions(ledger: readonly LedgerEntryView[], blocked: r
   const completed: BankTx[] = oldestFirst.map((entry) => {
     const kind = kindOf(entry);
     const transferIndex = transferOrder.get(entry.seq) ?? null;
-    const isFee = entry.itemId === "page.fee" && entry.actionId === "pay-card";
+    const isFee = entry.itemId === "page.fee" && entry.actionId === "enter-code";
     return {
       id: `tx-${entry.seq}`,
       status: "completed",

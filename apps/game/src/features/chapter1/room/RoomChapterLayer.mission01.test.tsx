@@ -87,15 +87,20 @@ describe("Mission 01 in the phone", () => {
     expect(rig.store().getState().resources.cash).toBe(2_500_000);
     fireEvent.click(within(phone).getByTestId("clearance-continue"));
     await within(phone).findByTestId("fake-step-login");
+    fireEvent.focus(within(phone).getByTestId("login-id"));
     fireEvent.click(within(phone).getByTestId("login-fill"));
     fireEvent.click(within(phone).getByTestId("login-submit"));
     await within(phone).findByTestId("fake-step-payment");
     expect(rig.store().getState().persistent.loginCredentialsExposed).toBe(true);
     expect(rig.store().getState().world.missions["m01.security-breach"].status).toBe("open");
     expect(rig.store().getState().resources.cash).toBe(2_500_000);
+    fireEvent.focus(within(phone).getByTestId("pay-number"));
     fireEvent.click(within(phone).getByTestId("pay-fill"));
+    // The saved card leaves the security code to the player, as the browser does.
+    for (const key of "123") fireEvent.keyDown(within(phone).getByTestId("pay-cvc"), { key });
     fireEvent.click(within(phone).getByTestId("pay-submit"));
     await within(phone).findByTestId("fake-step-verify");
+    fireEvent.focus(within(phone).getByTestId("verify-code"));
     fireEvent.click(within(phone).getByTestId("verify-fill"));
     fireEvent.click(within(phone).getByTestId("verify-submit"));
     await within(phone).findByTestId("fake-step-complete");

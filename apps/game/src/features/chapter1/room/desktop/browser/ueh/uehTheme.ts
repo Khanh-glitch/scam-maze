@@ -46,11 +46,14 @@ export const CLEARANCE_COLORS: SiteColors = {
 export const GAME_PROFILE = {
   name: "Alex",
   studentId: "ALEX-0001",
-  email: "alex@student.example",
+  email: "alex.nguyen@st.ueh.edu.vn",
   /** Shown as dots; the password itself is never stored or typed. */
   passwordMask: "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022",
-  cardHolder: "ALEX",
-  cardNumber: "0000 0000 0000 0000",
-  cardExpiry: "00/00",
-  code: "000000",
+  /** Fictional, and only ever shown masked: the browser's saved card, like Chrome shows it. */
+  cardHolder: "ALEX NGUYEN",
+  cardNumber: "\u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 0451",
+  cardLast4: "0451",
+  cardBrand: "Visa",
+  cardExpiry: "04/28",
+  cardCvc: "\u2022\u2022\u2022",
 } as const;

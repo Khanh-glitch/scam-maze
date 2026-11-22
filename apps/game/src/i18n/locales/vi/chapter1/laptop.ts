@@ -13,6 +13,7 @@ const laptop: LocaleShape<typeof en> = {
     desktop: {
       homeLabel: "Màn hình chính",
       appsGroup: "Ứng dụng",
+      taskTarget: "nhiệm vụ hiện tại",
       launch: "Mở {{app}}",
       windowLabel: "Cửa sổ {{app}}",
       backToDesktop: "Quay lại màn hình chính",
@@ -47,7 +48,10 @@ const laptop: LocaleShape<typeof en> = {
       linkAddress: "Địa chỉ liên kết: {{url}}",
       linkUnavailable: "Không thể mở liên kết ở đây.",
       folderLabel: "Thư mục",
-    },
+      toolbar: "Thao tác với thư",
+      actionDone: "{{label}}: đã xong",
+    },
+
     browser: {
       address: "Địa chỉ",
       addressPlaceholder: "Nhập một địa chỉ",
@@ -102,7 +106,7 @@ const laptop: LocaleShape<typeof en> = {
           title: "Thư viện trường",
           heading: "Giờ mở cửa",
           p1: "Trong mùa thi, thư viện mở cửa sớm hơn một giờ và đóng cửa muộn hơn một giờ.",
-          p2: "Câu hỏi: library@university.example",
+          p2: "Câu hỏi: library@ueh.edu.vn",
         },
       },
     },

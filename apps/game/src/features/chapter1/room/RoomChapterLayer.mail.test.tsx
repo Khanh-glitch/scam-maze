@@ -16,7 +16,7 @@ vi.mock("../../../i18n/narrative/lastSubmission.vi", async (importOriginal) => i
 
 const SESSION: ChapterSession = { chapterId: "chapter-1", chapterNumber: 1, sceneId: "apartment", origin: "new-game" };
 const SAVE_SOURCE: SaveGameSource = { read: () => ({ status: "none" }), write: () => true, clear: () => true };
-const URL = "https://pay.uni-graduation-office.example/confirm";
+const URL = "https://payment-ueh.vn/confirm";
 
 function mountLayer() {
   const bridge = new RoomStoryBridge();
@@ -106,10 +106,10 @@ describe("the laptop Mail client", () => {
     const rig = mountLayer();
     const laptop = openMail(rig);
     fireEvent.click(within(laptop).getByTestId("mail-row-mail.clearance"));
-    expect(within(laptop).getByTestId("mail-sender-address").textContent).toBe("clearance@uni-graduation-office.example");
+    expect(within(laptop).getByTestId("mail-sender-address").textContent).toBe("clearance@payment-ueh.vn");
     expect(within(laptop).queryByTestId("mail-sender-details")).toBeNull();
     fireEvent.click(within(laptop).getByTestId("mail-sender-toggle"));
-    expect(within(laptop).getByTestId("mail-detail-domain").textContent).toBe("uni-graduation-office.example");
+    expect(within(laptop).getByTestId("mail-detail-domain").textContent).toBe("payment-ueh.vn");
     expect(within(laptop).getByTestId("mail-sender-toggle").getAttribute("aria-expanded")).toBe("true");
   });
 
@@ -199,7 +199,7 @@ describe("the in-game browser from Mail", () => {
     await within(laptop).findByTestId("browser-newtab");
     // A new tab, then a saved bookmark.
     fireEvent.click(within(laptop).getByTestId("browser-new-tab"));
-    fireEvent.click(await within(laptop).findByTestId("newtab-bookmark-https://library.university.example/hours"));
+    fireEvent.click(await within(laptop).findByTestId("newtab-bookmark-https://lib.ueh.edu.vn/hours"));
     await within(laptop).findByTestId("browser-site-library");
     fireEvent.click(within(laptop).getByTestId("browser-star"));
     fireEvent.click(within(laptop).getByTestId("browser-history-button"));
@@ -231,6 +231,7 @@ describe("the in-game browser from Mail", () => {
     const before = rig.store().getState();
     fireEvent.click(within(laptop).getByTestId("clearance-continue"));
     await within(laptop).findByTestId("fake-step-login");
+    fireEvent.focus(within(laptop).getByTestId("login-id"));
     fireEvent.click(within(laptop).getByTestId("login-fill"));
     fireEvent.click(within(laptop).getByRole("tab").parentElement!.querySelector("[data-testid^=browser-tab-close-]")!);
     await within(laptop).findByTestId("browser-newtab");
@@ -246,6 +247,7 @@ describe("the in-game browser from Mail", () => {
     const start = rig.store().getState();
     fireEvent.click(within(laptop).getByTestId("clearance-continue"));
     await within(laptop).findByTestId("fake-step-login");
+    fireEvent.focus(within(laptop).getByTestId("login-id"));
     fireEvent.click(within(laptop).getByTestId("login-fill"));
     expect(rig.store().getState().persistent.loginCredentialsExposed).toBeFalsy();
     fireEvent.click(within(laptop).getByTestId("login-submit"));
@@ -256,16 +258,22 @@ describe("the in-game browser from Mail", () => {
     expect(state.persistent.verificationCodeExposed).toBeFalsy();
     expect(state.world.missions["m01.security-breach"].status).toBe("open");
     await within(laptop).findByTestId("fake-step-payment");
+    fireEvent.focus(within(laptop).getByTestId("pay-number"));
     fireEvent.click(within(laptop).getByTestId("pay-fill"));
+    // The saved card leaves the security code to the player, as the browser does.
+    for (const key of "123") fireEvent.keyDown(within(laptop).getByTestId("pay-cvc"), { key });
     expect(rig.store().getState().resources.cash).toBe(start.resources.cash);
     fireEvent.click(within(laptop).getByTestId("pay-submit"));
     state = rig.store().getState();
-    expect(state.resources.cash).toBe(start.resources.cash - 800_000);
+    // The card details alone take nothing: the bank asks for its code first.
+    expect(state.resources.cash).toBe(start.resources.cash);
     expect(state.persistent.accountCompromised).toBeFalsy();
     await within(laptop).findByTestId("fake-step-verify");
-    fireEvent.click(within(laptop).getByTestId("verify-fill"));
+    // On the laptop the code is read on the phone and typed in.
+    fireEvent.change(within(laptop).getByTestId("verify-code"), { target: { value: "481206" } });
     fireEvent.click(within(laptop).getByTestId("verify-submit"));
     state = rig.store().getState();
+    expect(state.resources.cash).toBe(start.resources.cash - 800_000);
     expect(state.persistent.verificationCodeExposed).toBe(true);
     expect(state.persistent.accountCompromised).toBe(true);
     await within(laptop).findByTestId("fake-step-complete");
@@ -278,7 +286,7 @@ describe("the in-game browser from Mail", () => {
     fireEvent.click(within(laptop).getByTestId("desktop-back"));
     fireEvent.click(within(laptop).getByTestId("desktop-icon-browser"));
     fireEvent.click(within(laptop).getByTestId("browser-bookmarks"));
-    fireEvent.click(within(laptop).getByTestId("menu-bookmark-https://portal.university.example/"));
+    fireEvent.click(within(laptop).getByTestId("menu-bookmark-https://student.ueh.edu.vn/"));
     await within(laptop).findByTestId("portal-site");
     expect(within(laptop).getByTestId("portal-access-dashboard").textContent).toBe("Active");
     // Services: the published fees and the Training Office number saved in the phone.

@@ -23,8 +23,8 @@ const SESSION: ChapterSession = { chapterId: "chapter-1", chapterNumber: 1, scen
 const SAVE_SOURCE: SaveGameSource = { read: () => ({ status: "none" }), write: () => true, clear: () => true };
 const advance = (minutes: number): CoreAction => ({ type: "ADVANCE_TIME", minutes });
 const use = (itemId: string, actionId: string): CoreAction => ({ type: "USE_DEVICE_ITEM", itemId, actionId });
-const PORTAL = "https://portal.university.example/";
-const FAKE = "https://pay.uni-graduation-office.example/confirm";
+const PORTAL = "https://student.ueh.edu.vn/";
+const FAKE = "https://payment-ueh.vn/confirm";
 const START_CASH = 2_500_000;
 
 function mountLayer() {
@@ -105,7 +105,7 @@ describe("the mistake path: Mail, Fake Clearance, Banking, Security Breach, File
     // Mail: the email of the "Graduation Office", then the link.
     let laptop = app(rig, "device-mail");
     fireEvent.click(within(laptop).getByTestId("mail-row-mail.clearance"));
-    expect(within(laptop).getByTestId("mail-sender-address").textContent).toBe("clearance@uni-graduation-office.example");
+    expect(within(laptop).getByTestId("mail-sender-address").textContent).toBe("clearance@payment-ueh.vn");
     fireEvent.click(within(laptop).getByTestId("mail-link"));
     await within(laptop).findByTestId("fake-step-notice");
     // The fake site uses the UEH name and logo, on another address than the portal, with no verdict.
@@ -117,13 +117,18 @@ describe("the mistake path: Mail, Fake Clearance, Banking, Security Breach, File
     // The chain, one step per page.
     fireEvent.click(within(laptop).getByTestId("clearance-continue"));
     await within(laptop).findByTestId("fake-step-login");
+    fireEvent.focus(within(laptop).getByTestId("login-id"));
     fireEvent.click(within(laptop).getByTestId("login-fill"));
     fireEvent.click(within(laptop).getByTestId("login-submit"));
     await within(laptop).findByTestId("fake-step-payment");
+    fireEvent.focus(within(laptop).getByTestId("pay-number"));
     fireEvent.click(within(laptop).getByTestId("pay-fill"));
+    // The saved card leaves the security code to the player, as the browser does.
+    for (const key of "123") fireEvent.keyDown(within(laptop).getByTestId("pay-cvc"), { key });
     fireEvent.click(within(laptop).getByTestId("pay-submit"));
     await within(laptop).findByTestId("fake-step-verify");
-    fireEvent.click(within(laptop).getByTestId("verify-fill"));
+    // On the laptop the code is read on the phone and typed in.
+    fireEvent.change(within(laptop).getByTestId("verify-code"), { target: { value: "481206" } });
     fireEvent.click(within(laptop).getByTestId("verify-submit"));
     await within(laptop).findByTestId("fake-step-complete");
     let state = rig.store().getState();

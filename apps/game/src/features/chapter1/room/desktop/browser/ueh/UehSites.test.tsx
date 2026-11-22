@@ -104,7 +104,7 @@ describe("UEH Student Portal", () => {
     expect(screen.getByTestId("portal-fee-transcript").textContent).toContain("30,000 VND");
     expect(screen.getByTestId("portal-fees").textContent).not.toMatch(/confirmation/i);
     expect(screen.getByTestId("portal-training-phone").textContent).toBe("+000 100 0200");
-    expect(screen.getByTestId("portal-training-email").textContent).toBe("training-office@university.example");
+    expect(screen.getByTestId("portal-training-email").textContent).toBe("training@ueh.edu.vn");
   });
 
   it("checks the account only when the player asks, through the story's saved-portal action", () => {
@@ -135,12 +135,12 @@ describe("UEH Student Portal", () => {
 });
 
 describe("the look-alike clearance site", () => {
-  const FEE = "https://pay.uni-graduation-office.example/confirm";
+  const FEE = "https://payment-ueh.vn/confirm";
   const source = item("mail.src", { body: `Pay: ${FEE}`, actions: [act1("open-link")] });
 
   function pageItem(done: { signIn?: boolean; pay?: boolean; code?: boolean } = {}, extra: Partial<DeviceItemView> = {}) {
     return item("page.fee", {
-      detail: "pay.uni-graduation-office.example",
+      detail: "payment-ueh.vn",
       actions: [
         act1("close"),
         done.signIn ? doneAction("sign-in") : act1("sign-in"),
@@ -185,8 +185,8 @@ describe("the look-alike clearance site", () => {
     const footer = screen.getByTestId("clearance-footer").textContent ?? "";
     expect(footer).toContain("Graduation Clearance Office");
     expect(footer).not.toContain("+000 100 0200");
-    expect(footer).toContain("uni-graduation-office.example");
-    expect(footer).not.toContain("training-office@university.example");
+    expect(footer).toContain("payment-ueh.vn");
+    expect(footer).not.toContain("training@ueh.edu.vn");
   });
 
   it("moves between pages without touching the story", () => {
@@ -198,6 +198,7 @@ describe("the look-alike clearance site", () => {
 
   it("fills the login form with the game's details and signs in only on the sign in button", () => {
     const first = site("login");
+    fireEvent.focus(screen.getByTestId("login-id"));
     fireEvent.click(screen.getByTestId("login-fill"));
     expect(first.setFields).toHaveBeenCalledWith({ "login.id": "ALEX-0001", "login.password": "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" });
     expect(first.onUseItem).not.toHaveBeenCalled();
@@ -219,7 +220,7 @@ describe("the look-alike clearance site", () => {
   });
 
   it("pays only on the pay button with the card filled in, and then goes on to verification", () => {
-    const { go, onUseItem } = site("payment", { signIn: true }, { "pay.holder": "ALEX", "pay.number": "0000 0000 0000 0000", "pay.expiry": "00/00" });
+    const { go, onUseItem } = site("payment", { signIn: true }, { "pay.holder": "ALEX", "pay.number": "\u2022\u2022\u2022\u2022 0451", "pay.expiry": "04/28", "pay.cvc": "\u2022\u2022\u2022" });
     expect(onUseItem).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("pay-submit"));
     expect(onUseItem).toHaveBeenCalledWith("page.fee", "pay-card");
@@ -227,13 +228,27 @@ describe("the look-alike clearance site", () => {
   });
 
   it("gives the verification code only on the confirm button, after the payment", () => {
-    const { go, onUseItem } = site("verify", { signIn: true, pay: true }, { "verify.code": "000000" });
+    const { go, onUseItem } = site("verify", { signIn: true, pay: true }, { "verify.code": "481206" });
     fireEvent.click(screen.getByTestId("verify-submit"));
     expect(onUseItem).toHaveBeenCalledTimes(1);
     expect(onUseItem).toHaveBeenCalledWith("page.fee", "enter-code");
     expect(go).toHaveBeenCalledWith(urlOfPage("fee-complete"));
   });
 
+  it("refuses a code that is not the one from the bank's text", () => {
+    const { onUseItem } = site("verify", { signIn: true, pay: true }, { "verify.code": "123456" });
+    fireEvent.click(screen.getByTestId("verify-submit"));
+    expect(onUseItem).not.toHaveBeenCalled();
+    expect(screen.getByTestId("verify-code").getAttribute("aria-invalid")).toBe("true");
+  });
+  it("types the game's fictional login whatever keys are pressed, and never takes a paste", () => {
+    const { setFields } = site("login");
+    const id = screen.getByTestId("login-id");
+    fireEvent.keyDown(id, { key: "m" });
+    expect(setFields).toHaveBeenLastCalledWith({ "login.id": "A" });
+    fireEvent.paste(id, { clipboardData: { getData: () => "my-real-password" } });
+    expect(setFields).toHaveBeenCalledTimes(1);
+  });
   it("does not show the verification step before the payment, nor a thank-you before the code", () => {
     site("verify", { signIn: true });
     expect(screen.getByTestId("fake-step-needpayment")).toBeTruthy();

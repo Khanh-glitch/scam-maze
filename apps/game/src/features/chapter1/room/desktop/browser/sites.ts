@@ -28,16 +28,16 @@ export interface VirtualPage {
 }
 
 export const VIRTUAL_PAGES: readonly VirtualPage[] = [
-  { id: "portal", url: "https://portal.university.example/", kind: "portal", section: "dashboard", bookmarkedByDefault: true },
-  { id: "portal-thesis", url: "https://portal.university.example/thesis", kind: "portal", section: "thesis" },
-  { id: "portal-services", url: "https://portal.university.example/services", kind: "portal", section: "services" },
-  { id: "portal-account", url: "https://portal.university.example/account", kind: "portal", section: "account" },
-  { id: "library", url: "https://library.university.example/hours", kind: "static", bookmarkedByDefault: true },
-  { id: "fee", url: "https://pay.uni-graduation-office.example/confirm", kind: "clearance", step: "notice" },
-  { id: "fee-login", url: "https://pay.uni-graduation-office.example/login", kind: "clearance", step: "login" },
-  { id: "fee-payment", url: "https://pay.uni-graduation-office.example/payment", kind: "clearance", step: "payment" },
-  { id: "fee-verify", url: "https://pay.uni-graduation-office.example/verify", kind: "clearance", step: "verify" },
-  { id: "fee-complete", url: "https://pay.uni-graduation-office.example/complete", kind: "clearance", step: "complete" },
+  { id: "portal", url: "https://student.ueh.edu.vn/", kind: "portal", section: "dashboard", bookmarkedByDefault: true },
+  { id: "portal-thesis", url: "https://student.ueh.edu.vn/thesis", kind: "portal", section: "thesis" },
+  { id: "portal-services", url: "https://student.ueh.edu.vn/services", kind: "portal", section: "services" },
+  { id: "portal-account", url: "https://student.ueh.edu.vn/account", kind: "portal", section: "account" },
+  { id: "library", url: "https://lib.ueh.edu.vn/hours", kind: "static", bookmarkedByDefault: true },
+  { id: "fee", url: "https://payment-ueh.vn/confirm", kind: "clearance", step: "notice" },
+  { id: "fee-login", url: "https://payment-ueh.vn/login", kind: "clearance", step: "login" },
+  { id: "fee-payment", url: "https://payment-ueh.vn/payment", kind: "clearance", step: "payment" },
+  { id: "fee-verify", url: "https://payment-ueh.vn/verify", kind: "clearance", step: "verify" },
+  { id: "fee-complete", url: "https://payment-ueh.vn/complete", kind: "clearance", step: "complete" },
 ];
 
 export type Route =

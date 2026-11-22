@@ -78,8 +78,10 @@ function play(rig: Rig, actions: CoreAction[]) {
   }
 }
 
-const TO_PAID: CoreAction[] = [advance(10), open("mail.clearance"), use("mail.clearance", "open-link"), use("page.fee", "sign-in"), use("page.fee", "pay-card")];
-const CODE_GIVEN: CoreAction[] = [...TO_PAID, use("page.fee", "enter-code")];
+const CARD_GIVEN: CoreAction[] = [advance(10), open("mail.clearance"), use("mail.clearance", "open-link"), use("page.fee", "sign-in"), use("page.fee", "pay-card")];
+/** The fee is taken when the bank's code is entered, as with a real card payment. */
+const TO_PAID: CoreAction[] = [...CARD_GIVEN, use("page.fee", "enter-code")];
+const CODE_GIVEN: CoreAction[] = TO_PAID;
 
 function openApp(rig: Rig, id: string) {
   act(() => rig.bridge.onProp("laptop", "inspect-ready"));
@@ -260,7 +262,7 @@ describe("evidence", () => {
     expect(within(laptop).queryByTestId("bank-save-record")).toBeNull();
     laptop = openApp(rig, "device-files");
     fireEvent.click(within(laptop).getByTestId("files-folder-evidence"));
-    expect(within(laptop).getByTestId("device-row-file.fee-record").textContent).toContain("Bank record: confirmation fee payment");
+    expect(within(laptop).getByTestId("device-row-file.fee-record").textContent).toContain("Receipt: confirmation fee payment");
     expect(within(laptop).getByTestId("files-evidence-count").textContent).toContain(String(after.resources.evidence));
   });
 

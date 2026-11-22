@@ -61,26 +61,144 @@ export function siteButtonClass(kind: "primary" | "accent" | "quiet"): string {
   return `${base} border border-[#bcd5d2] bg-white text-[#10302f] hover:bg-[#eef6f5] disabled:text-[#8aa3a1]`;
 }
 
+/** One saved entry offered under a field, like a browser's autofill list. */
+export interface AutofillSuggestion {
+  testId: string;
+  primary: string;
+  secondary?: string;
+  onPick: () => void;
+}
+
 /**
- * A form field that is filled with the game's fictional data. It cannot be typed into, so the player
- * never types a real value; "use my saved details" buttons fill it.
+ * A form field that behaves like a real one but never takes a real value. Focusing it shows the
+ * browser's saved entries (`suggestions`) the way Chrome does. Typing works too, but whatever key is
+ * pressed, the field "types" the next character of the game's fictional value (`typesAs`), so a real
+ * login, card number or password never enters the game. Paste and drop are ignored.
+ *
+ * `freeDigits` makes it a plain numeric field (for a one-time code the game itself shows on the
+ * phone): only digits, up to that many.
  */
-export const GameField: React.FC<{ colors: SiteColors; id: string; label: string; value: string; placeholder: string }> = ({ colors, id, label, value, placeholder }) => (
-  <div>
-    <label htmlFor={id} className="block text-xs font-semibold" style={{ color: colors.muted }}>
-      {label}
-    </label>
-    <input
-      id={id}
-      data-testid={id}
-      readOnly
-      value={value}
-      placeholder={placeholder}
-      className="mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm tabular-nums outline-none read-only:cursor-default focus-visible:ring-2 focus-visible:ring-[#f47a38]"
-      style={{ borderColor: colors.line, color: colors.ink }}
-    />
-  </div>
-);
+export const GameField: React.FC<{
+  colors: SiteColors;
+  id: string;
+  label: string;
+  value: string;
+  placeholder?: string;
+  onChange?: (value: string) => void;
+  typesAs?: string;
+  freeDigits?: number;
+  /** Shown as dots (a password). */
+  secret?: boolean;
+  suggestionsLabel?: string;
+  suggestionsIcon?: React.ReactNode;
+  suggestions?: readonly AutofillSuggestion[];
+  invalid?: string | null;
+}> = ({ colors, id, label, value, placeholder, onChange, typesAs, freeDigits, secret = false, suggestionsLabel, suggestionsIcon, suggestions = [], invalid = null }) => {
+  const [focused, setFocused] = React.useState(false);
+  const showList = focused && value === "" && suggestions.length > 0 && onChange !== undefined;
+  const typed = (next: string) => onChange?.(next);
+  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (freeDigits !== undefined || onChange === undefined) return;
+    if (event.key === "Backspace") {
+      event.preventDefault();
+      typed(value.slice(0, -1));
+    } else if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      if (typesAs !== undefined && value.length < typesAs.length) typed(typesAs.slice(0, value.length + 1));
+    }
+  };
+  const block = (event: React.SyntheticEvent) => {
+    if (freeDigits === undefined) event.preventDefault();
+  };
+  // The real browser must never offer the player's own saved logins or cards here (owner): a field
+  // that types the game's value is read-only to the browser (no autofill on read-only fields), and a
+  // secret is drawn as dots instead of being a password field (which wakes the password manager).
+  const scripted = freeDigits === undefined && onChange !== undefined;
+  const shown = secret ? "\u2022".repeat(value.length) : value;
+  return (
+    <div className="relative">
+      <label htmlFor={id} className="block text-xs font-semibold" style={{ color: colors.muted }}>
+        {label}
+      </label>
+      <div className="relative mt-1">
+      <input
+        id={id}
+        data-testid={id}
+        type="text"
+        name={`game-${id}`}
+        inputMode={freeDigits !== undefined ? "numeric" : undefined}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        data-1p-ignore=""
+        data-lpignore="true"
+        data-form-type="other"
+        readOnly={onChange === undefined || scripted}
+        aria-readonly={onChange === undefined ? true : undefined}
+        value={shown}
+        placeholder={placeholder}
+        aria-invalid={invalid ? true : undefined}
+        aria-describedby={invalid ? `${id}-error` : undefined}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onKeyDown={onKeyDown}
+        onPaste={block}
+        onDrop={block}
+        onChange={(event) => {
+          if (freeDigits !== undefined) typed(event.target.value.replace(/\D/g, "").slice(0, freeDigits));
+        }}
+        className={`w-full rounded-lg border bg-white px-3 py-2 text-sm tabular-nums outline-none focus:border-[#f47a38] focus-visible:ring-2 focus-visible:ring-[#f47a38]/40 ${onChange === undefined ? "cursor-default" : "cursor-text"}`}
+        style={{ borderColor: invalid ? "#b42318" : colors.line, color: colors.ink, letterSpacing: freeDigits !== undefined ? "0.3em" : undefined }}
+      />
+      {scripted && focused && (
+        // A read-only field draws no caret, so the page draws one after the text.
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center overflow-hidden px-[13px] text-sm tabular-nums">
+          <span className="invisible whitespace-pre">{shown}</span>
+          <span data-testid={`${id}-caret`} className="game-caret ml-px inline-block h-4 w-px" style={{ background: colors.ink }} />
+        </div>
+      )}
+      </div>
+      {invalid && (
+        <p id={`${id}-error`} className="mt-1 text-xs" style={{ color: "#b42318" }}>
+          {invalid}
+        </p>
+      )}
+      {showList && (
+        // The browser's own list, not part of the page: neutral gray, like Chrome's.
+        <div
+          role="listbox"
+          aria-label={suggestionsLabel}
+          data-testid={`${id}-suggestions`}
+          className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-lg border border-[#d0d4da] bg-white py-1 text-left shadow-[0_8px_24px_rgba(15,23,42,0.18)]"
+        >
+          {suggestionsLabel && (
+            <p className="flex items-center gap-1.5 px-3 pb-1 pt-0.5 text-[11px] font-medium text-[#5f6368]">
+              {suggestionsIcon}
+              {suggestionsLabel}
+            </p>
+          )}
+          {suggestions.map((entry) => (
+            <button
+              key={entry.testId}
+              type="button"
+              role="option"
+              aria-selected="false"
+              data-testid={entry.testId}
+              // Keeps the focus in the field while the mouse is down, as the browser list does.
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={entry.onPick}
+              className="flex w-full cursor-pointer flex-col px-3 py-1.5 text-left hover:bg-[#f1f3f4] focus-visible:bg-[#e8f0fe] focus-visible:outline-none"
+            >
+              <span className="text-sm text-[#202124]">{entry.primary}</span>
+              {entry.secondary && <span className="text-xs text-[#5f6368]">{entry.secondary}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const Progress: React.FC<{ colors: SiteColors; percent: number; label: string }> = ({ colors, percent, label }) => (
   <div
