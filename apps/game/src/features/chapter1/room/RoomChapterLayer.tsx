@@ -21,7 +21,7 @@
  * stops being free, and 0 disables it.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarClock, NotebookText } from "lucide-react";
+import { CalendarClock, NotebookText, Smartphone } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { GameSettings } from "@scammaze/shared-types";
 import { useReducedMotion } from "../../../components/ui/useReducedMotion";
@@ -136,6 +136,10 @@ const PROP_TO_OBJECT: Partial<Record<RoomPropId, InteractableId>> = {
 
 const INTRO_CONTROLS = ["move", "look", "interact", "journal", "schedule"] as const;
 
+/** z-index of the corner HUD while the laptop is open: just above the laptop desktop (`UI.backdrop`, z-40). */
+const HUD_OVER_LAPTOP_Z = 41;
+/** Brings up the carried phone. */
+const PHONE_KEY = "P";
 /** Small translucent key-cap chip of the cinematic UI (Journal, hints). Colors come from `CINE`. */
 const HUD_CHIP_CLASS =
   "relative flex items-center gap-2 py-1 pl-1.5 pr-3 font-medium cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b9a5f5]";
@@ -592,6 +596,8 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
   /** Closing the laptop or the phone leaves the inspect pose too. */
   const leaveInspect = useCallback(
     (kind: OverlayKind) => {
+      // The phone put away over the open laptop leaves the laptop where it is.
+      if (kind === "phone" && isOpen(overlaysRef.current, "laptop")) return;
       if (kind === "laptop" || kind === "phone") bridge.commands?.closeInspect();
     },
     [bridge],
@@ -831,10 +837,13 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
     openMissions.find((mission) => mission.current !== null) ??
     openMissions[0] ??
     null;
+  // The laptop app of the current step (its icon carries the task marker on the desktop).
+  const currentStep = trackedMission?.current ?? null;
+  const laptopTaskAppId = taskMode && currentStep?.target === "laptop" && currentStep.app ? (currentStep.app === "thesis" ? "thesis" : `device-${currentStep.app}`) : null;
   const seenEventsRef = useRef<Set<string> | null>(null);
   if (seenEventsRef.current === null) seenEventsRef.current = new Set(pendingEvents.map((event) => event.id));
   const arrivalCounterRef = useRef(0);
-  const [arrival, setArrival] = useState<{ key: number; title: string } | null>(null);
+  const [arrival, setArrival] = useState<{ key: number; title: string; onPhone?: boolean } | null>(null);
   useEffect(() => {
     const seen = seenEventsRef.current;
     if (seen === null) return;
@@ -859,7 +868,8 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
     );
     if (notable.length === 0) return;
     arrivalCounterRef.current += 1;
-    setArrival({ key: arrivalCounterRef.current, title: notable[notable.length - 1].title });
+    const latest = notable[notable.length - 1];
+    setArrival({ key: arrivalCounterRef.current, title: latest.title, onPhone: latest.app === "messages" });
   }, [arrivedItems, scenario]);
   const dismissArrival = useCallback(() => setArrival(null), []);
   const gameplay = gameplayConfig(scenario);
@@ -947,6 +957,18 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
     if (stack.length === 0) openOverlay({ kind: "planner" });
     else if (top(stack)?.kind === "planner") closeTop();
   }, [closeTop, openOverlay, store]);
+  // The chapter's phone is carried: P brings it up low on the right (like in GTA) and puts it away.
+  const phoneCarried = taskMode;
+  const togglePhone = useCallback(() => {
+    if (!phoneCarried || introOpenRef.current) return;
+    const state = store.getState();
+    if (state.status !== "playing" || callInProgress(state)) return;
+    const stack = overlaysRef.current;
+    if (stack.length === 0) openOverlay({ kind: "phone" });
+    // At the laptop the phone comes up over it, so the bank's code can be read (owner).
+    else if (stack.length === 1 && stack[0].kind === "laptop") openOverlay({ kind: "phone" }, { stack: true });
+    else if (top(stack)?.kind === "phone") closeTop();
+  }, [closeTop, openOverlay, phoneCarried, store]);
   // Task button on the map: marked while a mission is open that the task list has not shown yet.
   const [tasksSeen, setTasksSeen] = useState<ReadonlySet<string>>(() => new Set());
   const tasksUnseen = openMissions.some((mission) => !tasksSeen.has(mission.id));
@@ -990,6 +1012,9 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
       } else if (event.code === "KeyT") {
         event.preventDefault();
         toggleTasks();
+      } else if (event.code === "KeyP" && phoneCarried) {
+        event.preventDefault();
+        togglePhone();
       } else if (event.code === "KeyH") {
         // Hints are a HUD toggle only: no story state changes.
         if (store.getState().status !== "playing" || overlaysRef.current.length > 0) return;
@@ -1012,7 +1037,7 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keydown", onTab);
     };
-  }, [canClose, closeTop, store, toggleJournal, togglePlanner, toggleTasks]);
+  }, [canClose, closeTop, phoneCarried, store, toggleJournal, togglePhone, togglePlanner, toggleTasks]);
 
   // Focus returns to the element that opened the overlay when it closes (Requirement 22.1).
   const previousOverlaysRef = useRef<OverlayStack>(EMPTY_OVERLAYS);
@@ -1065,7 +1090,13 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
     inspecting,
   });
   const callFocused = uiMode === "call" || uiMode === "decision";
-  const trackerHidden = callFocused || uiMode === "investigation" || overlays.length > 0;
+  // On the laptop (and nothing on top of it) the HUD stays: the map, the clock, cash and the task.
+  // (Task mode only; the parked story keeps its earlier rule of hiding the HUD there.)
+  const laptopWithPhone = overlays.length === 2 && overlays[0].kind === "laptop" && overlays[1].kind === "phone";
+  const hudOverLaptop = taskMode && !callFocused && ((overlays.length === 1 && overlays[0].kind === "laptop") || laptopWithPhone);
+  // The phone brought up with P sits low on the right: the HUD stays as it is, like in GTA.
+  const hudWithPhone = taskMode && !callFocused && overlays.length === 1 && overlays[0].kind === "phone";
+  const trackerHidden = !hudOverLaptop && !hudWithPhone && (callFocused || uiMode === "investigation" || overlays.length > 0);
 
   const { toast, notice, announcements, completed, dismissToast, dismissNotice } = useHudNotices(store);
   // Open missions show the objective of their current path next to the authored objectives.
@@ -1175,6 +1206,7 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
               initialState={desktopUiRef.current}
               onStateChange={handleDesktopState}
               registerEscape={registerLaptopEscape}
+              taskAppId={laptopTaskAppId}
             />
           );
         }
@@ -1203,6 +1235,7 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
             browserState={phoneBrowserRef.current}
             onBrowserState={handlePhoneBrowser}
             onClose={closePhone}
+            held={phoneCarried ? { screenSink: callSink, mode: modelAllowed ? "model" : "fallback" } : undefined}
           />
         );
       case "planner":
@@ -1262,6 +1295,28 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
 
   const stopMouseDown = useCallback((event: React.MouseEvent) => event.stopPropagation(), []);
   const hudVisible = !introOpen && status === "playing";
+  const phoneUp = phoneCarried && isOpen(overlays, "phone");
+  // Unread on the phone: messages and mail that track unread (the chip's badge).
+  const phoneUnread = phoneCarried ? phoneDevice.unread.messages + phoneDevice.unread.mail : 0;
+  // A call takes the phone: the held phone gives way to the call screen.
+  useEffect(() => {
+    if (callOpen && phoneCarried && isOpen(overlaysRef.current, "phone")) removeOverlay("phone");
+  }, [callOpen, phoneCarried, removeOverlay]);
+  // The carried phone is not on the nightstand.
+  useEffect(() => {
+    if (!engineReady || !phoneCarried) return undefined;
+    const commands = bridge.commands;
+    commands?.setPhoneCarried?.(true);
+    return () => commands?.setPhoneCarried?.(false);
+  }, [bridge, engineReady, phoneCarried]);
+  // The open laptop covers the room: the room behind it holds still and draws fewer frames.
+  const laptopOpen = isOpen(overlays, "laptop");
+  useEffect(() => {
+    if (!engineReady || !laptopOpen) return undefined;
+    const commands = bridge.commands;
+    commands?.setBackdrop?.(true);
+    return () => commands?.setBackdrop?.(false);
+  }, [bridge, engineReady, laptopOpen]);
   // The marker over the prop of the current step, while the player walks around (no overlay, call or inspect pose).
   const markerTarget = taskMode && hudVisible && !trackerHidden && inspecting === null ? (trackedMission?.current?.target ?? null) : null;
   // The marker moves itself (DOM writes per frame); the layer only keeps the whole-metre distance for the tracker.
@@ -1321,9 +1376,12 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
             {engineReady && markerTarget !== null && <TaskMarker target={markerTarget} source={markerSource} onDistance={setTaskDistance} />}
             {/* Top left, like the neighborhood HUD: the map with the status ring, the clock beside it, the objective under it. */}
             <div
-              className="pointer-events-none absolute left-[clamp(1rem,3vw,2.5rem)] top-4 z-10 flex flex-col items-start gap-3"
+              className={`pointer-events-none absolute left-[clamp(1rem,3vw,2.5rem)] z-10 flex ${hudOverLaptop ? "top-2.5 max-w-[calc(100%-30rem)] flex-row items-center gap-5" : "top-4 flex-col items-start gap-3"}`}
               data-testid="objective-tracker-slot"
+              data-over-laptop={hudOverLaptop ? "true" : undefined}
               style={{
+                // Over the laptop the HUD sits above its screen (the overlays come later in the DOM).
+                zIndex: hudOverLaptop ? HUD_OVER_LAPTOP_Z : undefined,
                 // The call, its replies, the laptop, the phone records and the journal own the
                 // screen: the HUD steps aside, then returns.
                 opacity: trackerHidden ? 0 : 1,
@@ -1332,6 +1390,7 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
               }}
             >
               <ChapterStatusCluster
+                compact={hudOverLaptop}
                 resources={resources}
                 fatigueLevel={fatigueOn ? fatigueLevel(resources.fatigue, gameplay.fatigue) : undefined}
                 mapCorner={<ChapterTaskButton unseen={tasksUnseen} onOpen={taskMode ? toggleTasks : togglePlanner} onHoverSound={onHoverSound} />}
@@ -1343,9 +1402,10 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
                   distance={markerTarget === null ? null : taskDistance}
                   onOpenList={toggleTasks}
                   onHoverSound={onHoverSound}
+                  compact={hudOverLaptop}
                 />
               ) : null}
-              {taskMode && trackedMission && hintOn && (
+              {taskMode && trackedMission && hintOn && !hudOverLaptop && (
                 <p role="note" aria-label={text("room.hud.hintPanelLabel")} data-testid="room-hint" className={`pl-[34px] font-menu text-sm italic leading-snug text-zinc-400 ${SHADOW}`}>
                   {currentHint ?? text("room.hints.none")}
                 </p>
@@ -1367,6 +1427,7 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
             <div
               className="absolute right-[clamp(1rem,3vw,2.5rem)] top-4 z-10"
               style={{
+                zIndex: hudOverLaptop ? HUD_OVER_LAPTOP_Z : undefined,
                 opacity: trackerHidden ? 0 : 1,
                 visibility: trackerHidden ? "hidden" : "visible",
                 transition: `opacity ${CINE.motion.baseMs}ms ${CINE.motion.ease}, visibility ${CINE.motion.baseMs}ms`,
@@ -1388,6 +1449,34 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
               onMouseDown={stopMouseDown}
             >
               <div className="flex gap-2">
+                {phoneCarried && (
+                  <button
+                    type="button"
+                    className={HUD_CHIP_CLASS}
+                    style={HUD_CHIP_STYLE}
+                    aria-pressed={phoneUp}
+                    aria-keyshortcuts={PHONE_KEY}
+                    data-testid="hud-phone-chip"
+                    onClick={togglePhone}
+                  >
+                    <kbd aria-hidden="true" className="inline-flex items-center justify-center font-mono" style={CINE_KEYCAP_STYLE}>
+                      {PHONE_KEY}
+                    </kbd>
+                    <Smartphone className="h-4 w-4" aria-hidden="true" />
+                    <span>{text("hud.phone")}</span>
+                    {phoneUnread > 0 && (
+                      <>
+                        <span
+                          aria-hidden="true"
+                          className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full bg-[#f2b24b] px-1.5 text-center text-xs font-bold leading-5 text-[#171521]"
+                        >
+                          {phoneUnread}
+                        </span>
+                        <span className="sr-only">{text("hud.unreadMessages", { count: phoneUnread, number: formatNumber(locale, phoneUnread) })}</span>
+                      </>
+                    )}
+                  </button>
+                )}
                 <button
                   type="button"
                   className={HUD_CHIP_CLASS}
@@ -1510,7 +1599,12 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
 
             {arrival && (
               <div className="pointer-events-none absolute left-1/2 top-24 z-10 -translate-x-1/2" aria-hidden="true">
-                <EventArrivalNotice key={arrival.key} title={arrival.title} onDismiss={dismissArrival} />
+                <EventArrivalNotice
+                  key={arrival.key}
+                  title={arrival.title}
+                  onDismiss={dismissArrival}
+                  keyHint={phoneCarried && arrival.onPhone ? { key: PHONE_KEY, label: text("hud.phone") } : undefined}
+                />
               </div>
             )}
             <MovementHints active={uiMode === "exploration" && overlays.length === 0 && !introOpen} />
@@ -1520,7 +1614,8 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
         <div ref={overlayLayerRef} onMouseDown={stopMouseDown}>
           {/* Before the overlays in the DOM, so the journal opened from a call is the top dialog. */}
           <RoomPhoneModelLayer
-            active={callOpen}
+            active={callOpen || phoneUp}
+            placement={callOpen ? "call" : "held"}
             modelAllowed={modelAllowed}
             ringing={callRinging}
             screenSink={callSink}
@@ -1575,6 +1670,7 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
             mode={introMode}
             lines={introLines}
             cinematic={!Object.hasOwn(scenario.dialogues, "dlg.intro")}
+            holdForVoice={alexVoice.introSpeaking}
             onLineChange={goToIntroLine}
             controlIds={INTRO_CONTROLS}
             voiceGain={voiceGain(

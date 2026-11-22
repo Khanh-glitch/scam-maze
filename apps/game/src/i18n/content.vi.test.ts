@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { CHAPTER_1_INTERACTION_PROMPTS } from "../game/narrative/chapter1/interactables";
 import { CHAPTER_1_SCENARIO } from "../game/narrative/chapter1/scenario";
 import { narrativeTextEntries } from "../game/narrative/localize";
+import { isOwnerApprovedHost } from "../game/narrative/approvedDomains";
 import { CHAPTER_1_NARRATIVE_VI } from "./narrative/chapter1.vi";
 import { NAMESPACES, resources, type Namespace } from "./resources";
 
@@ -179,7 +180,7 @@ describe("Vietnamese content lint: domains and phone numbers", () => {
   it("uses only reserved domains in the overlay and the chapter1 dictionary", () => {
     const hits = DOMAIN_SCOPED_ENTRIES.flatMap((entry) =>
       domainsOf(entry.vi)
-        .filter((domain) => !RESERVED_DOMAIN.test(domain))
+        .filter((domain) => !RESERVED_DOMAIN.test(domain) && !isOwnerApprovedHost(domain))
         .map((domain) => label(entry, domain)),
     );
     expect(hits).toEqual([]);

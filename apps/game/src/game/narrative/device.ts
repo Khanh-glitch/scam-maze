@@ -7,6 +7,7 @@
 // `USE_DEVICE_ITEM`), so they cost simulated time and cash, can change persistent state, can
 // advance events and missions, and replay from a save. The views carry facts and costs only: they
 // never label an item or an action as safe, unsafe, good or bad.
+import { isOwnerApprovedHost } from "./approvedDomains";
 import { evaluateConditions } from "./conditions";
 import { simulatedClock, CHAPTER_DURATION_MINUTES } from "./resources";
 import type {
@@ -339,7 +340,7 @@ export function ledgerLabel(scenario: ScenarioDefinition, entry: LedgerEntry): s
 // Content validation
 // ---------------------------------------------------------------------------
 
-/** Domains that are allowed in plain text: reserved or documentation domains only. */
+/** Domains that are allowed in plain text: reserved or documentation domains, and the owner-approved list. */
 const RESERVED_DOMAIN = /(?:^|\.)(?:test|example|invalid|localhost)$|^example\.(?:com|net|org)$|\.example\.(?:com|net|org)$/i;
 const FILE_EXTENSION = /\.(?:docx?|pdf|xlsx?|pptx?|txt|csv|zip|png|jpe?g|gif|mp3|mp4|wav|m4a)$/i;
 const DOMAIN_LIKE = /\b[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+\b/gi;
@@ -350,7 +351,7 @@ function unreservedDomains(text: string): string[] {
     const domain = match[0];
     // Skip numbers such as 2.500.000, times such as 17.00 and file names such as thesis-final.docx.
     if (/^[\d.]+$/.test(domain) || FILE_EXTENSION.test(domain)) continue;
-    if (!RESERVED_DOMAIN.test(domain)) found.push(domain);
+    if (!RESERVED_DOMAIN.test(domain) && !isOwnerApprovedHost(domain)) found.push(domain);
   }
   return found;
 }

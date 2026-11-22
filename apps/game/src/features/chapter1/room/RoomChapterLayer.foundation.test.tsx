@@ -19,7 +19,7 @@ vi.mock("../../../i18n/narrative/lastSubmission.vi", async (importOriginal) => i
 const SESSION: ChapterSession = { chapterId: "chapter-1", chapterNumber: 1, sceneId: "apartment", origin: "new-game" };
 const SAVE_SOURCE: SaveGameSource = { read: () => ({ status: "none" }), write: () => true, clear: () => true };
 
-function mountLayer(): { store: () => ChapterStore } {
+function mountLayer(): { store: () => ChapterStore; bridge: RoomStoryBridge } {
   const bridge = new RoomStoryBridge();
   bridge.commands = {
     setPhoneMode: vi.fn(),
@@ -29,6 +29,7 @@ function mountLayer(): { store: () => ChapterStore } {
     setMood: vi.fn(),
     closeInspect: vi.fn(),
     setCursorMode: vi.fn(),
+    setPhoneCarried: vi.fn(),
   } satisfies RoomStoryCommands;
   let store: ChapterStore | null = null;
   render(
@@ -45,6 +46,7 @@ function mountLayer(): { store: () => ChapterStore } {
     />,
   );
   return {
+    bridge,
     store: () => {
       if (!store) throw new Error("store not ready");
       return store;
@@ -122,6 +124,59 @@ describe("RoomChapterLayer with LAST SUBMISSION routing", () => {
     // The task took 90 minutes, so the email of 17:10 has arrived: reading it is the next step.
     expect(within(screen.getByTestId("task-tracker")).getByTestId("task-current").textContent).toBe("Read the new email about your submission account");
     expect(screen.getByTestId("task-step-done").textContent).toContain("Edit the introduction and literature review");
+  });
+
+  it("keeps the HUD over the laptop and marks the app of the current step on its desktop", () => {
+    const rig = mountLayer();
+    finishIntro();
+    act(() => rig.store().dispatch({ type: "ADVANCE_TIME", minutes: 10 }));
+    act(() => rig.bridge.onProp("laptop", "inspect-ready"));
+    const slot = screen.getByTestId("objective-tracker-slot");
+    expect(slot.style.visibility).toBe("visible");
+    expect(slot.getAttribute("data-over-laptop")).toBe("true");
+    // One row above the laptop: the small ring and the clock, then the step.
+    expect(within(slot).getByTestId("chapter-status-cluster").getAttribute("data-compact")).toBe("true");
+    expect(within(slot).getByTestId("task-tracker").getAttribute("data-compact")).toBe("true");
+    expect(within(slot).getByTestId("task-current").textContent).toBe("Read the new email about your submission account");
+    expect(screen.getByTestId("desktop-icon-device-mail").getAttribute("data-task-target")).toBe("true");
+    expect(screen.getByTestId("desktop-icon-thesis").getAttribute("data-task-target")).toBeNull();
+  });
+
+  it("brings the carried phone up with P, low on the right, and puts it away with P", () => {
+    const rig = mountLayer();
+    finishIntro();
+    expect(rig.bridge.commands?.setPhoneCarried).toHaveBeenCalledWith(true);
+    expect(screen.queryByTestId("held-phone")).toBeNull();
+    fireEvent.keyDown(window, { key: "p", code: "KeyP" });
+    const held = screen.getByTestId("held-phone");
+    // No WebGL in the tests: the flat frame stands where the 3D phone would be.
+    expect(held.getAttribute("data-held-mode")).toBe("fallback");
+    expect(within(held).getByRole("dialog", { name: /Phone/ })).toBeTruthy();
+    expect(screen.getByTestId("hud-phone-chip").getAttribute("aria-pressed")).toBe("true");
+    // The HUD stays while the phone is up.
+    expect(screen.getByTestId("objective-tracker-slot").style.visibility).toBe("visible");
+    // No Close button on the held phone: P puts it away.
+    expect(within(held).queryByTestId("phone-close")).toBeNull();
+    fireEvent.click(within(held).getByTestId("phone-unlock"));
+    expect(within(held).queryByTestId("phone-close")).toBeNull();
+    fireEvent.keyDown(window, { key: "p", code: "KeyP" });
+    expect(screen.queryByTestId("held-phone")).toBeNull();
+  });
+
+  it("brings the phone up over the open laptop with P, and putting it away leaves the laptop open", () => {
+    const rig = mountLayer();
+    finishIntro();
+    act(() => rig.bridge.onProp("laptop", "inspect-ready"));
+    expect(screen.getByTestId("desktop-icon-device-mail")).toBeTruthy();
+    fireEvent.keyDown(window, { key: "p", code: "KeyP" });
+    expect(screen.getByTestId("held-phone")).toBeTruthy();
+    expect(screen.getByTestId("desktop-icon-device-mail")).toBeTruthy();
+    expect(screen.getByTestId("objective-tracker-slot").getAttribute("data-over-laptop")).toBe("true");
+    const closes = vi.mocked(rig.bridge.commands!.closeInspect).mock.calls.length;
+    fireEvent.keyDown(window, { key: "p", code: "KeyP" });
+    expect(screen.queryByTestId("held-phone")).toBeNull();
+    expect(screen.getByTestId("desktop-icon-device-mail")).toBeTruthy();
+    expect(vi.mocked(rig.bridge.commands!.closeInspect).mock.calls.length).toBe(closes);
   });
 
   it("shows the task tracker in Vietnamese", () => {

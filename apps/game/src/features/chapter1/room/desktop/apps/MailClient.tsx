@@ -7,7 +7,7 @@
 // (`useDesktopNav().openBrowser`); it is a button, never an `<a href>`, and following it changes no
 // game state by itself. Messages carry no warning colors or labels: the player decides what to trust.
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ArrowLeft, ChevronDown, ChevronUp, Inbox } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, ChevronUp, Flag, Inbox, MousePointerClick, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { DeviceAppId } from "../../../../../game/narrative/types";
 import type { DeviceItemView, DeviceView } from "../../../../../game/narrative/device";
@@ -32,7 +32,9 @@ const SURFACE = "#f6f9fd";
 const WIDE_PX = 620;
 
 const FOCUS = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]";
-const BUTTON_PRIMARY = `inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white motion-safe:transition-colors hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:bg-[#c5d3ea] disabled:text-[#6b7b95] ${FOCUS}`;
+/** Icons of message actions in the reader's toolbar; other actions use a generic one. */
+const ACTION_ICONS: Readonly<Record<string, LucideIcon>> = { "save-record": Flag };
+const BUTTON_TOOL = `inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium text-[#14233d] motion-safe:transition-colors hover:bg-[#e6eefb] disabled:cursor-default disabled:text-[#6b7b95] disabled:hover:bg-transparent ${FOCUS}`;
 const BUTTON_QUIET = `inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#cdd9ec] bg-white px-3 py-1.5 text-sm font-medium text-[#14233d] motion-safe:transition-colors hover:bg-[#eef3fb] ${FOCUS}`;
 
 function useIsWide(ref: React.RefObject<HTMLElement | null>): boolean {
@@ -205,6 +207,28 @@ export const MailClient: React.FC<MailClientProps> = ({ view, onOpenItem, onUseI
               {t("laptop.mail.backToInbox")}
             </button>
           )}
+          {actions.length > 0 && (
+            // Like a real mail app: what you can do with a message sits in a toolbar above it.
+            <div role="toolbar" aria-label={t("laptop.mail.toolbar")} data-testid="mail-toolbar" className="-mx-2 mb-3 flex flex-wrap items-center gap-1 border-b pb-2" style={{ borderColor: LINE }}>
+              {actions.map((action) => {
+                const Icon = action.blocked === "done" ? Check : (ACTION_ICONS[action.id] ?? MousePointerClick);
+                return (
+                  <button
+                    key={action.id}
+                    type="button"
+                    className={BUTTON_TOOL}
+                    disabled={!action.available}
+                    data-testid={`device-action-${current.id}-${action.id}`}
+                    title={action.blocked !== null && action.blocked !== "done" ? t(`device.blocked.${action.blocked}`) : actionLabel(t, localeCode, action)}
+                    onClick={() => onUseItem(current.id, action.id)}
+                  >
+                    <Icon className={`h-4 w-4 ${action.blocked === "done" ? "text-[#15803d]" : ""}`} aria-hidden="true" />
+                    {action.blocked === "done" ? t("laptop.mail.actionDone", { label: action.label }) : actionLabel(t, localeCode, action)}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <h3 className="break-words text-lg font-bold leading-snug" style={{ color: INK }}>
             {current.title}
           </h3>
@@ -284,28 +308,6 @@ export const MailClient: React.FC<MailClientProps> = ({ view, onOpenItem, onUseI
               ),
             )}
           </div>
-          {actions.length > 0 && (
-            <ul className="mt-5 space-y-2">
-              {actions.map((action) => (
-                <li key={action.id} className="space-y-1">
-                  <button
-                    type="button"
-                    className={BUTTON_PRIMARY}
-                    disabled={!action.available}
-                    data-testid={`device-action-${current.id}-${action.id}`}
-                    onClick={() => onUseItem(current.id, action.id)}
-                  >
-                    {actionLabel(t, localeCode, action)}
-                  </button>
-                  {action.blocked !== null && (
-                    <p className="text-xs" style={{ color: MUTED }}>
-                      {t(`device.blocked.${action.blocked}`)}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
         <div
           aria-live="polite"

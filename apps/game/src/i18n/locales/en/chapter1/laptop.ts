@@ -12,6 +12,7 @@ const laptop = {
     desktop: {
       homeLabel: "Desktop",
       appsGroup: "Applications",
+      taskTarget: "current task",
       launch: "Open {{app}}",
       windowLabel: "{{app}} window",
       backToDesktop: "Back to desktop",
@@ -46,7 +47,10 @@ const laptop = {
       linkAddress: "Link address: {{url}}",
       linkUnavailable: "Links cannot be opened here.",
       folderLabel: "Folders",
-    },
+      toolbar: "Message actions",
+      actionDone: "{{label}}: done",
+    },
+
     browser: {
       address: "Address",
       addressPlaceholder: "Enter an address",
@@ -101,7 +105,7 @@ const laptop = {
           title: "University Library",
           heading: "Opening hours",
           p1: "During the exam period the library opens one hour earlier and closes one hour later.",
-          p2: "Questions: library@university.example",
+          p2: "Questions: library@ueh.edu.vn",
         },
       },
     },

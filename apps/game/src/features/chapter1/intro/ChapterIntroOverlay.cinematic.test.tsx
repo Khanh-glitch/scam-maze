@@ -15,7 +15,7 @@ describe("the cinematic intro", () => {
     expect(text).not.toMatch(/72 h|hours left|Friday|signature|chữ ký|72 giờ/i);
   });
 
-  it("keeps the hint, the controls and Continue at the edges, and a click goes on once", () => {
+  it("keeps the hint and the controls at the edges, and a click goes on once", () => {
     const onBegin = vi.fn();
     render(<ChapterIntroOverlay {...props} onBegin={onBegin} />);
     expect(screen.getByTestId("chapter-intro-hint").className).toContain("bottom-6");
@@ -24,13 +24,23 @@ describe("the cinematic intro", () => {
     expect(onBegin).toHaveBeenCalledTimes(1);
   });
 
-  it("starts the story with the Continue button", () => {
+  it("shows one instruction and no second Continue button", () => {
+    render(<ChapterIntroOverlay {...props} onBegin={() => undefined} />);
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.getByTestId("chapter-intro-hint").textContent).toBe("Click to continue");
+  });
+  it("cannot be skipped while Alex speaks: no hint, and clicks and Enter do nothing until the line ends", () => {
     const onBegin = vi.fn();
-    render(<ChapterIntroOverlay {...props} onBegin={onBegin} />);
-    fireEvent.click(screen.getByRole("button"));
+    const view = render(<ChapterIntroOverlay {...props} holdForVoice onBegin={onBegin} />);
+    expect(screen.queryByTestId("chapter-intro-hint")).toBeNull();
+    fireEvent.click(screen.getByTestId("chapter-intro"));
+    fireEvent.keyDown(screen.getByTestId("chapter-intro"), { key: "Enter" });
+    expect(onBegin).not.toHaveBeenCalled();
+    view.rerender(<ChapterIntroOverlay {...props} holdForVoice={false} onBegin={onBegin} />);
+    expect(screen.getByTestId("chapter-intro-hint").textContent).toBe("Click to continue");
+    fireEvent.click(screen.getByTestId("chapter-intro"));
     expect(onBegin).toHaveBeenCalledTimes(1);
   });
-
   it("waits for the scene: nothing goes on while it loads", () => {
     const onBegin = vi.fn();
     render(<ChapterIntroOverlay {...props} ready={false} onBegin={onBegin} />);

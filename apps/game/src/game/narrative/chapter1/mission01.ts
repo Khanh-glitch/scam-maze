@@ -29,6 +29,11 @@ export const MISSION_01_CONFIG = {
   /** The amount the fake email asks for. */
   clearanceFeeVnd: 800_000,
   /**
+   * The one-time code the bank texts after the card payment on the fake page. Fictional; the player
+   * reads it on the phone and types it on the page, like the real thing.
+   */
+  paymentCode: "481206",
+  /**
    * Unauthorized transfers after the verification code was given: minutes after the code was
    * entered, and the amount. A transfer can only take the cash that is there.
    */
@@ -129,6 +134,8 @@ export const MISSION_01_LEDGER_LABELS: Record<string, string> = {
   "ledger.unauthorized-3": "Transfer to an unknown recipient",
 };
 
+/** The bank's one-time code text (English); the code itself is `MISSION_01_CONFIG.paymentCode`. */
+const MISSION_01_CODE_TEXT = `${MISSION_01_CONFIG.paymentCode} is your code to approve a card payment of ${FEE} VND to UNI GRADUATION OFFICE. Never share this code with anyone. The bank will never ask you for it.`;
 /** The alert never repeats an amount: the ledger is the one place that shows what actually left. */
 const TRANSFER_ALERT =
   "A transfer from your account to an account you do not know was approved. The amount is in your bank app. If this was not you, call the bank's official line.";
@@ -140,19 +147,20 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
     app: "mail",
     folder: "university",
     title: "Graduation Clearance — Action Required",
-    from: "Graduation Office <clearance@uni-graduation-office.example>",
+    from: "Graduation Office <clearance@payment-ueh.vn>",
     body:
       "Dear student,\n\nYour thesis submission account has been locked because the international student confirmation fee has not been paid.\n\n" +
       `Fee: ${FEE} VND\nDeadline: today\n\n` +
-      "Pay now to unlock your account: https://pay.uni-graduation-office.example/confirm\n\n" +
+      "Pay now to unlock your account: https://payment-ueh.vn/confirm\n\n" +
       "If the fee is not paid today, your account will stay locked and you may miss the graduation period.\n\nGraduation Office",
     arrives: { atMinute: 10 },
     actions: [
       { id: "open-link", label: "Open the payment link", timeCostMinutes: M.openLink, once: true },
-      // Evidence is saved by choice, never by opening the mail.
+      // Reporting is a choice, never a side effect of opening the mail. The report keeps a copy of the
+      // email, the sender and the link address (the "evidence" of this mission).
       {
         id: "save-record",
-        label: "Save the email, the sender and the link address as evidence",
+        label: "Report to the IT help desk",
         timeCostMinutes: M.saveRecord,
         once: true,
         effects: [{ kind: "adjustResource", resource: "evidence", delta: 1 }],
@@ -165,7 +173,7 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
     folder: "other",
     title: "Payment page: student confirmation fee",
     from: "Payment page",
-    detail: "pay.uni-graduation-office.example",
+    detail: "payment-ueh.vn",
     body:
       `Student confirmation fee: ${FEE} VND.\nSign in with your student account to continue.\n\n` +
       "This page is a simulation. No real login, card or code is used in this game.",
@@ -174,7 +182,7 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
       { id: "close", label: "Close the page", timeCostMinutes: M.closePage },
       {
         id: "save-address",
-        label: "Save the page address as evidence",
+        label: "Report this site",
         timeCostMinutes: M.saveRecord,
         once: true,
         effects: [{ kind: "adjustResource", resource: "evidence", delta: 1 }],
@@ -194,17 +202,18 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
         label: "Pay the fee by card",
         visibleWhen: [done("page.fee", "sign-in")],
         timeCostMinutes: M.payCard,
-        cashCost: MISSION_01_CONFIG.clearanceFeeVnd,
-        ledgerLabel: "ledger.clearance-fee",
-        ledgerCategory: "loss",
-        counterparty: "Payment page",
         once: true,
       },
+      // As with a real card payment, the money leaves only when the bank's code is entered.
       {
         id: "enter-code",
         label: "Enter the verification code from my phone",
         visibleWhen: [done("page.fee", "pay-card")],
         timeCostMinutes: M.enterCode,
+        cashCost: MISSION_01_CONFIG.clearanceFeeVnd,
+        ledgerLabel: "ledger.clearance-fee",
+        ledgerCategory: "loss",
+        counterparty: "Payment page",
         once: true,
         effects: [
           { kind: "setPersistent", flag: "verificationCodeExposed", value: true },
@@ -222,7 +231,7 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
     app: "files",
     folder: "bookmarks",
     title: "Student portal (saved)",
-    detail: "portal.university.example",
+    detail: "student.ueh.edu.vn",
     body: "The bookmark you saved for the submission portal when you registered.",
     actions: [{ id: "check-account", label: "Sign in to the saved portal and check my account", timeCostMinutes: M.checkPortal, once: true }],
   },
@@ -291,7 +300,7 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
     app: "mail",
     folder: "university",
     title: "Re: Question about a confirmation fee",
-    from: "Training Office <training-office@university.example>",
+    from: "Training Office <training@ueh.edu.vn>",
     body:
       "Hello,\n\nThere is no international student confirmation fee for thesis submission. Your submission account is active and nothing is owed.\n\n" +
       "Please write to us again if you receive other messages about fees.\n\nTraining Office",
@@ -402,19 +411,19 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
     app: "files",
     folder: "bank",
     title: "Online bank statement",
-    body: "Your online bank statement. You can save a record of a payment or a transfer as evidence.",
+    body: "Your online bank statement. You can download the receipt of a payment or a statement of transfers.",
     actions: [
       {
         id: "save-fee-record",
-        label: "Save the record of the confirmation fee payment as evidence",
-        visibleWhen: [done("page.fee", "pay-card")],
+        label: "Download the receipt of the confirmation fee payment",
+        visibleWhen: [done("page.fee", "enter-code")],
         timeCostMinutes: M.saveRecord,
         once: true,
         effects: [{ kind: "adjustResource", resource: "evidence", delta: 1 }],
       },
       {
         id: "save-transfer-record",
-        label: "Save the record of the unauthorized transfers as evidence",
+        label: "Download a statement of the unauthorized transfers",
         visibleWhen: [{ kind: "eventStatus", eventId: "m01.transfer-1", status: "resolved" }],
         timeCostMinutes: M.saveRecord,
         once: true,
@@ -426,32 +435,32 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
     id: "file.email-record",
     app: "files",
     folder: "evidence",
-    title: "Graduation Clearance email (saved)",
-    body: "A saved copy of the Graduation Clearance email: the sender address, the fee it asks for and the link address.",
+    title: "Report sent: Graduation Clearance email",
+    body: "You reported the Graduation Clearance email to the university IT help desk. The report keeps a copy of the email: the sender address, the fee it asks for and the link address.",
     arrives: { when: [done("mail.clearance", "save-record")] },
   },
   {
     id: "file.address-record",
     app: "files",
     folder: "evidence",
-    title: "Payment page address (saved)",
-    body: "The address of the payment page that the email linked to: pay.uni-graduation-office.example.",
+    title: "Report sent: payment page address",
+    body: "You reported the payment page to the university IT help desk. The report keeps the address that the email linked to: payment-ueh.vn.",
     arrives: { when: [done("page.fee", "save-address")] },
   },
   {
     id: "file.fee-record",
     app: "files",
     folder: "evidence",
-    title: "Bank record: confirmation fee payment (saved)",
-    body: "A saved record of the card payment made on the payment page: the amount, the time and the recipient shown by your bank.",
+    title: "Receipt: confirmation fee payment",
+    body: "The downloaded receipt of the card payment made on the payment page: the amount, the time and the recipient shown by your bank.",
     arrives: { when: [done("bank.statement", "save-fee-record")] },
   },
   {
     id: "file.transfer-record",
     app: "files",
     folder: "evidence",
-    title: "Bank record: unauthorized transfers (saved)",
-    body: "A saved record of the transfers that left your account without your approval: the amounts, the times and the recipient shown by your bank.",
+    title: "Statement: unauthorized transfers",
+    body: "The downloaded statement of the transfers that left your account without your approval: the amounts, the times and the recipient shown by your bank.",
     arrives: { when: [done("bank.statement", "save-transfer-record")] },
   },
   {
@@ -459,9 +468,19 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
     app: "mail",
     folder: "university",
     title: "New sign-in to your student account",
-    from: "Account Security <no-reply@university.example>",
+    from: "Account Security <no-reply@ueh.edu.vn>",
     body: "A sign-in to your student account from a device we do not know was recorded. If this was not you, change your password.",
     arrives: { afterAction: { itemId: "page.fee", actionId: "sign-in", minutes: MISSION_01_CONFIG.loginAlertAfterMinutes } },
+  },
+  // The bank's one-time code for the card payment on the page. The text says what the code approves
+  // and that nobody should ask for it: the same words a real bank uses, and the lesson of this step.
+  {
+    id: "msg.bank-code",
+    app: "messages",
+    title: "Bank alerts",
+    from: "Bank",
+    body: `${MISSION_01_CODE_TEXT}`,
+    arrives: { when: [done("page.fee", "pay-card")] },
   },
   ...([1, 2, 3] as const).map(
     (index): DeviceItemDef => ({
@@ -487,7 +506,7 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
     app: "mail",
     folder: "university",
     title: "Draft feedback: please check the comments on chapter 3",
-    from: "Supervisor <supervisor@university.example>",
+    from: "Supervisor <supervisor@ueh.edu.vn>",
     body: "Hello Alex,\n\nI added comments on chapter 3. Please review them when you finish the draft.\n\nBest regards",
   },
   {
@@ -495,7 +514,7 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
     app: "mail",
     folder: "university",
     title: "Opening hours during the exam period",
-    from: "University Library <library@university.example>",
+    from: "University Library <library@ueh.edu.vn>",
     body: "The library opens one hour earlier and closes one hour later during the exam period.",
   },
   {
@@ -503,7 +522,7 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
     app: "mail",
     folder: "other",
     title: "Your print order is ready for pickup",
-    from: "Print Shop <orders@print-shop.example>",
+    from: "Print Shop <orders@inkhoaluan.vn>",
     body: "Your order is ready. The shop is open until 21:00.",
   },
   {

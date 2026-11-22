@@ -12,9 +12,9 @@ import {
   type BrowserState,
 } from "./browserState";
 
-const PORTAL = "https://portal.university.example/";
-const LIBRARY = "https://library.university.example/hours";
-const FEE = "https://pay.uni-graduation-office.example/confirm";
+const PORTAL = "https://student.ueh.edu.vn/";
+const LIBRARY = "https://lib.ueh.edu.vn/hours";
+const FEE = "https://payment-ueh.vn/confirm";
 
 function run(actions: BrowserAction[], from: BrowserState = createBrowserState()): BrowserState {
   return actions.reduce(browserReducer, from);

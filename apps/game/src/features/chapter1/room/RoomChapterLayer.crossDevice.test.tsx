@@ -86,18 +86,23 @@ describe("the phone's own apps show the same game state as the laptop", () => {
     fireEvent.click(within(phone).getByTestId("mail-link"));
     await within(phone).findByTestId("fake-step-notice");
     fireEvent.click(within(phone).getByTestId("clearance-continue"));
-    fireEvent.click(await within(phone).findByTestId("login-fill"));
+    fireEvent.focus(await within(phone).findByTestId("login-id"));
+    fireEvent.click(within(phone).getByTestId("login-fill"));
     fireEvent.click(within(phone).getByTestId("login-submit"));
-    fireEvent.click(await within(phone).findByTestId("pay-fill"));
+    fireEvent.focus(await within(phone).findByTestId("pay-number"));
+    fireEvent.click(within(phone).getByTestId("pay-fill"));
+    // The saved card leaves the security code to the player, as the browser does.
+    for (const key of "123") fireEvent.keyDown(within(phone).getByTestId("pay-cvc"), { key });
     fireEvent.click(within(phone).getByTestId("pay-submit"));
-    fireEvent.click(await within(phone).findByTestId("verify-fill"));
+    fireEvent.focus(await within(phone).findByTestId("verify-code"));
+    fireEvent.click(within(phone).getByTestId("verify-fill"));
     fireEvent.click(within(phone).getByTestId("verify-submit"));
     await within(phone).findByTestId("fake-step-complete");
     const state = rig.store().getState();
     expect(state.resources.cash).toBe(startCash - FEE);
     expect(state.persistent.accountCompromised).toBe(true);
     // One ledger line for the fee, not two.
-    const feeLines = state.device.ledger.filter((entry) => entry.itemId === "page.fee" && entry.actionId === "pay-card");
+    const feeLines = state.device.ledger.filter((entry) => entry.itemId === "page.fee" && entry.actionId === "enter-code");
     expect(feeLines).toHaveLength(1);
     // The laptop bank shows that one payment.
     closePhone(rig);
@@ -114,7 +119,7 @@ describe("the phone's own apps show the same game state as the laptop", () => {
     // Verify on the laptop portal by bookmark.
     const laptop = openLaptop(rig, "browser");
     fireEvent.click(within(laptop).getByTestId("browser-bookmarks"));
-    fireEvent.click(within(laptop).getByTestId("menu-bookmark-https://portal.university.example/"));
+    fireEvent.click(within(laptop).getByTestId("menu-bookmark-https://student.ueh.edu.vn/"));
     await within(laptop).findByTestId("portal-site");
     closeLaptop(rig);
     // The phone browser starts on its own New Tab, not the laptop's portal tab.

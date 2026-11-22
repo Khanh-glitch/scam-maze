@@ -23,6 +23,7 @@ import {
   SCREEN_HEIGHT_M,
   SCREEN_WIDTH_M,
   computeCallLayout,
+  heldPhoneLayout,
   solveScreenPose,
   type Rect,
 } from "./callLayout";
@@ -58,6 +59,8 @@ const ENTRY_ANIMATION_WINDOW_MS = 150;
  */
 const PHONE_TILT_Y = -0.16;
 const PHONE_TILT_X = -0.07;
+/** Turn of the held phone (P) toward the view center (radians), against the off-axis view of its side. */
+const HELD_TILT_Y = -0.22;
 /** Fallback vertical field of view (degrees) if the camera is not a perspective camera. */
 const DEFAULT_FOV_DEG = 70;
 
@@ -74,6 +77,8 @@ export interface PhoneModel3DProps {
   /** `performance.now()` when the call overlay opened. */
   openedAt: number;
   screenSink: PhoneScreenSink;
+  /** `call` (default): the call framing with the room dimmed. `held`: the phone brought up with P, low on the right, no dimming. */
+  placement?: "call" | "held";
 }
 
 /** Screen anchor corners in anchor-local space (the anchor sits on the screen center). */
@@ -84,7 +89,7 @@ const SCREEN_CORNERS: ReadonlyArray<readonly [number, number]> = [
   [-SCREEN_WIDTH_M / 2, -SCREEN_HEIGHT_M / 2],
 ];
 
-export const PhoneModel3D: FC<PhoneModel3DProps> = ({ live, ringing, reducedMotion, openedAt, screenSink }) => {
+export const PhoneModel3D: FC<PhoneModel3DProps> = ({ live, ringing, reducedMotion, openedAt, screenSink, placement = "call" }) => {
   const { scene } = useCallPhoneGLTF();
   const size = useThree((state) => state.size);
   const gl = useThree((state) => state.gl);
@@ -144,8 +149,8 @@ export const PhoneModel3D: FC<PhoneModel3DProps> = ({ live, ringing, reducedMoti
   const animateEntryRef = useRef(true);
 
   // Latest props for the frame callback without re-subscribing it.
-  const propsRef = useRef({ live, ringing, reducedMotion, openedAt, screenSink });
-  propsRef.current = { live, ringing, reducedMotion, openedAt, screenSink };
+  const propsRef = useRef({ live, ringing, reducedMotion, openedAt, screenSink, placement });
+  propsRef.current = { live, ringing, reducedMotion, openedAt, screenSink, placement };
   useEffect(() => {
     return () => {
       screenSink.publish(null);
@@ -165,7 +170,7 @@ export const PhoneModel3D: FC<PhoneModel3DProps> = ({ live, ringing, reducedMoti
     } else {
       screenSink.publish(null);
     }
-  }, [live, invalidate, screenSink]);
+  }, [live, placement, invalidate, screenSink]);
 
   // Default priority (0): R3F keeps rendering. Mounted after the player, so this runs after the
   // player runtime has moved the camera in the same frame.
@@ -186,7 +191,9 @@ export const PhoneModel3D: FC<PhoneModel3DProps> = ({ live, ringing, reducedMoti
     if (viewport.width <= 0 || viewport.height <= 0) return;
     const fov = camera instanceof THREE.PerspectiveCamera ? camera.fov : DEFAULT_FOV_DEG;
 
-    const layout = computeCallLayout(viewport);
+    const layout = props.placement === "held" ? heldPhoneLayout(viewport) : computeCallLayout(viewport);
+    // The held phone leaves the room as it is; only a call dims it.
+    dimming.visible = props.placement !== "held";
     const offset = phoneMotionOffset({
       elapsedMs: now - firstFrameAtRef.current,
       animateEntry: animateEntryRef.current,
@@ -204,8 +211,13 @@ export const PhoneModel3D: FC<PhoneModel3DProps> = ({ live, ringing, reducedMoti
     rig.translateX(pose.x);
     rig.translateY(pose.y);
     rig.translateZ(pose.z - SCREEN_FRONT_OFFSET_M);
-    rig.rotateY(PHONE_TILT_Y);
-    rig.rotateX(PHONE_TILT_X);
+    // The held phone turns its face in toward the view center, so its outer side does not show
+    // (owner); the call keeps its own turn.
+    if (props.placement === "held") rig.rotateY(HELD_TILT_Y);
+    else {
+      rig.rotateY(PHONE_TILT_Y);
+      rig.rotateX(PHONE_TILT_X);
+    }
 
     // Dimming plane: centered on the camera axis, behind the screen, covering the frustum.
     const dimmingDistance = -pose.z + DIMMING_DISTANCE_BEHIND_M;

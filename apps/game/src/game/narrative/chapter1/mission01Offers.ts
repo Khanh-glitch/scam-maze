@@ -100,7 +100,7 @@ const EASY_MONEY_ITEMS: DeviceItemDef[] = [
     from: "Linh (student, another faculty)",
     body:
       "Hi Alex! I found an online job. You rate short product pages, about 5 minutes each, and the money shows in the app right away. " +
-      "I got my first reward today. Try it, it is easy money for a student: tasks.quickpay-tasks.example",
+      "I got my first reward today. Try it, it is easy money for a student: quickpay-tasks.vn",
     arrives: { atMinute: MISSION_01_OFFERS_CONFIG.easyMoneyAtMinute },
     actions: [
       {
@@ -135,7 +135,7 @@ const EASY_MONEY_ITEMS: DeviceItemDef[] = [
     app: "jobs",
     title: "Online tasks: rate product pages",
     from: "QuickPay Tasks",
-    detail: "tasks.quickpay-tasks.example",
+    detail: "quickpay-tasks.vn",
     body:
       "Earn money from your phone. Rate product pages and get paid for every task.\n\n" +
       "Level 1: free tasks. Higher levels need a deposit and pay more.\n\n" +
@@ -201,7 +201,7 @@ const EASY_MONEY_ITEMS: DeviceItemDef[] = [
       { id: "try-withdraw-4", label: "Try to withdraw once more", visibleWhen: [{ kind: "anyOf", conditions: [done(P, "deposit-3"), done(P, "deposit-3-borrow")] }], timeCostMinutes: T.tryWithdraw, once: true },
       {
         id: "save-records",
-        label: "Save the deposit history, the messages and the page address",
+        label: "Take screenshots of the deposit history, the messages and the page address",
         visibleWhen: [done(P, "try-withdraw-1")],
         timeCostMinutes: T.saveRecords,
         once: true,
@@ -327,7 +327,7 @@ const GOLDEN_ITEMS: DeviceItemDef[] = [
     from: "Hung (a friend of Minh's cousin)",
     body:
       "Hi Alex, I am Hung. My friend earns about 8% every week with the Golden Platform. I put money in last month and I already took profit out. " +
-      "Join with my code and you get a new member bonus. The page: golden-platform-invest.example",
+      "Join with my code and you get a new member bonus. The page: golden-platform-invest.com",
     arrives: { atMinute: MISSION_01_OFFERS_CONFIG.goldenPlatformAtMinute },
     actions: [
       {
@@ -394,7 +394,7 @@ const GOLDEN_ITEMS: DeviceItemDef[] = [
     folder: "other",
     title: "The Golden Platform: member dashboard",
     from: "The Golden Platform",
-    detail: "golden-platform-invest.example",
+    detail: "golden-platform-invest.com",
     body:
       "Grow your money with weekly profit. Join now and receive the new member bonus.\n\n" +
       "This page is a simulation. No real money, account or investment is used in this game.",
@@ -448,7 +448,7 @@ const GOLDEN_ITEMS: DeviceItemDef[] = [
       { id: "withdraw-4", label: "Try to withdraw after the last fee", visibleWhen: [done(G, "pay-fee-3")], timeCostMinutes: GT.withdraw, once: true },
       {
         id: "save-records",
-        label: "Save the dashboard, the fee messages and the page address",
+        label: "Take screenshots of the dashboard, the fee messages and the page address",
         visibleWhen: [done(G, "withdraw-1")],
         timeCostMinutes: GT.saveRecords,
         once: true,

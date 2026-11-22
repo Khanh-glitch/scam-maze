@@ -53,6 +53,8 @@ export interface RoomPhoneModelLayerProps {
   onModelError?: (error: unknown) => void;
   /** Called with true on webglcontextlost and false on webglcontextrestored. */
   onContextChange?: (lost: boolean) => void;
+  /** `call` (default) or `held`: the phone brought up with P (see `PhoneModel3D`). */
+  placement?: "call" | "held";
 }
 
 /** Requests the next frame only while the phone moves (ring, entry slide). */
@@ -99,11 +101,12 @@ const PhoneCanvas: React.FC<Omit<RoomPhoneModelLayerProps, "modelAllowed">> = ({
   screenSink,
   onModelError,
   onContextChange,
+  placement = "call",
 }) => {
   const reducedMotion = useReducedMotion();
-  // The moment the current call opened (a new value each time `active` changes).
+  // The moment the current call (or the held phone) opened: a new value each time it changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const openedAt = useMemo(() => performance.now(), [active]);
+  const openedAt = useMemo(() => performance.now(), [active, placement]);
 
   const handleError = (error: unknown) => {
     reportPhoneModelFailure(CALL_PHONE_GLB, error);
@@ -135,7 +138,7 @@ const PhoneCanvas: React.FC<Omit<RoomPhoneModelLayerProps, "modelAllowed">> = ({
         <FrameDriver active={active} ringing={ringing} reducedMotion={reducedMotion} openedAt={openedAt} />
         <PhoneModelBoundary onError={handleError}>
           <Suspense fallback={null}>
-            <PhoneModel3D live={active} ringing={ringing} reducedMotion={reducedMotion} openedAt={openedAt} screenSink={screenSink} />
+            <PhoneModel3D live={active} ringing={ringing} reducedMotion={reducedMotion} openedAt={openedAt} screenSink={screenSink} placement={placement} />
           </Suspense>
         </PhoneModelBoundary>
       </Canvas>

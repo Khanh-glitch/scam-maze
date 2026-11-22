@@ -1,6 +1,7 @@
 // Chapter 1 content tests (spec chapter-01-double-deception, task 7.5; Requirements 5.1, 5.4, 5.5,
 // 6.4, 6.5, 12.4, 19.1, 19.2). Data lint over every text field of the scenario, plus checks that
 // the first call and its records carry the case ID and foreshadow the later layers.
+import { isOwnerApprovedHost } from "../approvedDomains";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -23,6 +24,7 @@ const ID_LIKE = /^(?:ev|dev|src|ded|obj|call|dlg|msg|claim|ws|spk|act|off|alex|r
 
 function reservedHost(host: string): boolean {
   const h = host.toLowerCase();
+  if (isOwnerApprovedHost(h)) return true;
   return (
     h.endsWith(".test") ||
     h.endsWith(".example") ||

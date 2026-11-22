@@ -5,6 +5,7 @@
 //
 // Seeded random walks through the real scenario: after every accepted action, every text the
 // player can see in that state is linted. Failures print the seed and the case index.
+import { isOwnerApprovedHost } from "../approvedDomains";
 import { describe, expect, it } from "vitest";
 import {
   CORE_PROPERTY_RUNS,
@@ -30,6 +31,7 @@ const NOTIFICATION_EVIDENCE = ["ev.notification-metadata", "ev.shared-case-id"] 
 
 function reservedHost(host: string): boolean {
   const h = host.toLowerCase();
+  if (isOwnerApprovedHost(h)) return true;
   return h.endsWith(".test") || h.endsWith(".example") || h.endsWith(".invalid") || h === "example.com" || h.endsWith(".example.com");
 }
 

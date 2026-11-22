@@ -258,8 +258,9 @@ describe("what the player sees and does", () => {
     const fake = fakePort();
     const store = createChapterStore(started([advance(10), use("mail.clearance", "open-link"), use("page.fee", "sign-in"), use("page.fee", "pay-card")]), S);
     const view = mount(store, fake.port, { viewing: null });
-    const before = store.getState().resources.cash;
     await dispatch(store, use("page.fee", "enter-code"));
+    // The fee leaves with the code; the transfer comes after it.
+    const before = store.getState().resources.cash;
     await dispatch(store, advance(MISSION_01_CONFIG.unauthorizedTransfers[0].afterMinutes));
     // The money left on time, and Alex said nothing about it.
     expect(store.getState().resources.cash).toBe(before - MISSION_01_CONFIG.unauthorizedTransfers[0].amountVnd);
@@ -324,6 +325,17 @@ describe("playback", () => {
     expect(fake.starts).toHaveLength(1);
   });
 
+  it("reports the opening as speaking while its line plays, and not without an engine", async () => {
+    const fake = fakePort();
+    const view = mount(createChapterStore(createInitialState(S), S), fake.port, { introVisible: true });
+    await flush();
+    expect(view.result.current.introSpeaking).toBe(true);
+    act(() => fake.handles[0].end());
+    expect(view.result.current.introSpeaking).toBe(false);
+    const none = mount(createChapterStore(createInitialState(S), S), null, { introVisible: true });
+    await flush();
+    expect(none.result.current.introSpeaking).toBe(false);
+  });
   it("never plays the intro when a save is continued, nor any cue that already held when it was saved", async () => {
     const fake = fakePort();
     const saved = started([advance(10), { type: "OPEN_DEVICE_ITEM", itemId: "mail.clearance" }, use("mail.clearance", "open-link"), use("page.fee", "sign-in"), use("page.fee", "pay-card"), use("page.fee", "enter-code"), advance(MISSION_01_CONFIG.unauthorizedTransfers[0].afterMinutes)]);

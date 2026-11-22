@@ -7,10 +7,10 @@ import { DesktopNavProvider, type DesktopNav } from "../desktopNav";
 import { BrowserApp } from "./BrowserApp";
 import { browserReducer, createBrowserState, type BrowserAction, type BrowserState } from "./browserState";
 
-const PORTAL = "https://portal.university.example/";
-const LIBRARY = "https://library.university.example/hours";
+const PORTAL = "https://student.ueh.edu.vn/";
+const LIBRARY = "https://lib.ueh.edu.vn/hours";
 const FACTS = { accountLocked: false, draftFinished: false, tasksDone: [] as string[] };
-const FEE = "https://pay.uni-graduation-office.example/confirm";
+const FEE = "https://payment-ueh.vn/confirm";
 
 function item(id: string, extra: Partial<DeviceItemView> = {}): DeviceItemView {
   return {
@@ -139,7 +139,7 @@ describe("BrowserApp", () => {
   it("types an address with the keyboard and keeps it selectable and copyable", async () => {
     mount();
     fireEvent.focus(address());
-    fireEvent.change(address(), { target: { value: "library.university.example/hours" } });
+    fireEvent.change(address(), { target: { value: "lib.ueh.edu.vn/hours" } });
     fireEvent.keyDown(address(), { key: "Enter" });
     await screen.findByTestId("browser-site-library");
     expect(address().value).toBe(LIBRARY);
@@ -249,7 +249,7 @@ describe("BrowserApp", () => {
 describe("the look-alike clearance site", () => {
   const source = item("mail.src", { body: `Pay: ${FEE}`, actions: [action("open-link", "Open the payment link")] });
   const page = item("page.fee", {
-    detail: "pay.uni-graduation-office.example",
+    detail: "payment-ueh.vn",
     title: "Fee page",
     actions: [action("close", "Close the page"), action("sign-in", "Sign in")],
   });
@@ -275,6 +275,7 @@ describe("the look-alike clearance site", () => {
     await screen.findByTestId("fake-step-login");
     expect(onUseItem).not.toHaveBeenCalled();
     expect(screen.getByTestId("login-submit").hasAttribute("disabled")).toBe(true);
+    fireEvent.focus(screen.getByTestId("login-id"));
     fireEvent.click(screen.getByTestId("login-fill"));
     expect((screen.getByTestId("login-id") as HTMLInputElement).value).toBe("ALEX-0001");
     expect(onUseItem).not.toHaveBeenCalled();
@@ -285,8 +286,9 @@ describe("the look-alike clearance site", () => {
 
   it("keeps the form values of a tab while the player looks elsewhere, and closing the tab calls nothing", async () => {
     const { onUseItem, probe } = mount({ view: viewOf([source, page]) });
-    act(() => probe.dispatch({ type: "openLink", url: "https://pay.uni-graduation-office.example/login" }));
+    act(() => probe.dispatch({ type: "openLink", url: "https://payment-ueh.vn/login" }));
     await screen.findByTestId("fake-step-login");
+    fireEvent.focus(screen.getByTestId("login-id"));
     fireEvent.click(screen.getByTestId("login-fill"));
     expect(probe.state().tabs.find((tab) => tab.id === probe.state().activeTabId)?.fields["login.id"]).toBe("ALEX-0001");
     fireEvent.click(screen.getByTestId(`browser-tab-close-${probe.state().activeTabId}`));
@@ -295,7 +297,7 @@ describe("the look-alike clearance site", () => {
 
   it("saves the page address as evidence only from the menu, as the player's own step", async () => {
     const withSave = item("page.fee", {
-      detail: "pay.uni-graduation-office.example",
+      detail: "payment-ueh.vn",
       actions: [action("sign-in", "Sign in"), action("save-address", "Save the page address as evidence")],
     });
     const { onUseItem, probe } = mount({ view: viewOf([source, withSave]) });
