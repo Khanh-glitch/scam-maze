@@ -1,6 +1,6 @@
-// The right hand that holds the phone brought up with P (like in GTA). It is the first-person arms
-// model the room uses (`first_person_animations.glb`), frozen in a relaxed pose whose fingertips
-// curl around the phone's left edge, with the thumb turned in along the right edge and the left arm
+// The right hand that holds the phone brought up with P (like in GTA VI). It is the first-person arms
+// model the room uses (`first_person_animations.glb`), frozen in a relaxed pose whose fingers
+// curl naturally around the phone, with the thumb resting along the side and the left arm
 // folded away. It lives in the phone's own canvas, as a child of the phone rig, so it follows the
 // phone and the phone (and the page on its screen) are drawn over it. DOM-free; no light: the skin
 // takes the same studio reflections as the phone.
@@ -15,23 +15,48 @@ import { createPhoneReflectionMap } from "./phoneReflections";
 /** The pose: a clip and the time it is frozen at (the relaxed idle hand curls its fingers). */
 const POSE_CLIP = "rig|Idle";
 const POSE_TIME_S = 0.5;
-/** Extra bone turns (radians, local XYZ) on top of the pose: the thumb stands up beside the right edge, off the screen (owner). */
+/**
+ * Extra bone turns (radians, local XYZ) on top of the pose, so the hand grips the phone: all four
+ * fingers curl around the left edge, stacked side by side without passing into each other (measured:
+ * at least 1.36 cm between neighbouring finger bones), with their tips turned back toward the screen;
+ * the index spreads a little (local Z) to reach the edge. The thumb stands up along the right edge,
+ * beside the screen. In this rig the ring finger flexes about -X, the other fingers about +X.
+ */
 const BONE_TURNS: Readonly<Record<string, readonly [number, number, number]>> = {
-  "DEF-thumb.01.R": [-0.2, 0.3, -0.22],
+  "DEF-f_index.01.R": [-0.234, 0.115, 0.222],
+  "DEF-f_index.02.R": [-0.7, 0, 0],
+  "DEF-f_index.03.R": [-0.2, 0, 0],
+  "DEF-f_middle.01.R": [0.162, 0.197, 0.455],
+  "DEF-f_middle.02.R": [-0.5, 0, 0],
+  "DEF-f_middle.03.R": [0.8, 0, 0],
+  "DEF-f_ring.01.R": [0.2, 0, -0.4],
+  "DEF-f_ring.02.R": [-0.6, 0, 0],
+  "DEF-f_ring.03.R": [-0.9, 0, 0],
+  "DEF-f_pinky.01.R": [-1.185, -0.077, 0.693],
+  "DEF-f_pinky.02.R": [1.4, 0, 0],
+  "DEF-f_pinky.03.R": [-0.1, 0, 0],
+  "DEF-thumb.01.R": [-0.476, 0.073, -0.24],
+  "DEF-thumb.02.R": [0.127, 0.008, 0.161],
+  "DEF-thumb.03.R": [-0.471, -0.047, 0.177],
 };
 /** Bones scaled to nothing: the left arm is not in the picture. */
-const HIDDEN_BONES = ["DEF-shoulder.L", "DEF-upper_arm.L"] as const;
+const HIDDEN_BONES = [
+  "DEF-shoulder.L",
+  "DEF-upper_arm.L",
+  "DEF-upper_arm.L.001",
+  "DEF-forearm.L",
+  "DEF-hand.L",
+] as const;
 /**
- * Where the palm goes in the phone rig's space (meters; the screen faces +z): a little right of
- * and below the screen center, behind the phone. The hand points up and left (fingers wrap the left edge), the palm
- * faces the back of the phone, and the hand measures `HAND_SIZE_M` from the wrist to the knuckles.
+ * Where the palm goes in the phone rig's space (meters; the screen faces +z): behind the lower right
+ * of the phone, the palm toward its back, the hand pointing up and left so the fingers reach the left
+ * edge and the thumb base sits at the right edge. The wrist keeps the clip's own angle (no extra
+ * bend or forearm roll), so at this hand angle the forearm runs straight down to the bottom right.
  */
-const PALM_AT: readonly [number, number, number] = [0.032, -0.052, -0.024];
-const FINGERS_ALONG: readonly [number, number, number] = [-0.7, 0.7, 0];
+const PALM_AT: readonly [number, number, number] = [0.024, -0.05, -0.024];
+const FINGERS_ALONG: readonly [number, number, number] = [-0.6, 0.8, 0];
 const PALM_FACING: readonly [number, number, number] = [0, 0, 1];
-const HAND_SIZE_M = 0.082;
-/** Where the forearm goes from the wrist (rig space): straight down in the screen plane, out of the frame below the phone, like in GTA (owner). Pointing it toward the camera made the near forearm look swollen in perspective. */
-const FOREARM_TOWARD: readonly [number, number, number] = [0.3,-1,0.15];
+const HAND_SIZE_M = 0.08;
 /** The studio reflections are bright for skin in a dark room: lower, and the skin a little darker. */
 const SKIN_ENV_INTENSITY = 0.3;
 const SKIN_TINT = 0.72;
@@ -47,9 +72,7 @@ function findBone(root: THREE.Object3D, name: string): THREE.Object3D | null {
 }
 
 /**
- * The transform of the arms root (in the rig's space) that puts the posed hand at `PALM_AT`. The
- * hand frame comes from the bones: origin between the wrist and the middle knuckle, y toward the
- * knuckles, z out of the palm.
+ * The transform of the arms root (in the rig's space) that puts the posed hand at `PALM_AT`.
  */
 export function heldHandTransform(arms: THREE.Object3D): THREE.Matrix4 | null {
   arms.updateMatrixWorld(true);
@@ -74,39 +97,6 @@ export function heldHandTransform(arms: THREE.Object3D): THREE.Matrix4 | null {
   const tz = new THREE.Vector3().crossVectors(tx, ty).normalize();
   const target = new THREE.Matrix4().makeBasis(tx, ty, tz).setPosition(new THREE.Vector3(...PALM_AT));
   return target.multiply(hand.invert()).multiply(new THREE.Matrix4().makeScale(scale, scale, scale));
-}
-
-/**
- * Turns the arm about the wrist so the forearm points along `FOREARM_TOWARD`, then turns the joints
- * back so the hand does not move. The roll part of that correction goes to the two forearm bones
- * (how a real forearm turns, radius over ulna) and only the bend stays at the wrist: a whole roll
- * at the wrist bone collapses and swells the wrist skin.
- */
-function pointForearm(arms: THREE.Object3D): void {
-  const hand = findBone(arms, "DEF-hand.R");
-  const lower = findBone(arms, "DEF-forearm.R.001");
-  const upper = findBone(arms, "DEF-forearm.R");
-  if (!hand?.parent || !lower || !upper) return;
-  arms.updateMatrixWorld(true);
-  const wrist = new THREE.Vector3().setFromMatrixPosition(hand.matrixWorld);
-  const along = new THREE.Vector3().setFromMatrixPosition(upper.matrixWorld).sub(wrist).normalize();
-  const turn = new THREE.Quaternion().setFromUnitVectors(along, new THREE.Vector3(...FOREARM_TOWARD).normalize());
-  // The wrist correction in the lower forearm's space: parent⁻¹ · turn⁻¹ · parent.
-  const parent = hand.parent.getWorldQuaternion(new THREE.Quaternion());
-  const fix = parent.clone().invert().multiply(turn.clone().invert()).multiply(parent);
-  // Split it into a roll about the forearm (the hand bone's offset in its parent) and a bend.
-  const axis = hand.position.clone().normalize();
-  const v = new THREE.Vector3(fix.x, fix.y, fix.z);
-  const p = axis.clone().multiplyScalar(v.dot(axis));
-  const roll = new THREE.Quaternion(p.x, p.y, p.z, fix.w).normalize();
-  const bend = fix.clone().multiply(roll.clone().invert());
-  // Half the roll on each forearm bone; the hand gets the bend, seen from the rolled forearm.
-  const half = new THREE.Quaternion().slerp(roll, 0.5);
-  upper.quaternion.multiply(half);
-  lower.quaternion.multiply(half);
-  hand.quaternion.premultiply(roll.clone().invert().multiply(bend).multiply(roll));
-  arms.position.sub(wrist).applyQuaternion(turn).add(wrist);
-  arms.quaternion.premultiply(turn);
 }
 
 export const HeldHand: FC = () => {
@@ -136,7 +126,6 @@ export const HeldHand: FC = () => {
     for (const name of HIDDEN_BONES) findBone(clone, name)?.scale.setScalar(1e-4);
     const transform = heldHandTransform(clone);
     if (transform) transform.decompose(clone.position, clone.quaternion, clone.scale);
-    pointForearm(clone);
     return clone;
   }, [gltf]);
   // Own materials, with the phone's studio reflections at a lower strength.
