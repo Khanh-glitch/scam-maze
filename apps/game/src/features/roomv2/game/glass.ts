@@ -17,6 +17,10 @@ export function createRainGlass(cityTex: THREE.Texture, paneSize: THREE.Vector2,
       uFog: { value: 0.55 },
       uWarm: { value: new THREE.Color(0, 0, 0) },
       uSliding: { value: 0.35 },
+      // Daylight outside: beads sample a blurrier level and bend less, so sub-pixel beads do not sparkle.
+      uMinLod: { value: 0 },
+      uRefract: { value: 0.9 },
+      uBeads: { value: 1 },
     },
     vertexShader: /* glsl */ `
       varying vec2 vUv;
@@ -38,6 +42,9 @@ export function createRainGlass(cityTex: THREE.Texture, paneSize: THREE.Vector2,
       uniform float uFog;
       uniform vec3 uWarm;
       uniform float uSliding;
+      uniform float uMinLod;
+      uniform float uRefract;
+      uniform float uBeads;
       varying vec2 vUv;
       varying vec3 vWorld;
       varying vec3 vN;
@@ -103,7 +110,7 @@ export function createRainGlass(cityTex: THREE.Texture, paneSize: THREE.Vector2,
       }
 
       vec2 Drops(vec2 uv, float t){
-        float s = StaticDrops(uv, t);
+        float s = StaticDrops(uv, t) * uBeads;
         vec2 m1 = DropLayer2(uv, t);
         vec2 m2 = DropLayer2(uv*1.85, t*0.8);
         float c = s + m1.x + m2.x*0.7;
@@ -128,7 +135,7 @@ export function createRainGlass(cityTex: THREE.Texture, paneSize: THREE.Vector2,
         float focus = mix(1.0 + fog*5.5, 0.0, S(.1, .25, c.x));
 
         vec2 suv = gl_FragCoord.xy / uRes;
-        vec3 col = textureLod(tCity, suv + n*0.9, focus).rgb;
+        vec3 col = textureLod(tCity, suv + clamp(n*uRefract, -0.04, 0.04), max(focus, uMinLod)).rgb;
         // drops are tiny lenses: flip & brighten what they see
         col *= 1.0 + c.x*0.35;
         // frosted veil

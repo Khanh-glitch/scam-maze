@@ -1,0 +1,3 @@
+Textures from Poly Haven (https://polyhaven.com), licensed CC0 1.0 (public domain).
+IDs: painted_plaster_wall, beige_wall_001, blue_plaster_weathered, clay_plaster, painted_worn_brick, concrete_wall_007, grey_plaster_02, brick_wall_04.
+Resized to 1024px and re-encoded as WebP.

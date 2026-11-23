@@ -5,6 +5,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
+import { Pass } from 'three/examples/jsm/postprocessing/Pass.js';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 import { buildApartment, ROOM, WIN, type Apartment } from './apartment';
 import { buildCity } from './city';
@@ -22,6 +23,34 @@ import { isRoomPropId, type RoomOptions, type RoomStoryCommands, type TaskMarker
 
 export type Caption = { text: string; voice?: boolean; id: number };
 export type UIAction = { key: string; label: string };
+/** Screen part (0..1, origin bottom-left) where the open door / window shows. */
+export interface OutsidePortal { x0: number; y0: number; x1: number; y1: number }
+/** Camera lens shared by the room and the outside world, so their depth buffers line up. */
+export interface OutsideLens { fov: number; aspect: number; near: number; far: number }
+/**
+ * A live outside world around the room (the Chapter 1 host plugs the Saigon open world in here). Room and outside
+ * are one space: the outside is drawn every frame from the room camera into `backdrop()` (colour + depth) and the
+ * room is composited over it, so the player walks out of the open door and back in with no cut.
+ * Positions are room-local.
+ */
+export interface OutsideView {
+  /** Player in the room. `backdrop` asks for the colour + depth image this frame (door or window open). */
+  stepView(dt: number, pose: OutsideLens & { position: THREE.Vector3; quaternion: THREE.Quaternion; yaw: number; pitch: number; door: number; window: number; backdrop: boolean; portal?: OutsidePortal | null }): void;
+  /** The player stepped through the doorway; `eye` is the room camera position. */
+  enterPlay(eye: THREE.Vector3, yaw: number, pitch: number): void;
+  /** Player outside: moves with the room's keys and look; returns the camera position and whether they are back in. */
+  stepPlay(dt: number, input: OutsideLens & { keys: ReadonlySet<string>; yaw: number; pitch: number; door: number }): { position: THREE.Vector3; inRoom: boolean; moved: number };
+  /** E outside (bus, ...). */
+  interact(): void;
+  /** What the last step drew, or null. */
+  backdrop(): { color: THREE.Texture; depth: THREE.DepthTexture } | null;
+  /** Exposure the outside is meant to be seen at (the room's tone mapping applies on top). */
+  exposure?(): number;
+  /** 0..1: how hard it rains outside. Drives the drops on the glass. */
+  rainAmount?(): number;
+  /** 0..1: how bright the sky is outside. Drives the light through the window. */
+  daylight?(): number;
+}
 /** Engine.activate options. entrance: play the scripted entrance shot (outside the door, the door opens, walk in) instead of appearing at the spawn. */
 export interface ActivateOptions {
   entrance?: boolean;
@@ -99,6 +128,14 @@ const CAPTION_COUNTS: Record<string, number> = {
 };
 /** Behind the laptop page the settled room draws one frame in this many (about 20 per second at 60 Hz). */
 const BACKDROP_FRAME_STEP = 3;
+/** Front doorway (room-local x of its centre) and the half width the player's centre can use in it. */
+const DOOR_X = 1.2;
+const DOOR_HALF = 0.25;
+const _portalP = new THREE.Vector3();
+const _portalC = Array.from({ length: 8 }, () => new THREE.Vector3());
+/** Box edges as corner index pairs (corner bits: 1 = x, 2 = y, 4 = z). */
+const PORTAL_EDGES: [number, number][] = [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]];
+const EMPTY_KEYS: ReadonlySet<string> = new Set<string>();
 const captionLines = (id: string): string[] => trLines(`inspect.${id}`, CAPTION_COUNTS[id] ?? 0);
 const typedText = () => tr('typed');
 /** Small objects the player picks up or looks over closely: the hands play the take animation. */
@@ -176,6 +213,15 @@ export class Engine implements RoomStoryCommands {
   lights = { ceiling: false, desk: false, bed: false, kitchen: false };
   lightLevels = { ceiling: 0, desk: 0, bed: 0, kitchen: 0 };
   windowOpen = false;
+  /** Set by the story host: the live outside world replaces the built-in city. */
+  private outside: OutsideView | null = null;
+  /** The player is outside the room (the outside world moves them; the room only looks and draws). */
+  outdoors = false;
+  /** The front door when an outside world is plugged in: open state and 0..1 swing. */
+  outDoorOpen = false;
+  outDoorT = 0;
+  private backdropQuad: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> | null = null;
+  private readonly outsideLens: OutsideLens = { fov: 68, aspect: 1, near: 0.03, far: 700 };
   sashX = 0;
   laptopAwake = 0;
   laptopWoken = false;
@@ -378,6 +424,83 @@ export class Engine implements RoomStoryCommands {
     this.emit();
   }
 
+  /** Plugs a live outside world into the window (replaces the built-in city). */
+  setOutside(view: OutsideView | null) {
+    this.outside = view;
+    this.city.group.visible = view === null;
+    // The dark hall stub only exists for the entrance shot; the real corridor replaces it.
+    for (const o of this.apt.hallStub) o.visible = view === null;
+    // The doorway in the entrance wall opens only onto a real corridor.
+    this.apt.entranceWall.full.visible = view === null;
+    for (const o of this.apt.entranceWall.doorway) o.visible = view !== null;
+    if (view) this.ensureBackdropQuad();
+    this.audio.weatherDriven = view !== null;
+    // The outside world's sky dome has a 920 m radius: the shared lens must reach past it.
+    this.camera.far = view ? 1400 : 700;
+    this.camera.updateProjectionMatrix();
+    if (!view) {
+      if (this.outdoors) { this.outdoors = false; this.pos.set(1.2, HANDOFF.y, ROOM.z1 - 0.3); }
+      this.outDoorOpen = false;
+      if (this.backdropQuad) this.backdropQuad.visible = false;
+      this.audio.setRain(1);
+    }
+  }
+  /**
+   * A full-screen quad drawn first in the room pass: it writes the outside's colour and depth, so the room's own
+   * meshes are depth-tested against the street (one render call, so the MSAA buffer keeps both).
+   */
+  private ensureBackdropQuad() {
+    if (this.backdropQuad) return;
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { tColor: { value: null }, tDepth: { value: null }, uGain: { value: 1 } },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 1.0, 1.0); }',
+      fragmentShader: `uniform sampler2D tColor; uniform sampler2D tDepth; uniform float uGain; varying vec2 vUv;
+        void main(){
+          // Soft-limit the street's HDR highlights (sun glints, lamps): above 1.1 they roll off toward 2.4, so the
+          // room's bloom never flares the whole doorway.
+          vec3 c = max(texture2D(tColor, vUv).rgb * uGain, vec3(0.0));
+          float l = max(c.r, max(c.g, c.b));
+          if (l > 1.1) { float e = l - 1.1; c *= (1.1 + e / (1.0 + e / 1.3)) / l; }
+          gl_FragColor = vec4(c, 1.0); gl_FragDepth = texture2D(tDepth, vUv).x; }`,
+      depthTest: true,
+      depthWrite: true,
+      depthFunc: THREE.AlwaysDepth,
+      fog: false,
+      toneMapped: false,
+    });
+    const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat);
+    quad.name = 'OutsideBackdrop';
+    quad.frustumCulled = false;
+    quad.renderOrder = -1e9;
+    quad.matrixAutoUpdate = false;
+    quad.visible = false;
+    this.scene.add(quad);
+    this.backdropQuad = quad;
+    // Hide it again right after the scene pass, so the AO pass (which redraws the scene) never sees it.
+    const hide = new (class extends Pass {
+      constructor() { super(); this.needsSwap = false; }
+      render() { quad.visible = false; }
+    })();
+    this.composer.insertPass(hide, 1);
+  }
+  /** Open / close the front door (outside world plugged in). From outside it always opens, so nobody is locked out. */
+  toggleOutsideDoor() {
+    if (!this.outside) return;
+    if (!this.outdoors && !this.outDoorOpen && this.opts.story?.doorLocked?.()) { this.audio.switchClick('door'); this.say(captionLines('door')[0]); return; }
+    this.outDoorOpen = !this.outDoorOpen;
+    if (this.outDoorOpen) this.audio.switchClick('door'); else this.audio.doorClose();
+    this.emit();
+  }
+  /** The player walked through the open doorway onto the corridor. */
+  private goOutdoors() {
+    if (!this.outside || this.outdoors) return;
+    this.outdoors = true;
+    this.outside.enterPlay(this.pos, this.yaw, this.pitch);
+    this.vel.set(0, 0, 0);
+    this.hovered = null;
+    this.ui.prompt = null; this.ui.anchor = null; this.ui.focus = false;
+    this.emit();
+  }
   private applyEntranceFrame(f: ReturnType<typeof entranceFrame>) {
     this.pos.set(f.x, f.y, f.z); this.yaw = f.yaw; this.pitch = f.pitch;
     this.apt.doorLeaf.rotation.y = -f.doorAngle;
@@ -583,7 +706,7 @@ export class Engine implements RoomStoryCommands {
 
   /* =================== INPUT =================== */
   onMouseMove = (e: MouseEvent) => {
-    if (!this.ui.locked || this.entrance) return;
+    if (!this.live || !this.ui.locked || this.entrance) return;
     if (this.callHeld()) return;
     if (Math.abs(e.movementX) > MAX_MOUSE_STEP || Math.abs(e.movementY) > MAX_MOUSE_STEP) return;
     const s = 0.0021;
@@ -610,6 +733,11 @@ export class Engine implements RoomStoryCommands {
     }
     this.keys.add(e.code);
     if (!this.ui.started) return;
+    if (this.outdoors) {
+      // Outside: E works the room door when it is aimed at, otherwise the street (bus, ...).
+      if (e.code === 'KeyE') { if (this.hovered === 'door') this.interact(); else this.outside?.interact(); }
+      return;
+    }
     if (e.code === 'KeyE') { if (this.inspect && this.inspect.dir === 1) this.endInspect(); else this.interact(); }
     if (e.code === 'KeyQ' || e.code === 'Backspace') { if (this.inspect) this.endInspect(); else if (this.seat === 'seated') this.standUp(); }
     if (e.code === 'KeyF') this.inspectAction('F');
@@ -619,10 +747,12 @@ export class Engine implements RoomStoryCommands {
   onMouseDown = (e: MouseEvent) => {
     if (!this.ui.started) return;
     if (!this.ui.locked && !this.ui.cursorMode) { this.lock(); return; }
+    if (this.outdoors) { if (e.button === 0) { if (this.hovered === 'door') this.interact(); else this.outside?.interact(); } return; }
     if (e.button === 0) { if (this.inspect && this.inspect.dir === 1) { /* click = primary action if any */ if (!this.inspectAction('F')) this.endInspect(); } else this.interact(); }
     if (e.button === 2) { if (this.inspect) this.endInspect(); else if (this.seat === 'seated') this.standUp(); }
   };
   onLockChange = () => {
+    if (!this.live) return;
     this.ui.locked = document.pointerLockElement === this.renderer.domElement;
     if (this.ui.locked) this.ui.cursorMode = false;
     this.emit();
@@ -721,6 +851,10 @@ export class Engine implements RoomStoryCommands {
       case 'jacket': return tr('label.jacket');
       case 'umbrella': return tr('label.umbrella');
       case 'door':
+        if (this.outside) {
+          if (!this.outdoors && !this.outDoorOpen && this.opts.story?.doorLocked?.()) return tr('label.doorLocked');
+          return this.outDoorOpen ? tr('label.doorClose') : tr('label.doorOpen');
+        }
         if (this.opts.story?.doorLocked?.()) return tr('label.doorLocked');
         return this.opts.onExit ? tr('label.doorLeave') : tr('label.door');
     }
@@ -734,6 +868,7 @@ export class Engine implements RoomStoryCommands {
     this.reachWithHand(id);
     const port = this.opts.story;
     if (port && isRoomPropId(id)) port.onProp(id, 'interact');
+    if (id === 'door' && this.outside) { this.toggleOutsideDoor(); return; }
     if (id === 'door' && port?.doorLocked?.()) { this.audio.switchClick('door'); this.say(captionLines('door')[0]); return; }
     if (id === 'door' && this.opts.onExit) { this.audio.switchClick('door'); this.requestExit(); return; }
     switch (id) {
@@ -1195,7 +1330,11 @@ export class Engine implements RoomStoryCommands {
     const next = _next.copy(this.pos).addScaledVector(this.vel, dt);
     const R = 0.24;
     next.x = THREE.MathUtils.clamp(next.x, ROOM.x0 + R, ROOM.x1 - R);
-    next.z = THREE.MathUtils.clamp(next.z, ROOM.z0 + R, ROOM.z1 - R);
+    // With an outside world the front doorway is walkable while the door stands open (the jambs still hold).
+    const inDoorway = !!this.outside && this.pos.z > ROOM.z1 - R + 1e-3;
+    const doorPass = !!this.outside && this.outDoorT > 0.6 && Math.abs(next.x - DOOR_X) < DOOR_HALF;
+    next.z = THREE.MathUtils.clamp(next.z, ROOM.z0 + R, inDoorway || doorPass ? ROOM.z1 + 0.6 : ROOM.z1 - R);
+    if (inDoorway) next.x = THREE.MathUtils.clamp(next.x, DOOR_X - DOOR_HALF, DOOR_X + DOOR_HALF);
     for (const [ax0, ax1, az0, az1] of this.apt.colliders) {
       const cx = THREE.MathUtils.clamp(next.x, ax0, ax1), cz = THREE.MathUtils.clamp(next.z, az0, az1);
       const dx = next.x - cx, dz = next.z - cz;
@@ -1207,6 +1346,7 @@ export class Engine implements RoomStoryCommands {
       }
     }
     this.pos.x = next.x; this.pos.z = next.z;
+    if (this.outside && this.pos.z > ROOM.z1 + 0.25) { this.goOutdoors(); return; }
     const sp = Math.hypot(this.vel.x, this.vel.z);
     if (sp > 0.05) {
       this.bobPhase += dt * sp * 5.2;
@@ -1286,6 +1426,7 @@ export class Engine implements RoomStoryCommands {
       ? pickHoverId(found.map((h) => ({ id: h.object.userData.id as string, proxy: !!h.object.userData.hitProxy, distance: h.distance })))
       : ((found[0]?.object.userData.id as string) ?? null);
     if (id === 'chair' && this.seat !== 'none') id = null;
+    if (this.outdoors && id !== 'door') id = null;
     // Story mode only: the aimed prop's world point, projected; the prompt is drawn next to it.
     let ax: number | null = null;
     let ay: number | null = null;
@@ -1392,6 +1533,19 @@ export class Engine implements RoomStoryCommands {
     a.rightSash.position.x = a.rightSash.userData.base + this.sashX;
     // curtain would breathe a little with the window open (via glass fog)
     this.glassMats.forEach((m) => { m.uniforms.uTime.value = this.t; m.uniforms.uFog.value = 0.55 - (this.windowOpen ? 0.25 : 0) * Math.min(1, el / 60); });
+    if (this.outside) {
+      // The weather outside decides how much rain runs down the glass and how much daylight comes in.
+      const rain = this.outside.rainAmount?.() ?? 1;
+      const day = this.outside.daylight?.() ?? 0;
+      this.audio.setRain(rain);
+      this.glassMats.forEach((m) => {
+        const u = m.uniforms;
+        u.uSliding.value = 0.05 + 0.3 * rain; u.uFog.value *= 0.5 + 0.5 * rain;
+        u.uMinLod.value = 1.2 + 1.3 * day; u.uRefract.value = 0.9 - 0.6 * day; u.uBeads.value = 1 - 0.85 * day;
+      });
+      this.winRect.intensity = 1.6 + 0.7 * day;
+      this.winRect.color.setRGB(0.55 + 0.25 * day, 0.59 + 0.22 * day, 0.78 + 0.1 * day);
+    }
     // kettle
     if (this.kettleOn) {
       this.kettleT += dt;
@@ -1472,10 +1626,38 @@ export class Engine implements RoomStoryCommands {
     const dt = Math.min(0.05, rawDt);
     this.t = tNow;
 
-    if (this.entrance) this.stepEntrance(dt);
-    else if (this.ui.started) this.movePlayer(dt);
-    this.updateSeat(rawDt > 0.05 ? 0.05 : dt);
-    this.updateCamera(dt);
+    const out = this.outside;
+    // Front door swing (outside world plugged in; the entrance shot drives the leaf itself).
+    if (out) {
+      this.outDoorT += ((this.outDoorOpen ? 1 : 0) - this.outDoorT) * (1 - Math.exp(-dt * 4));
+      if (!this.entrance) this.apt.doorLeaf.rotation.y = -this.outDoorT * 1.45;
+    }
+    if (out && this.outdoors) {
+      // Outside: the outside world walks the player with the room's keys and look; the room camera follows it.
+      const lens = this.lensForOutside();
+      const res = out.stepPlay(dt, { ...lens, keys: this.ui.locked || this.ui.cursorMode ? this.keys : EMPTY_KEYS, yaw: this.yaw, pitch: this.pitch, door: this.outDoorT });
+      if (res.inRoom) {
+        this.outdoors = false;
+        this.pos.set(res.position.x, HANDOFF.y, Math.min(res.position.z, ROOM.z1 + 0.2));
+        this.vel.set(0, 0, 0);
+        this.updateCamera(dt);
+      } else {
+        this.camera.position.copy(res.position);
+        this.camera.quaternion.setFromEuler(_walkE.set(this.pitch, this.yaw, 0, 'YXZ'));
+        if (res.moved > 0) {
+          this.bobPhase += res.moved * 5.2;
+          const sign = Math.sign(Math.sin(this.bobPhase));
+          if (sign !== this.lastStepSign && sign !== 0) { this.lastStepSign = sign; this.audio.started && this.audio.footstep(1); }
+        }
+      }
+    } else {
+      if (this.entrance) this.stepEntrance(dt);
+      else if (this.ui.started) this.movePlayer(dt);
+      if (!this.outdoors) {
+        this.updateSeat(rawDt > 0.05 ? 0.05 : dt);
+        this.updateCamera(dt);
+      }
+    }
     this.updateScreenWatch();
     this.updateTaskMarker();
     this.updateArms(dt);
@@ -1514,12 +1696,33 @@ export class Engine implements RoomStoryCommands {
     }
     // pass 1: the city alone, for the glass to refract
     this.glassMats.forEach((m) => m.uniforms.uRes.value.set(r.domElement.width, r.domElement.height));
-    this.camera.layers.set(1);
-    r.setRenderTarget(this.cityRT);
-    r.render(this.scene, this.camera);
-    r.setRenderTarget(null);
-    this.camera.layers.set(0);
-    this.camera.layers.enable(1);
+    if (out) {
+      const cam = this.camera;
+      if (!this.outdoors) {
+        const window = Math.min(1, Math.abs(this.sashX) / 0.45);
+        // Only the part of the street seen through the open door / window is drawn; nothing when neither is in view.
+        const portal = this.outsidePortal(this.outDoorT > 0.01, window > 0.01);
+        out.stepView(dt, { ...this.lensForOutside(), position: cam.position, quaternion: cam.quaternion, yaw: this.yaw, pitch: this.pitch, door: this.outDoorT, window, backdrop: portal !== false, portal: portal || null });
+      }
+      const bd = out.backdrop();
+      const quad = this.backdropQuad;
+      if (quad) {
+        quad.visible = !!bd;
+        if (bd) {
+          const u = quad.material.uniforms;
+          u.tColor.value = bd.color;
+          u.tDepth.value = bd.depth;
+          u.uGain.value = (out.exposure?.() ?? 1.3) / Math.max(0.05, r.toneMappingExposure);
+        }
+      }
+    } else {
+      this.camera.layers.set(1);
+      r.setRenderTarget(this.cityRT);
+      r.render(this.scene, this.camera);
+      r.setRenderTarget(null);
+      this.camera.layers.set(0);
+      this.camera.layers.enable(1);
+    }
     // pass 2: everything
     const sig = this.shadowSignature();
     if (sig !== this.shadowSig) { this.shadowSig = sig; this.shadowFrames = 2; }
@@ -1530,6 +1733,60 @@ export class Engine implements RoomStoryCommands {
     this.composer.render(dt);
   }
 
+  /** A lightning strike in the outside world (0..1, already softened): thunder follows the flash. */
+  outsideThunder(v: number) {
+    this.audio.thunderAfter(Math.min(0.6, 0.25 + v * 0.8), 0.6 + Math.random() * 1.8);
+  }
+  /**
+   * Where the open front door and the open window are on screen: a rectangle (0..1, origin bottom-left), null for
+   * the whole screen (the camera is in the opening), or false when neither opening is open and in view.
+   */
+  private outsidePortal(door: boolean, win: boolean): OutsidePortal | null | false {
+    if (!door && !win) return false;
+    const cam = this.camera;
+    cam.updateMatrixWorld();
+    const p = _portalP;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    const boxes: number[][] = [];
+    // [x0, x1, y0, y1, z0, z1]: the doorway (through the wall, a little past it) and the window recess.
+    if (door) boxes.push([DOOR_X - 0.46, DOOR_X + 0.46, -0.02, 2.16, ROOM.z1 - 0.06, ROOM.z1 + 0.2]);
+    if (win) boxes.push([WIN.x0 - 0.02, WIN.x1 + 0.02, WIN.y0 - 0.02, WIN.y1 + 0.02, ROOM.z0 - WIN.depth - 0.02, ROOM.z0 + 0.02]);
+    const near = -cam.near * 1.05;
+    const add = (v: THREE.Vector3) => {
+      v.applyMatrix4(cam.projectionMatrix);
+      x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y);
+    };
+    for (const b of boxes) {
+      // The box corners in view space, then its 12 edges clipped to the near plane, projected and bounded.
+      for (let i = 0; i < 8; i++) _portalC[i].set(i & 1 ? b[1] : b[0], i & 2 ? b[3] : b[2], i & 4 ? b[5] : b[4]).applyMatrix4(cam.matrixWorldInverse);
+      // The camera inside the opening's box: it fills the view.
+      if (this.camInBox(b)) return null;
+      for (const [i, j] of PORTAL_EDGES) {
+        const a = _portalC[i], c = _portalC[j];
+        const ia = a.z <= near, ic = c.z <= near;
+        if (ia) add(p.copy(a));
+        if (ic) add(p.copy(c));
+        if (ia !== ic) add(p.copy(a).lerp(c, (near - a.z) / (c.z - a.z)));
+      }
+    }
+    const pad = 0.02;
+    x0 = Math.max(-1, x0 - pad); y0 = Math.max(-1, y0 - pad); x1 = Math.min(1, x1 + pad); y1 = Math.min(1, y1 + pad);
+    if (x1 <= x0 || y1 <= y0) return false;
+    const r = this.portalRect;
+    r.x0 = (x0 + 1) / 2; r.y0 = (y0 + 1) / 2; r.x1 = (x1 + 1) / 2; r.y1 = (y1 + 1) / 2;
+    return r;
+  }
+  private camInBox(b: number[]) {
+    const c = this.camera.position, m = 0.15;
+    return c.x > b[0] - m && c.x < b[1] + m && c.y > b[2] - m && c.y < b[3] + m && c.z > b[4] - m && c.z < b[5] + m;
+  }
+  private portalRect: OutsidePortal = { x0: 0, y0: 0, x1: 1, y1: 1 };
+  /** The room camera's lens, for the outside world (same projection, so the two depth buffers agree). */
+  private lensForOutside(): OutsideLens {
+    const c = this.camera, l = this.outsideLens;
+    l.fov = c.fov; l.aspect = c.aspect; l.near = c.near; l.far = c.far;
+    return l;
+  }
   dispose() {
     if (this.disposed) return;
     this.disposed = true;

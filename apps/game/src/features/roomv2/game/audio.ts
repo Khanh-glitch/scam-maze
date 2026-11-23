@@ -144,9 +144,9 @@ export class AudioEngine {
       })
       .catch((err) => console.warn('[room] clock sound failed to load', err));
     // Thunder far away, the storm moving off: once early, then now and then.
-    this.timers.push(window.setTimeout(() => this.thunder(0.55), 18000));
-    this.every(60, 130, () => { if (this.ctx.state === 'running') this.thunder(0.3 + Math.random() * 0.25); });
-    this.every(5, 12, () => { if (this.ctx.state === 'running') this.tireHiss(); });
+    this.timers.push(window.setTimeout(() => { if (!this.weatherDriven && this.rainLevel > 0.5) this.thunder(0.55 * this.rainLevel); }, 18000));
+    this.every(60, 130, () => { if (this.ctx.state === 'running' && !this.weatherDriven && this.rainLevel > 0.5) this.thunder((0.3 + Math.random() * 0.25) * this.rainLevel); });
+    this.every(5, 12, () => { if (this.ctx.state === 'running' && this.rainLevel > 0.15) this.tireHiss(); });
     this.rainFilter = this.filt('lowpass', 900);
     this.rainGain = this.gain(0);
     this.rainFilter.connect(this.rainGain); this.rainGain.connect(this.cityDuck);
@@ -157,7 +157,7 @@ export class AudioEngine {
         if (this.ctx.state === 'closed') return;
         const src = this.ctx.createBufferSource(); src.buffer = buf; src.loop = true; src.connect(this.rainFilter!);
         src.start(0, Math.random() * Math.max(0, buf.duration - 1));
-        this.rainGain!.gain.setTargetAtTime(RAIN_CLOSED, this.ctx.currentTime, 1.5);
+        this.rainGain!.gain.setTargetAtTime(this.rainTarget(), this.ctx.currentTime, 1.5);
       })
       .catch((err) => console.warn('[room] rain sound failed to load', err));
 
@@ -276,9 +276,31 @@ export class AudioEngine {
   windowSlide(open: boolean) {
     this.windowOpen = open ? 1 : 0;
     const t = this.ctx.currentTime;
-    this.rainGain?.gain.setTargetAtTime(open ? RAIN_OPEN : RAIN_CLOSED, t, 0.5);
+    this.rainGain?.gain.setTargetAtTime(this.rainTarget(), t, 0.5);
     this.rainFilter?.frequency.setTargetAtTime(open ? 7000 : 900, t, 0.5);
     this.windowBed?.gain.setTargetAtTime(open ? CITY_WINDOW_OPEN : CITY_WINDOW_CLOSED, t, 0.4);
+  }
+  /**
+   * 0..1: how hard it rains outside (1 when the room has no live outside world: the story night is rainy).
+   * The recorded rain follows it, and thunder and wet tyres only play while it really rains.
+   */
+  private rainLevel = 1;
+  /** A live outside world sends its own lightning (`thunderAfter`); the random thunder is off then. */
+  weatherDriven = false;
+  /** Thunder for a lightning strike outside, a moment after the flash. */
+  thunderAfter(v: number, delayS: number) {
+    this.timers.push(window.setTimeout(() => { if (this.started && this.ctx.state === 'running') this.thunder(v); }, delayS * 1000));
+  }
+  setRain(level: number) {
+    const v = Math.max(0, Math.min(1, level));
+    if (Math.abs(v - this.rainLevel) < 0.02 && !(v === 0 && this.rainLevel !== 0)) return;
+    this.rainLevel = v;
+    if (this.started) this.rainGain?.gain.setTargetAtTime(this.rainTarget(), this.ctx.currentTime, 1.2);
+  }
+  /** Rain level: muffled through the closed window, clearer when it is open; silent when it does not rain. */
+  private rainTarget() {
+    const r = this.rainLevel < 0.03 ? 0 : Math.min(1, this.rainLevel * 1.6);
+    return (this.windowOpen ? RAIN_OPEN : RAIN_CLOSED) * r;
   }
   setFan(..._args: unknown[]): void {}
   setFridge(..._args: unknown[]): void {}
