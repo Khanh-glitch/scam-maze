@@ -116,6 +116,7 @@ import {
   type RoomPresentation,
 } from "./roomPresentation";
 import { RoomCallLayer } from "./RoomCallLayer";
+import { doorForcedOpen } from "./outsideWorld";
 import { RoomEndingLayer } from "./RoomEndingLayer";
 import { RoomPhoneModelLayer, detectPhoneModelSupport } from "./RoomPhoneModelLayer";
 import type { RoomStoryBridge } from "./roomStoryBridge";
@@ -204,6 +205,11 @@ export interface RoomChapterLayerProps {
   clockPaused?: boolean;
   /** Opens the host's pause menu (with Settings). Shows the settings button in the top-right corner. */
   onOpenSettings?: () => void;
+  /**
+   * The front door leads out to the street (the Chapter 1 page with the Saigon open world). It opens whenever no
+   * call or overlay is running. Without it the door stays locked until the chapter is finished (the prologue).
+   */
+  outsideDoor?: boolean;
 }
 
 const INTRO_NARRATION: NarrationSequence = { graphId: "dlg.intro", nodeIds: INTRO_SEQUENCE };
@@ -352,6 +358,7 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
   phoneScreenSink,
   clockPaused = false,
   onOpenSettings,
+  outsideDoor = false,
 }) => {
   const { t } = useTranslation("chapter1");
   const locale = useGameLocale();
@@ -528,18 +535,19 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
   });
   // --- Port cache (the bridge reads it on every hover frame) --------------------------------
   const cacheRef = useRef<PortCache>(EMPTY_CACHE);
-  const latestRef = useRef({ text, scenario });
-  latestRef.current = { text, scenario };
+  const latestRef = useRef({ text, scenario, outsideDoor });
+  latestRef.current = { text, scenario, outsideDoor };
 
   const rebuildCache = useCallback(() => {
     const state = store.getState();
-    const { text: tr, scenario: sc } = latestRef.current;
+    const { text: tr, scenario: sc, outsideDoor: doorOut } = latestRef.current;
     const ringing = state.call.status === "ringing";
     const busy = callInProgress(state);
     const overlayOpen = introOpenRef.current || overlaysRef.current.length > 0 || extensionBlockingRef.current;
+    const doorLocked = state.status !== "finished" && !doorForcedOpen() && !(doorOut && !busy && !ringing && !overlayOpen);
     const cache: PortCache = {
       labels: {
-        door: state.status !== "finished" ? tr("room.prompt.doorLocked") : null,
+        door: doorLocked ? tr("room.prompt.doorLocked") : null,
         phone: busy && !ringing ? null : ringing ? tr("room.prompt.phoneRinging") : tr("room.prompt.phoneRecords"),
         laptop: tr("room.prompt.laptopUse"),
       },
@@ -553,7 +561,7 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
       },
       inspect: {},
       leave: { phone: !busy && !overlayOpen, laptop: !overlayOpen },
-      doorLocked: state.status !== "finished",
+      doorLocked,
       overlayOpen,
     };
     for (const [prop, objectId] of Object.entries(PROP_TO_OBJECT)) {
@@ -567,6 +575,10 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
     }
     cacheRef.current = cache;
   }, [store]);
+  // The door prompt and lock follow the host's outside world as soon as it is ready.
+  useEffect(() => {
+    rebuildCache();
+  }, [outsideDoor, rebuildCache]);
 
   const updateOverlays = useCallback(
     (change: (stack: OverlayStack) => OverlayStack) => {
