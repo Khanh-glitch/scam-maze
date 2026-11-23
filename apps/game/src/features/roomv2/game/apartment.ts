@@ -36,6 +36,10 @@ export interface Apartment {
   chair: THREE.Group;
   /** The entrance door leaf on its hinge pivot: `rotation.y` 0 is closed, negative opens into the room. */
   doorLeaf: THREE.Group;
+  /** The dark hall stub outside the entrance (only for the entrance shot); hidden when a real outside world is plugged in. */
+  hallStub: THREE.Object3D[];
+  /** The entrance wall: whole (default) or with the doorway open (pieces around the door). */
+  entranceWall: { full: THREE.Object3D; doorway: THREE.Object3D[] };
   clockHands: { h: THREE.Object3D; m: THREE.Object3D; s: THREE.Object3D };
   updaters: ((t: number, dt: number) => void)[];
   points: Record<string, THREE.Vector3>;
@@ -131,7 +135,31 @@ export function buildApartment(scene: THREE.Scene, cityTexHook: (panes: THREE.Me
   const north = new THREE.Group(); north.position.set(0, 0, z0); root.add(north);
   [[x0, x1, 0, WIN.y0], [x0, x1, WIN.y1, h], [x0, WIN.x0, WIN.y0, WIN.y1], [WIN.x1, x1, WIN.y0, WIN.y1]].forEach(([a, b, c, d]) => mesh(wallPiece(a, b, c, d), wallMat, 0, 0, 0, north, false));
   const south = new THREE.Group(); south.position.set(0, 0, z1); south.rotation.y = Math.PI; root.add(south);
-  mesh(wallPiece(-x1, -x0, 0, h), wallMat, 0, 0, 0, south, false);
+  const southFull = mesh(wallPiece(-x1, -x0, 0, h), wallMat, 0, 0, 0, south, false);
+  // The same wall with the doorway cut out (the group is turned around, so room x maps to -x here). Shown only
+  // when the door leads somewhere real (a live outside world); otherwise the full wall stays as it always was.
+  const DOOR_X0 = 1.2 - 0.45, DOOR_X1 = 1.2 + 0.45, DOOR_TOP = 2.13;
+  const southDoorway = [[-x1, -DOOR_X1, 0, h], [-DOOR_X0, -x0, 0, h], [-DOOR_X1, -DOOR_X0, DOOR_TOP, h]].map(([a, b, c, d]) => {
+    const piece = mesh(wallPiece(a, b, c, d), wallMat, 0, 0, 0, south, false);
+    piece.visible = false;
+    return piece;
+  });
+  // Doorway reveals: the wall thickness between the room and the building's outer wall (14 cm).
+  {
+    const REVEAL = 0.14;
+    const revealMat = wallMat.clone();
+    revealMat.side = THREE.DoubleSide;
+    for (const x of [DOOR_X0, DOOR_X1]) {
+      const jamb = mesh(new THREE.PlaneGeometry(REVEAL, DOOR_TOP), revealMat, x, DOOR_TOP / 2, z1 + REVEAL / 2, root, false);
+      jamb.rotation.y = Math.PI / 2;
+      jamb.visible = false;
+      southDoorway.push(jamb);
+    }
+    const head = mesh(new THREE.PlaneGeometry(DOOR_X1 - DOOR_X0, REVEAL), revealMat, 1.2, DOOR_TOP, z1 + REVEAL / 2, root, false);
+    head.rotation.x = Math.PI / 2;
+    head.visible = false;
+    southDoorway.push(head);
+  }
   const west = new THREE.Group(); west.position.set(x0, 0, 0); west.rotation.y = Math.PI / 2; root.add(west);
   mesh(wallPiece(-z1, -z0, 0, h), wallMat, 0, 0, 0, west, false);
   const east = new THREE.Group(); east.position.set(x1, 0, 0); east.rotation.y = -Math.PI / 2; root.add(east);
@@ -780,6 +808,7 @@ export function buildApartment(scene: THREE.Scene, cityTexHook: (panes: THREE.Me
   colliders.push([x0, -0.55, z1 - 0.65, z1]);
 
   /* ======================= ENTRANCE ======================= */
+  const hallStub: THREE.Object3D[] = [];
   const ent = new THREE.Group(); root.add(ent);
   const DXc = 1.2;
   // door frame & slab
@@ -811,13 +840,17 @@ export function buildApartment(scene: THREE.Scene, cityTexHook: (panes: THREE.Me
     const shell = new THREE.BoxGeometry(HW, h, HD);
     // BoxGeometry draws +x, -x, +y, -y, +z, -z (6 indices each); the -z face lies on the entrance wall and is left open.
     shell.setIndex(Array.from(shell.index!.array).slice(0, 30)); shell.clearGroups();
-    mesh(shell, hallMat, HW / 2, h / 2, z1 + HD / 2, root, false).receiveShadow = false;
+    const hallBox = mesh(shell, hallMat, HW / 2, h / 2, z1 + HD / 2, root, false);
+    hallBox.receiveShadow = false;
+    hallStub.push(hallBox);
     const outer = new THREE.Shape();
     outer.moveTo(0, 0); outer.lineTo(HW, 0); outer.lineTo(HW, h); outer.lineTo(0, h); outer.lineTo(0, 0);
     const hole = new THREE.Path();
     hole.moveTo(DXc - 0.45, 0); hole.lineTo(DXc - 0.45, 2.13); hole.lineTo(DXc + 0.45, 2.13); hole.lineTo(DXc + 0.45, 0); hole.lineTo(DXc - 0.45, 0);
     outer.holes.push(hole);
-    mesh(new THREE.ShapeGeometry(outer), hallMat, 0, 0, z1 + 0.02, root, false).receiveShadow = false;
+    const hallWall = mesh(new THREE.ShapeGeometry(outer), hallMat, 0, 0, z1 + 0.02, root, false);
+    hallWall.receiveShadow = false;
+    hallStub.push(hallWall);
   }
   // light switch
   const sw = new THREE.Group(); sw.position.set(0.52, 1.2, z1 - 0.004); root.add(sw);
@@ -1008,6 +1041,6 @@ export function buildApartment(scene: THREE.Scene, cityTexHook: (panes: THREE.Me
     lights: { ceilingSpot, ceilingFill, deskSpot, deskFill, bedLamp, kitchen: kitchenLight, phone: phoneLight, laptop: laptopLight },
     emissives: { ceiling: ceilingShade, desk: deskBulb, bed: bedShade, kitchen: kitchenStrip, powerLed, acLed },
     glassPanes, rightSash, phone, phoneScreenMat, laptopScreen, laptopScreenMat, laptopScreenMesh, phoneScreenMesh: scr, phoneScreen, steam,
-    fridgeDoor: fdoor, fridgeCollider, fridge: { point: frPoint, spot: frSpot, led: fridgeLed, mist }, chair, doorLeaf, clockHands,
+    fridgeDoor: fdoor, fridgeCollider, fridge: { point: frPoint, spot: frSpot, led: fridgeLed, mist }, chair, doorLeaf, hallStub, entranceWall: { full: southFull, doorway: southDoorway }, clockHands,
   };
 }

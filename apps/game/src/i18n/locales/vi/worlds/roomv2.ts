@@ -139,6 +139,8 @@ const roomv2: LocaleShape<typeof en> = {
         jacket: "Áo khoác",
         umbrella: "Cây dù",
         door: "Cửa ra vào",
+        doorOpen: "Mở cửa",
+        doorClose: "Đóng cửa",
         doorLeave: "Rời khỏi phòng",
         doorLocked: "Cửa ra vào (đã khóa)",
         phoneRecords: "Mở nhật ký điện thoại",

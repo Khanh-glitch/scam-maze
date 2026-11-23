@@ -20,6 +20,7 @@ import { AnchoredPrompt } from "../hud/AnchoredPrompt";
 import { RoomChapterLayer } from "./RoomChapterLayer";
 import { consumeRoomPreload, discardRoomPreload, peekReadyRoom } from "./roomPreloader";
 import { RoomStoryBridge } from "./roomStoryBridge";
+import { OutsideHud, useOutsideWorld } from "./useOutsideWorld";
 
 const RoomV2Page = lazy(() => import("../../roomv2").then((module) => ({ default: module.RoomV2Page })));
 
@@ -56,6 +57,9 @@ export const RoomChapterPage: React.FC<RoomChapterPageProps> = ({
   const [paused, setPaused] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const engineRef = useRef<RoomEngine | null>(null);
+  // The Saigon open world around the room: live through the window and the open door, walkable with no cut.
+  const [roomEngine, setRoomEngine] = useState<RoomEngine | null>(null);
+  const outside = useOutsideWorld(roomEngine, true);
 
   // The chapter happens in the apartment, whatever scene a new or old session names.
   const layerSession = useMemo<ChapterSession>(() => ({ ...session, sceneId: "apartment" }), [session]);
@@ -71,6 +75,7 @@ export const RoomChapterPage: React.FC<RoomChapterPageProps> = ({
       engineRef.current = engine;
       bridge.commands = engine;
       setEngineReady(true);
+      setRoomEngine(engine);
     },
     [bridge],
   );
@@ -139,6 +144,7 @@ export const RoomChapterPage: React.FC<RoomChapterPageProps> = ({
               onOpenSettings={openPause}
               onReturnToMenu={onReturnToMenu}
               onHoverSound={onHoverSound}
+              outsideDoor={outside.ready}
             />
           }
         />
@@ -149,6 +155,7 @@ export const RoomChapterPage: React.FC<RoomChapterPageProps> = ({
         <PrologueHud objective={null} prompt={null} showResume={showResume} cursorMode={cursorMode} crosshair={false} />
       )}
 
+      {playing && !paused && <OutsideHud state={outside} />}
       {paused && !settingsOpen && (
         <ProloguePauseMenu
           onHoverSound={onHoverSound}
