@@ -23,6 +23,7 @@ import type { ChapterSession } from "../../game/chapters/chapterSession";
 import type { SaveGameSource } from "../../game/saves/saveGame";
 import { RoomChapterLayer } from "../chapter1/room/RoomChapterLayer";
 import { RoomStoryBridge } from "../chapter1/room/roomStoryBridge";
+import { OutsideHud, useOutsideWorld } from "../chapter1/room/useOutsideWorld";
 
 // The room is its own chunk, downloaded in the background while the player walks around.
 const loadRoomModule = () => import("../roomv2");
@@ -109,6 +110,7 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
   const pendingEnter = useRef(false);
   const streetRef = useRef<StreetEngine | null>(null);
   const roomRef = useRef<RoomEngine | null>(null);
+  const [roomEngine, setRoomEngine] = useState<RoomEngine | null>(null);
   const prefetchRef = useRef<Promise<void> | null>(null);
   const goneHome = useRef(false);
   const progressRef = useRef(onBuildProgress);
@@ -230,6 +232,8 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
   // The street stays silent while the player is in the room: the room is often built after the
   // player went home (the room's `onReady` shows it at once), and this effect then runs again.
   const inRoom = stage === "room";
+  // Story mode: the Saigon open world around the room (live through the window and the door, walkable with no cut).
+  const outside = useOutsideWorld(roomEngine, !!session && inRoom);
   useEffect(() => {
     streetRef.current?.audio.setMuted(!soundOn || inRoom);
     roomRef.current?.audio.setMuted(!soundOn);
@@ -618,12 +622,14 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
                     onReturnToMenu={onBackToMenu}
                     onHoverSound={onHoverSound}
                     onOpenSettings={openPause}
+                    outsideDoor={outside.ready}
                   />
                 ) : undefined
               }
               onUI={setRoomUI}
               onReady={(engine) => {
                 roomRef.current = engine;
+                setRoomEngine(engine);
                 if (session) bridge.commands = engine;
                 setRoomCommands(true);
                 setRoomBuilt(true);
@@ -633,6 +639,7 @@ export const ProloguePage: React.FC<ProloguePageProps> = ({ settings, onUpdateSe
           </Suspense>
         </div>
       )}
+      {stage === "room" && playingRoom && !paused && <OutsideHud state={outside} />}
       {stage === "room" && playingRoom && !paused && <PrologueHud objective={null} prompt={null} showResume={showResume} cursorMode={roomCursor} crosshair={false} minimap={session ? undefined : <NoSignalMinimap label={t("worlds:quests.noSignal")} />} />}
 
       {inGame && !callOpen && !paused && !(session && stage === "room") && (
