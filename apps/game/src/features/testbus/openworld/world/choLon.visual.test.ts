@@ -11,7 +11,9 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import * as T from "three";
 import sharp from "sharp";
-import { buildChoLon, CHO_LON_Z } from "./choLon";
+import { buildChoLon, CHO_LON_X, CHO_LON_Z, FAR_FRONT_X, ROAD_MAX, ROAD_MIN } from "./choLon";
+import { ROUTE } from "../simulation/transit";
+const ROUTE_CURB_X = ROUTE.curbX;
 import { collectTriangles, renderLook, textureKey, type Look } from "../../../../test/qa/render-world";
 import { sampleTexture, type SampledTexture } from "../../../../test/qa/texture-sampler";
 
@@ -127,6 +129,24 @@ describe("Chợ Lớn is a place, not a label (R16)", () => {
     expect(handles.receiptNail.x).toBeLessThan(7);
     expect(handles.receiptNail.y).toBeGreaterThan(1.2);
     expect(handles.receiptNail.y).toBeLessThan(2.0);
+
+    // THE PLACEMENT GATE. Before this round the market stood in a 58 m gap with no road in it at
+    // all — a cross-section through the district at z = -128 found zero geometry between x = -40 and
+    // x = +18. These assertions pin the street that replaced the gap: a carriageway the bus actually
+    // drives on, pavements on both sides, and the market set back behind its own frontage line.
+    expect(ROUTE_CURB_X).toBeGreaterThan(ROAD_MIN);
+    expect(ROUTE_CURB_X).toBeLessThan(ROAD_MAX);
+    expect(ROAD_MIN).toBeLessThan(CHO_LON_X); // the road is in front of the market, not under it
+    expect(CHO_LON_X).toBeLessThan(ROAD_MAX);
+    expect(ROAD_MAX).toBeLessThan(FAR_FRONT_X); // the far terrace closes the far side
+
+    // Nothing the player can stand on may be inside the carriageway except the road itself: the
+    // shelters, the ATM and the stall must all be off the asphalt.
+    for (const stop of handles.busStops) {
+      // Off the carriageway on one side or the other, never in a lane.
+      const offRoad = stop.x < ROAD_MIN || stop.x > ROAD_MAX;
+      expect(offRoad, `a shelter stands in the carriageway at x=${stop.x}`).toBe(true);
+    }
 
     // The block must be solid where it is a wall, or the player walks through the market.
     expect(solids.length).toBeGreaterThanOrEqual(18);

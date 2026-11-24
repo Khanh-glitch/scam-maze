@@ -35,10 +35,30 @@ import type { WorldStreamer } from "./WorldStreamer";
 
 /** Where the bus drops the player. Must match `ROUTE.destinationZ` in `simulation/transit.ts`. */
 export const CHO_LON_Z = -128;
-/** The market frontage, standing inside the walkable corridor (x ∈ [-19.5, 7]). */
-const FRONT_X = -8.4;
-/** The truck/scooter lane that backs the market — why a market opens onto a street, not a road. */
+/**
+ * The market frontage line, exported so district-level QA can frame the block without duplicating the
+ * constant. If this moves, the placement frames move with it.
+ */
+export const CHO_LON_X = -8.4;
+/** Exported so the placement gate can prove the carriageway contains the lane the bus drives in. */
+export const ROAD_MIN = -8.7;
+export const ROAD_MAX = 1.3;
+export const FAR_FRONT_X = 7.0;
+/** The market frontage line. See `CHO_LON_X`. */
+const FRONT_X = CHO_LON_X;
+/**
+ * The carriageway, derived from the only authoritative number in the runtime: `ROUTE.curbX = -1.54`
+ * is where Bus 06 physically drives (`simulation/transit.ts:16`). Building the road around the bus
+ * rather than declaring a width and hoping is what stops the block being decorative.
+ */
+const ROAD_CX = (ROAD_MIN + ROAD_MAX) / 2;
+const ROAD_HALF = (ROAD_MAX - ROAD_MIN) / 2;
+/** The far pavement, where the bus doors open and where the shelter stands. */
+const FAR_MIN = ROAD_MAX; // 1.3
+const FAR_MAX = 7.0;
+/** The truck/scooter access lane at the back of the market — the block needs a back to be a block. */
 const LANE_X = -17.4;
+
 /** Depth of the covered market, from the frontage back into the block. */
 const DEPTH = 5.6;
 /** The block spans this z range: wide enough that the corridor reads as a place, not a pocket. */
@@ -116,43 +136,130 @@ export function buildChoLon(
   // Three different surfaces, because they are three different things: stained concrete under the
   // stalls, patched pavement where people stand, and a rutted asphalt lane where the trucks idle.
   // ---------------------------------------------------------------------------
-  // These three planes fill the lower half of every frame in the block, so they are the last place a
-  // flat colour is acceptable. They use the same scanned Saigon surfaces as the neighbouring chunks:
-  // slab, concrete and asphalt. Repeat counts are chosen so every tile is ~2.8 m, so the paving does
-  // not change size as the player walks from the market floor to the pavement to the lane.
+  // These planes fill the lower half of every frame in the block, so they are the last place a flat
+  // colour is acceptable. They use the same scanned Saigon surfaces as the neighbouring chunks.
+  //
+  // WHAT THIS USED TO BE, AND WHY IT WAS WRONG
+  //
+  // Before this chunk existed, nothing in the world covered x < 18 around z = -128: a cross-section
+  // taken through the district at the market's own z found *zero* geometry between x = -40 and
+  // x = +18. The "corridor" the bus drove through was a 58 m empty slot with the city only on one
+  // side of it. The first version of this file put a market in that slot and called the result a
+  // market by a road. It was a market in a vacant lot.
+  //
+  // So the street is built here: carriageway, kerbs, the pavement the market faces, the far pavement
+  // the bus doors open onto, and the far shopfronts that were missing. Its width is not chosen — it
+  // is derived from `ROUTE.curbX`, where the bus actually drives.
   const marketFloor = createGranitePlazaPBR(2, 17);
   marketFloor.color = new T.Color(0x8a857c); // washed concrete, not polished granite
-  const pavement = createGranitePlazaPBR(3, 17);
-  const lane = createSaigonAsphaltPBR(1, 17);
-  plane(chunk, [FRONT_X - DEPTH / 2, 0.02, midZ], [DEPTH, spanZ], marketFloor, 0, -Math.PI / 2);
-  plane(chunk, [FRONT_X + 3.4, 0.022, midZ], [6.8, spanZ], pavement, 0, -Math.PI / 2);
-  plane(chunk, [LANE_X, 0.018, midZ], [2.8, spanZ], lane, 0, -Math.PI / 2);
+  const roadSurface = createSaigonAsphaltPBR(2, 22);
+  const roadMat = roadSurface;
+  const pavement = createGranitePlazaPBR(2, 22);
+  pavement.color = new T.Color(0x9d978c);
+  const paved = createGranitePlazaPBR(2, 16);
+  paved.color = new T.Color(0x87817a);
 
-  // The block must be *bigger than the shot*. The walkable corridor is x ∈ [-19.5, 7] and these
-  // planes cover x ∈ [-19.3, 3.6]; the first frames ended the pavement in mid-air about 8 m from the
-  // camera, which reads as a bug even though the far side is technically off-limits. A market does
-  // not stop at the edge of the pavement, so the ground runs on under the neighbouring blocks and
-  // the camera never finds an edge.
-  // This is the *whole* walkable corridor plus 12 m of slack on each side, not a decorative apron.
-  // The corridor is x ∈ [-19.5, 7]; the pavement only reaches x = -1.6, so a camera standing at
-  // x = 2.6 — which is where the bus doors open — had four metres of nothing between its feet and
-  // the paving, and every frame ended in the void a few metres out.
-  const WALK_MIN_X = -19.5;
-  const WALK_MAX_X = 7;
-  const SLACK = 12;
-  const groundMinX = WALK_MIN_X - SLACK;
-  const groundMaxX = WALK_MAX_X + SLACK;
-  const groundW = groundMaxX - groundMinX;
-  const apron = createGranitePlazaPBR(Math.round(groundW / 2.4), Math.round((spanZ + 26) / 2.4));
-  apron.color = new T.Color(0x6f6b64);
-  plane(chunk, [(groundMinX + groundMaxX) / 2, 0.014, midZ], [groundW, spanZ + 26], apron, 0, -Math.PI / 2);
-  // ...and a kerb along the lane, because a 6 cm step is what tells the eye where the road starts.
+  const stretch = spanZ + 34; // the street runs past the market at both ends
+  const mid = midZ;
+
+  // 1. The carriageway.
+  plane(chunk, [ROAD_CX, 0.004, mid], [ROAD_HALF * 2, stretch], roadMat, 0, -Math.PI / 2);
+
+  // 2. Lane markings. A 10 m carriageway in this district is two lanes with a broken centre line.
+  //    Faded to almost nothing — municipal paint twenty years old, which is what the reference
+  //    photographs show and what stops the road reading as a freshly decalled track.
+  const lanePaint = material(0xb9b49a, 0.94, 0.01);
+  const centrePaint = material(0xc0a53e, 0.94, 0.01);
+  for (let z = Z1 - 14; z < Z0 + 18; z += 6.5) {
+    box(chunk, [ROAD_CX, 0.012, z], [0.12, 0.005, 3.1], centrePaint, false);
+  }
+  // Edge lines, both sides, hugging the kerbs.
+  for (const ex of [ROAD_MIN + 0.36, ROAD_MAX - 0.36]) {
+    box(chunk, [ex, 0.012, mid], [0.1, 0.005, stretch], lanePaint, false);
+  }
+
+  // 3. Kerbs. A 14 cm step is the entire reason a pavement reads as a pavement.
   const kerb = createWorldFacadePBR("concrete_wall_007", "#8e8a82", 1.6, 0.8, 0.94);
+  box(chunk, [ROAD_MIN - 0.11, CURB_HEIGHT / 2, mid], [0.22, CURB_HEIGHT, stretch], kerb, false);
+  box(chunk, [ROAD_MAX + 0.11, CURB_HEIGHT / 2, mid], [0.22, CURB_HEIGHT, stretch], kerb, false);
+
+  // 4. The pavement the market faces: 3.0 m, exactly the strip between the frontage and the kerb.
+  const nearPaveCx = (FRONT_X + ROAD_MIN) / 2;
+  const nearPaveW = Math.abs(FRONT_X - ROAD_MIN);
+  plane(chunk, [nearPaveCx, CURB_HEIGHT + 0.002, mid], [nearPaveW, stretch], pavement, 0, -Math.PI / 2);
+
+  // 5. The far pavement: 5.7 m from the far kerb to the far shopfronts, wide enough to walk two
+  //    abreast past the shelter and the ATM, which is what makes waiting for a bus a place to stand.
+  const farPaveCx = (FAR_MIN + FAR_MAX) / 2;
+  const farPaveW = FAR_MAX - FAR_MIN;
+  plane(chunk, [farPaveCx, CURB_HEIGHT + 0.002, mid], [farPaveW, stretch], paved, 0, -Math.PI / 2);
+
+  // 6. The market floor under the stalls, behind the frontage line.
+  plane(chunk, [FRONT_X - DEPTH / 2, 0.02, midZ], [DEPTH, spanZ], marketFloor, 0, -Math.PI / 2);
+
+  // 6b. THE FAR SIDE OF THE STREET — the half of a street that a one-sided build always forgets.
+  //
+  // Without this, the market faced an open void: the district's own geometry starts at x = 18 and
+  // `isWithinOpenWorld` ends at x = 7, so five metres of nothing sat between the far kerb and the
+  // first building. A street is a corridor between two walls; with one wall it is a set.
+  //
+  // Modest three-storey terraces, because this is the edge of the block, not its subject: their job
+  // is to close the frame, give the far pavement something to be in front of, and let the market be
+  // the thing you cross toward.
+  const farFacades = [
+    createWorldFacadePBR("painted_plaster_wall", "#c2b6a2", 3.2, 0.95, 0.9),
+    createWorldFacadePBR("clay_plaster", "#cbb194", 3.2, 0.9, 0.88),
+    createWorldFacadePBR("blue_plaster_weathered", "#a8b3ad", 3.2, 1.0, 0.9),
+    createWorldFacadePBR("grey_plaster_02", "#a49c90", 3.2, 0.9, 0.92),
+  ];
+  const farShutter = material(0x82878b, 0.56, 0.6);
+  const farGlass = new T.MeshStandardMaterial({
+    color: 0x1d2529,
+    roughness: 0.16,
+    metalness: 0.3,
+    emissive: new T.Color(0xffd9a0),
+    emissiveIntensity: 0.14,
+  });
+  for (let i = 0; i < 14; i++) {
+    const fz = Z0 + 8 - i * 4.6;
+    const h = 8.6 + (i % 3) * 1.5;
+    const w = 4.2;
+    const facade = farFacades[i % farFacades.length];
+    // The volume: sits on the far frontage line, opens toward -X onto the pavement.
+    box(chunk, [FAR_FRONT_X + 3.0, h / 2, fz], [6.0, h, w - 0.3], facade);
+    // Ground floor: either a closed roller shutter or a dim shop window, alternating.
+    if (i % 3 === 0) {
+      box(chunk, [FAR_FRONT_X - 0.02, 1.35, fz], [0.08, 2.5, w - 1.2], farShutter, false);
+    } else {
+      box(chunk, [FAR_FRONT_X - 0.02, 1.5, fz], [0.08, 2.2, w - 1.4], farGlass, false);
+    }
+    // A floor band and a parapet, so the terrace does not read as one extruded block.
+    box(chunk, [FAR_FRONT_X + 0.01, 2.95, fz], [0.14, 0.22, w - 0.3], facade, false);
+    box(chunk, [FAR_FRONT_X + 2.9, h + 0.16, fz], [6.2, 0.32, w - 0.2], facade, false);
+    // A couple of shuttered upper windows: dark rectangles at the right rhythm read as windows.
+    for (let wy = 0; wy < Math.floor((h - 3.4) / 2.1); wy++) {
+      for (const ox of [-1.2, 1.2]) {
+        box(chunk, [FAR_FRONT_X + 2.2, 4.1 + wy * 2.1, fz + ox], [0.06, 1.3, 0.9], farGlass, false);
+      }
+    }
+    solids.push(rect(FAR_FRONT_X + 3.0, fz, 6.0, w));
+  }
+  // A downpipe every third unit: the cheapest vertical that stops a terrace reading as a slab.
+  const downpipe = material(0x6e6a63, 0.9, 0.2);
+  for (let i = 0; i < 14; i += 3) {
+    const fz = Z0 + 8 - i * 4.6 + 2.15;
+    rod(chunk, [FAR_FRONT_X - 0.06, 0.0, fz], [FAR_FRONT_X - 0.06, 9.1, fz], 0.055, downpipe, 0.055, 5);
+  }
+
+  // 7. The service lane at the back, and the strip of waste ground between it and the market.
+  const laneSurf = createSaigonAsphaltPBR(1, 20);
+  plane(chunk, [LANE_X, 0.018, midZ], [2.8, spanZ], laneSurf, 0, -Math.PI / 2);
   box(chunk, [LANE_X + 1.55, CURB_HEIGHT / 2, midZ], [0.22, CURB_HEIGHT, spanZ + 26], kerb, false);
-  // Fill the two metres between the lane edge and the market floor: that was the one remaining strip
-  // of sky visible from under the canopies.
   const gutter = createSaigonAsphaltPBR(1, 20);
   plane(chunk, [(LANE_X + 1.4 + FRONT_X - DEPTH) / 2, 0.016, midZ], [2.4, spanZ], gutter, 0, -Math.PI / 2);
+  // ...and it has to keep going past the block, or the lane dead-ends in mid-air.
+  plane(chunk, [LANE_X, 0.018, mid], [2.8, stretch], laneSurf, 0, -Math.PI / 2);
+  plane(chunk, [-21.6, 0.008, mid], [6.2, stretch], laneSurf, 0, -Math.PI / 2);
 
   // Expansion joints across the market floor: the single cheapest thing that stops a big flat plane
   // looking like a void.
@@ -505,8 +612,18 @@ export function buildChoLon(
     lightSpecsLocal.push({ x, y: 2.3, z, color: 0xf2ead6, intensity: 2.6, distance: 6.2, decay: 2 });
     solids.push(rect(x, z, 1.5, 3.5));
   };
-  buildShelter(FRONT_X + 3.9, CHO_LON_Z + 1.5, Math.PI / 2);
-  buildShelter(3.1, 9.4, -Math.PI / 2);
+  // The Chợ Lớn stop stands on the FAR pavement, against the far frontage, so the shelter roof covers
+  // the doors when Bus 06 opens them at `ROUTE.curbX = -1.54` on the near side of the carriageway...
+  // which is the near lane. The bus pulls to the far kerb (`curbX` is negative, i.e. the market side),
+  // so the stop belongs on the MARKET pavement, at the kerb, not across the road.
+  //
+  // Corrected here rather than guessed: the shelter is placed at the kerb on the side the bus is on,
+  // facing the road, with its back to the pavement the player walks along.
+  buildShelter(ROAD_MIN - 0.95, CHO_LON_Z + 1.5, -Math.PI / 2);
+  // Lý Thái Tổ, where the player boards: on the far pavement at the origin end, at the kerb, facing
+  // the road. It was at x = 3.1, which is in the middle of the carriageway this round added — the
+  // kind of placement error that is invisible until a road exists to be standing in.
+  buildShelter(FAR_MIN + 1.0, 9.4, -Math.PI / 2);
 
   // ---------------------------------------------------------------------------
   // THE ATM (D3) — the rider offers to stop at one, so one has to exist.
@@ -693,8 +810,10 @@ export function buildChoLon(
     cobaStall: { x: FRONT_X + 1.15, z: cobaZ, yaw: -Math.PI / 2 },
     receiptNail: { x: nailX, y: 1.6, z: nailZ },
     busStops: [
-      { x: FRONT_X + 3.9, z: CHO_LON_Z + 1.5, yaw: Math.PI / 2 },
-      { x: 3.1, z: 9.4, yaw: -Math.PI / 2 },
+      // Must match `buildShelter` calls above. The Chợ Lớn stop sits at the market-side kerb where
+      // Bus 06 pulls in; Lý Thái Tổ is the far pavement at the origin end.
+      { x: ROAD_MIN - 0.95, z: CHO_LON_Z + 1.5, yaw: -Math.PI / 2 },
+      { x: FAR_MIN + 1.0, z: 9.4, yaw: -Math.PI / 2 },
     ],
   };
 }
