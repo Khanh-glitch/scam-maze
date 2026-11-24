@@ -51,6 +51,7 @@ import {
 } from "./gtaRealism";
 import { buildSaigonStreetProps, createWetTireSpraySystem } from "./saigonProps";
 import { buildSaigonRiversideWorld } from "./saigonRiverside";
+import { buildChoLon, type ChoLonHandles } from "./choLon";
 
 export const BITEXCO_POS = new T.Vector3(94, 0, -186);
 export const LANDMARK81_POS = new T.Vector3(26, 0, -356);
@@ -59,6 +60,8 @@ export interface SaigonDistricts {
   root: T.Group;
   solids: Solid[];
   lightSpecs: PooledLightSpec[];
+  /** The Chợ Lớn block: Cô Ba's stall and the two bus shelters, addressed by name, not by prompt. */
+  choLon: ChoLonHandles;
   isWalkableSidewalk: (x: number, z: number) => boolean;
   isWithinOpenWorld: (x: number, z: number) => boolean;
   setWindowPreviewMode: (enabled: boolean) => void;
@@ -1795,11 +1798,21 @@ export function buildSaigonDistricts(
   // Phase 3 & 4: Thủ Thiêm Skyline, Cable-Stayed Ba Son Bridge, Illuminated Saigon River Boats & Living Sky!
   const riversideWorld = buildSaigonRiversideWorld(chunkHorizon, dynamicRoot, towerMats);
 
+  // =========================================================================
+  // CHUNK 5: CHỢ LỚN, QUẬN 5 — the market at the end of Route 06.
+  //
+  // `WorldStreamer.getZone` has named this stop (`zone.choLonStop` / `district.d5`) since the bus was
+  // built, but nothing was ever built here: the bus arrived at z = -128 and the doors opened onto an
+  // empty corridor. Mission 02's whole destination is this block, so it is authored in `choLon.ts`
+  // and stitched in here, before the static-mesh batching pass so it shares its draw calls.
+  // =========================================================================
+  const choLon = buildChoLon(root, streamer, solids, districtLights.map((d) => d.spec));
+
   // Phase 3: 1-Draw-Call Wet-Road Tire Spray Mist System for ALL moving Saigon traffic!
   const tireSpray = createWetTireSpraySystem(dynamicRoot, 32);
 
   // Batch static district meshes across all 6 chunks down to minimal GPU draw calls!
-  for (const ch of [chunkNorthView, chunkEastBlvd, chunkEastBlvdLod, chunkBitexco, chunkLandmark, chunkHorizon]) {
+  for (const ch of [chunkNorthView, chunkEastBlvd, chunkEastBlvdLod, chunkBitexco, chunkLandmark, chunkHorizon, choLon.root]) {
     mergeStaticMeshesByMaterial(ch);
     freezeStaticMatrices(ch);
   }
@@ -1848,6 +1861,7 @@ export function buildSaigonDistricts(
     root,
     solids,
     lightSpecs: districtLights.map((d) => d.spec),
+    choLon,
     setWindowPreviewMode(enabled: boolean) {
       if (enabled) {
         savedVis = {
