@@ -459,12 +459,33 @@ real in the only sense that matters.
 
 | Slice | Contents | Cost | Risk |
 | --- | --- | --- | --- |
-| **A — the paper** | `obj.note` interactable + prompt + 3 flags; `msg.parcel-fee`; `page.parcel`; `app.courier` | low: 5 files, no engine change | none |
+| **A — the paper** ✅ | `obj.note` interactable + 6 flags; `msg.parcel-fee`; `page.parcel`; `app.courier`; one event | shipped in `1a8d95a`: 8 files, 1,029 lines, no engine change | none |
 | **B — the schedule** | `TransitHost` from `outsideWorld.ts`; `ADVANCE_TIME` from `clock.advance`; fare to the ledger; unpause the clock while ringing (§5.1) | medium: 2 UI files, 1 test class | the one place a bug costs real minutes of play |
 | **C — the woman** | `worldAnchor` for `interviewee_q5`; `contact.coba` (5 actions); `m02.last-interview` + 3 events; `cobaTrustsAlex`; street barks gated on the new flags; the 3 rewritten lines | medium: `storyCast.ts` + tests that count NPCs | 7th street NPC: separation test, staging cues, plus one more skinned model on the street |
 | **D — the tell** | derived battery selector + drawn status bar; phone dims below 20 | medium-low: presentation only | must not become a HUD meter |
 
 Slices A→B→C are the mission. D is the mission's texture and ships only if A–C are green.
+
+### What Slice A changed on contact with the code
+
+Three things could not be shipped as written, and the reasons are worth keeping:
+
+1. **No per-chapter prompt table.** `CHAPTER_1_INTERACTION_PROMPTS` is a total
+   `Record<InteractableId, string>`, and the overlay-key test compares the scenario's keys with the
+   Vietnamese file exactly. A `prompts/obj.note` key is therefore an error until the parked story
+   and the table grow a per-chapter seam. Slice A uses the room engine's own hover label
+   (`label.note` in `worlds/roomv2.ts`) and authors the *content* in `inspectionText`, which is what
+   the player actually reads. Revisit only if the chapter needs two different labels for one prop.
+2. **`INTERACT_OBJECT` still cannot write state** — confirmed at runtime, not just by reading: the
+   reducer appends to `interacted` and discovers `reveals`, nothing else. Every state move in the
+   parcel thread therefore lives on a device action, and the slip itself is text.
+3. **The validator gap is now closed, not just documented** (`validateScenario.ts`): persistent flags
+   are collected from `initial.persistent`, event `onFire`/`onExpire`/responses, mission
+   `onOpen`/`onComplete`/`onFail`/`path.onEnter`, thesis-task effects and device-item
+   `onOpen`/actions, and every `persistent` condition is checked against that set (V4,
+   "is never set by any effect"). `cond.value === false` is accepted for a known flag, because
+   "not set yet" is the default the initial state produces. Costs ~50 lines, not the ~6 the earlier
+   draft guessed; the widening is the four extra effect sites, not the check itself.
 
 ---
 
