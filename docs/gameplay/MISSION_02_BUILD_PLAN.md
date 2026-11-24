@@ -1,13 +1,18 @@
 # Mission 02 — The Last Interview: the build plan
 
-**Status:** `PROPOSED` (v2, deep research). **Branch:** `arena/f8bcde55-scam-maze`.
+**Status:** `v3 — PLAN SETTLED, BUILDING`. Owner decisions made 2026-11-23 (§7). W0 shipped
+(`c31b609`). §10 is the asset/map brief the owner is working from. **Branch:**
+`arena/f8bcde55-scam-maze`.
 **What v1 was:** a correct but shallow plan — it listed what the repository contains and what to add.
 **What v2 is:** the same task, grounded in how the scam actually runs in Vietnam in 2026, in how
 Rockstar solves the exact problem this mission has, and in the source code of two games that are
 smaller than GTA and braver than it. v1's units survive; three of them are rewritten, four are new,
 and one premise of v1 was wrong (§1, R14).
 
-> Read this as the working document. Nothing in it is claimed from memory: every repository fact
+> **If you are here to make assets, skip to §10.** It is written as a build order, not an argument.
+> §1c explains why the destination has to exist before anyone can place a character in it.
+>
+> Read the rest as the working document. Nothing in it is claimed from memory: every repository fact
 > cites a line, every world fact cites a published source, and every overturned assumption is
 > recorded rather than deleted (§8, §9).
 
@@ -302,6 +307,39 @@ exactly the canon rule that missing Cô Ba must produce a *different day*, not a
 
 ---
 
+### 1c. What the map actually is (this changes the asset brief more than anything else)
+
+I walked the world in code, not on screen. Three findings, and the first one is the biggest problem
+in the whole mission.
+
+**R16 — District 5 is a label on empty ground.** `WorldStreamer.getZone` already returns
+`zone.choLonStop` / `district.d5` for `|z+128| < 18, x ∈ [-16, 8]`
+(`WorldStreamer.ts:79-81`; strings at `i18n/locales/{vi,en}/worlds/testbus.ts:56-57`). So the HUD
+*happens to say* Chợ Lớn when the bus gets there. But **no chunk builds anything there**:
+`grep "Chợ Lớn|choLon|ChoLon"` over `saigonDistricts.ts` returns **nothing**. There is no market, no
+vendor, no shutter, no umbrella. The bus arrives at `z = -128` (`transit.ts:14,190`), the doors open,
+and the player steps into a corridor that is walkable (`isWithinOpenWorld:1892`) and **empty**.
+
+**Consequence:** Cô Ba cannot simply be "given a `worldAnchor`". W5 as written in v1 would have
+placed her on a bare road. The mission's destination has to be **built** first, and that is the real
+asset job — not a character model.
+
+**R17 — the fake brand already exists, and it is the house style.** `saigonDistricts.ts:352-357`
+strokes illuminated ground-floor retail signage, and the convenience store line is an **image asset**
+(`signs/gs36.webp`, 1459×198) rather than a string — the comment says it plainly: *"the convenience
+store is GS36 now."* That is the owner's "half-real" rule already shipped. M02 inherits it: the fake
+courier is a **logo-shaped file on a real-looking fascia**, not a new rendering system.
+
+**R18 — the street already has its cast, and it is thin.** `residents.ts:26-41` places 15 models at 15
+hard-coded `[x, z]` positions; two of them already stand at `[2.7, -129]` and `[1.1, -134]` — i.e.
+**inside the empty Chợ Lớn zone**. These are anonymous residents (`npc-linmei`, `npc-nguoigia`,
+`npc-napole` reused as crowd). Cô Ba is not one of them; she needs her own anchor, her own model, and
+a place that is worth walking to.
+
+**R19 — no bus stop exists anywhere.** `grep "busStop|shelter|trạm"` over the world files returns
+nothing. The two stop signs the mission talks about (`zone.lyThaiToStop`, `zone.choLonStop`) are
+**names in a zone table with no geometry**. The player is told to wait at a place that has no shape.
+
 ## 2. The design rule this plan obeys
 
 From the owner brief (Thẻ 1, Thẻ 2), quoted because every work unit is judged against it:
@@ -417,9 +455,12 @@ dependency, not by size. **No unit may be described as finished before its gate 
 
 ### W5 — Cô Ba has a body, a memory, and one true lesson
 
-- **What**: `interviewee_q5` gets a `worldAnchor` at the Chợ Lớn counter (`z≈-128`, R2), joins
+- **What**: `interviewee_q5` gets a `worldAnchor` at the Chợ Lớn counter (`z≈-130`, R2), joins
   `OPEN_WORLD_STORY_NPCS` (7 not 6), and gains flag-driven replies through the one reader that
   already exists (`storyCast.ts:401`, R12).
+- **Blocked on assets, and this is the honest order**: R16 shows the ground at `z=-128` is **empty**.
+  An anchor dropped there today puts her on a bare corridor. So W5 cannot start until **§10's A1–A3
+  and C1** exist. That is not a formality — it is the difference between a mission and a marker.
 - **The lesson she teaches is the researched one, not the invented one.** She does not teach
   font-spotting. She teaches what every Vietnamese source and the police say:
   **stop looking at the picture, look at your own balance** (§1b.2). Concretely:
@@ -587,12 +628,16 @@ writing:
 
 ---
 
-## 7. Open decisions (owner only)
+## 7. Owner decisions — **DECIDED 2026-11-23**
 
-1. **Brand realism.** `audience.md` (rule of 2026-11-22) says a scam must imitate a *real* target
-   with few details wrong. M02 currently uses a fictional courier on a reserved domain. Either the
-   rule is applied (a real brand look-alike, DNS-checked, added to `approvedDomains.ts`) or M02 is
-   recorded as a documented exception. **Not decided here.**
+1. **Brand realism — DECIDED: half-real, half-fake.** Imitate the real thing and move **one
+   character**: `GS25` becomes `GS36`. The repository already does exactly this
+   (`saigonDistricts.ts:356-357`, `public/assets/testbus/ow/images/signs/gs36.webp`), so this is
+   the house style, not a new risk. The rule for M02: **the shape is real, the identity is not.**
+   `Tốc Hành 24` must therefore become the obvious cousin of a real Vietnamese courier — same
+   logo grammar, same message wording, same colour temperature — with one letter or digit changed.
+   Never a real name, never a real domain (§1b.1 shows VNPost is *already* impersonated in the
+   wild, which is the reason to be careful, not the reason to use their name).
 2. **How bad is the driver's outcome?** He is cheap and effective; the cost is that the trip leaves
    no record. The plan's default is "wrong destination, later, still recoverable". A harsher version
    (lost phone, exposed data) is possible and is the owner's call.
@@ -602,15 +647,14 @@ writing:
 4. **What counts as success if the interview is skipped?** The brief says success is "knowing what
    you traded". This plan treats a skipped interview with a secured drive as a valid, different
    outcome — not a failure. Confirmation needed.
-5. **May a fake receipt be flawless?** (new, and the sharpest question in the plan) §1b.2 says the
-   only reliable check is the player's own balance, and §9 C1 says teaching that is a gamble.
-   Default in this plan: **yes, one flawless receipt**, with a cheap alternative the player declined.
-   This is a product decision about how hard the game is allowed to be, so it is the owner's.
-6. **How much CCCD may the fake page ask for?** (new) The real page asks for `số căn cước công dân`.
-   Adding it is *more* honest and *more* disturbing; the audience note (`audience.md`) argues for
-   imitating the real target, while the doc's "all fictional" principle argues for restraint.
-   Default in this plan: **ask for it, but never let the game store, echo or display a plausible
-   value** — the field accepts typing and the page thanks the player, nothing more.
+5. **May a fake receipt be flawless? — DECIDED: yes, as the default.** One receipt with no tell
+   at all, plus a cheap alternative the player chose not to take. §9 C1 still applies: this must be
+   playtested by someone who has not read this plan before W5 is called done.
+6. **How much CCCD may the fake page ask for? — DECIDED: ask, as the default.** The page requests
+   `số căn cước công dân` because the real one does. The game **never stores, echoes, validates or
+   displays** a plausible value: the field accepts typing, the page thanks the player, nothing else
+   exists in state. If a value ever appears in a transcript it must be visibly impossible (all
+   zeros, or asterisks) so no real ID can ever be mistaken for the game's.
 
 Two decisions I am **not** asking for, because they are already answered by the sources: the four
 fee cover names (§1b.1) and the fare figures (§1b.3). Those are corrections, not choices.
@@ -637,7 +681,7 @@ Two rows above say "do not cut". They are the two places where the plan is not a
 
 | Step | Unit | Report |
 | --- | --- | --- |
-| 0 | W0 | one commit; states the researched figures **and** the verdict purge (R13) in the message so the change is auditable |
+| 0 | **W0 — DONE** (`c31b609`) | figures + verdict purge; three locale tests lock both |
 | 1 | W1, W2 | one commit each, with the reducer test named in the message |
 | 1.5 | W9 | before W8, because §5 #4 fails until it lands |
 | 2 | W3, W4 | one commit, because they are the same decision seen from two sides |
@@ -645,12 +689,88 @@ Two rows above say "do not cut". They are the two places where the plan is not a
 | 4 | W6 | one commit |
 | 5 | W7 | this is the gate; if it fails, earlier units reopen |
 | 6 | W8 | documentation truth pass |
+| — | **§10 assets (parallel)** | A4/A5 → A1/A2/A3 → C1 gate W5; B* are 2D and can run alongside everything |
 
 Each step ends with: the three gates green, the PR body updated with what actually changed, and a
 short note listing **what could not be checked in this environment** (real GPU placement, real audio,
 real-device pacing). No step is described as playable until W7 passes.
 
 ---
+
+## 10. The asset and map brief — what to build, in the order that unblocks them
+
+This section exists because the owner asked the right question: *"finish the M02 plan first so I know
+what assets to make, and what to add to the map."* So it is written for a person with a 3D tool and a
+calendar, not for a reviewer. Every row names the **file**, the **target path**, and the **unit** it
+unblocks. Anything not on this list is not needed for M02.
+
+### 10.1 The single most important asset is not a character — it is the Chợ Lớn block
+
+R16: the bus arrives at `z = -128` in an empty corridor. Everything else in M02 is cheap next to
+this, because a mission whose destination does not exist cannot be playtested.
+
+| # | Asset | Spec | Path | Unblocks |
+| --- | --- | --- | --- | --- |
+| A1 | **Chợ Lớn market block** | 1 chunk, built like `CHUNK 1`/`CHUNK 2` in `saigonDistricts.ts` (modular box/plane composition, not a single GLB). Programme: 18–26 m of continuous shophouse frontage on the east side of the corridor facing −X, at `z ∈ [-110, -146]`; ground floor open as **stalls with roll shutters**; one **cross-alley** punched through at `z ≈ -132` so the block is walkable, not a wall. Ceiling height of the covered part 3.2 m. | `world/saigonDistricts.ts`, new `CHUNK 5: CHỢ LỚN` | W5 (Cô Ba), W4 (arrival means something) |
+| A2 | **Vendor canopy field** | 12–18 instanced umbrellas over the stalls, 2.2–2.8 m square, 5 colours sampled from real D5 photos (brown, navy, bottle-green, mauve, sand), slight per-instance yaw/scale jitter. This is the **roof of the district** (§1b.6) — without it the block reads as a corridor with shops. | same chunk | W5, and §12's "what was written on the desk paper" class of memory |
+| A3 | **Cô Ba's shopfront** | One stall inside A1, at `z ≈ -130`, facing the corridor. Needs: a **half-lowered shutter** (she is open but tidying), a **glass display case** at 0.9 m, a **stool**, and a **hanging string of receipts/bills** on a nail — visible, touchable, and the only prop the mission's dialogue actually refers to. | same chunk | W5, W6 |
+| A4 | **Bus stop, Chợ Lớn** | R19: there is no bus stop anywhere in the world. One shelter: 3.4 × 1.4 m roof, two uprights, a route plate, a bench, at the **east curb at `z ≈ -126`** so the doors open onto it. Must be built twice (see A5). | `world/saigonProps.ts` or the new chunk | W4, and it is what makes 34 minutes feel like a place |
+| A5 | **Bus stop, Lý Thái Tổ** | Same kit as A4, different plate. The player leaves from here; today it has no shape either. | same | W2, W3 |
+| A6 | **Ride-app trip card** (2D) | Not 3D. A single 1080×1350 PNG/WebP for the phone: driver portrait placeholder, plate, route line, fare. One per run (A/B) = **two files**. | `public/assets/.../ui/` (follow `signs/gs36.webp` precedent) | W2, W7 |
+
+**Do not build yet:** no interiors, no crowd of 30, no animated vendors, no second district. The block
+above is the minimum that makes the destination real.
+
+### 10.2 The "half-real, half-fake" brand kit (owner's decision #1)
+
+The rule is now: *shape is real, identity is not.* For assets this means **build the fascia, generate
+the logo**, and keep them separate so a rejected logo costs nothing.
+
+| # | Asset | Spec | Why |
+| --- | --- | --- | --- |
+| B1 | **Courier fascia** (3D, reusable) | Generic Vietnamese courier shopfront: blue-white livery band at 2.6 m, roll shutter, a stack of flat cardboard against the wall, a plastic stool. **No logo baked in.** | the same fascia serves the real-looking shop at District 5 and any later mission |
+| B2 | **Courier logo** (2D, replaceable) | Wordmark + mark, 1459×198 to match the `gs36.webp` precedent. Must be **one character away** from a real courier's identity and must not use a real `.vn` domain. Ship as `signs/<name>.webp`. | §7.1 decision; a logo is a file swap, a fascia is a rebuild |
+| B3 | **Fake parcel page** (2D, UI) | The redelivery page as it looks on the in-game browser: header, order summary, address block, **CCCD field**, fee block with one of the four real cover names. All text from locale files, no text baked into the image. | W6, and §7.6 (CCCD decided: ask, never store) |
+| B4 | **Receipt pair** (2D, UI) | Two images: the *flawless* fake (§7.5) and a real one. Same aspect, same crop, same compression. The player must be unable to tell them apart, and the code must not hint which is which. | W5 — this is the lesson |
+| B5 | **Second-ask message** (2D, UI) | One more message bubble, same thread, later. Cheap, but only if W9 survives its kill criterion (§9 C2). | W9 |
+
+### 10.3 Characters
+
+| # | Asset | Spec | Note |
+| --- | --- | --- | --- |
+| C1 | **Cô Ba** | Stylised-real older Vietnamese woman, ~1.55 m, sitting or standing at a stall; needs **idle** and a **hands-busy** loop (sorting papers); face readable at 2 m because she is the mission's only face-to-face character. | existing rigs in `assets-src/characters/` are the reference for scale/animation budget; `npc-nguoigia.optimized.glb` is currently a **crowd extra**, not her |
+| C2 | **The rider** | Already exists: `manvn.optimized.glb` holds `propKind: "helmet"` at `x 3.25, z 7.6` (`storyCast.ts:219-225`). | **no new asset needed** — this is why he is the cheapest tempting choice to build |
+| C3 | **Minh** | Exists (`npc-minh.optimized.glb`). | none |
+
+### 10.4 Props that carry writing (cheap, high value)
+
+| # | Prop | Where | Why it matters |
+| --- | --- | --- | --- |
+| D1 | **The tracking slip** | already `obj.note` in the room (Slice A) | exists; needs a **second placement** in Cô Ba's hand for the street version |
+| D2 | **The receipt string** | A3 | the one prop the dialogue points at; a player should be able to walk up and *see* that she keeps everything |
+| D3 | **The ATM** | on the route between the two stops | the rider offers to stop at one; if the world has no ATM, that offer is fiction with nothing behind it |
+| D4 | **A parked Super Cub** | at A5 | already implied by the rider's anchor; confirm there is a visible bike, not just a man with a helmet |
+
+### 10.5 What this brief deliberately excludes
+
+- **No Chợ Lớn temple.** Bình Tây / Thiên Hậu are the district's real landmarks and they are
+  tempting, but the mission happens at 08:00–11:30 on a working street, and a temple set piece would
+  cost more than A1 and teach nothing. The §1b.6 institution detail is carried in **one line of
+  dialogue**, not in geometry.
+- **No animation for the crowd in the block.** Instanced canopies + the two residents already at
+  `[2.7,-129]` and `[1.1,-134]` are enough for the first playable.
+- **No new vehicle.** The bus, the Super Cub and the app bike all exist.
+
+### 10.6 Order, and what "done enough to build against" means
+
+Build **A4 → A5 → A1 → A2 → A3 → C1**, and only then B*. Reason: A4/A5 are small and they make the
+two ends of the trip real; A1/A2 make the destination; C1 is the only character that cannot be
+faked. B* items are 2D and can be made in parallel by anyone who can use a canvas, but **B4 must not
+ship before C1 exists**, because the receipt lesson is delivered by a face.
+
+"Done enough to build against" = the bus can arrive, the doors open onto a shelter, and a person can
+walk 20 m under canopies to a stall. That is the whole bar. Nothing in this list needs to be pretty
+before W5 starts.
 
 ## 9. Self-critique: where this plan is probably wrong
 
@@ -701,3 +821,7 @@ compliance chain around a character the player never wants to talk to is still a
 only defence is §12's five questions, asked to a real person, after W7.
 
 ---
+
+---
+
+
