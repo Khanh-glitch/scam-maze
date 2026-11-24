@@ -85,6 +85,8 @@ function timelineKind(action: CoreAction): DebriefTimelineKind {
       return "evidence";
     case "COMBINE_EVIDENCE":
       return "deduction";
+    case "PAY_FARE":
+      return "device";
     case "VERIFY_CLAIM":
       return "verification";
     case "MAKE_DECISION":

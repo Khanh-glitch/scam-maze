@@ -123,6 +123,7 @@ import {
 } from "./roomPresentation";
 import { RoomCallLayer } from "./RoomCallLayer";
 import { doorForcedOpen } from "./outsideWorld";
+import { clockRunsNow } from "./clockRule";
 import { RoomEndingLayer } from "./RoomEndingLayer";
 import { RoomPhoneModelLayer, detectPhoneModelSupport } from "./RoomPhoneModelLayer";
 import type { RoomStoryBridge } from "./roomStoryBridge";
@@ -453,6 +454,7 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
   const inspectingRef = useRef<RoomPropId | null>(null);
   // A call that rings or is active blocks the room like any overlay (its UI is mounted below).
   const callOpen = useChapterState(store, (state) => state.call.status === "ringing" || state.call.status === "active");
+  const callStatusActive = useChapterState(store, (state) => state.call.status === "active");
   const blocking = extensionBlocking || callOpen;
 
   // --- 3D phone model (task 10.4): one sink shared by the model layer and the call screen.
@@ -827,8 +829,27 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
   const ringableSelector = useCallback((state: ChapterState) => selectRingableCall(state, scenario), [scenario]);
   const ringable = useChapterState(store, ringableSelector);
   const free = engineReady && !introOpen && overlays.length === 0 && inspecting === null && !blocking;
-  // --- World clock: time passes while the player is free in the room -------------------------
-  useWorldClock({ store, scenario, running: free && !clockPaused && status === "playing" });
+  // The parked story ("The Urgent Call") has laptop device actions and its own fixed room clock.
+  const legacyLaptop = Object.keys(scenario.deviceActions).length > 0;
+  // --- World clock --------------------------------------------------------------------------
+  // The world does not wait for the player: an open phone, an open laptop and a ringing call all
+  // let time pass. Only the story's own stops hold it (see `clockRule.ts`).
+  const clockRunning = clockRunsNow({
+    started: engineReady,
+    playing: status === "playing",
+    hostPaused: clockPaused,
+    introOpen,
+    inspecting: inspecting !== null,
+    extensionBlocking,
+    overlays: overlays.map((entry) => entry.kind),
+    callOpen,
+    callActive: callStatusActive,
+    // The parked story keeps its own fixed clock (its opening call is scripted, not scheduled), so
+    // it keeps the old rule: only free roam moves time.
+    legacyTimedStory: legacyLaptop,
+    freeRoam: free,
+  });
+  useWorldClock({ store, scenario, running: clockRunning });
   const pendingEventsSelector = useCallback((state: ChapterState) => selectPendingEvents(state, scenario), [scenario]);
   const phoneDeviceSelector = useCallback((state: ChapterState) => selectDeviceView(state, scenario, "phone"), [scenario]);
   const laptopDeviceSelector = useCallback((state: ChapterState) => selectDeviceView(state, scenario, "laptop"), [scenario]);
@@ -904,7 +925,6 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
   const dismissArrival = useCallback(() => setArrival(null), []);
   const gameplay = gameplayConfig(scenario);
   // The parked story ("The Urgent Call") has laptop device actions and its own fixed room clock.
-  const legacyLaptop = Object.keys(scenario.deviceActions).length > 0;
   const storyClockOn = gameplay.clockRuns || !legacyLaptop;
   // The simulated time of day shows on the wall clock, the 3D screens, the phone status bar and the laptop.
   const narrativeState = useChapterState(store, (s) => s);

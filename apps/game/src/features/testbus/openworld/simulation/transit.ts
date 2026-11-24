@@ -82,6 +82,12 @@ export class BusRouteController {
 
   get clock() { return this.host.clock?.read() ?? this.seconds; }
   get balance() { return this.host.wallet?.read() ?? this.cash; }
+  /**
+   * True when the bus runs on the chapter's own clock. Then the ride costs real game minutes and the
+   * demo accelerators (12x while waiting, 5x otherwise) must be off, and waiting must not fast-forward:
+   * on a story clock, four minutes of waiting is four minutes the player actually spends.
+   */
+  private get storyClock() { return this.host.clock !== undefined; }
 
   emit(type: TransitEvent['type'], details: Partial<TransitEvent> = {}) {
     this.host.onEvent?.({ type, at: this.clock, route: ROUTE.number, ...details });
@@ -94,7 +100,9 @@ export class BusRouteController {
 
   wait() {
     if (this.phase !== 'waiting') return false;
-    this.advance(Math.max(0, this.nextBus - this.clock));
+    // On the chapter clock the wait is spent, not skipped: `update` arrives the bus when the clock
+    // says so. On the demo clock the wait is compressed so /testbus stays a 40-second loop.
+    if (!this.storyClock) this.advance(Math.max(0, this.nextBus - this.clock));
     this.phase = 'approaching';
     this.emit('wait-started', { stop: ROUTE.origin });
     return true;
@@ -141,7 +149,7 @@ export class BusRouteController {
     const oldPosition = this.z;
     const prevSpeed = this.speed;
     if (this.phase !== 'driving') {
-      this.advance(dt * (this.phase === 'waiting' ? 12 : 5));
+      this.advance(dt * (this.storyClock ? 1 : this.phase === 'waiting' ? 12 : 5));
     }
     if (this.phase === 'waiting' && this.clock >= this.nextBus) this.wait();
     if (this.phase === 'approaching') {

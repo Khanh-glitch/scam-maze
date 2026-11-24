@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Engine as RoomEngine } from "../../roomv2/game/engine";
-import { attachOutsideWorld, type OutsideWorldHandle } from "./outsideWorld";
+import { attachOutsideWorld, type OutsideWorldHandle, type OutsideWorldHooks } from "./outsideWorld";
 import type { ActiveStoryNpcDialogue, AmbientStreetBark } from "../../testbus/openworld/simulation/storyNpcs";
 import type { CrowdReactionBark } from "../../testbus/openworld/simulation/humanPresence";
 import type { WeatherPreset } from "../../testbus/openworld/world/AtmosphereSystem";
@@ -58,11 +58,16 @@ export function useOutsideWorld(
   engine: RoomEngine | null,
   enabled: boolean,
   storyContext?: Partial<StoryNpcRuntimeContext>,
+  /** The chapter clock and wallet for Route 06; omitted, the bus runs on its demo clock. */
+  transit?: OutsideWorldHooks["transit"],
 ): OutsideWorldState {
   const [state, setState] = useState<OutsideWorldState>(IDLE);
   const handleRef = useRef<OutsideWorldHandle | null>(null);
   const latestCtxRef = useRef(storyContext);
   latestCtxRef.current = storyContext;
+  // The world is built once; the transit host reads live state through these refs.
+  const transitRef = useRef(transit);
+  transitRef.current = transit;
 
   useEffect(() => {
     if (handleRef.current && storyContext) {
@@ -82,6 +87,7 @@ export function useOutsideWorld(
     let cancelled = false;
     const timer = window.setTimeout(() => {
       void attachOutsideWorld(engine, {
+        transit: transitRef.current,
         onSnapshot: (snap, outdoors) => {
           setState((prev) => {
             const prompt = outdoors ? snap.prompt : null;

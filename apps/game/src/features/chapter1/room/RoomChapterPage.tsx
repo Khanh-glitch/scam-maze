@@ -22,6 +22,10 @@ import { RoomChapterLayer } from "./RoomChapterLayer";
 import { consumeRoomPreload, discardRoomPreload, peekReadyRoom } from "./roomPreloader";
 import { RoomStoryBridge } from "./roomStoryBridge";
 import { OutsideHud, useOutsideWorld } from "./useOutsideWorld";
+import type { OutsideWorldHooks } from "./outsideWorld";
+import { elapsedMinutes } from "../../../game/narrative/world";
+import type { ChapterStore } from "../../../game/narrative/store";
+import { LAST_SUBMISSION_SCENARIO } from "../../../game/narrative/chapter1/lastSubmission";
 
 const RoomV2Page = lazy(() => import("../../roomv2").then((module) => ({ default: module.RoomV2Page })));
 
@@ -61,7 +65,39 @@ export const RoomChapterPage: React.FC<RoomChapterPageProps> = ({
   // The Saigon open world around the room: live through the window and the open door, walkable with no cut.
   const [roomEngine, setRoomEngine] = useState<RoomEngine | null>(null);
   const [storyContext, setStoryContext] = useState<Partial<StoryNpcRuntimeContext> | undefined>(undefined);
-  const outside = useOutsideWorld(roomEngine, true, storyContext);
+  // The chapter store, once the layer has it: Route 06 spends chapter minutes and puts the fare in
+  // the ledger through this handle.
+  const [chapterStore, setChapterStore] = useState<ChapterStore | null>(null);
+  const transit = useMemo<OutsideWorldHooks["transit"]>(() => {
+    if (!chapterStore) return undefined;
+    return {
+      clock: {
+        read: () => {
+          const state = chapterStore.getState();
+          return elapsedMinutes(state, LAST_SUBMISSION_SCENARIO) * 60;
+        },
+        advance: (seconds: number) => {
+          const minutes = Math.round(seconds / 60);
+          if (minutes > 0) chapterStore.dispatch({ type: "ADVANCE_TIME", minutes });
+        },
+      },
+      wallet: {
+        read: () => chapterStore.getState().resources.cash,
+        debit: (amount: number): boolean => {
+          // A fare is a real transaction: the core refuses it without the cash and writes one ledger
+          // line when it takes it. The bus only reports that the gate opened.
+          const result = chapterStore.dispatch({
+            type: "PAY_FARE",
+            amount,
+            label: "ledger.bus-fare",
+            counterparty: "Route 06",
+          });
+          return result.accepted;
+        },
+      },
+    };
+  }, [chapterStore]);
+  const outside = useOutsideWorld(roomEngine, true, storyContext, transit);
 
   // The chapter happens in the apartment, whatever scene a new or old session names.
   const layerSession = useMemo<ChapterSession>(() => ({ ...session, sceneId: "apartment" }), [session]);
@@ -172,6 +208,7 @@ export const RoomChapterPage: React.FC<RoomChapterPageProps> = ({
               outsideRadar={outside.radar ?? null}
               hideHud={inStreetDialogue}
               onStoryContext={setStoryContext}
+              onStoreReady={setChapterStore}
             />
           }
         />

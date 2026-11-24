@@ -153,6 +153,11 @@ export interface ExternalHost {
   viewTarget: T.WebGLRenderTarget;
   /** Hours of the day from the story clock, or null to let the world run its own day. */
   clockHours?: () => number | null;
+  /**
+   * The chapter clock and wallet, for the Route 06 bus. With them the ride costs chapter minutes and
+   * the fare lands in the chapter's ledger; without them the bus keeps its own demo clock and cash.
+   */
+  transit?: { clock: { read: () => number; advance: (seconds: number) => void }; wallet: { read: () => number; debit: (amount: number) => boolean } };
   /** E at Room 6.07's door from the corridor: open / close the room's real door. */
   onDoor?: () => void;
   /** A lightning strike outside (0..1): the host plays the thunder. */
@@ -869,9 +874,16 @@ export class OpenWorldEngine {
     });
 
     // 6. EXACT ROUTE 06 BUS & 15 EXACT BUS STATION NPCS + DRIVER (UNIFIED WITH SAIGON TRAFFIC!)
-    this.route = new BusRouteController();
-    this.route.wait();
-    this.route.update(6.5, { front: false, rear: false }, false);
+    // Route 06 rides on the chapter's clock and wallet when the room host provides them, so a
+    // 34-minute ride costs 34 real chapter minutes and a 7,000đ fare reaches the ledger.
+    this.route = new BusRouteController(external?.transit);
+    // /testbus is a ride demo, so its bus is already at the stop. The chapter's world is not: the
+    // bus is somewhere up the street and arrives at the stop on the chapter's clock, four minutes
+    // after the player starts waiting there.
+    if (!external?.transit) {
+      this.route.wait();
+      this.route.update(6.5, { front: false, rear: false }, false);
+    }
     this.traffic.registerBus06(this.route.x, this.route.z, Math.PI + this.route.yaw);
     // Keep exteriorGroup free of extra dynamic PointLights (bus already has emissive interior strips!) -> constant light count!
     this.bus = buildBus(extScene, this.route, false);

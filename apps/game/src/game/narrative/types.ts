@@ -76,7 +76,12 @@ export type CoreAction =
   /** Opens a message, email, listing, file or appointment on the phone or laptop. The first time it marks it read. Reading costs no time. */
   | { type: "OPEN_DEVICE_ITEM"; itemId: string }
   /** Uses one action of a device item: reply, pay, travel, apply, submit, call. Costs time and cash as the item says. */
-  | { type: "USE_DEVICE_ITEM"; itemId: string; actionId: string };
+  | { type: "USE_DEVICE_ITEM"; itemId: string; actionId: string }
+  /**
+   * Pays a fare at a world counter (the Route 06 ticket). Money leaves the wallet and one ledger line
+   * is written. `label` is the ledger label; it may be empty, in which case the fare is still paid.
+   */
+  | { type: "PAY_FARE"; amount: number; label: string; counterparty?: string };
 
 export type CoreActionType = CoreAction["type"];
 

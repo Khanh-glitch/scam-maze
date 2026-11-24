@@ -7,11 +7,16 @@
  * keeps its props, story port and UI, and only gains a real door and a real outside.
  */
 import type { Engine as RoomEngine } from "../../roomv2/game/engine";
-import type { OpenWorldEngine, OpenWorldSnapshot } from "../../testbus/openworld/world/OpenWorldEngine";
+import type { ExternalHost, OpenWorldEngine, OpenWorldSnapshot } from "../../testbus/openworld/world/OpenWorldEngine";
 
 export interface OutsideWorldHooks {
   /** HUD data (about 8 times a second). `outdoors` is true while the player is out of the room. */
   onSnapshot: (snap: OpenWorldSnapshot, outdoors: boolean) => void;
+  /**
+   * The chapter clock and wallet, so Route 06 spends real chapter minutes and its fare reaches the
+   * ledger. Omitted (tests, or a host without a store): the bus keeps its own demo clock.
+   */
+  transit?: ExternalHost["transit"];
 }
 
 export interface OutsideWorldHandle {
@@ -42,6 +47,7 @@ export async function attachOutsideWorld(room: RoomEngine, hooks: OutsideWorldHo
       clockHours: () => (room.storyClockSeconds === null ? null : room.storyClockSeconds / 3600),
       onDoor: () => room.toggleOutsideDoor(),
       onThunder: (intensity) => room.outsideThunder(intensity),
+      ...(hooks.transit ? { transit: hooks.transit } : {}),
     });
   } catch (error) {
     console.error("Outside world failed to start, keeping the built-in city:", error);

@@ -139,7 +139,7 @@ function randomEvidenceSet(next: () => number): EvidenceId[] {
 
 /** A random well-formed Core_Action (all 16 kinds) with known IDs, not drawn from the candidate list. */
 function randomWellFormedAction(next: () => number): CoreAction {
-  switch (randomInt(next, 0, 15)) {
+  switch (randomInt(next, 0, 16)) {
     case 0:
       return { type: "START_CHAPTER" };
     case 1:
@@ -171,6 +171,9 @@ function randomWellFormedAction(next: () => number): CoreAction {
       return { type: "DEVICE_ACTION", deviceActionId: pick(next, DEVICE_ACTION_IDS) };
     case 14:
       return { type: "COMBINE_EVIDENCE", evidenceIds: randomEvidenceSet(next) };
+    case 15:
+      // A fare the player could actually pay; in a fresh chapter it is accepted (enough cash).
+      return { type: "PAY_FARE", amount: pick(next, [3000, 7000, 12000]), label: "ledger.bus-fare" };
     default:
       return { type: "FINISH_CHAPTER" };
   }

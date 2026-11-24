@@ -469,11 +469,36 @@ real in the only sense that matters.
 | Slice | Contents | Cost | Risk |
 | --- | --- | --- | --- |
 | **A — the paper** ✅ | `obj.note` interactable + 6 flags; `msg.parcel-fee`; `page.parcel`; `app.courier`; one event | shipped in `1a8d95a`: 8 files, 1,029 lines, no engine change | none |
-| **B — the schedule** | `TransitHost` from `outsideWorld.ts`; `ADVANCE_TIME` from `clock.advance`; fare to the ledger; unpause the clock while ringing (§5.1) | medium: 2 UI files, 1 test class | the one place a bug costs real minutes of play |
+| **B — the schedule** ✅ | `clockRule.ts` (the world no longer waits for the phone or the ring); `PAY_FARE` core action with a ledger line; Route 06 on the chapter clock and wallet | shipped: 4 core files, 5 host files, 3 test files | the one place a bug costs real minutes of play |
 | **C — the woman** | `worldAnchor` for `interviewee_q5`; `contact.coba` (5 actions); `m02.last-interview` + 3 events; `cobaTrustsAlex`; street barks gated on the new flags; the 3 rewritten lines | medium: `storyCast.ts` + tests that count NPCs | 7th street NPC: separation test, staging cues, plus one more skinned model on the street |
 | **D — the tell** | derived battery selector + drawn status bar; phone dims below 20 | medium-low: presentation only | must not become a HUD meter |
 
 Slices A→B→C are the mission. D is the mission's texture and ships only if A–C are green.
+
+### What Slice B changed on contact with the code
+
+1. **"The phone stops the clock" was only half the bug.** §5.1 proposed unpausing while *ringing*;
+   in practice `free` also excludes every overlay, so the phone and the laptop froze the day too.
+   The fix is a named rule (`clockRule.ts`) with two answers, not one line: **devices in the world
+   let time pass** (phone, laptop), **the game's own screens do not** (planner, journal, tasks,
+   inspection, pause, ending), and **a ringing call does not, an answered call does**. The parked
+   story keeps its old rule because its opening call is scripted, not scheduled — a branch in the
+   rule, tested, rather than a regression hidden in M01.
+2. **A fare must be a transaction.** The bus had a private `cash` field, so a ticket could not
+   reach the ledger. `PAY_FARE {amount,label,counterparty}` is now a core action: it refuses
+   without the cash, writes one ledger line through `recordTransaction`, and touches nothing
+   else. The alternative — letting the UI subtract money — would have put a second wallet in the
+   game, which is the exact failure mode the chapter is about.
+3. **The demo accelerators had to go, but only on the story clock.** `BusRouteController` runs at
+   12× while waiting and 5× otherwise so `/testbus` is a 40-second loop, and it *fast-forwards the
+   wait* on `wait()`. On the chapter clock all three are wrong: four minutes of waiting is four
+   minutes, and a ride is exactly 34 (`transit.storyclock.test.ts` asserts it lands 34 minutes after
+   departure). The demo path is untouched and tested from the other side.
+4. **The bus was already the right bus.** Route 06 runs Lý Thái Tổ (Quận 10) → Chợ Lớn (Quận 5),
+   which is where the parcel counter is. No new route, no new geometry: wiring the existing one was
+   the whole job.
+5. **The core cannot import `features/`** (a boundary test enforces it), so the fare constant is
+   duplicated with a cross-check from the `features` side instead of a shared import.
 
 ### What Slice A changed on contact with the code
 

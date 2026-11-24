@@ -210,6 +210,18 @@ export function isCoreAction(value: unknown): value is CoreAction {
         value.evidenceIds.every((id) => isOneOf(EVIDENCE_IDS, id)) &&
         new Set(value.evidenceIds).size === value.evidenceIds.length
       );
+    case "PAY_FARE":
+      // A fare is a small positive whole amount of cash with a short label. Zero is not a payment.
+      return (
+        typeof value.amount === "number" &&
+        Number.isFinite(value.amount) &&
+        Math.trunc(value.amount) === value.amount &&
+        value.amount > 0 &&
+        value.amount <= 10_000_000 &&
+        typeof value.label === "string" &&
+        value.label.length <= 120 &&
+        (value.counterparty === undefined || (typeof value.counterparty === "string" && value.counterparty.length <= 120))
+      );
     case "ADVANCE_TIME":
       return isWholeMinutes(value.minutes, MAX_ADVANCE_MINUTES);
     case "WORK_ON_THESIS":
@@ -677,6 +689,16 @@ function applyAction(state: ChapterState, action: CoreAction, scenario: Scenario
       return accept(next, def.debriefTag ? [def.debriefTag] : []);
     }
 
+    case "PAY_FARE": {
+      if (state.resources.timeMinutes <= 0) return reject(REASONS.timeIsUp);
+      if (state.resources.cash < action.amount) return reject(REASONS.notEnoughCash);
+      // One ledger line, written by the same helper every other payment uses, so the bank app and
+      // the debrief see the fare exactly like a device action's.
+      return accept(
+        recordTransaction(state, scenario, action.label, -action.amount, action.counterparty ?? null, null, null),
+        [`${WORLD_TAG_PREFIX}fare:${action.amount}`],
+      );
+    }
     case "ADVANCE_TIME": {
       if (state.resources.timeMinutes <= 0) return reject(REASONS.timeIsUp);
       return accept(applyEffect(state, { kind: "adjustResource", resource: "timeMinutes", delta: -action.minutes }, scenario));

@@ -158,9 +158,10 @@ describe("action generators", () => {
     "FINISH_CHAPTER",
     "DEVICE_ACTION",
     "COMBINE_EVIDENCE",
+    "PAY_FARE",
   ];
 
-  it("generates all 16 action kinds across seeds", () => {
+  it("generates all 17 action kinds across seeds", () => {
     const seen = new Set<string>();
     for (let i = 0; i < 60; i += 1) {
       for (const action of generateActionSequence(caseSeed(CORE_PROPERTY_SEED, i), 80)) {

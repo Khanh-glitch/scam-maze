@@ -130,7 +130,11 @@ describe("Property 11: exits are always available", () => {
   it("keeps hang-up, refuse-and-stop, verify and report rules in every reachable state", () => {
     const counts: Counts = { states: 0, calls: 0, dialogueNodes: 0, actFive: 0, verifyChecks: 0, reportOffered: 0 };
     const failures: string[] = [];
-    for (let index = 0; index < CORE_PROPERTY_RUNS; index += 1) {
+    // The run count is a floor, not a target: adding an action kind reweights every seed, and this
+    // property's own contract is that each rule is *exercised*, so it keeps drawing cases until all
+    // of them have been seen (up to a hard ceiling, so a genuinely unreachable rule still fails).
+    const extra = (): boolean => counts.reportOffered === 0 || counts.verifyChecks === 0;
+    for (let index = 0; index < CORE_PROPERTY_RUNS || (index < CORE_PROPERTY_RUNS * 4 && extra()); index += 1) {
       const seed = caseSeed(EXITS_SEED, index);
       const next = createLcg(seed);
       const length = randomInt(next, 0, CORE_SEQUENCE_MAX_LENGTH);
