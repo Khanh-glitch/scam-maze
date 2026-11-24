@@ -55,12 +55,19 @@ describe("routing", () => {
     expect(ACTIVE_SCENARIO).not.toBe(CHAPTER_1_SCENARIO);
   });
 
-  it("defines no story mission yet", () => {
-    for (const key of ["objectives", "interactables", "evidence", "calls", "dialogues", "decisions", "endings", "deviceActions"] as const) {
+  it("has no objectives, calls, dialogue, decisions, endings or beats yet", () => {
+    for (const key of ["objectives", "calls", "dialogues", "decisions", "endings", "deviceActions"] as const) {
       expect(Object.keys(ACTIVE_SCENARIO[key]), key).toEqual([]);
     }
     expect(ACTIVE_SCENARIO.beats).toEqual([]);
     expect(ACTIVE_SCENARIO.phone.messages).toEqual({});
+  });
+
+  it("holds the Mission 02 desk sheet and no other prop of the parked story", () => {
+    // Mission 02's parcel thread puts the courier's tracking slip on the room's own `note` prop; the
+    // other props of "The Urgent Call" (its bank note and statement) stay out of this chapter.
+    expect(Object.keys(ACTIVE_SCENARIO.interactables)).toEqual(["obj.note"]);
+    expect(ACTIVE_SCENARIO.evidence).toEqual({});
   });
 });
 
@@ -108,6 +115,12 @@ describe("a new game", () => {
       findingsReconciled: false,
       finalDraftReviewed: false,
       supervisorFeedbackRequested: false,
+      trackingSlipOnPerson: false,
+      parcelCredentialsExposed: false,
+      parcelFeePaid: false,
+      parcelAtCounter: false,
+      interviewDone: false,
+      cobaTrustsAlex: false,
     });
   });
 

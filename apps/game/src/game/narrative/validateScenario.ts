@@ -30,6 +30,7 @@
 //      `ringWhen` alternative that can hold.
 // The solver-based parts of V2, V3 and V4 live in `reachability.ts`.
 
+import { isPersistentFlagId } from "./resources";
 import { MAX_BEAT_PASSES } from "./beats";
 import { validateDeviceContent } from "./device";
 import { validateWorldContent } from "./world";
@@ -105,6 +106,8 @@ interface RefSets {
 /** What can produce each condition input, built once from the whole scenario. */
 interface Producers {
   flags: ReadonlySet<string>;
+  /** Persistent flags some effect sets, so a `persistent` condition is not a typo or a dead end. */
+  persistent: ReadonlySet<string>;
   /** `claimId|status` pairs that an effect or the reducer can produce. */
   claimStatuses: ReadonlySet<string>;
   evidence: ReadonlySet<string>;
@@ -368,6 +371,10 @@ function runChecks(errors: Issues, scenario: ScenarioDefinition): void {
 
 function collectProducers(scenario: ScenarioDefinition, refs: RefSets): Producers {
   const flags = new Set<string>(ENGINE_FLAGS);
+  // Initial state counts as a producer: a flag that starts as true is already a real value.
+  const persistent = new Set<string>(
+    Object.entries(scenario.initial?.persistent ?? {}).filter(([, value]) => value === true).map(([flag]) => flag),
+  );
   const claimStatuses = new Set<string>(ENGINE_CLAIM_STATUSES);
   const evidence = new Set<string>();
 
@@ -377,10 +384,35 @@ function collectProducers(scenario: ScenarioDefinition, refs: RefSets): Producer
   const visit = (effects: Effect[] | undefined): void => {
     for (const effect of effects ?? []) {
       if (effect.kind === "setFlag") flags.add(effect.flag);
+      else if (effect.kind === "setPersistent") persistent.add(effect.flag);
       else if (effect.kind === "setClaimStatus") claimStatuses.add(`${effect.claimId}|${effect.status}`);
       else if (effect.kind === "discoverEvidence") evidence.add(effect.evidenceId);
     }
   };
+  // Mission 02 and later read persistent flags from worlds the parked story never used: events,
+  // missions, thesis tasks and device items. Without this walk a typo in a flag name would delete a
+  // mission path in silence.
+  for (const event of scenario.events ?? []) {
+    visit(event.onFire);
+    visit(event.onExpire);
+    for (const response of event.responses ?? []) visit(response.effects);
+  }
+  for (const mission of scenario.missions ?? []) {
+    visit(mission.onOpen);
+    visit(mission.onComplete);
+    visit(mission.onFail);
+    for (const path of mission.paths ?? []) {
+      visit(path.onEnter);
+    }
+  }
+  for (const task of scenario.thesisTasks ?? []) {
+    visit(task.effects);
+    for (const approach of task.approaches ?? []) visit(approach.effects);
+  }
+  for (const item of scenario.deviceItems ?? []) {
+    visit(item.onOpen);
+    for (const action of item.actions ?? []) visit(action.effects);
+  }
   for (const graph of Object.values(scenario.dialogues ?? {})) {
     for (const node of Object.values(graph.nodes ?? {})) {
       visit(node.onEnter);
@@ -420,7 +452,7 @@ function collectProducers(scenario: ScenarioDefinition, refs: RefSets): Producer
   for (const call of Object.values(scenario.calls ?? {})) {
     if (refs.dialogues.has(call.graphId)) callsWithGraph.add(call.id);
   }
-  return { flags, claimStatuses, evidence, callsWithGraph };
+  return { flags, persistent, claimStatuses, evidence, callsWithGraph };
 }
 
 // ---------------------------------------------------------------------------
@@ -676,6 +708,19 @@ function checkConditions(
       case "notFlag":
         checkRef(errors, where, "flag", cond.flag, KNOWN_FLAGS);
         break;
+      case "persistent": {
+        // An unknown flag name is already a type error; report only a known flag that nothing sets.
+        const known = isPersistentFlagId(cond.flag);
+        checkProducible(
+          errors,
+          where,
+          `persistent flag "${cond.flag}"`,
+          known,
+          producers.persistent.has(cond.flag) || (cond.value === false && known),
+          "is never set by any effect",
+        );
+        break;
+      }
       case "deductionRecorded":
         checkRef(errors, where, "deduction", cond.deductionId, refs.deductions);
         break;
