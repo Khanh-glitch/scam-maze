@@ -523,6 +523,31 @@ Three things could not be shipped as written, and the reasons are worth keeping:
 
 ---
 
+## 14b. What the first real playtest broke (fixed)
+
+The first playtest that went through the mounted UI caught a defect no unit test had: **the parcel
+page could not be opened at all.** Two independent reasons, both by design elsewhere:
+
+1. `page.parcel` is a `page.*` item, and `mailModel.isWebPageItem` hides every `page.*` item from
+   Mail on purpose. So it was never a mail row to click.
+2. The message pointed at `https://tochhanh24.example/...` and that host was not in `VIRTUAL_PAGES`,
+   so the browser answered "unreachable".
+
+The fix follows how the world already works instead of inventing a route:
+
+- A **message in this game never becomes a link** (`ChatThread`: *"Plain text only: a web address in
+  a message is never a link"*). That rule stays: a redelivery SMS that made its own address clickable
+  would teach the habit this game exists to break. The message now names the courier's app.
+- The courier app (`app.courier`) gained the action **Open the redelivery page**, which delivers
+  `page.parcel`. `page.parcel` now arrives from there, not from the message.
+- `VIRTUAL_PAGES` gained `https://tochhanh24.example/redelivery` (`kind: "parcel"`), rendered by
+  `ParcelSite`: one form, details **before** the fee, no stepper and no sign-in, because the order is
+  the tell and there is nothing to log into.
+- The fee button does not exist until the details are given, so the expensive step is visible.
+
+The player's real path is now: Messages (read, no link) -> Files -> Tốc Hành 24 -> open the page ->
+Browser -> details -> fee. Verified end to end in `RoomChapterLayer.mission02.test.tsx` (4/4).
+
 ## 15. Open questions
 
 1. **Battery**: keep it presentational (v3) or promote it to a resource in Chapter 2, with the

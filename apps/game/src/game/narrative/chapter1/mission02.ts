@@ -93,19 +93,13 @@ export const MISSION_02_DEVICE_ITEMS: DeviceItemDef[] = [
     body:
       "Your parcel TH24 4471 0925 could not be delivered this morning: the address was incomplete. " +
       "A redelivery fee of 22,000 VND is required before the next attempt. " +
-      "Open the page in the message to confirm the address and pay the fee.",
+      "Confirm the address and pay the fee in the courier's app.",
     arrives: { atMinute: MISSION_02_CONFIG.opensAtMinute },
     actions: [
       {
         id: "read",
         label: "Read the message again",
         timeCostMinutes: M.readMessage,
-        once: true,
-      },
-      {
-        id: "open-link",
-        label: "Open the page in the message",
-        timeCostMinutes: M.openPage,
         once: true,
       },
       {
@@ -127,11 +121,13 @@ export const MISSION_02_DEVICE_ITEMS: DeviceItemDef[] = [
     title: "Redelivery confirmation",
     from: "Redelivery confirmation",
     detail: "tochhanh24.example",
+    // The browser resolves `https://tochhanh24.example/redelivery` to this item; `page.*` items are
+    // pages, not mail, so Mail hides this one on purpose (see `isWebPageItem`).
     body:
       "Parcel TH24 4471 0925 is waiting for a redelivery. " +
       "Confirm the recipient and the address, then pay the redelivery fee of 22,000 VND.\n\n" +
       "This page is a simulation. No real card, account or code is used in this game.",
-    arrives: { when: [done("msg.parcel-fee", "open-link")] },
+    arrives: { when: [done("app.courier", "open-redelivery-page")] },
     actions: [
       {
         id: "enter-details",
@@ -172,6 +168,10 @@ export const MISSION_02_DEVICE_ITEMS: DeviceItemDef[] = [
     ],
   },
 
+  // The message points at the app, not at a link: an SMS in this game never becomes a link (a
+  // deliberate rule in `ChatThread`), and that rule is worth keeping — a redelivery SMS that made
+  // its own address clickable would teach the habit this game exists to break.
+  //
   // --- The app that could have answered the message ------------------------------------------------
   // Two routes to the same fact, and they cost different amounts: the slip's code is on the desk,
   // the phone number is in the message. Neither route is called right or wrong.
@@ -200,6 +200,15 @@ export const MISSION_02_DEVICE_ITEMS: DeviceItemDef[] = [
               "No redelivery fee is recorded for this parcel. The counter is open until 13:30.",
           },
         ],
+      },
+      // The page itself. Reached from here because an SMS cannot carry a link in this game, and the
+      // courier's app is where a parcel question naturally gets answered.
+      {
+        id: "open-redelivery-page",
+        label: "Open the redelivery page",
+        timeCostMinutes: M.openPage,
+        once: true,
+        effects: [{ kind: "deliverItem", itemId: "page.parcel" }],
       },
       {
         id: "lookup-by-phone",

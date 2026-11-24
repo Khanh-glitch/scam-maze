@@ -396,7 +396,6 @@ export const LAST_SUBMISSION_NARRATIVE_VI: NarrativeOverlay = {
   "device/msg.parcel-fee/body":
     "Bưu phẩm TH24 4471 0925 của bạn chưa giao được sáng nay: địa chỉ nhận chưa đầy đủ. Cần thanh toán phí giao lại 22.000 VNĐ trước lần giao tiếp theo. Mở trang trong tin nhắn để xác nhận địa chỉ và thanh toán phí.",
   "device/msg.parcel-fee/actions/read/label": "Đọc lại tin nhắn",
-  "device/msg.parcel-fee/actions/open-link/label": "Mở trang trong tin nhắn",
   "device/msg.parcel-fee/actions/ignore/label": "Để sau",
   "device/page.parcel/title": "Xác nhận giao lại",
   "device/page.parcel/from": "Xác nhận giao lại",
@@ -412,6 +411,7 @@ export const LAST_SUBMISSION_NARRATIVE_VI: NarrativeOverlay = {
   "device/page.parcel/actions/close/label": "Đóng trang",
   "device/app.courier/title": "Tốc Hành 24 — tra cứu bưu phẩm",
   "device/app.courier/body": "Tra cứu bưu phẩm bằng mã theo dõi hoặc bằng số điện thoại người gửi đã dùng.",
+  "device/app.courier/actions/open-redelivery-page/label": "Mở trang giao lại",
   "device/app.courier/actions/lookup-with-slip/label": "Tra mã TH24 4471 0925",
   "device/app.courier/actions/lookup-with-slip/transcript/0": "Mã theo dõi TH24 4471 0925.",
   "device/app.courier/actions/lookup-with-slip/transcript/1":

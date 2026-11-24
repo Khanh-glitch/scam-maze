@@ -35,7 +35,8 @@ const MESSAGE = run([START, advance(MISSION_02_CONFIG.opensAtMinute)]);
 /** The chapter is running and the message has arrived. */
 const PAST_ARRIVAL = run([START, advance(MISSION_02_CONFIG.opensAtMinute)]);
 /** The page is open. */
-const PAGE = run([open("msg.parcel-fee"), use("msg.parcel-fee", "open-link")], PAST_ARRIVAL);
+/** The courier app opened and the page delivered: the only way in, now that SMS carries no links. */
+const PAGE = run([open("app.courier"), use("app.courier", "open-redelivery-page")], PAST_ARRIVAL);
 
 const item = (state: ChapterState, id: string) =>
   selectDeviceView(state, S, "phone").apps.messages.find((entry) => entry.id === id);
@@ -75,10 +76,13 @@ describe("the message", () => {
     expect(message?.arrivedAtMinute).toBe(MISSION_02_CONFIG.opensAtMinute);
   });
 
-  it("is a message: the sender number is fictional and the page has no link to follow", () => {
+  it("is a message with a fictional sender and no clickable address", () => {
     const message = item(MESSAGE, "msg.parcel-fee");
     expect(message?.detail).toBe("+000 90 4471 2210");
-    // The page is a device item, not a URL: the player opens an action, nothing is fetched.
+    // An SMS in this game never becomes a link, so the message names the app instead of an address.
+    expect(message?.body).toContain("courier");
+    expect(message?.body).not.toMatch(/https?:/);
+    // The page is a page (a `page.*` item), reached through the app, and it names its own host.
     const page = selectDeviceView(PAGE, S, "phone").apps.mail.find((entry) => entry.id === "page.parcel");
     expect(page?.detail).toBe("tochhanh24.example");
   });
