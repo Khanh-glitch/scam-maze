@@ -59,10 +59,11 @@ import { EvidenceNotice } from "../hud/EvidenceNotice";
 import { ObjectiveToast, type ObjectiveChangeKind } from "../hud/ObjectiveToast";
 import { ObjectiveTracker } from "../hud/ObjectiveTracker";
 import { ChapterStatusCluster, ChapterTaskButton, ChapterTopBar } from "../hud/ChapterStatusHud";
+import type { SaigonRadarData } from "../hud/SaigonMinimap";
 import { TaskListPanel } from "../hud/TaskListPanel";
 import { TaskMarker, type TaskMarkerSource } from "../hud/TaskMarker";
 import { TaskTracker } from "../hud/TaskTracker";
-import { SHADOW } from "../../prologue/PrologueHud";
+import { KEYCAP, KEYCAP_HOVER, SHADOW } from "../../prologue/PrologueHud";
 import { Mission01VoiceCaption } from "../voice/Mission01VoiceCaption";
 import { useMission01Voice, type VoiceView } from "../voice/useMission01Voice";
 import type { BrowserState } from "./desktop/browser/browserState";
@@ -74,9 +75,10 @@ import { PlannerOverlay } from "../world/PlannerOverlay";
 import { DeviceApp } from "../device/DeviceApp";
 import { deviceAppEntries } from "../device/deviceApps";
 import { selectDeviceView } from "../../../game/narrative/device";
+import type { StoryNpcRuntimeContext } from "../../../game/narrative/chapter1/storyCast";
 import { ThesisPanel, type ThesisPanelProps } from "../world/ThesisPanel";
 import { useWorldClock } from "../world/useWorldClock";
-import { gameplayConfig, selectClosedMissions, selectOpenMissions, selectPendingEvents, selectThesisView } from "../../../game/narrative/world";
+import { elapsedMinutes, gameplayConfig, selectClosedMissions, selectOpenMissions, selectPendingEvents, selectThesisView } from "../../../game/narrative/world";
 import { CHAPTER_PROTAGONIST, CHAPTER_1_INITIAL_STATE, simulatedClock } from "../../../game/narrative/resources";
 import { setGameClockOverride } from "../../../game/clock/gameClock";
 import { SaveFailureNotice } from "../hud/SaveFailureNotice";
@@ -87,7 +89,7 @@ import { EvidenceJournal } from "../journal/EvidenceJournal";
 import { relatedDeductionStatements } from "../journal/relatedDeductions";
 import { EMPTY_OVERLAYS, isOpen, pop, push, top, type Overlay, type OverlayKind, type OverlayStack } from "../overlays";
 import { PhoneOverlay } from "../phone/PhoneOverlay";
-import { CINE, CINE_KEYCAP_STYLE, cinePanelStyle } from "../theme";
+import { CINE } from "../theme";
 import { MovementHints } from "../hud/MovementHints";
 import { deriveUiMode } from "./uiMode";
 import { useChapterState } from "../useChapterState";
@@ -137,14 +139,12 @@ const PROP_TO_OBJECT: Partial<Record<RoomPropId, InteractableId>> = {
 
 const INTRO_CONTROLS = ["move", "look", "interact", "journal", "schedule"] as const;
 
-/** z-index of the corner HUD while the laptop is open: just above the laptop desktop (`UI.backdrop`, z-40). */
-const HUD_OVER_LAPTOP_Z = 41;
 /** Brings up the carried phone. */
 const PHONE_KEY = "P";
-/** Small translucent key-cap chip of the cinematic UI (Journal, hints). Colors come from `CINE`. */
+/** Unified cinema keybind rail item matching PrologueHud & ChapterStatusHud (no clashing web-app pill chrome). */
 const HUD_CHIP_CLASS =
-  "relative flex items-center gap-2 py-1 pl-1.5 pr-3 font-medium cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b9a5f5]";
-const HUD_CHIP_STYLE = { ...cinePanelStyle(), borderRadius: CINE.radiusPx.chip, fontSize: CINE.fontPx.small } as const;
+  `group relative flex items-center gap-2 rounded-md border border-transparent px-2 py-1 font-menu text-xs font-semibold uppercase tracking-[0.14em] text-[#f3efe4]/90 ${SHADOW} transition-all duration-150 hover:border-white/15 hover:bg-black/40 hover:text-white cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b9a5f5]`;
+const HUD_CHIP_STYLE = { fontSize: CINE.fontPx.small } as const;
 
 export interface RoomLayerApi {
   store: ChapterStore;
@@ -210,6 +210,14 @@ export interface RoomChapterLayerProps {
    * call or overlay is running. Without it the door stays locked until the chapter is finished (the prologue).
    */
   outsideDoor?: boolean;
+  /** True while the player has walked outside Room 6.07 onto Saigon streets. */
+  outdoors?: boolean;
+  /** Live rotating Saigon GPS radar telemetry while outdoors (replaces indoor standby disc). */
+  outsideRadar?: SaigonRadarData | null;
+  /** Hides room HUD overlays (mission list, bottom chips, top bar) during immersive street conversations. */
+  hideHud?: boolean;
+  /** Publishes live narrative state to the surrounding Saigon 3D Story NPCs. */
+  onStoryContext?: (ctx: Partial<StoryNpcRuntimeContext>) => void;
 }
 
 const INTRO_NARRATION: NarrationSequence = { graphId: "dlg.intro", nodeIds: INTRO_SEQUENCE };
@@ -359,6 +367,10 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
   clockPaused = false,
   onOpenSettings,
   outsideDoor = false,
+  outdoors = false,
+  outsideRadar = null,
+  hideHud = false,
+  onStoryContext,
 }) => {
   const { t } = useTranslation("chapter1");
   const locale = useGameLocale();
@@ -370,6 +382,8 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
 
   // Created once per mount: a fresh chapter or the state replayed by the loader.
   const [store] = useState(() => createChapterStore(session.restored?.state ?? createInitialState(ACTIVE_SCENARIO), ACTIVE_SCENARIO));
+  // The document editor unmounts when another laptop app opens; keep its in-progress and saved text for this run.
+  const thesisDocumentDraft = useRef<{ content: Record<string, string>; savedContent: Record<string, string> }>({ content: {}, savedContent: {} });
   const onStoreReadyRef = useRef(onStoreReady);
   onStoreReadyRef.current = onStoreReady;
   useEffect(() => {
@@ -822,6 +836,8 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
   const portalAccountLocked = useChapterState(store, (state) => state.persistent.accountCompromised);
   const portalDraftFinished = useChapterState(store, (state) => state.persistent.draftFinished);
   const portalTasksDone = useChapterState(store, (state) => state.world.thesisTasksDone);
+  const portalAccessVerified = useChapterState(store, (state) => state.persistent.schoolAccessVerified);
+  const portalSubmissionDeadlineMissed = useChapterState(store, (state) => state.persistent.submissionDeadlineMissed);
   // The bank app: transfers the bank blocked (derived, read-only) and what the player reported.
   const bankDevice = useChapterState(store, (state) => state.device);
   const bankEvents = useChapterState(store, (state) => state.world.events);
@@ -829,8 +845,8 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
   const blockedTransfers = useMemo(() => selectBlockedTransfers({ device: bankDevice, world: { events: bankEvents } }, scenario), [bankDevice, bankEvents, scenario]);
   const bankFacts = useMemo(() => ({ bankReported, accountCompromised: portalAccountLocked }), [bankReported, portalAccountLocked]);
   const portalFacts = useMemo(
-    () => ({ accountLocked: portalAccountLocked, draftFinished: portalDraftFinished, tasksDone: portalTasksDone }),
-    [portalAccountLocked, portalDraftFinished, portalTasksDone],
+    () => ({ accountLocked: portalAccountLocked, draftFinished: portalDraftFinished, tasksDone: portalTasksDone, accessVerified: portalAccessVerified, submissionDeadlineMissed: portalSubmissionDeadlineMissed }),
+    [portalAccountLocked, portalDraftFinished, portalTasksDone, portalAccessVerified, portalSubmissionDeadlineMissed],
   );
   const thesisSelector = useCallback((state: ChapterState) => selectThesisView(state, scenario), [scenario]);
   const thesisView = useChapterState(store, thesisSelector);
@@ -889,16 +905,37 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
   const legacyLaptop = Object.keys(scenario.deviceActions).length > 0;
   const storyClockOn = gameplay.clockRuns || !legacyLaptop;
   // The simulated time of day shows on the wall clock, the 3D screens, the phone status bar and the laptop.
+  const narrativeState = useChapterState(store, (s) => s);
+  const currentElapsedMinutes = elapsedMinutes(narrativeState, scenario);
+  useEffect(() => {
+    if (!onStoryContext) return;
+    onStoryContext({
+      elapsedMinutes: currentElapsedMinutes,
+      thesisProgress: narrativeState.resources.thesisProgress,
+      fatigue: narrativeState.resources.fatigue,
+      money: narrativeState.resources.cash,
+      flags: narrativeState.persistent,
+    });
+  }, [
+    onStoryContext,
+    currentElapsedMinutes,
+    narrativeState.resources.thesisProgress,
+    narrativeState.resources.fatigue,
+    narrativeState.resources.cash,
+    narrativeState.persistent,
+  ]);
+  const [thesisClockPreviewOffset, setThesisClockPreviewOffset] = useState<number | null>(null);
   const clockMinuteOfDay = useChapterState(store, (state) => {
     const clock = simulatedClock(state.resources.timeMinutes);
     return clock.hour * 60 + clock.minute;
   });
-  const clockText = `${String(Math.floor(clockMinuteOfDay / 60)).padStart(2, "0")}:${String(clockMinuteOfDay % 60).padStart(2, "0")}`;
+  const effectiveClockMinute = (clockMinuteOfDay + (thesisClockPreviewOffset ?? 0)) % (24 * 60);
+  const clockText = `${String(Math.floor(effectiveClockMinute / 60)).padStart(2, "0")}:${String(effectiveClockMinute % 60).padStart(2, "0")}`;
   useEffect(() => {
     if (!storyClockOn) return;
-    setGameClockOverride(clockMinuteOfDay * 60);
-    if (engineReady) bridge.commands?.setStoryClock?.(clockMinuteOfDay * 60);
-  }, [storyClockOn, clockMinuteOfDay, engineReady, bridge]);
+    setGameClockOverride(effectiveClockMinute * 60);
+    if (engineReady) bridge.commands?.setStoryClock?.(effectiveClockMinute * 60);
+  }, [storyClockOn, effectiveClockMinute, engineReady, bridge]);
   useEffect(
     () => () => {
       setGameClockOverride(null);
@@ -923,8 +960,28 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
     freeWorkMaxPercent: gameplay.thesisFreeWorkMaxPercent,
     timeLeftMinutes: resources.timeMinutes,
     tasks: thesisView.tasks,
-    onWork: (minutes) => void store.dispatch({ type: "WORK_ON_THESIS", minutes }),
-    onTask: (taskId) => void store.dispatch({ type: "COMPLETE_THESIS_TASK", taskId }),
+    onWork: (minutes, focusMode) => void store.dispatch({ type: "START_THESIS_SESSION", minutes, mode: focusMode ?? "normal" }),
+    onTask: (taskId, researchNotes) => void store.dispatch({ type: "COMPLETE_THESIS_TASK", taskId, researchNotes }),
+    onOpenDocument: () => {
+      closePlanner();
+      openOverlay({ kind: "laptop" });
+    },
+    deepWork: !legacyLaptop
+      ? {
+          state: narrativeState,
+          scenario,
+          baseMinutesPerPercent: gameplay.thesisMinutesPerPercent,
+          fatigueConfig: gameplay.fatigue,
+          documentDraft: thesisDocumentDraft,
+          onPreviewMinutesOffset: setThesisClockPreviewOffset,
+          onInspectInterruption: (appHint) => {
+            if (appHint && isOpen(overlaysRef.current, "laptop")) openOverlay({ kind: "phone" }, { stack: true });
+          },
+          onResumeSession: () => void store.dispatch({ type: "RESUME_THESIS_SESSION" }),
+          onEndSession: () => void store.dispatch({ type: "END_THESIS_SESSION" }),
+          onSaveDraft: (sectionId, content) => void store.dispatch({ type: "SAVE_THESIS_DRAFT", sectionId, content }),
+        }
+      : undefined,
   };
 
   useEffect(() => {
@@ -1102,13 +1159,10 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
     inspecting,
   });
   const callFocused = uiMode === "call" || uiMode === "decision";
-  // On the laptop (and nothing on top of it) the HUD stays: the map, the clock, cash and the task.
-  // (Task mode only; the parked story keeps its earlier rule of hiding the HUD there.)
-  const laptopWithPhone = overlays.length === 2 && overlays[0].kind === "laptop" && overlays[1].kind === "phone";
-  const hudOverLaptop = taskMode && !callFocused && ((overlays.length === 1 && overlays[0].kind === "laptop") || laptopWithPhone);
-  // The phone brought up with P sits low on the right: the HUD stays as it is, like in GTA.
+  // The laptop is a focused desktop surface: suppress the room HUD while it is open, and let
+  // LaptopDesktop provide its own clock and controls. The carried phone remains a separate overlay.
   const hudWithPhone = taskMode && !callFocused && overlays.length === 1 && overlays[0].kind === "phone";
-  const trackerHidden = !hudOverLaptop && !hudWithPhone && (callFocused || uiMode === "investigation" || overlays.length > 0);
+  const trackerHidden = !hudWithPhone && (callFocused || uiMode === "investigation" || overlays.length > 0);
 
   const { toast, notice, announcements, completed, dismissToast, dismissNotice } = useHudNotices(store);
   // Open missions show the objective of their current path next to the authored objectives.
@@ -1306,7 +1360,8 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
   };
 
   const stopMouseDown = useCallback((event: React.MouseEvent) => event.stopPropagation(), []);
-  const hudVisible = !introOpen && status === "playing";
+  const laptopOpen = isOpen(overlays, "laptop");
+  const hudVisible = !introOpen && status === "playing" && !hideHud && !laptopOpen;
   const phoneUp = phoneCarried && isOpen(overlays, "phone");
   // Unread on the phone: messages and mail that track unread (the chip's badge).
   const phoneUnread = phoneCarried ? phoneDevice.unread.messages + phoneDevice.unread.mail : 0;
@@ -1322,15 +1377,14 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
     return () => commands?.setPhoneCarried?.(false);
   }, [bridge, engineReady, phoneCarried]);
   // The open laptop covers the room: the room behind it holds still and draws fewer frames.
-  const laptopOpen = isOpen(overlays, "laptop");
   useEffect(() => {
     if (!engineReady || !laptopOpen) return undefined;
     const commands = bridge.commands;
     commands?.setBackdrop?.(true);
     return () => commands?.setBackdrop?.(false);
   }, [bridge, engineReady, laptopOpen]);
-  // The marker over the prop of the current step, while the player walks around (no overlay, call or inspect pose).
-  const markerTarget = taskMode && hudVisible && !trackerHidden && inspecting === null ? (trackedMission?.current?.target ?? null) : null;
+  // The marker over the prop of the current step, while the player walks around indoors (never leaked onto Saigon streets).
+  const markerTarget = taskMode && hudVisible && !outdoors && !trackerHidden && inspecting === null ? (trackedMission?.current?.target ?? null) : null;
   // The marker moves itself (DOM writes per frame); the layer only keeps the whole-metre distance for the tracker.
   const [taskDistance, setTaskDistance] = useState<number | null>(null);
   const markerSource = useCallback<TaskMarkerSource>(
@@ -1367,10 +1421,29 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
     [bridge],
   );
 
+  const currentFatigue = fatigueOn ? fatigueLevel(resources.fatigue, gameplay.fatigue) : undefined;
+  const hasUnreadHudBadge = phoneUnread > 0 || journalUnread > 0 || pendingEvents.length > 0;
+  const chipRailCalm = !callFocused && !hasUnreadHudBadge && overlays.length === 0 && !hintOn;
+
   return (
     <ScreenQuadContext.Provider value={screenSource}>
     <ComfortProvider settings={settings}>
       <div data-testid="room-chapter-layer" data-ui-mode={uiMode} className="contents">
+        {/* Diegetic peripheral fatigue atmosphere (subtle ocular warmth/vignette when tired or exhausted) */}
+        {!introOpen && !settings.reducedStress && (currentFatigue === "tired" || currentFatigue === "exhausted") && (
+          <div
+            aria-hidden="true"
+            data-testid="fatigue-atmosphere"
+            className="pointer-events-none fixed inset-0 z-[4] transition-opacity duration-1000"
+            style={{
+              background:
+                currentFatigue === "exhausted"
+                  ? "radial-gradient(ellipse at 50% 48%, rgba(16,12,24,0) 56%, rgba(18,11,22,0.42) 100%)"
+                  : "radial-gradient(ellipse at 50% 48%, rgba(16,12,24,0) 64%, rgba(18,13,24,0.22) 100%)",
+            }}
+          />
+        )}
+
         {/* Polite live region: new notification, new evidence, recorded deduction (Requirement 22.2). */}
         <div role="status" aria-live="polite" aria-atomic="false" className="sr-only" data-testid="room-live-region">
           {announcements.map((item) => (
@@ -1388,23 +1461,19 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
             {engineReady && markerTarget !== null && <TaskMarker target={markerTarget} source={markerSource} onDistance={setTaskDistance} />}
             {/* Top left, like the neighborhood HUD: the map with the status ring, the clock beside it, the objective under it. */}
             <div
-              className={`pointer-events-none absolute left-[clamp(1rem,3vw,2.5rem)] z-10 flex ${hudOverLaptop ? "top-2.5 max-w-[calc(100%-30rem)] flex-row items-center gap-5" : "top-4 flex-col items-start gap-3"}`}
+              className="pointer-events-none absolute left-[clamp(1rem,3vw,2.5rem)] top-4 z-10 flex flex-col items-start gap-3"
               data-testid="objective-tracker-slot"
-              data-over-laptop={hudOverLaptop ? "true" : undefined}
               style={{
-                // Over the laptop the HUD sits above its screen (the overlays come later in the DOM).
-                zIndex: hudOverLaptop ? HUD_OVER_LAPTOP_Z : undefined,
-                // The call, its replies, the laptop, the phone records and the journal own the
-                // screen: the HUD steps aside, then returns.
+                // Focused overlays own the screen: the room HUD steps aside, then returns.
                 opacity: trackerHidden ? 0 : 1,
                 visibility: trackerHidden ? "hidden" : "visible",
                 transition: `opacity ${CINE.motion.baseMs}ms ${CINE.motion.ease}, visibility ${CINE.motion.baseMs}ms`,
               }}
             >
               <ChapterStatusCluster
-                compact={hudOverLaptop}
                 resources={resources}
-                fatigueLevel={fatigueOn ? fatigueLevel(resources.fatigue, gameplay.fatigue) : undefined}
+                fatigueLevel={currentFatigue}
+                outsideRadar={outdoors ? outsideRadar : null}
                 mapCorner={<ChapterTaskButton unseen={tasksUnseen} onOpen={taskMode ? toggleTasks : togglePlanner} onHoverSound={onHoverSound} />}
               />
               {taskMode && trackedMission ? (
@@ -1414,10 +1483,9 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
                   distance={markerTarget === null ? null : taskDistance}
                   onOpenList={toggleTasks}
                   onHoverSound={onHoverSound}
-                  compact={hudOverLaptop}
                 />
               ) : null}
-              {taskMode && trackedMission && hintOn && !hudOverLaptop && (
+              {taskMode && trackedMission && hintOn && (
                 <p role="note" aria-label={text("room.hud.hintPanelLabel")} data-testid="room-hint" className={`pl-[34px] font-menu text-sm italic leading-snug text-zinc-400 ${SHADOW}`}>
                   {currentHint ?? text("room.hints.none")}
                 </p>
@@ -1439,7 +1507,6 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
             <div
               className="absolute right-[clamp(1rem,3vw,2.5rem)] top-4 z-10"
               style={{
-                zIndex: hudOverLaptop ? HUD_OVER_LAPTOP_Z : undefined,
                 opacity: trackerHidden ? 0 : 1,
                 visibility: trackerHidden ? "hidden" : "visible",
                 transition: `opacity ${CINE.motion.baseMs}ms ${CINE.motion.ease}, visibility ${CINE.motion.baseMs}ms`,
@@ -1453,14 +1520,16 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
               {toast && <ObjectiveToast key={toast.key} kind={toast.kind} text={objectiveText(toast.objectiveId)} onDismiss={dismissToast} />}
             </div>
 
-            {/* Bottom right for now. During a call the chip row rises above the call presentation (z-40) so Notes is reachable. */}
+            {/* Bottom right: unified cinema keybind rail (quiet during calm free-roam, wakes up on hover or unread badge). */}
             <div
-              className="absolute bottom-4 right-[clamp(1rem,3vw,2.5rem)] z-10 flex flex-col-reverse items-end gap-2"
+              className={`absolute bottom-4 right-[clamp(1rem,3vw,2.5rem)] z-10 flex flex-col-reverse items-end gap-2 transition-opacity duration-300 ${
+                chipRailCalm ? "opacity-65 hover:opacity-100 focus-within:opacity-100" : "opacity-100"
+              }`}
               style={callFocused ? { zIndex: 45 } : undefined}
               data-testid="hud-chip-row"
               onMouseDown={stopMouseDown}
             >
-              <div className="flex gap-2">
+              <div className="flex items-center gap-1.5">
                 {phoneCarried && (
                   <button
                     type="button"
@@ -1471,16 +1540,16 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
                     data-testid="hud-phone-chip"
                     onClick={togglePhone}
                   >
-                    <kbd aria-hidden="true" className="inline-flex items-center justify-center font-mono" style={CINE_KEYCAP_STYLE}>
+                    <kbd aria-hidden="true" className={`${KEYCAP} ${KEYCAP_HOVER}`}>
                       {PHONE_KEY}
                     </kbd>
-                    <Smartphone className="h-4 w-4" aria-hidden="true" />
+                    <Smartphone className="h-3.5 w-3.5 text-zinc-200" aria-hidden="true" />
                     <span>{text("hud.phone")}</span>
                     {phoneUnread > 0 && (
                       <>
                         <span
                           aria-hidden="true"
-                          className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full bg-[#f2b24b] px-1.5 text-center text-xs font-bold leading-5 text-[#171521]"
+                          className="ml-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-[#f2b24b] px-1 text-[10px] font-bold leading-4 text-[#171521]"
                         >
                           {phoneUnread}
                         </span>
@@ -1497,7 +1566,7 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
                   aria-keyshortcuts="J"
                   onClick={toggleJournal}
                 >
-                  <kbd aria-hidden="true" className="inline-flex items-center justify-center font-mono" style={CINE_KEYCAP_STYLE}>
+                  <kbd aria-hidden="true" className={`${KEYCAP} ${KEYCAP_HOVER}`}>
                     J
                   </kbd>
                   <span>{text("hud.journal")}</span>
@@ -1505,7 +1574,7 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
                     <>
                       <span
                         aria-hidden="true"
-                        className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full bg-[#f2b24b] px-1.5 text-center text-xs font-bold leading-5 text-[#171521]"
+                        className="ml-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-[#f2b24b] px-1 text-[10px] font-bold leading-4 text-[#171521]"
                       >
                         {journalUnread}
                       </span>
@@ -1524,16 +1593,16 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
                   data-testid="hud-planner-chip"
                   onClick={togglePlanner}
                 >
-                  <kbd aria-hidden="true" className="inline-flex items-center justify-center font-mono" style={CINE_KEYCAP_STYLE}>
+                  <kbd aria-hidden="true" className={`${KEYCAP} ${KEYCAP_HOVER}`}>
                     K
                   </kbd>
-                  <CalendarClock className="h-4 w-4" aria-hidden="true" />
+                  <CalendarClock className="h-3.5 w-3.5 text-zinc-200" aria-hidden="true" />
                   <span>{text("planner.chip")}</span>
                   {pendingEvents.length > 0 && (
                     <>
                       <span
                         aria-hidden="true"
-                        className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full bg-[#f2b24b] px-1.5 text-center text-xs font-bold leading-5 text-[#171521]"
+                        className="ml-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-[#f2b24b] px-1 text-[10px] font-bold leading-4 text-[#171521]"
                       >
                         {pendingEvents.length}
                       </span>
@@ -1553,12 +1622,12 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
                   data-testid="hud-hints-chip"
                   onClick={() => setHintOn((on) => !on)}
                 >
-                  <kbd aria-hidden="true" className="inline-flex items-center justify-center font-mono" style={CINE_KEYCAP_STYLE}>
+                  <kbd aria-hidden="true" className={`${KEYCAP} ${KEYCAP_HOVER}`}>
                     H
                   </kbd>
                   <span aria-hidden="true">{text("room.hints.heading")}</span>
                 </button>
-                {/* Only while a call is active and nothing is on top of it. Same chip style as Journal and Hint. */}
+                {/* Only while a call is active and nothing is on top of it. Same rail style as Journal and Hint. */}
                 {callStatus === "active" && overlays.length === 0 && (
                   <button
                     type="button"
@@ -1569,18 +1638,16 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
                     data-testid="room-call-notes"
                     onClick={openJournal}
                   >
-                    <NotebookText className="ml-1 h-4 w-4" aria-hidden="true" />
+                    <NotebookText className="h-3.5 w-3.5 text-[#c9bbf7]" aria-hidden="true" />
                     <span>{text("room.call.notes")}</span>
                   </button>
                 )}
               </div>
               {mouseHintPhase !== "hidden" && (
                 <p
-                  className="px-3 py-2"
+                  className={`pointer-events-none px-2 py-0.5 font-menu text-xs font-medium tracking-[0.06em] text-zinc-300/85 ${SHADOW}`}
                   style={{
-                    ...cinePanelStyle(),
                     maxWidth: CINE.widthPx.toast,
-                    fontSize: CINE.fontPx.body,
                     opacity: mouseHintPhase === "fading" ? 0 : 1,
                     transition: reducedMotionPref ? "none" : `opacity ${CINE.motion.baseMs}ms ${CINE.motion.ease}`,
                   }}
@@ -1591,23 +1658,6 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
                 </p>
               )}
             </div>
-
-            {/* Visual only (the live region above announces it). Above the laptop and phone surface
-                (z-index from `CINE.toast`), never takes clicks, and sits under the chip row. */}
-            {notice && (
-              <div
-                aria-hidden="true"
-                data-testid="evidence-notice-slot"
-                className="pointer-events-none absolute right-4"
-                style={{ top: 72, zIndex: CINE.toast.zIndex }}
-              >
-                <EvidenceNotice
-                  key={notice.key}
-                  title={Object.hasOwn(scenario.evidence, notice.evidenceId) ? scenario.evidence[notice.evidenceId].title : notice.evidenceId}
-                  onDismiss={dismissNotice}
-                />
-              </div>
-            )}
 
             {arrival && (
               <div className="pointer-events-none absolute left-1/2 top-24 z-10 -translate-x-1/2" aria-hidden="true">
@@ -1621,6 +1671,22 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
             )}
             <MovementHints active={uiMode === "exploration" && overlays.length === 0 && !introOpen} />
           </>
+        )}
+
+        {/* Keep diegetic event feedback above the device even while the room HUD steps away. */}
+        {notice && (
+          <div
+            aria-hidden="true"
+            data-testid="evidence-notice-slot"
+            className="pointer-events-none absolute right-4"
+            style={{ top: 72, zIndex: CINE.toast.zIndex }}
+          >
+            <EvidenceNotice
+              key={notice.key}
+              title={Object.hasOwn(scenario.evidence, notice.evidenceId) ? scenario.evidence[notice.evidenceId].title : notice.evidenceId}
+              onDismiss={dismissNotice}
+            />
+          </div>
         )}
 
         <div ref={overlayLayerRef} onMouseDown={stopMouseDown}>
