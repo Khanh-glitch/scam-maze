@@ -24,6 +24,12 @@
 import * as T from "three";
 import { CURB_HEIGHT, rect, type Solid } from "../simulation/boarding";
 import { box, contact, contactMaterial, material, plane, random, rod, tube } from "../simulation/scene-kit";
+import {
+  createCorrugatedTinPBR,
+  createGranitePlazaPBR,
+  createSaigonAsphaltPBR,
+  createWorldFacadePBR,
+} from "./pbrTextures";
 import type { PooledLightSpec } from "./boardingHouse";
 import type { WorldStreamer } from "./WorldStreamer";
 
@@ -45,11 +51,22 @@ const ALLEY_Z = -132;
 const ALLEY_W = 3.1;
 
 /**
- * The canopy colours are sampled from photographs of the district's morning market rather than
- * invented: sun-faded brown, navy, bottle green, a mauve washed too many times, and sand. A market
- * in one colour reads as a render; a market in five reads as a place.
+ * Canopy palette, sampled from photographs of the district's morning market and then corrected once
+ * I had actually looked at them. The first pass used brown, navy, bottle green, mauve and sand — a
+ * plausible-sounding list that made the market look like a festival. The photographs disagree: the
+ * fabric over these stalls is almost colourless. Cold grey, dusty white, deep navy, slate blue, and
+ * a green that has been in the sun too long. Ten thousand morning markets fade the same way, and a
+ * market that has faded together reads as a place; one in five bright colours reads as a render.
  */
-const CANOPY_COLORS = ["#8c6a4a", "#2c3f5e", "#2f4a3a", "#6b4756", "#b9a888"] as const;
+const CANOPY_COLORS = [
+  // Ordered by how often they appear in the photographs: the dark ones carry the field, the pale
+  // ones are what makes it read as fifty separate vendors rather than a tarpaulin.
+  "#2b3a52",
+  "#39424e",
+  "#31463f",
+  "#6f7378",
+  "#b6b1a4",
+] as const;
 
 const frameMat = () => material(0x8d9298, 0.44, 0.62);
 const plasticRed = () => material(0xa4322a, 0.62, 0.04);
@@ -59,8 +76,21 @@ export interface ChoLonHandles {
   root: T.Group;
   solids: Solid[];
   lightSpecs: PooledLightSpec[];
-  /** Where Cô Ba's stall is. Mission 02 places her here; the geometry owns the address, not the cast. */
+  /**
+   * Cô Ba's stall, described from the customer's side of the counter: `x, z` is where a person
+   * stands to talk to her, and `yaw` is the facing toward her. The vendor's own position is
+   * `x - 1.05` — derive it, do not duplicate it.
+   *
+   * The first version returned the vendor's spot and called it the stall, so the QA camera stood
+   * inside the glass case and photographed the inside of the display. A handle that is ambiguous
+   * about *whose* position it is will eventually be used by the wrong side.
+   */
   cobaStall: { x: number; z: number; yaw: number };
+  /**
+   * The nail the bills hang on. Mission 02's W6 inspect verb is aimed here, and the receipt is the
+   * proof object of the whole mission, so its address belongs to the geometry that built it.
+   */
+  receiptNail: { x: number; y: number; z: number };
   /** The two bus shelters: the Chợ Lớn stop the player arrives at, and Lý Thái Tổ where they left. */
   busStops: { x: number; z: number; yaw: number }[];
 }
@@ -86,12 +116,43 @@ export function buildChoLon(
   // Three different surfaces, because they are three different things: stained concrete under the
   // stalls, patched pavement where people stand, and a rutted asphalt lane where the trucks idle.
   // ---------------------------------------------------------------------------
-  const marketFloor = material(0x6a6459, 0.96, 0.01);
-  const pavement = material(0x86827a, 0.94, 0.02);
-  const lane = material(0x585a5c, 0.95, 0.01);
+  // These three planes fill the lower half of every frame in the block, so they are the last place a
+  // flat colour is acceptable. They use the same scanned Saigon surfaces as the neighbouring chunks:
+  // slab, concrete and asphalt. Repeat counts are chosen so every tile is ~2.8 m, so the paving does
+  // not change size as the player walks from the market floor to the pavement to the lane.
+  const marketFloor = createGranitePlazaPBR(2, 17);
+  marketFloor.color = new T.Color(0x8a857c); // washed concrete, not polished granite
+  const pavement = createGranitePlazaPBR(3, 17);
+  const lane = createSaigonAsphaltPBR(1, 17);
   plane(chunk, [FRONT_X - DEPTH / 2, 0.02, midZ], [DEPTH, spanZ], marketFloor, 0, -Math.PI / 2);
   plane(chunk, [FRONT_X + 3.4, 0.022, midZ], [6.8, spanZ], pavement, 0, -Math.PI / 2);
   plane(chunk, [LANE_X, 0.018, midZ], [2.8, spanZ], lane, 0, -Math.PI / 2);
+
+  // The block must be *bigger than the shot*. The walkable corridor is x ∈ [-19.5, 7] and these
+  // planes cover x ∈ [-19.3, 3.6]; the first frames ended the pavement in mid-air about 8 m from the
+  // camera, which reads as a bug even though the far side is technically off-limits. A market does
+  // not stop at the edge of the pavement, so the ground runs on under the neighbouring blocks and
+  // the camera never finds an edge.
+  // This is the *whole* walkable corridor plus 12 m of slack on each side, not a decorative apron.
+  // The corridor is x ∈ [-19.5, 7]; the pavement only reaches x = -1.6, so a camera standing at
+  // x = 2.6 — which is where the bus doors open — had four metres of nothing between its feet and
+  // the paving, and every frame ended in the void a few metres out.
+  const WALK_MIN_X = -19.5;
+  const WALK_MAX_X = 7;
+  const SLACK = 12;
+  const groundMinX = WALK_MIN_X - SLACK;
+  const groundMaxX = WALK_MAX_X + SLACK;
+  const groundW = groundMaxX - groundMinX;
+  const apron = createGranitePlazaPBR(Math.round(groundW / 2.4), Math.round((spanZ + 26) / 2.4));
+  apron.color = new T.Color(0x6f6b64);
+  plane(chunk, [(groundMinX + groundMaxX) / 2, 0.014, midZ], [groundW, spanZ + 26], apron, 0, -Math.PI / 2);
+  // ...and a kerb along the lane, because a 6 cm step is what tells the eye where the road starts.
+  const kerb = createWorldFacadePBR("concrete_wall_007", "#8e8a82", 1.6, 0.8, 0.94);
+  box(chunk, [LANE_X + 1.55, CURB_HEIGHT / 2, midZ], [0.22, CURB_HEIGHT, spanZ + 26], kerb, false);
+  // Fill the two metres between the lane edge and the market floor: that was the one remaining strip
+  // of sky visible from under the canopies.
+  const gutter = createSaigonAsphaltPBR(1, 20);
+  plane(chunk, [(LANE_X + 1.4 + FRONT_X - DEPTH) / 2, 0.016, midZ], [2.4, spanZ], gutter, 0, -Math.PI / 2);
 
   // Expansion joints across the market floor: the single cheapest thing that stops a big flat plane
   // looking like a void.
@@ -119,21 +180,27 @@ export function buildChoLon(
   // is exactly how Chợ Lớn reads at eye level. Braked with pilasters and a parapet so it does not
   // read as a hangar.
   // ---------------------------------------------------------------------------
-  const stucco = material(0xb0a696, 0.92, 0.02);
-  const stuccoWarm = material(0xbfb29c, 0.9, 0.02);
+  // The terrace wall used to be a single FlatColor 0xb0a696 over 48 m, which is 48 m of nothing.
+  // `createWorldFacadePBR` projects UVs from world space, so one tile covers a fixed ~3.4 m of wall
+  // however long the box is — the same function, and the same weathering shader, as the D1 frontages.
+  const stucco = createWorldFacadePBR("painted_plaster_wall", "#c9bda9", 3.4, 1.0, 0.9);
+  const stuccoWarm = createWorldFacadePBR("clay_plaster", "#d3c0a4", 3.4, 0.9, 0.88);
   const backX = FRONT_X - DEPTH + 0.42;
   const wallH = 7.6;
   box(chunk, [backX, wallH / 2, midZ], [0.92, wallH, spanZ], stucco);
-  box(chunk, [backX, wallH + 0.15, midZ], [1.16, 0.3, spanZ], material(0xa29888, 0.88), false);
+  box(chunk, [backX, wallH + 0.15, midZ], [1.16, 0.3, spanZ], createWorldFacadePBR("concrete_wall_007", "#b6ada0", 2.0, 0.7, 0.92), false);
   for (let z = Z1 + BAY; z < Z0; z += BAY * 4) {
     box(chunk, [backX + 0.52, wallH / 2, z], [0.16, wallH - 0.2, 0.4], stuccoWarm, false);
   }
   // Ground-floor openings behind the stalls: warm interior recesses, not texture. This is what the
   // player sees past the canopies, and depth is what sells the block.
+  // A shophouse interior at 08:40 is dim but never black: a fluorescent tube over a counter, spill
+  // from the street. The first version used 0x17140f at 0.3 emissive and rendered as a void — which
+  // put the mission's receipt string against pure black and made the prop unreadable.
   const recessMat = new T.MeshStandardMaterial({
-    color: 0x17140f,
-    emissive: new T.Color(0xffcf92),
-    emissiveIntensity: 0.3,
+    color: 0x2b2418,
+    emissive: new T.Color(0xffd9a0),
+    emissiveIntensity: 0.62,
     roughness: 0.88,
     metalness: 0.02,
   });
@@ -179,12 +246,20 @@ export function buildChoLon(
   // enough that the fabric reads as a ceiling from the street. This is the one thing the reference
   // photographs are unambiguous about, and the first version got it wrong twice — once with a tin
   // roof over everything, once with canopies too few and too high.
-  const canopyCount = 42;
+  // Four files, and every one of them is OUTSIDE the frontage line.
+  //
+  // The third version put the "mid-walkway" and "over the kerb" files at FRONT_X - 3.15 and -5.05,
+  // which is *behind* the shopfronts, between the stalls and the back wall. The aerial frame showed
+  // it immediately: a strip of fabric over the produce and 12 m of open pavement where the player
+  // actually walks. The brief is "approaches her by walking under fabric", so the field has to hang
+  // over the customer strip — from just inside the stall edge out to the kerb.
+  const canopyCount = 56;
   for (let i = 0; i < canopyCount; i++) {
-    const file = i % 3; // 0 = over the stalls, 1 = mid-walkway, 2 = over the kerb
-    const k = Math.floor(i / 3);
-    const z = Z1 + 1.6 + (k / 13) * (spanZ - 3.2) + (rand() - 0.5) * 0.45;
-    const x = FRONT_X - (file === 0 ? 1.15 : file === 1 ? 3.15 : 5.05) - rand() * 0.4;
+    const file = i % 4;
+    const k = Math.floor(i / 4);
+    const z = Z1 + 1.4 + (k / 13) * (spanZ - 2.8) + (rand() - 0.5) * 0.4;
+    // -0.9 (stall edge, rigged to the eave) → +3.4 (over the kerb, on ground stems).
+    const x = FRONT_X + (file === 0 ? -0.9 : file === 1 ? 0.9 : file === 2 ? 2.3 : 3.5) - rand() * 0.3;
     const size = 2.35 + rand() * 0.7;
     const yaw = (rand() - 0.5) * 0.55;
     const tilt = (rand() - 0.5) * 0.15;
@@ -217,7 +292,7 @@ export function buildChoLon(
 
   // The narrow permanent eave over the back wall: enough to keep stock dry, narrow enough that it
   // never becomes the roof of the market.
-  const tin = material(0x5a6368, 0.68, 0.4);
+  const tin = createCorrugatedTinPBR("#7d8b93", "#6b442b", 2, 1);
   const eave = box(chunk, [backX + 0.95, 3.32, midZ], [2.5, 0.08, spanZ + 0.3], tin, false);
   eave.rotation.z = 0.085;
   for (let z = Z1 + 1.2; z < Z0; z += 3.2) {
@@ -333,18 +408,39 @@ export function buildChoLon(
   const nailX = FRONT_X - 0.62;
   const nailZ = cobaZ + 1.28;
   rod(chunk, [nailX - 0.04, 1.64, nailZ], [nailX + 0.05, 1.64, nailZ], 0.011, caseFrame, 0.011, 5);
-  const paperA = material(0xe0d8c6, 0.96, 0.01);
-  const paperB = material(0xd2c8b2, 0.96, 0.01);
+  // The string of bills — the only prop the mission's dialogue actually points at (A3).
+  //
+  // The first version hung eleven slips 0.10-0.16 m tall at 0.026 m intervals, so they occupied the
+  // same 0.29 m of height as one slip and rendered as a single white smear. A spike of receipts is
+  // not a stack; it is a rosette. Each slip is impaled at one point and hangs outward under its own
+  // weight, so the fan is what tells the eye "eleven bills", and the fan is also why a shopkeeper can
+  // read any one of them without taking the others off.
+  //
+  // Golden-angle spacing puts the bills around the nail without clumping, which is what actually
+  // happens when they are threaded on in a hurry over a morning.
+  const paperA = material(0xe8e1d2, 0.95, 0.01);
+  const paperB = material(0xd8cfbc, 0.95, 0.01);
+  const GOLDEN = 2.3999632297286535;
   for (let b = 0; b < 11; b++) {
-    const h = 0.1 + rand() * 0.06;
+    const angle = b * GOLDEN;
+    const hang = 0.13 + rand() * 0.09;
+    const reach = 0.012 + b * 0.0042; // later bills splay further out
     const slip = box(
       chunk,
-      [nailX + 0.012, 1.57 - b * 0.026, nailZ + (b % 2 === 0 ? 0.018 : -0.018)],
-      [0.007, h, 0.074 + rand() * 0.024],
+      [
+        nailX + 0.02 + Math.cos(angle) * reach,
+        // Top of every slip is at the nail; the body drops from there.
+        1.6 - hang / 2 - b * 0.0016,
+        nailZ + Math.sin(angle) * reach,
+      ],
+      [0.006, hang, 0.062 + rand() * 0.026],
       b % 3 === 0 ? paperB : paperA,
       false,
     );
-    slip.rotation.x = (rand() - 0.5) * 0.14;
+    // Every slip pivots about the nail, so the whole fan is one readable object from any side.
+    slip.rotation.y = angle;
+    slip.rotation.x = (rand() - 0.5) * 0.18;
+    slip.rotation.z = (rand() - 0.5) * 0.22;
   }
   // Her stool behind the counter, and the crate she keeps under it.
   const herStool = new T.Mesh(new T.CylinderGeometry(0.2, 0.18, 0.05, 12), plasticRed());
@@ -360,7 +456,7 @@ export function buildChoLon(
   // what makes carts, porters and the whole economy of the place legible.
   // ---------------------------------------------------------------------------
   plane(chunk, [FRONT_X - DEPTH / 2, 0.028, ALLEY_Z], [DEPTH + 1.6, ALLEY_W], marketFloor, 0, -Math.PI / 2);
-  const alleyWall = material(0x9f9789, 0.94, 0.02);
+  const alleyWall = createWorldFacadePBR("grey_plaster_02", "#a8a094", 3.0, 1.1, 0.94);
   for (const sz of [-1, 1]) {
     box(
       chunk,
@@ -593,7 +689,9 @@ export function buildChoLon(
     root: chunk,
     solids,
     lightSpecs: lightSpecsLocal,
-    cobaStall: { x: cobaX - 1.05, z: cobaZ, yaw: Math.PI / 2 },
+    // The customer stands on the pavement outside the frontage line, facing the counter.
+    cobaStall: { x: FRONT_X + 1.15, z: cobaZ, yaw: -Math.PI / 2 },
+    receiptNail: { x: nailX, y: 1.6, z: nailZ },
     busStops: [
       { x: FRONT_X + 3.9, z: CHO_LON_Z + 1.5, yaw: Math.PI / 2 },
       { x: 3.1, z: 9.4, yaw: -Math.PI / 2 },

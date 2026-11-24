@@ -13,6 +13,9 @@ export default defineConfig({
   },
   server: {
     port: 5174,
+    // The live preview is served from a proxied host under *.e2b.app; without this the dev server
+    // answers 403 and the preview is a blank page.
+    allowedHosts: [".e2b.app"],
   },
   build: {
     chunkSizeWarningLimit: 1500,

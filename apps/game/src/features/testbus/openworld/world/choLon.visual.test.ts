@@ -12,7 +12,8 @@ import { describe, expect, it } from "vitest";
 import * as T from "three";
 import sharp from "sharp";
 import { buildChoLon, CHO_LON_Z } from "./choLon";
-import { collectTriangles, renderLook, type Look } from "./render-world";
+import { collectTriangles, renderLook, textureKey, type Look } from "../../../../test/qa/render-world";
+import { sampleTexture, type SampledTexture } from "../../../../test/qa/texture-sampler";
 
 const OUT = "/home/user/scam-maze/.kiro/qa-output/choLon";
 
@@ -71,6 +72,22 @@ if (typeof HTMLCanvasElement !== "undefined") {
   } as unknown as HTMLCanvasElement["getContext"];
 }
 
+function textureByKey(root: T.Object3D, key: string): T.Texture | undefined {
+  let found: T.Texture | undefined;
+  root.traverse((obj) => {
+    const mesh = obj as T.Mesh;
+    if (found || !mesh.isMesh) return;
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const m of mats) {
+      if (textureKey(m) === key) {
+        found = (m as T.MeshStandardMaterial).map ?? undefined;
+        return;
+      }
+    }
+  });
+  return found;
+}
+
 describe("Chợ Lớn is a place, not a label (R16)", () => {
   it("builds the block, registers the chunk, and stands on the corridor the bus arrives at", () => {
     const root = new T.Group();
@@ -105,6 +122,11 @@ describe("Chợ Lớn is a place, not a label (R16)", () => {
     const lyThaiToStop = handles.busStops[1];
     expect(Math.abs(choLonStop.z - CHO_LON_Z)).toBeLessThan(8);
     expect(Math.abs(lyThaiToStop.z)).toBeLessThan(12);
+    // The nail must be reachable: on the market side of the pavement, at chest-to-shoulder height.
+    expect(handles.receiptNail.x).toBeGreaterThan(-19.5);
+    expect(handles.receiptNail.x).toBeLessThan(7);
+    expect(handles.receiptNail.y).toBeGreaterThan(1.2);
+    expect(handles.receiptNail.y).toBeLessThan(2.0);
 
     // The block must be solid where it is a wall, or the player walks through the market.
     expect(solids.length).toBeGreaterThanOrEqual(18);
@@ -149,10 +171,17 @@ describe("Chợ Lớn is a place, not a label (R16)", () => {
         width: 640,
       },
       {
+        // The player's own eye-line at Cô Ba's counter: standing on the pavement, looking slightly
+        // down and left into the display case and the receipt string above it. This is the frame the
+        // mission's key prop has to survive, so it is framed like a shot, not like a survey.
         name: "03-coba-counter",
-        eye: [handles.cobaStall.x + 1.45, 1.58, handles.cobaStall.z + 0.55],
-        target: [handles.cobaStall.x - 1.6, 1.34, handles.cobaStall.z - 0.1],
-        fov: 62,
+        // Standing square to the counter, 2.2 m back on the pavement: the distance a person stops at
+        // when they are about to speak to the vendor. The earlier frame stood almost against the
+        // display case, so the shutter and the case filled the shot and the receipt string — the one
+        // prop this mission is built on — was behind the camera's own shoulder.
+        eye: [handles.cobaStall.x + 1.05, 1.62, handles.cobaStall.z + 2.2],
+        target: [handles.cobaStall.x - 2.3, 1.2, handles.cobaStall.z - 0.15],
+        fov: 58,
         width: 640,
       },
       {
@@ -184,6 +213,16 @@ describe("Chợ Lớn is a place, not a label (R16)", () => {
         width: 640,
       },
       {
+        // W6: the inspect frame. The mission's proof object is eleven bills on a nail, and a player
+        // who leans in is the only one who ever sees them. If this frame cannot be read, the prop
+        // does not exist no matter how correct the geometry is.
+        name: "09-inspect-the-receipts",
+        eye: [handles.receiptNail.x + 0.62, 1.63, handles.receiptNail.z + 0.5],
+        target: [handles.receiptNail.x, handles.receiptNail.y - 0.05, handles.receiptNail.z],
+        fov: 42,
+        width: 640,
+      },
+      {
         name: "08-plan-from-above",
         eye: [1.0, 15.0, CHO_LON_Z + 2.0],
         target: [-8.4, 0.0, CHO_LON_Z - 9.0],
@@ -193,21 +232,72 @@ describe("Chợ Lớn is a place, not a label (R16)", () => {
     ];
 
     mkdirSync(OUT, { recursive: true });
-    const tris = collectTriangles(root);
-    const report: string[] = [`# Chợ Lớn — CPU-rasterised visual QA`, `triangles: ${tris.length}`, ""];
+
+    // Decode every image this chunk actually binds, so the frames show surfaces rather than blocks.
+    // A material whose image cannot be decoded stays a flat colour AND lowers `texturedShare`, which
+    // the report prints and the test asserts — the tool is not allowed to claim a texture it did not
+    // draw.
+    const textures = new Map<string, SampledTexture | null>();
+    root.traverse((obj) => {
+      const mesh = obj as T.Mesh;
+      if (!mesh.isMesh) return;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const m of mats) {
+        const key = textureKey(m);
+        if (key && !textures.has(key)) textures.set(key, null);
+      }
+    });
+    for (const key of [...textures.keys()]) {
+      textures.set(key, await sampleTexture(textureByKey(root, key)));
+    }
+
+    const tris = collectTriangles(root, textures);
+    const texturedTris = tris.filter((tri) => tri.textured).length;
+    const texturedShare = tris.length ? texturedTris / tris.length : 0;
+    const imageSources = [...textures.entries()]
+      .filter(([, v]) => v)
+      .map(([, v]) => `  - ${(v as SampledTexture).source} (${(v as SampledTexture).width}px)`);
+    const report: string[] = [
+      `# Chợ Lớn — CPU-rasterised visual QA`,
+      ``,
+      `triangles: ${tris.length}`,
+      `triangles on a decoded image: ${texturedTris} (${(texturedShare * 100).toFixed(1)}%)`,
+      `distinct images decoded: ${imageSources.length}`,
+      ...imageSources,
+      ``,
+      `Not proved here: mipmapping, anisotropy, sRGB decode, normal maps, shadowing, the`,
+      `tropical-weathering shader. This box has no GPU.`,
+      ``,
+    ];
 
     for (const look of looks) {
-      const res = renderLook(tris, look);
+      const res = renderLook(tris, look, textures);
       const png = await sharp(res.raw, {
         raw: { width: res.width, height: res.height, channels: 3 },
       })
         .png()
         .toBuffer();
       writeFileSync(`${OUT}/${look.name}.png`, png);
-      report.push(`${look.name}: coverage ${(res.coverage * 100).toFixed(1)}%`);
+      report.push(
+        `${look.name}: coverage ${(res.coverage * 100).toFixed(1)}%, textured ${(res.texturedPixels * 100).toFixed(1)}% of drawn pixels`,
+      );
       // A sightline that sees nothing is a failed sightline, not a subtle one.
       expect(res.coverage, `${look.name} sees nothing`).toBeGreaterThan(0.2);
     }
+    // The whole point of this round: the surfaces the eye spends its time on must be built from real
+    // scanned material, not flat colour. Measured in *drawn pixels*, not triangles — twelve facade
+    // triangles fill half a frame and five thousand crate triangles fill none, so a triangle count
+    // reports the opposite of what a player sees.
+    //
+    // The bar is per-sightline and low on purpose. The market is genuinely full of small flat-coloured
+    // objects (stools, crates, produce, cabling) and they should stay flat: they are 20 cm props, not
+    // architecture, and texturing them is where a scene starts to look like a texture demo. What must
+    // not happen is the *ground and the walls* being flat, which is what the first version got wrong.
+    for (const line of report.filter((r) => r.includes("coverage"))) {
+      const pct = Number(/textured ([\d.]+)%/.exec(line)?.[1] ?? 0);
+      expect(pct, `a sightline is almost entirely flat colour: ${line}`).toBeGreaterThan(15);
+    }
+    expect(texturedShare, "no material in the block binds a real image").toBeGreaterThan(0);
     writeFileSync(`${OUT}/report.md`, report.join("\n"));
   });
 });
