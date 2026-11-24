@@ -95,3 +95,70 @@ describe("Chapter 1 canonical 5-mission Story NPC system", () => {
     expect(hungLocked.mood).toBe("defensive");
   });
 });
+
+describe("the ride to District 5 is described without a verdict (W0)", () => {
+  // The numbers came from published 2026 sources, not from taste: the bus waits 4 and rides 34
+  // (`simulation/transit.ts`), an app bike for this trip is ~2,000-5,400đ/km, and a GrabBike driver
+  // keeps 60-86% of the fare after the 2026 platform-fee review. A rider who is trying to win a
+  // fare quotes figures that are true to him; he does not quote a warning.
+  const VERDICT = /\b(warning|red flag|scam|dangerous|unsafe|risky ignore)\b|(cảnh báo nhiệm vụ|dấu hiệu cảnh giác)/i;
+
+  const stringsOf = (turn: ReturnType<typeof resolveStoryNpcDialogue>) =>
+    [
+      turn.ambientBark?.en,
+      turn.ambientBark?.vi,
+      ...turn.lines.flatMap((line) => [line.en, line.vi]),
+      ...turn.replies.flatMap((reply) => [
+        reply.label.en,
+        reply.label.vi,
+        reply.response.en,
+        reply.response.vi,
+        reply.insight?.en ?? "",
+        reply.insight?.vi ?? "",
+      ]),
+      turn.hookNote?.en ?? "",
+      turn.hookNote?.vi ?? "",
+    ].filter((entry): entry is string => typeof entry === "string");
+
+  it("keeps every string of the rider free of verdict words", () => {
+    const turn = resolveStoryNpcDialogue("unverified_driver", {
+      elapsedMinutes: 900,
+      thesisProgress: 60,
+      fatigue: 20,
+      money: 2_500_000,
+      flags: { draftFinished: true },
+    });
+    for (const text of stringsOf(turn)) {
+      expect(text).not.toMatch(VERDICT);
+    }
+  });
+
+  it("keeps every string of Minh's ride briefing free of verdict words", () => {
+    const turn = resolveStoryNpcDialogue("minh", {
+      elapsedMinutes: 900,
+      thesisProgress: 60,
+      fatigue: 20,
+      money: 2_500_000,
+      flags: { draftFinished: true },
+    });
+    for (const text of stringsOf(turn)) {
+      expect(text).not.toMatch(VERDICT);
+    }
+  });
+
+  it("does not quote the superseded app fare or the superseded bus wait", () => {
+    // `105k` was ~3x the real 2026 fare and made the unverified rider look thrifty;
+    // "forty minutes" contradicted a 4-minute wait in the shipped route data.
+    const turn = resolveStoryNpcDialogue("unverified_driver", {
+      elapsedMinutes: 900,
+      thesisProgress: 60,
+      fatigue: 20,
+      money: 2_500_000,
+      flags: { draftFinished: true },
+    });
+    for (const text of stringsOf(turn)) {
+      expect(text).not.toMatch(/105\s?k|105\s?ngàn|105,000/i);
+      expect(text).not.toMatch(/forty minutes|bốn chục phút/i);
+    }
+  });
+});

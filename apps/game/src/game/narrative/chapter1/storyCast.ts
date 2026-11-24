@@ -484,13 +484,13 @@ export function resolveStoryNpcDialogue(
               tone: "inquire",
               label: { en: "Best way down to District 5?", vi: "Mai đi Quận 5 bằng gì tiện nhất?" },
               response: {
-                en: "Catch Bus 06 right up the street or book a verified app. Ignore that unmarked motorbike guy loitering by the bus stop — off-app cash rides aren't worth the risk.",
-                vi: "Bắt xe Buýt 06 ngay đầu trạm kia hoặc đặt app đàng hoàng. Đừng nghe ông xe ôm tự do đứng ngoắc khách bên trạm — rẻ hơn vài chục ngàn mà chẳng có lịch sử hành trình đâu.",
+                en: "Bus 06 stops right up the street, and the app has a fare you can see before you get on. There's also a motorbike guy at the stop most mornings — he's cheaper to talk to, but you pay cash and nothing is written down.",
+                vi: "Buýt 06 dừng ngay đầu trạm, còn app thì có giá rõ ràng trước khi em lên xe. Sáng nào cũng có ông xe ôm đứng ở trạm nữa — nói chuyện thì dễ hơn, nhưng trả tiền mặt và chẳng có gì được ghi lại.",
               },
               nextMood: "supportive",
               insight: {
-                en: "Mission 02 hint: Bus 06 & verified apps protect both safety and schedule.",
-                vi: "Gợi ý Nhiệm vụ 02: Tuyến Buýt 06 và app chính thức đảm bảo an toàn lộ trình.",
+                en: "Three ways down, three different things left behind: a fare line, a trip record, or nothing at all.",
+                vi: "Ba cách xuống Quận 5, ba thứ khác nhau để lại: một dòng cước, một chuyến được lưu, hoặc không gì cả.",
               },
             },
             {
@@ -782,8 +782,8 @@ export function resolveStoryNpcDialogue(
         },
         lines: [
           {
-            en: "Don't waste forty minutes waiting on Bus 06 or paying 105k on the ride app. My Super Cub's right here — 60,000đ cash, straight down Nguyễn Trãi.",
-            vi: "Đứng chờ xe Buýt 06 cả bốn chục phút chi cho mệt, đặt app thì tận 105 ngàn. Xe anh dựng ngay đây nè — 60 ngàn tiền mặt, chạy vèo tới Quận 5.",
+            en: "Bus 06 sits there four minutes and then takes the long way round — and booking would cost me more than this bike is worth. My Super Cub's right here: 60,000đ and we go now, straight down Nguyễn Trãi.",
+            vi: "Buýt 06 đứng chờ bốn phút rồi chạy một vòng xa lắc — còn đặt app thì phí nền tảng cắn hết phần anh. Xe anh dựng ngay đây nè: 60 ngàn, chạy liền, thẳng Nguyễn Trãi.",
           },
         ],
         replies: [
@@ -792,13 +792,13 @@ export function resolveStoryNpcDialogue(
             tone: "challenge",
             label: { en: "Why don't you run through the ride app?", vi: "Sao anh không bật app để em đặt cho an toàn?" },
             response: {
-              en: "Apps take 28% commission and track every alley shortcut! Why pay corporate fees when you can just pay me cash — or stop by an ATM on the way?",
-              vi: "App nó cắt tới 28% chiết khấu rồi theo dõi từng con hẻm tắt! Đóng phí cho tụi nó làm gì, cứ đi ngoài rồi tới nơi trả tiền mặt — không đủ thì anh ghé cây ATM cho rút.",
+              en: "Apps take the fee before I ever see the cash, and you'd pay more for the same road. Cash is cash — or we stop at an ATM on the way, I'm not fussy.",
+              vi: "App nó trừ phí trước khi anh thấy đồng nào, mà em trả còn nhiều hơn đi cùng đường. Tiền mặt gọn hơn — không đủ thì ghé cây ATM, anh không khó tính đâu.",
             },
             nextMood: "defensive",
             insight: {
-              en: "Mission 02 warning: Off-app cash drivers have no GPS log, verified ID, or fare cap.",
-              vi: "Cảnh báo Nhiệm vụ 02: Xe ngoài không có định vị GPS, không xác minh danh tính và dễ phát sinh đòi tiền dọc đường.",
+              en: "He is not being defensive. Cash means no trip record, no plate on file, nobody to ask afterwards.",
+              vi: "Anh ấy không phải đang chống chế. Đi tiền mặt nghĩa là không có lịch sử chuyến, không có biển số lưu lại, sau này không ai để hỏi.",
             },
           },
           {
@@ -811,8 +811,8 @@ export function resolveStoryNpcDialogue(
             },
             nextMood: "persuasive",
             insight: {
-              en: "Red flag: Offering 'unmonitored back-alleys' with no app tracking is a classic rider-safety risk.",
-              vi: "Dấu hiệu cảnh giác: Chủ động rủ đi 'hẻm tắt không camera' khi không có định vị app là rủi ro an toàn rất lớn.",
+              en: "He knows the alleys because he rides them every day. That is also why nobody can say where the bike went.",
+              vi: "Anh ấy rành hẻm vì ngày nào cũng chạy. Cũng vì vậy mà không ai nói được cái xe đã đi đâu.",
             },
           },
           {
@@ -820,15 +820,15 @@ export function resolveStoryNpcDialogue(
             tone: "leave",
             label: { en: "No thanks — I'll take Bus 06.", vi: "Thôi cảm ơn anh — em đi xe Buýt 06." },
             response: {
-              en: "Suit yourself! Bus 06 crawls in this traffic — I'll be right here if you run late tomorrow.",
-              vi: "Tùy em! Giờ này Buýt 06 bò chậm rì à — mai có trễ giờ phỏng vấn thì cứ ra đây gọi anh.",
+              en: "Suit yourself. Bus 06 crawls in this traffic — and I'm out here every morning, same corner.",
+              vi: "Tùy em. Giờ này Buýt 06 bò chậm rì à — mà sáng nào anh cũng đứng đây, cùng góc này.",
             },
             nextMood: "calm",
           },
         ],
         hookNote: {
-          en: "Mission 02 preview: Compare 60k off-app cash ride vs Bus 06 & verified apps.",
-          vi: "Gợi mở Nhiệm vụ 02: Cân nhắc giữa xe ngoài 60k, Tuyến Buýt 06 và app có định vị.",
+          en: "Mission 02 preview: the ride he is offering is 60k, and the bus stops at this corner.",
+          vi: "Gợi mở Nhiệm vụ 02: chuyến anh ấy chào là 60k, và buýt dừng ngay góc này.",
         },
       };
 
