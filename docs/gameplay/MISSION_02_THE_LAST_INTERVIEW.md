@@ -157,11 +157,15 @@ What *is* true, and it is the useful part:
 engine's paper and its sound, and let the authored `inspectionText` replace the generic caption in
 this scenario only. The parked story keeps its own three entries; nothing is edited in it.
 
-Consequences that survive from v2: taking the slip is a `INTERACT_OBJECT` dispatch that sets
-`trackingSlipOnPerson`, and **the room's own caption line is the fallback** when the chapter does not
-provide one — which is exactly the graceful degradation the mission wants if a save predates the
-interactable. Cost: one `interactables` row, one prompt string, one vi key per field, and **zero**
-changes to `roomv2`.
+**Corrected in Slice A, after the code said no.** `INTERACT_OBJECT` appends to `state.interacted` and
+discovers `reveals`; it cannot set a flag. So reading the slip is **text and a record**, and nothing
+else — which is also the honest model: reading a paper does not change what the player will do, only
+what they know. Every state move in the parcel thread lives on a device action instead. There is no
+`trackingSlipOnPerson` flag: the slip's payoff is the 4-minute lookup in the courier app (the phone
+number route costs 8), and that difference is created by what the app says, not by owning paper.
+
+Cost as shipped: one `interactables` row, one long `inspectionText` per locale, and **zero** changes
+to `roomv2`. The room's own caption remains the fallback if a save predates the row.
 
 ---
 
@@ -320,12 +324,17 @@ so the street's dialogue reacts to M02 **with no new plumbing**.
 
 ## 10. Data model
 
-### 10.1 Flags (6, not 10 — `foundation.test.ts:78` asserts the exact object)
+### 10.1 Flags (6 planned; 3 shipped in Slice A — `foundation.test.ts:78` asserts the exact object)
 
 ```ts
-"trackingSlipOnPerson", "recorderOnPerson", "parcelFeePaid",
-"parcelCredentialsExposed", "cobaTrustsAlex", "interviewDone",
+shipped:  "parcelCredentialsExposed", "parcelFeePaid", "parcelAtCounter",
+later:    "recorderOnPerson" (Slice D), "cobaTrustsAlex" + "interviewDone" (Slice C),
 ```
+
+`parcelAtCounter` replaces the v3 `trackingSlipOnPerson`: it records *what the player learned*, which
+is what the game can actually write, and it is the flag the 13:30 closing event reads. Adding a flag
+before anything writes it makes the validator's new producer check pass on nothing and leaves dead
+state in the save — the three "later" flags land with the slice that first sets them.
 
 Deliberately dropped from v2: `rideOffAppTaken` / `rideDisputed` live in the **open world**, not the
 core, until Slice B wires a host; `cobaGuarded` is derived from `interviewDone` + a `check-times`
@@ -372,7 +381,7 @@ v3 takes **(2) as a precondition of Slice C**, not a nice-to-have: without it, a
 deletes M02 from every playthrough and the validator stays silent. The parked story is unaffected —
 it has no `persistent` conditions.
 
-### 10.3 The events (3)
+### 10.3 The events (3 planned; `m02.counter-closes` shipped)
 
 ```ts
 { id: "m02.ring", channel: "call", optional: false, autoResolve: false,

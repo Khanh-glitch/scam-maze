@@ -91,18 +91,12 @@ export const PERSISTENT_FLAG_IDS = [
   "finalDraftReviewed",
   /** Alex asked the supervisor for feedback on the draft (Mission 01 thesis desk). */
   "supervisorFeedbackRequested",
-  /** The courier's tracking slip is in Alex's pocket (Mission 02, the paper on the desk). */
-  "trackingSlipOnPerson",
   /** Alex typed his student number and card number on the redelivery page (Mission 02). */
   "parcelCredentialsExposed",
   /** Alex paid the 22,000 VND redelivery fee the page asked for (Mission 02). */
   "parcelFeePaid",
   /** A parcel lookup showed the parcel is waiting at the Chợ Lớn counter (Mission 02). */
   "parcelAtCounter",
-  /** The interview in District 5 happened, whatever came of it (Mission 02). */
-  "interviewDone",
-  /** Cô Ba saw Alex check something in front of her, and answered him (Mission 02). */
-  "cobaTrustsAlex",
 ] as const;
 export type PersistentFlagId = (typeof PERSISTENT_FLAG_IDS)[number];
 export type PersistentFlags = Record<PersistentFlagId, boolean>;
@@ -173,12 +167,9 @@ export const CHAPTER_1_INITIAL_STATE: ChapterInitialState = {
     findingsReconciled: false,
     finalDraftReviewed: false,
     supervisorFeedbackRequested: false,
-    trackingSlipOnPerson: false,
     parcelCredentialsExposed: false,
     parcelFeePaid: false,
     parcelAtCounter: false,
-    interviewDone: false,
-    cobaTrustsAlex: false,
   },
 };
 

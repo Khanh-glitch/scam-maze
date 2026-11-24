@@ -115,12 +115,9 @@ describe("a new game", () => {
       findingsReconciled: false,
       finalDraftReviewed: false,
       supervisorFeedbackRequested: false,
-      trackingSlipOnPerson: false,
       parcelCredentialsExposed: false,
       parcelFeePaid: false,
       parcelAtCounter: false,
-      interviewDone: false,
-      cobaTrustsAlex: false,
     });
   });
 
