@@ -264,7 +264,13 @@ export function buildChoLon(
   // land on the road or on the street's pavement.
   // ---------------------------------------------------------------------------
   const frontX = FRONT_X + 1.4;            // -19.2: the market's east edge
-  const gateZ = midZ;                       // the entrance bay faces the middle of the block
+  // The gate does NOT go at the block's geometric middle. A density sweep of tree vertices along
+  // the west pavement found z -136 almost clear (3 vertices in a 4 m band, against 1317 at -152),
+  // and z -144 nearly clear too. Placing the tower where the street already has a gap in its canopy
+  // means it is seen from the road on the first try, instead of being planted behind a plane tree
+  // and argued about. The market's own entrance is also offset from its centre in the real one:
+  // Bình Tây's main gate is on Tháp Mười, not at the middle of its 89.2 m frontage.
+  const gateZ = Z1 + 16;                    // -136: a gap the trees already leave
   const colMat = createWorldFacadePBR("painted_plaster_wall", "#b8ac97", 2.2, 1.0, 0.9);
   const beamMat = createWorldFacadePBR("concrete_wall_007", "#a9a294", 2.4, 0.9, 0.94);
 
