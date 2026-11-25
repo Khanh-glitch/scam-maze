@@ -848,14 +848,48 @@ export function buildChoLon(
     }
   }
 
-  // The narrow permanent eave over the back wall: enough to keep stock dry, narrow enough that it
-  // never becomes the roof of the market.
+  // The eave over the back wall — in two runs with a gap between them.
+  //
+  // Bình Tây keeps its interior lit by the space between two roofs: a slot along the ridge that
+  // lets daylight and moving air down into the hall, which is why the real market is bearable at
+  // midday without air conditioning. The courtyard that does the same job in the middle of the real
+  // building is 2 500 m² — seven times this entire market, so it cannot be copied here.
+  //
+  // The gap can. The eave runs in two lengths with a 1.4 m slot over the produce aisle at z -128,
+  // and the slot is the brightest thing under the fabric: a shaft of 11:00 light landing on the
+  // wet floor, which is the one interior effect a market of this size actually has.
   const tin = createCorrugatedTinPBR("#7d8b93", "#6b442b", 2, 1);
-  const eave = box(chunk, [backX + 0.95, 3.32, midZ], [2.5, 0.08, spanZ + 0.3], tin, false);
-  eave.rotation.z = 0.085;
-  for (let z = Z1 + 1.2; z < Z0; z += 3.2) {
-    box(chunk, [backX + 0.95, 3.18, z], [2.6, 0.1, 0.12], material(0x4a4f52, 0.62, 0.5), false);
+  const slotZ = midZ;
+  const slotHalf = 0.7;
+  const runs: [number, number][] = [
+    [Z1 - 0.15, slotZ - slotHalf],
+    [slotZ + slotHalf, Z0 + 0.15],
+  ];
+  for (const [z0, z1] of runs) {
+    const len = z1 - z0;
+    if (len < 0.6) continue;
+    const cz = (z0 + z1) / 2;
+    const eave = box(chunk, [backX + 0.95, 3.32, cz], [2.5, 0.08, len], tin, false);
+    eave.rotation.z = 0.085;
+    for (let z = z0 + 1.2; z < z1; z += 3.2) {
+      box(chunk, [backX + 0.95, 3.18, z], [2.6, 0.1, 0.12], material(0x4a4f52, 0.62, 0.5), false);
+    }
   }
+  // The light the slot lets in: a soft cone from the opening down to the floor, additive so it
+  // reads as daylight on wet concrete rather than a painted stripe.
+  const shaft = new T.Mesh(
+    new T.CylinderGeometry(0.55, 1.5, 3.2, 12, 1, true),
+    new T.MeshBasicMaterial({
+      color: 0xfff0d0,
+      transparent: true,
+      opacity: 0.11,
+      side: T.DoubleSide,
+      depthWrite: false,
+      blending: T.AdditiveBlending,
+    }),
+  );
+  shaft.position.set(backX + 1.6, 1.9, slotZ);
+  chunk.add(shaft);
 
   // ---------------------------------------------------------------------------
   // STALLS — a line of tables under the fabric, not an open hall.
