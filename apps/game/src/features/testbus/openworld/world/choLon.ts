@@ -281,16 +281,162 @@ export function buildChoLon(
   // The beam the columns carry, running the length of the frontage.
   box(chunk, [frontX - 0.55, 4.48, midZ], [0.46, 0.34, spanZ - 1.6], beamMat, false);
 
-  // The entrance bay: two taller piers and a lintel, framing the way in.
-  for (const dz of [-2.6, 2.6]) {
-    box(chunk, [frontX - 0.45, 2.6, gateZ + dz], [0.62, 5.2, 0.62], colMat, false);
-    box(chunk, [frontX - 0.45, 5.32, gateZ + dz], [0.74, 0.3, 0.74], beamMat, false);
-    solids.push(rect(frontX - 0.45, gateZ + dz, 0.62, 0.62));
+  // ---------------------------------------------------------------------------
+  // THE GATE TOWER
+  //
+  // The first frontage I built was a row of columns under a beam — a district market, not this one.
+  // Bình Tây's main gate on Tháp Mười is a tower: 13.1 m to the top, three tiers of Guangdong roof
+  // with upturned eaves, a clock face on each of its four sides, blue-and-white ceramic dragon
+  // relief at its base, and "lưỡng long tranh châu" — two dragons fighting over a pearl — on the
+  // ridge. Twelve gates in all; the rest are canopies with yin-yang red and green tiles.
+  //
+  // Everything below is inside the market's own footprint at x -19.2. The tower is 7 m across the
+  // frontage and 13.1 m tall, which is the published height of the real one.
+  // ---------------------------------------------------------------------------
+  const TOWER_H = 13.1;
+
+  // Two piers carrying the tower, 7 m apart, standing on the frontage line.
+  for (const dz of [-3.5, 3.5]) {
+    box(chunk, [frontX - 0.45, 2.6, gateZ + dz], [0.9, 5.2, 0.9], colMat, false);
+    solids.push(rect(frontX - 0.45, gateZ + dz, 0.9, 0.9));
   }
-  box(chunk, [frontX - 0.45, 5.36, gateZ], [0.66, 0.44, 5.9], beamMat, false);
+  // The portal itself: an opening you walk through, not a wall you look at.
+  box(chunk, [frontX - 0.45, 5.2, gateZ], [0.86, 0.6, 7.9], beamMat, false);
+
+  // The tower body above the portal: 7 m across, 5 m deep into the market, carried up to the roof.
+  // The tower body sits 2.5 m back from the frontage: a 5.0 m body centred at -21.7 spans
+  // -24.2..-19.2, so its east face is flush with the market's edge at -19.2 and no part of a
+  // 13.1 m tower hangs over the road's pavement. (The first version centred it at -17.6 and put
+  // 2.8 m of tower on the street's ground; street-collision.test.ts caught it.)
+  // Tall and slim: a gate tower's body is a shaft, not a block. 4.2 m across the frontage, 5.6 m
+  // deep, carried from the portal lintel at 5.5 m to 10.6 m — 5.1 m of shaft under a roof stack that
+  // only just overhangs it. The first version was 5.0 x 7.0 x 5.4 with roofs 7.6 wide, which is why
+  // it read as a pavilion with a hat rather than a tower.
+  box(chunk, [frontX - 2.5, 5.5 + 2.55, gateZ], [4.2, 5.1, 5.6], colMat);
+  // A band of yellow ceramic tile across the body, which is the colour the market is known for.
+  const tileBand = material(0xc9a23a, 0.7, 0.08);
+  for (const yy of [6.4, 9.0]) {
+    box(chunk, [frontX - 0.38, yy, gateZ], [0.06, 0.34, 5.64], tileBand, false);
+  }
+
+  // The dragon-and-pearl relief at the base, blue glazed ceramic on white: a flat panel with the
+  // two dragons meeting over a disc, drawn rather than modelled, which is how it reads at 15 m.
+  const relief = label(512, 200, (ctx) => {
+    ctx.fillStyle = "#e8e4d8";
+    ctx.fillRect(0, 0, 512, 200);
+    ctx.strokeStyle = "#2f5f8f";
+    ctx.fillStyle = "#2f5f8f";
+    ctx.lineWidth = 9;
+    // Two dragon bodies as curves, mirrored, meeting at the pearl.
+    for (const mirror of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(256 + mirror * 210, 150);
+      ctx.bezierCurveTo(256 + mirror * 150, 40, 256 + mirror * 70, 170, 256 + mirror * 26, 96);
+      ctx.stroke();
+      // head
+      ctx.beginPath();
+      ctx.ellipse(256 + mirror * 26, 96, 20, 13, mirror * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // the pearl
+    ctx.beginPath();
+    ctx.arc(256, 88, 24, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(256, 88, 11, 0, Math.PI * 2);
+    ctx.fill();
+    // a hint of the mosaic field the dragons swim in
+    ctx.globalAlpha = 0.22;
+    for (let i = 0; i < 90; i++) {
+      const x = (i * 137) % 512, y = (i * 61) % 200;
+      ctx.fillStyle = i % 2 ? "#6a9ac4" : "#c8d8e4";
+      ctx.fillRect(x, y, 4, 4);
+    }
+    ctx.globalAlpha = 1;
+  });
+  if (relief instanceof T.MeshStandardMaterial) {
+    relief.roughness = 0.42;
+    relief.metalness = 0.12;
+  }
+  plane(chunk, [frontX - 0.42, 7.0, gateZ], [3.4, 2.0], relief, Math.PI / 2);
+
+  // The clock: one face on each of the four sides, so the gate works from the road and from the
+  // aisle. Drawn, not a sphere — a market clock is a painted dial in a square frame.
+  const clockFace = label(256, 256, (ctx) => {
+    ctx.fillStyle = "#f2ede0";
+    ctx.fillRect(0, 0, 256, 256);
+    ctx.strokeStyle = "#2a2622";
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.arc(128, 128, 100, 0, Math.PI * 2);
+    ctx.stroke();
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      ctx.lineWidth = i % 3 === 0 ? 8 : 4;
+      ctx.beginPath();
+      ctx.moveTo(128 + Math.cos(a) * 88, 128 + Math.sin(a) * 88);
+      ctx.lineTo(128 + Math.cos(a) * 100, 128 + Math.sin(a) * 100);
+      ctx.stroke();
+    }
+    // 8:40, the hour the market is busiest.
+    ctx.lineWidth = 9;
+    ctx.beginPath(); ctx.moveTo(128, 128); ctx.lineTo(128 + Math.cos(-1.15) * 62, 128 + Math.sin(-1.15) * 62); ctx.stroke();
+    ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(128, 128); ctx.lineTo(128 + Math.cos(0.9) * 86, 128 + Math.sin(0.9) * 86); ctx.stroke();
+  });
+  const clockY = 9.5;
+  plane(chunk, [frontX - 0.42, clockY, gateZ], [1.55, 1.55], clockFace, Math.PI / 2);
+  plane(chunk, [frontX - 4.58, clockY, gateZ], [1.55, 1.55], clockFace, -Math.PI / 2);
+  plane(chunk, [frontX - 2.5, clockY, gateZ + 2.82], [1.55, 1.55], clockFace, 0);
+  plane(chunk, [frontX - 2.5, clockY, gateZ - 2.82], [1.55, 1.55], clockFace, Math.PI);
+
+  // Three tiers of Guangdong roof, each wider than the one below and each with upturned eaves.
+  // The tile is the market's red, and the tier heights are what make the tower read as a pagoda
+  // gate rather than a clock on a box.
+  const roofTile = createWorldFacadePBR("terracotta_roof", "#8e2f22", 1.6, 0.9, 0.92);
+  const eaveMat = material(0x5e1f16, 0.86, 0.02);
+  // Roof tiers are centred on the body. The widest is 7.6 m across and its horns add ~1.0 m, so a
+  // centre at -21.7 keeps the whole roof east edge at about -17.9... which would still overhang.
+  // The lower two tiers are therefore held to 6.6 m, giving an east edge of -18.4 + horns, and the
+  // top tier — the one that reads from across the road — stays full width.
+  const tiers = [
+    { y: 10.8, w: 5.4, d: 6.9 },
+    { y: 11.8, w: 4.7, d: 6.2 },
+    { y: TOWER_H - 0.55, w: 3.7, d: 5.0 },
+  ];
+  for (const [ti, t] of tiers.entries()) {
+    // The slab.
+    box(chunk, [frontX - 2.5, t.y, gateZ], [t.w, 0.34, t.d], roofTile, false);
+    // Eaves: four corner horns, bent upward. This is the detail that says Guangdong.
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      const horn = new T.Mesh(new T.ConeGeometry(0.3, 1.5, 6), eaveMat);
+      horn.position.set(frontX - 2.5 + sx * (t.w / 2 - 0.1), t.y + 0.5, gateZ + sz * (t.d / 2 - 0.1));
+      horn.rotation.set(sz * 0.9, 0, -sx * 0.75);
+      horn.scale.set(1, 1, 0.55);
+      chunk.add(horn);
+    }
+    // Ridge tile along the two long sides.
+    for (const sx of [-1, 1]) {
+      box(chunk, [frontX - 2.5 + sx * (t.w / 2 - 0.16), t.y + 0.24, gateZ], [0.22, 0.3, t.d - 0.2], eaveMat, false);
+    }
+    if (ti < 2) continue;
+    // The crowning ridge: "lưỡng long tranh châu" — two dragons curving up to a pearl.
+    for (const sz of [-1, 1]) {
+      const dragon = new T.Mesh(new T.TorusGeometry(0.62, 0.11, 5, 10, Math.PI * 0.92), eaveMat);
+      dragon.position.set(frontX - 2.5 + sz * 0.75, t.y + 0.66, gateZ);
+      dragon.rotation.set(Math.PI / 2, 0, sz * 0.6);
+      chunk.add(dragon);
+    }
+    const pearl = new T.Mesh(
+      new T.SphereGeometry(0.3, 10, 8),
+      new T.MeshStandardMaterial({ color: 0xd8b652, roughness: 0.32, metalness: 0.5, emissive: new T.Color(0x6a4a10), emissiveIntensity: 0.25 }),
+    );
+    pearl.position.set(frontX - 2.5, t.y + 0.82, gateZ);
+    chunk.add(pearl);
+  }
 
   // Name over the gate, in the same weather-beaten enamel as the shop signs: CHỢ LỚN, and the
-  // Chinese name underneath, because this is Chợ Lớn and not a shopping centre.
+  // Chinese name with it, because this is Chợ Lớn and not a shopping centre.
   const gateSign = label(1024, 256, (ctx) => {
     ctx.fillStyle = "#7d1f16";
     ctx.fillRect(0, 0, 1024, 256);
@@ -307,12 +453,12 @@ export function buildChoLon(
     ctx.fillStyle = "#f3e3c0";
     ctx.shadowColor = "#ffd79a";
     ctx.shadowBlur = 10;
-    ctx.font = "800 104px system-ui, sans-serif";
-    ctx.fillText("堤岸 CHỢ LỚN", 512, 128);
+    ctx.font = "800 96px system-ui, sans-serif";
+    ctx.fillText("堤岸 CHỢ LỚN", 512, 122);
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 0.9;
-    ctx.font = "600 48px system-ui, sans-serif";
-    ctx.fillText("CHỢ LỚN · BÌNH TÂY", 512, 200);
+    ctx.font = "600 44px system-ui, sans-serif";
+    ctx.fillText("CHỢ LỚN · BÌNH TÂY", 512, 196);
     ctx.globalAlpha = 1;
   });
   if (gateSign instanceof T.MeshStandardMaterial) {
@@ -322,9 +468,8 @@ export function buildChoLon(
     gateSign.roughness = 0.52;
     gateSign.metalness = 0.06;
   }
-  // Faces +x, out toward the road.
-  plane(chunk, [frontX - 0.12, 5.9, gateZ], [5.6, 1.4], gateSign, Math.PI / 2);
-  box(chunk, [frontX - 0.2, 5.9, gateZ], [0.1, 1.56, 5.72], material(0x2a2622, 0.6, 0.35), false);
+  plane(chunk, [frontX + 0.02, 5.85, gateZ], [5.4, 1.35], gateSign, Math.PI / 2);
+  box(chunk, [frontX - 0.08, 5.85, gateZ], [0.1, 1.5, 5.5], material(0x2a2622, 0.6, 0.35), false);
 
   // 6c. NO SECOND TERRACE ROW.
   //
