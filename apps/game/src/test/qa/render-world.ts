@@ -250,11 +250,42 @@ export function renderLook(
     z: v.z,
   });
 
+  /**
+   * A triangle with any vertex at or behind the eye plane cannot be projected: `v.z <= 0` divides by
+   * zero or flips the sign, the screen-space area becomes NaN, and the whole triangle — including
+   * the part genuinely in front of the camera — is discarded.
+   *
+   * This is why an 880 m ground plane never appeared in any QA frame: its corners are far behind the
+   * eye, so the plane was always dropped as a unit. Every "the market is floating in a void" picture
+   * in this repository was the rasteriser's bug, not the world's.
+   */
+  const nearClip = (a: T.Vector3, b: T.Vector3, c: T.Vector3): [T.Vector3, T.Vector3, T.Vector3] | null => {
+    const NEAR = 0.05;
+    const inside = (v: T.Vector3) => v.z > NEAR;
+    const ia = inside(a), ib = inside(b), ic = inside(c);
+    if (ia && ib && ic) return [a, b, c];
+    if (!ia && !ib && !ic) return null;
+    const out: T.Vector3[] = [];
+    const edge = (p: T.Vector3, q: T.Vector3, pIn: boolean) => {
+      if (pIn) out.push(p);
+      if (pIn !== inside(q)) {
+        const t = (NEAR - p.z) / (q.z - p.z);
+        out.push(new T.Vector3().lerpVectors(p, q, t));
+      }
+    };
+    edge(a, b, ia); edge(b, c, ib); edge(c, a, ic);
+    if (out.length < 3) return null;
+    return [out[0], out[1], out[2]];
+  };
+
   const fillTriangle = (
-    va: T.Vector3, vb: T.Vector3, vc: T.Vector3,
+    vaIn: T.Vector3, vbIn: T.Vector3, vcIn: T.Vector3,
     qa: T.Vector2, qb: T.Vector2, qc: T.Vector2,
     color: [number, number, number], tex: SampledTexture | null, tintCol: [number, number, number] | null,
   ) => {
+    const clipped = nearClip(vaIn, vbIn, vcIn);
+    if (!clipped) return;
+    const [va, vb, vc] = clipped;
     const p0 = project(va);
     const p1 = project(vb);
     const p2 = project(vc);

@@ -1908,7 +1908,13 @@ export function buildSaigonDistricts(
       return false;
     },
     isWithinOpenWorld(x: number, z: number) {
-      if (x >= -19.5 && x <= 7.0 && z >= -316 && z <= 48) return true;
+      // THE WESTERN MARKET STRIP IS PART OF THE WORLD NOW.
+      //
+      // The old western edge was x = -19.5, which put the market's own ground out of bounds: a player
+      // could look at it from the road and not walk into it. Lý Thái Tổ's real carriageway runs from
+      // x = -12.56 to -0.24, so everything from -25 to -12.56 is the market's strip and its back
+      // wall, and it has to be walkable for the block to be a place rather than scenery.
+      if (x >= -25.0 && x <= 7.0 && z >= -316 && z <= 48) return true;
       if (x >= 4.5 && x <= 31.8 && z >= -19.2 && z <= -6.6) return true;
       if (x >= 0 && x <= 132 && (Math.abs(z + 76) <= 10.6 || Math.abs(z + 147) <= 10.6)) return true;
       if (x >= 46 && x <= 66 && z >= -236 && z <= -65.6) return true;

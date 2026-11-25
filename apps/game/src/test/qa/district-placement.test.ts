@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 import * as T from "three";
 import sharp from "sharp";
 import { buildSaigonDistricts } from "../../features/testbus/openworld/world/saigonDistricts";
+import { buildStreet } from "../../features/testbus/openworld/simulation/street";
 import { CHO_LON_X, CHO_LON_Z } from "../../features/testbus/openworld/world/choLon";
 import { collectTriangles, renderLook, type Look } from "./render-world";
 import { sampleTexture, type SampledTexture } from "./texture-sampler";
@@ -51,6 +52,14 @@ describe("the Chợ Lớn block in its district (placement, not decoration)", ()
     const scene = new T.Scene();
     const streamer = { register: () => undefined, getZone: () => ({}) } as never;
     const districts = buildSaigonDistricts(scene, streamer, false);
+    // THE ROAD WAS NEVER IN THESE FRAMES.
+    //
+    // `OpenWorldEngine` builds two separate scenes: `buildStreet` owns Lý Thái Tổ and
+    // `buildSaigonDistricts` owns the districts, and both are added to the same exterior group. A QA
+    // harness that renders only the district scene therefore renders a city with no street in it —
+    // which is exactly why the market could sit "on the road" through four rounds of pictures and
+    // nobody could see it: the pictures had no road. Build both.
+    buildStreet(scene, false);
     const root = districts.root;
 
     const textures = new Map<string, SampledTexture | null>();
@@ -107,7 +116,7 @@ describe("the Chợ Lớn block in its district (placement, not decoration)", ()
         name: "plan-02-street-level-approach",
         // Down the street from the south-east, eye height just above a person, so the market frontage
         // and the far terrace both sit in the frame the way a player meets them.
-        eye: [4.4, 2.4, CHO_LON_Z + 24.0],
+        eye: [-3.0, 2.4, CHO_LON_Z + 24.0],
         target: [CHO_LON_X, 1.2, CHO_LON_Z - 4.0],
         fov: 62,
         width: 900,
@@ -116,10 +125,46 @@ describe("the Chợ Lớn block in its district (placement, not decoration)", ()
         // Stand on the service lane behind the market and look north: is the block's back wall
         // cutting through the district's existing riverside frontage at x -17..-15?
         name: "plan-04-behind-the-market",
-        eye: [-20.5, 2.2, CHO_LON_Z - 40.0],
-        target: [-14.0, 2.0, CHO_LON_Z + 6.0],
+        eye: [-24.0, 2.2, CHO_LON_Z - 40.0],
+        target: [-18.0, 2.0, CHO_LON_Z + 6.0],
         fov: 66,
         width: 900,
+      },
+      {
+        // The only floored, structure-free plot the site search found: x 48..70, z -306..-264.
+        // Before relocating anything into it, look at it.
+        name: "plan-07-the-only-free-plot",
+        eye: [59.0, 26.0, -240.0],
+        target: [59.0, 0.0, -285.0],
+        fov: 70,
+        width: 1000,
+      },
+      {
+        // Exactly the strip the market is being considered for: stand on the real Lý Thái Tổ
+        // carriageway at z = -128 and look west across x -12.6..-19.5.
+        name: "plan-09-the-west-strip",
+        eye: [-6.4, 1.7, CHO_LON_Z],
+        target: [-19.5, 1.5, CHO_LON_Z],
+        fov: 74,
+        width: 1000,
+      },
+      {
+        // The best free site the two-scene scan found near the bus corridor:
+        // x -60..-48, z -150..-106. Look at it before committing a market to it.
+        name: "plan-10-the-free-site",
+        eye: [-30.0, 30.0, -128.0],
+        target: [-54.0, 0.0, -128.0],
+        fov: 74,
+        width: 1000,
+      },
+      {
+        // The western land the walkable bound currently excludes: x -60..-20, z -170..-90.
+        // This is where an extended world would put the market.
+        name: "plan-08-the-western-land",
+        eye: [-16.0, 34.0, -128.0],
+        target: [-42.0, 0.0, -128.0],
+        fov: 76,
+        width: 1000,
       },
       {
         // Bird's eye: the whole block from 60 m up. This is the frame that answers, at a glance,
@@ -135,8 +180,8 @@ describe("the Chợ Lớn block in its district (placement, not decoration)", ()
         // at the houses this chunk added. This is the frame that must not show a row of identical
         // grey boxes.
         name: "plan-05-the-added-terrace",
-        eye: [-7.4, 1.72, CHO_LON_Z + 22.0],
-        target: [6.4, 4.6, CHO_LON_Z - 8.0],
+        eye: [-8.8, 1.72, CHO_LON_Z + 22.0],
+        target: [5.0, 4.6, CHO_LON_Z - 8.0],
         fov: 72,
         width: 900,
       },
@@ -145,7 +190,7 @@ describe("the Chợ Lớn block in its district (placement, not decoration)", ()
         name: "plan-03-cross-the-road",
         // Stand on the far pavement, at the kerb, where a pedestrian waits to cross. x = 10.5 was
         // inside the far terrace this round added; a camera inside a wall reports the wall.
-        eye: [5.6, 1.78, CHO_LON_Z],
+        eye: [-2.2, 1.78, CHO_LON_Z],
         target: [CHO_LON_X, 1.5, CHO_LON_Z],
         fov: 64,
         width: 900,

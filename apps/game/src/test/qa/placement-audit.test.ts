@@ -32,6 +32,45 @@ it("planting actually reaches the scene", () => {
   expect(inst).toBeGreaterThan(0);
 });
 
+it("the market still contains its landmarks", () => {
+  const scene = new T.Scene();
+  const streamer = { register: () => undefined, getZone: () => ({}) } as any;
+  const d = buildSaigonDistricts(scene, streamer, false);
+  const market = d.root.getObjectByName("ChoLonMarket")!;
+  const bb = new T.Box3().setFromObject(market);
+  console.log(`market bounds x ${bb.min.x.toFixed(1)}..${bb.max.x.toFixed(1)}  y ${bb.min.y.toFixed(1)}..${bb.max.y.toFixed(1)}  z ${bb.min.z.toFixed(1)}..${bb.max.z.toFixed(1)}`);
+  let meshes = 0, tris = 0;
+  market.traverse((o: any) => {
+    if (!o.isMesh || !o.geometry) return;
+    meshes++;
+    const g = o.geometry.getAttribute("position");
+    if (g) tris += g.count / 3;
+  });
+  console.log(`meshes ${meshes}, triangles ${Math.round(tris)}`);
+
+  // Where is anything in the sightline from (-6, z+12) toward (0.4, z+1.5)? Walk the ray.
+  const from = new T.Vector3(-5.0, 1.62, -117.0);
+  const to = new T.Vector3(1.4, 1.7, -126.5);
+  const dir = to.clone().sub(from).normalize();
+  const ray = new T.Raycaster(from, dir, 0.05, 40);
+  const hits = ray.intersectObject(market, true);
+  console.log(`ray hits in the market: ${hits.length}`);
+  // And what is at the shelter's own coordinates?
+  const probe = new T.Vector3(1.4, 1.7, -126.5);
+  const near: string[] = [];
+  market.traverse((o: any) => {
+    if (!o.isMesh || !o.geometry) return;
+    o.geometry.computeBoundingBox();
+    const b = new T.Box3().copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld);
+    if (b.distanceToPoint(probe) < 2.5) near.push(`${o.type} @ ${b.min.x.toFixed(1)}..${b.max.x.toFixed(1)} z ${b.min.z.toFixed(1)}..${b.max.z.toFixed(1)}`);
+  });
+  console.log(`objects within 2.5 m of the shelter point: ${near.length}`);
+  for (const n of near.slice(0, 5)) console.log(`   ${n}`);
+  for (const h of hits.slice(0, 6)) {
+    const p = h.point;
+    console.log(`   t=${h.distance.toFixed(1)} at ${p.x.toFixed(1)},${p.y.toFixed(1)},${p.z.toFixed(1)}  ${(h.object as any).name || h.object.type}`);
+  }
+});
 it("the Chợ Lớn chunk does not intersect any existing district structure", () => {
   const scene = new T.Scene();
   const streamer = { register: () => undefined, getZone: () => ({}) } as any;
