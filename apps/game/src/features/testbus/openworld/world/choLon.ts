@@ -274,12 +274,20 @@ export function buildChoLon(
   const colMat = createWorldFacadePBR("painted_plaster_wall", "#b8ac97", 2.2, 1.0, 0.9);
   const beamMat = createWorldFacadePBR("concrete_wall_007", "#a9a294", 2.4, 0.9, 0.94);
 
+  // Side gates. Bình Tây has a main gate and twelve side ones, across a 2.5 ha footprint — one every
+  // four metres of frontage if you copy the number. This market is 48 m by 7 m, seventy-four times
+  // smaller, so the count is scaled rather than copied: two side gates, one near each end, at the
+  // 1-in-17 m a real block of this length would have. Copying twelve here would give a gate every
+  // 4 m on a 7 m deep block, which is a colonnade with holes in it, not a market.
+  const SIDE_GATES = [Z1 + 7, Z0 - 9];
+
   // Colonnade: a square column every 3.05 m, standing 0.55 m inside the frontage so the columns read
   // as a portico rather than a fence. This is the one thing that says "public building" from across
   // a road.
   for (let z = Z1 + 2.0; z < Z0 - 1.0; z += 3.05) {
-    // Leave the entrance bay clear: a market you cannot walk into is a wall.
+    // Leave the entrance bays clear: a market you cannot walk into is a wall.
     if (Math.abs(z - gateZ) < 2.6) continue;
+    if (SIDE_GATES.some((g) => Math.abs(z - g) < 1.7)) continue;
     box(chunk, [frontX - 0.55, 2.1, z], [0.42, 4.2, 0.42], colMat, false);
     box(chunk, [frontX - 0.55, 4.32, z], [0.5, 0.24, 0.5], beamMat, false);
     solids.push(rect(frontX - 0.55, z, 0.42, 0.42));
@@ -308,6 +316,39 @@ export function buildChoLon(
   }
   // The portal itself: an opening you walk through, not a wall you look at.
   box(chunk, [frontX - 0.45, 5.2, gateZ], [0.86, 0.6, 7.9], beamMat, false);
+
+  // The two side gates: a narrower pier pair and a low lintel, no tower. A side gate in a real
+  // market is a way in, not a monument, and giving them towers would fight the main one.
+  for (const sz of SIDE_GATES) {
+    for (const dz of [-1.45, 1.45]) {
+      box(chunk, [frontX - 0.4, 1.5, sz + dz], [0.5, 3.0, 0.5], colMat, false);
+      solids.push(rect(frontX - 0.4, sz + dz, 0.5, 0.5));
+    }
+    box(chunk, [frontX - 0.4, 3.1, sz], [0.54, 0.42, 3.4], beamMat, false);
+    // A small enamel plate over each side gate: the same alphabet as the main sign, one character
+    // and the Vietnamese, because a side entrance is still an entrance.
+    const sideSign = label(384, 128, (ctx) => {
+      ctx.fillStyle = "#6f1c14";
+      ctx.fillRect(0, 0, 384, 128);
+      ctx.strokeStyle = "#2a2622";
+      ctx.lineWidth = 7;
+      ctx.strokeRect(4, 4, 376, 120);
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#f0dfba";
+      ctx.font = "700 54px system-ui, sans-serif";
+      ctx.fillText(sz < gateZ ? "南門" : "北門", 192, 60);
+      ctx.font = "600 26px system-ui, sans-serif";
+      ctx.fillText(sz < gateZ ? "CỔNG NAM" : "CỔNG BẮC", 192, 100);
+    });
+    if (sideSign instanceof T.MeshStandardMaterial) {
+      sideSign.emissiveMap = sideSign.map;
+      sideSign.emissive = new T.Color(0xffdca8);
+      sideSign.emissiveIntensity = 0.16;
+      sideSign.roughness = 0.55;
+      sideSign.metalness = 0.05;
+    }
+    plane(chunk, [frontX - 0.11, 3.62, sz], [3.0, 1.0], sideSign, Math.PI / 2);
+  }
 
   // The tower body above the portal: 7 m across, 5 m deep into the market, carried up to the roof.
   // The tower body sits 2.5 m back from the frontage: a 5.0 m body centred at -21.7 spans
