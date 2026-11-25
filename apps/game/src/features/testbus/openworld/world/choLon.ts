@@ -251,7 +251,82 @@ export function buildChoLon(
   // — tables, stools, canopies, produce, and the real GLB bikes and stools — stays where the market
   // owns the ground, under the fabric, between -19.2 and -25.8.
   //
-  // 6b. NO SECOND TERRACE ROW.
+  // ---------------------------------------------------------------------------
+  // 6b. THE MARKET'S OWN FRONTAGE — the thing you see from the road
+  //
+  // Removing the generic west infill across z -152..-104 (in `simulation/street.ts`) opened the
+  // block face, but an open face is not a market. Bình Tây fronts Tháp Mười for 108.6 m with a gate
+  // tower, a colonnade and its name over the entrance; a market that is simply a gap is a car park.
+  //
+  // This builds that frontage on the market's own ground at x -19.2: a colonnade of square columns,
+  // a deep entrance bay at the middle where the vendor aisle starts, and a gooseneck sign over it
+  // carrying the market's name. Everything sits inside the market's footprint, so nothing here can
+  // land on the road or on the street's pavement.
+  // ---------------------------------------------------------------------------
+  const frontX = FRONT_X + 1.4;            // -19.2: the market's east edge
+  const gateZ = midZ;                       // the entrance bay faces the middle of the block
+  const colMat = createWorldFacadePBR("painted_plaster_wall", "#b8ac97", 2.2, 1.0, 0.9);
+  const beamMat = createWorldFacadePBR("concrete_wall_007", "#a9a294", 2.4, 0.9, 0.94);
+
+  // Colonnade: a square column every 3.05 m, standing 0.55 m inside the frontage so the columns read
+  // as a portico rather than a fence. This is the one thing that says "public building" from across
+  // a road.
+  for (let z = Z1 + 2.0; z < Z0 - 1.0; z += 3.05) {
+    // Leave the entrance bay clear: a market you cannot walk into is a wall.
+    if (Math.abs(z - gateZ) < 2.6) continue;
+    box(chunk, [frontX - 0.55, 2.1, z], [0.42, 4.2, 0.42], colMat, false);
+    box(chunk, [frontX - 0.55, 4.32, z], [0.5, 0.24, 0.5], beamMat, false);
+    solids.push(rect(frontX - 0.55, z, 0.42, 0.42));
+  }
+  // The beam the columns carry, running the length of the frontage.
+  box(chunk, [frontX - 0.55, 4.48, midZ], [0.46, 0.34, spanZ - 1.6], beamMat, false);
+
+  // The entrance bay: two taller piers and a lintel, framing the way in.
+  for (const dz of [-2.6, 2.6]) {
+    box(chunk, [frontX - 0.45, 2.6, gateZ + dz], [0.62, 5.2, 0.62], colMat, false);
+    box(chunk, [frontX - 0.45, 5.32, gateZ + dz], [0.74, 0.3, 0.74], beamMat, false);
+    solids.push(rect(frontX - 0.45, gateZ + dz, 0.62, 0.62));
+  }
+  box(chunk, [frontX - 0.45, 5.36, gateZ], [0.66, 0.44, 5.9], beamMat, false);
+
+  // Name over the gate, in the same weather-beaten enamel as the shop signs: CHỢ LỚN, and the
+  // Chinese name underneath, because this is Chợ Lớn and not a shopping centre.
+  const gateSign = label(1024, 256, (ctx) => {
+    ctx.fillStyle = "#7d1f16";
+    ctx.fillRect(0, 0, 1024, 256);
+    const gr = ctx.createLinearGradient(0, 0, 0, 256);
+    gr.addColorStop(0, "rgba(14,12,10,0.34)");
+    gr.addColorStop(0.3, "rgba(255,255,255,0.05)");
+    gr.addColorStop(1, "rgba(10,9,7,0.42)");
+    ctx.fillStyle = gr;
+    ctx.fillRect(0, 0, 1024, 256);
+    ctx.strokeStyle = "#2a2622";
+    ctx.lineWidth = 12;
+    ctx.strokeRect(6, 6, 1012, 244);
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#f3e3c0";
+    ctx.shadowColor = "#ffd79a";
+    ctx.shadowBlur = 10;
+    ctx.font = "800 104px system-ui, sans-serif";
+    ctx.fillText("堤岸 CHỢ LỚN", 512, 128);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 0.9;
+    ctx.font = "600 48px system-ui, sans-serif";
+    ctx.fillText("CHỢ LỚN · BÌNH TÂY", 512, 200);
+    ctx.globalAlpha = 1;
+  });
+  if (gateSign instanceof T.MeshStandardMaterial) {
+    gateSign.emissiveMap = gateSign.map;
+    gateSign.emissive = new T.Color(0xffdca8);
+    gateSign.emissiveIntensity = 0.22;
+    gateSign.roughness = 0.52;
+    gateSign.metalness = 0.06;
+  }
+  // Faces +x, out toward the road.
+  plane(chunk, [frontX - 0.12, 5.9, gateZ], [5.6, 1.4], gateSign, Math.PI / 2);
+  box(chunk, [frontX - 0.2, 5.9, gateZ], [0.1, 1.56, 5.72], material(0x2a2622, 0.6, 0.35), false);
+
+  // 6c. NO SECOND TERRACE ROW.
   //
   // Round 27 added fourteen tube houses on the east side of this street. `simulation/street.ts`
   // already builds the east side of Lý Thái Tổ — shopfronts at x ~0.9..4.85 with balconies, awnings
