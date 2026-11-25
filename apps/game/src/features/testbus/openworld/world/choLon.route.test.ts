@@ -95,24 +95,21 @@ describe("bus 06, which waits in front of the alley", () => {
     expect(ROUTE.viaZ).toBeGreaterThan(ROUTE.destinationZ);
   });
 
-  it("runs a short route along the near lane, not down the middle of the road", () => {
-    const length = Math.abs(ROUTE.approachZ - ROUTE.destinationZ);
-    expect(length).toBeGreaterThan(100);
-    expect(length).toBeLessThan(250);
-    // The stop has to be on the market's side of the carriageway, not the far one. The bus used to
-    // wait at -1.54 (the east kerb), which left a passenger 17.5 m from the nearest stall with
-    // 12.32 m of moving traffic in between. `curbX` must now be in the west half of the road.
-    const centre = (ROAD_MIN + ROAD_MAX) / 2;
-    expect(ROUTE.curbX).toBeLessThan(centre);
-    // Inside the asphalt, not on the pavement and not off the far side.
-    expect(ROUTE.curbX).toBeGreaterThan(ROAD_MIN);
-    // A 2.55 m body at the stop keeps its east flank clear of the centre line.
-    expect(ROUTE.curbX + 2.55 / 2).toBeLessThan(centre);
-    // And its west flank may overhang the kerb by less than a metre — a bus noses into the kerb to
-    // let people off, it does not park in the middle of the lane.
-    const overhang = ROAD_MIN - (ROUTE.curbX - 2.55 / 2);
-    expect(overhang).toBeGreaterThan(-0.1);
-    expect(overhang).toBeLessThan(1.2);
+  it("stops in its own lane, on the side its own edge runs", () => {
+    // Ground truth is the traffic graph, not a reading of Vietnamese traffic law. Lý Thái Tổ is
+    // mapped as one-way NB edges at x = -3.2 with car lanes at -4.65 and -2.75. Bus 06 is registered
+    // onto those edges, so its stop must sit near -3.2 — not on the far side of a 12.32 m road.
+    //
+    // This assertion replaces one that only required `curbX` to be "inside the west half", which
+    // passed happily while the bus was waiting in the opposing direction.
+    const EDGE_X = -3.2;              // roadGraph.ts: LTT_*_NB start/end x
+    const OUTER_LANE = EDGE_X + 0.45; // carLaneOffsets[1] = -2.75
+    // Within a bus door's reach of the outer lane: a bus noses in, it does not sit centred on it.
+    expect(Math.abs(ROUTE.curbX - OUTER_LANE)).toBeLessThan(0.7);
+    // On the asphalt, in the outer lane: west of the east kerb (ROAD_MAX = -0.24) and a clear
+    // 1.3 m short of it, which is where a bus's nearside wheels actually run.
+    expect(ROUTE.curbX).toBeLessThan(ROAD_MAX);
+    expect(ROUTE.curbX).toBeGreaterThan(ROAD_MAX - 3.0);
   });
 
   it("covers 159 m in a realistic 23 km/h, not in a stated 0.28 km/h", () => {
@@ -139,21 +136,22 @@ describe("bus 06, which waits in front of the alley", () => {
 });
 
 describe("getting off the bus outside the market", () => {
-  it("puts the passenger a short pavement walk from the stalls, with no road to cross", () => {
-    // Alighting on the west flank of the bus, which is the kerb side.
-    const doorX = ROUTE.curbX - 2.55 / 2;
-    const toMarketEdge = Math.abs(doorX - CHO_LON_X); // CHO_LON_X is the market's frontage lane
-    // The pavement between the kerb and the market is 6.5 m. Under ten metres, but real: there is a
-    // pavement, a lane in front of the market, and then the stalls.
-    expect(toMarketEdge).toBeGreaterThan(5);
-    expect(toMarketEdge).toBeLessThan(10);
-    // Crucially: the whole walk is west of the road's west edge, so nobody steps into a lane.
-    expect(doorX).toBeLessThanOrEqual(ROAD_MIN + 1);
+  it("leaves a road crossing, because the market is across the road", () => {
+    // The bus stops on its own carriageway edge at -2.3. The market's edge is at -19.06. That is
+    // 16.76 m of kerb, footway, two lanes and a median — and the passenger crosses all of it.
+    // The market's own edge, not its centre: `CHO_LON_X` is the centre line of the block, and the
+    // forecourt column line stands 1.4 m east of it at FRONT_X + 1.4.
+    const marketEdge = CHO_LON_X + 1.4;
+    const toMarketEdge = Math.abs(ROUTE.curbX - marketEdge);
+    expect(toMarketEdge).toBeGreaterThan(15);
+    expect(toMarketEdge).toBeLessThan(18);
+    // The stop must stay on the road: west of the east kerb and clear of the west one.
+    expect(ROUTE.curbX).toBeGreaterThan(ROAD_MIN);
   });
 
-  it("is a shorter walk than the old east-kerb stop by more than half", () => {
-    const oldStop = Math.abs(-1.54 - CHO_LON_X);
-    const newStop = Math.abs(ROUTE.curbX - 2.55 / 2 - CHO_LON_X);
-    expect(newStop).toBeLessThan(oldStop / 2);
+  it("no longer pretends a bus can shorten that crossing by changing lanes", () => {
+    // The -12.2 version I wrote made the walk 6.9 m and looked marvellous in a frame. It also put
+    // the bus in the opposing lane. Distance is not an optimisation target here.
+    expect(Math.abs(ROUTE.curbX - (CHO_LON_X + 1.4))).toBeGreaterThan(10);
   });
 });

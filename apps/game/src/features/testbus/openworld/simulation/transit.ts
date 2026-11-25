@@ -14,20 +14,24 @@ export const ROUTE = {
   destinationZ: -128,
   approachZ: 31,
   /**
-   * The bus used to wait at `curbX = -1.54`, the east kerb. That is the wrong side of the road for
-   * this route: Chợ Lớn is at `x -25.78..-19.06`, so a passenger alighting at -1.54 is still 17.5 m
-   * east of the nearest stall, across 12.32 m of moving traffic. The bus now runs the west lane and
-   * puts its door on the market side.
+   * The stop is in the bus's own lane, on the side it is entitled to, and this was got wrong twice.
    *
-   * -12.2 is the west lane centre: the carriageway is `x -12.56..-0.24`, and a 2.55 m body at -12.2
-   * spans -13.48..-10.92, so its west flank overhangs the kerb by 0.9 m and the body is clear of the
-   * centre line. Alighting puts the passenger on the west pavement, 6.5 m from the market's edge at
-   * -19.06 — a pavement walk, not a road crossing.
+   * Ground truth is the traffic graph, not a guess about traffic law. `roadGraph.ts` maps Lý Thái Tổ
+   * as one-way NB edges — `LTT_S_NB`, `LTT_M1_NB`, `LTT_M2_NB`, `LTT_N_NB` — all running at
+   * `x = -3.2` with `carLaneOffsets: [-1.45, 0.45]`, so the two car lanes sit at x -4.65 and -2.75.
+   * `TrafficManager.registerBus06` places the bus at `latOffset = x - (-3.2)`. Route 06 therefore
+   * runs the -3.2 edge southward, and its stop belongs near that edge's outer lane, about -2.6.
    *
-   * It cannot stop closer than that. The strip between the street's west shop row (dense to x -17)
-   * and the market (from -19.06) is a 1.5 m gap, and the bus is 2.55 m wide.
+   * Round 30 changed this to -12.2 to "put the door on the market side". That is the far side of
+   * the carriageway from the bus's own edge — the opposite direction of travel — and it made the
+   * bus cross two lanes of oncoming traffic to reach a stop on the wrong side. Reverted to -2.3.
+   *
+   * -2.3 is the outer car lane's outer edge (-2.75 plus half a body) rather than the kerb at -1.54:
+   * the bus noses in to load but does not park on the pavement. A passenger steps off, stands on the
+   * kerb, and walks 16.5 m west to the market — which is the honest distance, because the market is
+   * on the other side of a 12.32 m road and a bus cannot fix that by stopping in the wrong lane.
    */
-  curbX: -12.2,
+  curbX: -2.3,
 } as const;
 
 export type Phase = 'waiting' | 'approaching' | 'boarding' | 'departing' | 'driving' | 'arrived' | 'complete';
