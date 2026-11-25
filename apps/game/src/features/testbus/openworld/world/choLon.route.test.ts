@@ -17,6 +17,7 @@ import { ROOM_ANCHOR } from "./boardingHouse";
 import { CURB_HEIGHT } from "../simulation/boarding";
 // The main road, and the market.
 import { CHO_LON_X, CHO_LON_Z, ROAD_MAX, ROAD_MIN } from "./choLon";
+import { ROUTE } from "../simulation/transit";
 
 /** The iron gate of khu trọ 462/14, from `boardingHouse.ts` — the street end of the alley. */
 const GATE_X = 13.25;
@@ -76,5 +77,55 @@ describe("the route from the boarding house to the market", () => {
     expect(CHO_LON_Z).toBeLessThan(MARKET_Z0);
     expect(CHO_LON_Z).toBeGreaterThan(MARKET_Z1);
     expect(CHO_LON_X).toBeLessThan(ROAD_MIN);
+  });
+});
+
+describe("bus 06, which waits in front of the alley", () => {
+  it("stops exactly at the market", () => {
+    // The route's destination and the market's own centre are the same coordinate. If one moves,
+    // the bus leaves the player somewhere else, and this fails.
+    expect(ROUTE.destinationZ).toBe(CHO_LON_Z);
+  });
+
+  it("passes one named stop on the way", () => {
+    expect(ROUTE.origin).toBe("Lý Thái Tổ");
+    expect(ROUTE.via).toBe("Châu Văn Liêm");
+    // The via stop falls between the approach and the market, on the way south.
+    expect(ROUTE.viaZ).toBeLessThan(ROUTE.approachZ);
+    expect(ROUTE.viaZ).toBeGreaterThan(ROUTE.destinationZ);
+  });
+
+  it("runs a short route along the near lane, not down the middle of the road", () => {
+    const length = Math.abs(ROUTE.approachZ - ROUTE.destinationZ);
+    expect(length).toBeGreaterThan(100);
+    expect(length).toBeLessThan(250);
+    // The stop is west of the road's centre line, so the bus waits on the near (west-bound) side.
+    expect(ROUTE.curbX).toBeGreaterThan(ROAD_MIN);
+    expect(ROUTE.curbX).toBeLessThan(0);
+    // And it is outside the east kerb, i.e. the stop is on the pavement, not in a traffic lane.
+    // This is what the first version of this test got wrong: -1.54 is east of ROAD_MAX at -0.24.
+    expect(ROUTE.curbX).toBeLessThan(ROAD_MAX);
+  });
+
+  it("covers 159 m in a realistic 23 km/h, not in a stated 0.28 km/h", () => {
+    // The number the player experiences: z = destinationZ * smoothstep(driving), driving += dt/30.
+    // Peak nominal speed is (|destinationZ| / 30) * 1.5 at the midpoint of the smoothstep.
+    const peak = (Math.abs(ROUTE.destinationZ) / 30) * 1.5;
+    expect(peak).toBeGreaterThan(5);
+    expect(peak).toBeLessThan(9);
+    expect(peak * 3.6).toBeGreaterThan(18);
+    expect(peak * 3.6).toBeLessThan(28);
+
+    // What the route is *stated* as is story-clock minutes. Those two are deliberately different,
+    // and the temptation to "fix" one to match the other is exactly what this asserts against.
+    const naive = Math.abs(ROUTE.approachZ - ROUTE.destinationZ) / (ROUTE.rideMinutes * 60);
+    expect(naive).toBeLessThan(0.1); // 0.078 m/s if you divide distance by story minutes
+    expect(ROUTE.rideMinutes).toBe(34);
+  });
+
+  it("costs one flat fare less than the cash in the player's pocket", () => {
+    expect(ROUTE.fare).toBe(7000);
+    expect(ROUTE.initialCash).toBeGreaterThan(ROUTE.fare);
+    expect(ROUTE.number).toBe("06");
   });
 });
