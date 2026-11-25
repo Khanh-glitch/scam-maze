@@ -13,7 +13,21 @@ export const ROUTE = {
   viaZ: -66,
   destinationZ: -128,
   approachZ: 31,
-  curbX: -1.54,
+  /**
+   * The bus used to wait at `curbX = -1.54`, the east kerb. That is the wrong side of the road for
+   * this route: Chợ Lớn is at `x -25.78..-19.06`, so a passenger alighting at -1.54 is still 17.5 m
+   * east of the nearest stall, across 12.32 m of moving traffic. The bus now runs the west lane and
+   * puts its door on the market side.
+   *
+   * -12.2 is the west lane centre: the carriageway is `x -12.56..-0.24`, and a 2.55 m body at -12.2
+   * spans -13.48..-10.92, so its west flank overhangs the kerb by 0.9 m and the body is clear of the
+   * centre line. Alighting puts the passenger on the west pavement, 6.5 m from the market's edge at
+   * -19.06 — a pavement walk, not a road crossing.
+   *
+   * It cannot stop closer than that. The strip between the street's west shop row (dense to x -17)
+   * and the market (from -19.06) is a 1.5 m gap, and the bus is 2.55 m wide.
+   */
+  curbX: -12.2,
 } as const;
 
 export type Phase = 'waiting' | 'approaching' | 'boarding' | 'departing' | 'driving' | 'arrived' | 'complete';

@@ -99,12 +99,20 @@ describe("bus 06, which waits in front of the alley", () => {
     const length = Math.abs(ROUTE.approachZ - ROUTE.destinationZ);
     expect(length).toBeGreaterThan(100);
     expect(length).toBeLessThan(250);
-    // The stop is west of the road's centre line, so the bus waits on the near (west-bound) side.
+    // The stop has to be on the market's side of the carriageway, not the far one. The bus used to
+    // wait at -1.54 (the east kerb), which left a passenger 17.5 m from the nearest stall with
+    // 12.32 m of moving traffic in between. `curbX` must now be in the west half of the road.
+    const centre = (ROAD_MIN + ROAD_MAX) / 2;
+    expect(ROUTE.curbX).toBeLessThan(centre);
+    // Inside the asphalt, not on the pavement and not off the far side.
     expect(ROUTE.curbX).toBeGreaterThan(ROAD_MIN);
-    expect(ROUTE.curbX).toBeLessThan(0);
-    // And it is outside the east kerb, i.e. the stop is on the pavement, not in a traffic lane.
-    // This is what the first version of this test got wrong: -1.54 is east of ROAD_MAX at -0.24.
-    expect(ROUTE.curbX).toBeLessThan(ROAD_MAX);
+    // A 2.55 m body at the stop keeps its east flank clear of the centre line.
+    expect(ROUTE.curbX + 2.55 / 2).toBeLessThan(centre);
+    // And its west flank may overhang the kerb by less than a metre — a bus noses into the kerb to
+    // let people off, it does not park in the middle of the lane.
+    const overhang = ROAD_MIN - (ROUTE.curbX - 2.55 / 2);
+    expect(overhang).toBeGreaterThan(-0.1);
+    expect(overhang).toBeLessThan(1.2);
   });
 
   it("covers 159 m in a realistic 23 km/h, not in a stated 0.28 km/h", () => {
@@ -127,5 +135,25 @@ describe("bus 06, which waits in front of the alley", () => {
     expect(ROUTE.fare).toBe(7000);
     expect(ROUTE.initialCash).toBeGreaterThan(ROUTE.fare);
     expect(ROUTE.number).toBe("06");
+  });
+});
+
+describe("getting off the bus outside the market", () => {
+  it("puts the passenger a short pavement walk from the stalls, with no road to cross", () => {
+    // Alighting on the west flank of the bus, which is the kerb side.
+    const doorX = ROUTE.curbX - 2.55 / 2;
+    const toMarketEdge = Math.abs(doorX - CHO_LON_X); // CHO_LON_X is the market's frontage lane
+    // The pavement between the kerb and the market is 6.5 m. Under ten metres, but real: there is a
+    // pavement, a lane in front of the market, and then the stalls.
+    expect(toMarketEdge).toBeGreaterThan(5);
+    expect(toMarketEdge).toBeLessThan(10);
+    // Crucially: the whole walk is west of the road's west edge, so nobody steps into a lane.
+    expect(doorX).toBeLessThanOrEqual(ROAD_MIN + 1);
+  });
+
+  it("is a shorter walk than the old east-kerb stop by more than half", () => {
+    const oldStop = Math.abs(-1.54 - CHO_LON_X);
+    const newStop = Math.abs(ROUTE.curbX - 2.55 / 2 - CHO_LON_X);
+    expect(newStop).toBeLessThan(oldStop / 2);
   });
 });
