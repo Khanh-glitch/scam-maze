@@ -23,7 +23,7 @@
 // must not walk through, and a streamer registration so the chunk streams like the rest.
 import * as T from "three";
 import { CURB_HEIGHT, rect, type Solid } from "../simulation/boarding";
-import { box, contact, contactMaterial, material, plane, random, rod, tube } from "../simulation/scene-kit";
+import { box, contact, contactMaterial, label, material, plane, random, rod, tube } from "../simulation/scene-kit";
 import {
   createCorrugatedTinPBR,
   createGranitePlazaPBR,
@@ -32,6 +32,8 @@ import {
 } from "./pbrTextures";
 import { buildRealisticPottedPlants, SaigonBotanicalBatch } from "./foliageAndProps";
 import { hasProp, propSize, queueWorldProp } from "../../../khupho/world/streetFurniture";
+import { createRealSaigonShophousePBR } from "./pbrTextures";
+import { addVietnameseShophouseRelief } from "./gtaRealism";
 import type { PooledLightSpec } from "./boardingHouse";
 import type { WorldStreamer } from "./WorldStreamer";
 
@@ -306,20 +308,31 @@ export function buildChoLon(
   // The terrace wall used to be a single FlatColor 0xb0a696 over 48 m, which is 48 m of nothing.
   // `createWorldFacadePBR` projects UVs from world space, so one tile covers a fixed ~3.4 m of wall
   // however long the box is — the same function, and the same weathering shader, as the D1 frontages.
-  const stucco = createWorldFacadePBR("painted_plaster_wall", "#c9bda9", 3.4, 1.0, 0.9);
   const stuccoWarm = createWorldFacadePBR("clay_plaster", "#d3c0a4", 3.4, 0.9, 0.88);
   const backX = FRONT_X - DEPTH + 0.42;
-  const wallH = 7.6;
-  box(chunk, [backX, wallH / 2, midZ], [0.92, wallH, spanZ], stucco);
-  box(chunk, [backX, wallH + 0.15, midZ], [1.16, 0.3, spanZ], createWorldFacadePBR("concrete_wall_007", "#b6ada0", 2.0, 0.7, 0.92), false);
-  for (let z = Z1 + BAY; z < Z0; z += BAY * 4) {
-    box(chunk, [backX + 0.52, wallH / 2, z], [0.16, wallH - 0.2, 0.4], stuccoWarm, false);
-  }
-  // Ground-floor openings behind the stalls: warm interior recesses, not texture. This is what the
-  // player sees past the canopies, and depth is what sells the block.
-  // A shophouse interior at 08:40 is dim but never black: a fluorescent tube over a counter, spill
-  // from the street. The first version used 0x17140f at 0.3 emissive and rendered as a void — which
-  // put the mission's receipt string against pure black and made the prop unreadable.
+
+  // ---------------------------------------------------------------------------
+  // THE TERRACE BEHIND THE STALLS — individual tube houses, not one wall
+  //
+  // This used to be a single `box`: 0.92 m x 7.6 m x 48 m, one material, one silhouette end to end.
+  // However good the texture, a 48 m unbroken volume is a warehouse. A Chợ Lớn street is a *terrace
+  // of separate shophouses*: Saigoneer's survey of the district describes the two-storey type — shop
+  // and storage at street level, living above — as the commonest shophouse in Saigon-Chợ Lớn, and
+  // the three-storey clusters that followed as merchants grew richer. So 7.6 m is right for the
+  // commonest house; what was wrong was that all 15 houses were the same object.
+  //
+  // Every plot now gets: its own party wall (masonry between neighbours, which is how a terrace is
+  // actually built), its own height and tint, a photographed Saigon shopfront on the street face,
+  // the 3D relief that `addVietnameseShophouseRelief` already provides (moisture plinth, parapet,
+  // slanted awning, cantilevered balcony, AC condenser), the ROTATING shop signs and paper lanterns
+  // of a Chinese-Vietnamese frontage, burglar bars, and a stainless roof tank.
+  //
+  // Width and height stay inside the measurements the research gives: 3.05 m plots are at the
+  // narrow end of the 2.5-5 m range, which is exactly what Chợ Lớn is.
+  // ---------------------------------------------------------------------------
+  // Shop interiors and upper windows. A shophouse interior at 08:40 is dim but never black: a
+  // fluorescent tube over a counter, spill from the street. Pure black put the mission's receipt
+  // string against nothing and made the prop unreadable.
   const recessMat = new T.MeshStandardMaterial({
     color: 0x2b2418,
     emissive: new T.Color(0xffd9a0),
@@ -327,11 +340,6 @@ export function buildChoLon(
     roughness: 0.88,
     metalness: 0.02,
   });
-  for (let z = Z1 + BAY / 2; z < Z0; z += BAY) {
-    plane(chunk, [backX + 0.48, 1.4, z], [2.4, 2.4], recessMat, Math.PI / 2);
-  }
-  // First-floor windows: dark, some with a light on. Two per bay would be too regular, so the
-  // pattern repeats every five bays.
   const windowMat = new T.MeshStandardMaterial({
     color: 0x2a2b28,
     emissive: new T.Color(0xffe0b0),
@@ -346,15 +354,147 @@ export function buildChoLon(
     roughness: 0.36,
     metalness: 0.2,
   });
-  for (let z = Z1 + 1.4; z < Z0; z += 2.4) {
-    const lit = Math.floor((z - Z1) / 2.4) % 7 === 2;
-    plane(chunk, [backX + 0.47, 4.5, z], [1.15, 1.45], lit ? litWindow : windowMat, Math.PI / 2);
-    // Burglar bars: every ground-floor window in this district has them.
+  /**
+   * A Chợ Lớn shop sign.
+   *
+   * Every frontage in this district carries its name in Chinese characters with the Vietnamese
+   * trading name underneath — that bilingual pairing is the single most recognisable thing about the
+   * street, and the market had no lettering at all. Drawn the same way `neonSignMat` in
+   * `saigonDistricts.ts` draws the district's signs: sun-faded acrylic, a dark bezel, a glow line,
+   * so these belong to the same city.
+   */
+  const choLonSign = (han: string, viet: string, bg: string) =>
+    label(512, 160, (ctx) => {
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, 512, 160);
+      const gr = ctx.createLinearGradient(0, 0, 0, 160);
+      gr.addColorStop(0, "rgba(16,14,12,0.42)");
+      gr.addColorStop(0.2, "rgba(255,255,255,0.06)");
+      gr.addColorStop(0.8, "rgba(0,0,0,0.1)");
+      gr.addColorStop(1, "rgba(10,9,7,0.5)");
+      ctx.fillStyle = gr;
+      ctx.fillRect(0, 0, 512, 160);
+      ctx.strokeStyle = "#2a2622";
+      ctx.lineWidth = 9;
+      ctx.strokeRect(5, 5, 502, 150);
+      ctx.fillStyle = "#f6e7c4";
+      ctx.textAlign = "center";
+      ctx.shadowColor = "#ffd79a";
+      ctx.shadowBlur = 7;
+      ctx.font = "700 62px system-ui, sans-serif";
+      ctx.fillText(han, 256, 78);
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 0.9;
+      ctx.font = "600 26px system-ui, sans-serif";
+      ctx.fillText(viet, 256, 128);
+      ctx.globalAlpha = 1;
+    });
+
+  const PLOT = BAY;
+  const plotCount = Math.round(spanZ / PLOT);
+  // Photographed shopfronts: shop3 is the two-storey terrace type, shop5 the taller merchant house.
+  // Tinting each instance differently keeps fifteen plots off the same two photographs.
+  const shopFronts = [
+    createRealSaigonShophousePBR(3, "#efe9df", 1),
+    createRealSaigonShophousePBR(3, "#e2dccf", 1),
+    createRealSaigonShophousePBR(5, "#e8e3da", 1),
+    createRealSaigonShophousePBR(3, "#dde4dc", 1),
+    createRealSaigonShophousePBR(3, "#e9dcc9", 1),
+  ];
+  // A Chợ Lớn frontage is Chinese-Vietnamese: shop names are in Chinese characters over Vietnamese.
+  const CHINESE_SIGNS: [string, string, string][] = [
+    ["金邊", "TẠP HÓA KIM BIÊN", "#8f1d16"],
+    ["福興", "ĐỒ KHÔ PHÚC HƯNG", "#123f6b"],
+    ["廣東", "THUỐC BẮC QUẢNG ĐÔNG", "#1d5133"],
+    ["同慶", "TRÀ THƠM ĐỒNG KHÁNH", "#6b1414"],
+    ["永發", "VẢI SỢI VĨNH PHÁT", "#3d2464"],
+    ["大華", "KIM HOÀN ĐẠI HOA", "#7a3d0a"],
+  ];
+
+  for (let p = 0; p < plotCount; p++) {
+    const z = Z1 + PLOT * (p + 0.5);
+    // Height: the commonest two-storey terrace, with the occasional three-storey merchant house.
+    // 7.6 m is two storeys at Vietnamese floor-to-floor; the taller plots are the 1890s clusters.
+    const tall = p % 5 === 2;
+    const h = tall ? 10.4 + rand() * 0.9 : 7.3 + rand() * 0.8;
+    const front = shopFronts[p % shopFronts.length];
+    const partyWall = createWorldFacadePBR("painted_plaster_wall", p % 3 === 0 ? "#c4b7a2" : "#cfc4b1", 3.4, 1.0, 0.9);
+
+    // Party walls both sides: 0.2 m of masonry per plot, which is what separates two houses and is
+    // the thing a single box cannot show. Slightly proud of the facade, as a real party wall is.
+    for (const side of [-1, 1]) {
+      const wz = z + side * PLOT * 0.5;
+      box(chunk, [backX, h * 0.5, wz], [1.02, h, 0.2], partyWall, false);
+    }
+
+    // The plot volume itself, pulled back so the party wall stands proud.
+    box(chunk, [backX + 0.03, h * 0.5, z], [0.8, h, PLOT - 0.22], partyWall, false);
+
+    // The photographed shopfront on the street-facing (+x) face: shop at ground level, living above.
+    // `plane` in this file faces +z by default; rotate it to face +x, toward the market.
+    plane(chunk, [backX + 0.45, h * 0.5, z], [PLOT - 0.26, h * 0.96], front, Math.PI / 2);
+
+    // Ground-floor recess behind the stalls: the shop interior, warm and dim, not a void. The
+    // fluorescent strip over the counter is what the player actually sees between the canopies.
+    plane(chunk, [backX + 0.48, 1.4, z], [2.4, 2.4], recessMat, Math.PI / 2);
+
+    // First-floor window with burglar bars, two per plot at different heights so the terrace does
+    // not read as a grid.
+    const lit = (p * 3) % 7 === 2;
+    plane(chunk, [backX + 0.47, tall ? 5.4 : 4.5, z], [1.15, 1.45], lit ? litWindow : windowMat, Math.PI / 2);
     for (let b = 0; b < 4; b++) {
-      box(chunk, [backX + 0.44, 3.82 + b * 0.42, z], [0.03, 0.03, 1.2], frameMat(), false);
+      box(chunk, [backX + 0.44, (tall ? 4.72 : 3.82) + b * 0.42, z], [0.03, 0.03, 1.2], frameMat(), false);
+    }
+
+    // The 3D relief that is already shipped and that this terrace never used: moisture plinth at
+    // the base, parapet coping on top, slanted awning, cantilevered balcony with railing, and the
+    // wall-mounted AC condenser. `facing: "+x"` points it at the market.
+    addVietnameseShophouseRelief(chunk, backX + 0.4, z, 0.82, h, PLOT - 0.2, "+x", p + 7, true);
+
+    // Rotating shop sign: a light box over the awning, Chinese characters over the Vietnamese name.
+    // This is the single most Chợ Lớn thing on the street and the terrace had none.
+    const [han, viet, signColor] = CHINESE_SIGNS[p % CHINESE_SIGNS.length];
+    const signY = tall ? 4.0 : 3.35;
+    const signMat = choLonSign(han, viet, signColor);
+    if (signMat instanceof T.MeshStandardMaterial) {
+      signMat.emissiveMap = signMat.map;
+      signMat.emissive = new T.Color(0xffdca8);
+      signMat.emissiveIntensity = 0.3 + (p % 4) * 0.07;
+      signMat.roughness = 0.5;
+      signMat.metalness = 0.08;
+    }
+    // The box hangs proud of the awning, facing +x down the market: a plane, not a slab, so the
+    // lettering is legible instead of buried inside a box's dark side.
+    plane(chunk, [backX + 0.86, signY, z], [PLOT - 0.45, (PLOT - 0.45) * 0.3125], signMat, Math.PI / 2);
+    box(chunk, [backX + 0.8, signY, z], [0.08, 0.66, PLOT - 0.4], material(0x2a2622, 0.6, 0.35), false);
+
+    // A paper lantern over some plots: red, dusty, hanging from the awning bracket.
+    if (p % 3 !== 1) {
+      const lantern = new T.Mesh(
+        new T.SphereGeometry(0.19, 10, 8),
+        new T.MeshStandardMaterial({
+          color: 0xb8281c,
+          emissive: new T.Color(0xd8402c),
+          emissiveIntensity: 0.28,
+          roughness: 0.78,
+          metalness: 0.02,
+        }),
+      );
+      lantern.scale.y = 1.18;
+      lantern.position.set(backX + 0.82, signY - 0.62, z + (p % 2 === 0 ? 0.5 : -0.5));
+      chunk.add(lantern);
+      rod(chunk, [backX + 0.82, signY - 0.42, lantern.position.z], [backX + 0.82, signY - 0.12, lantern.position.z], 0.008, frameMat(), 0.006, 4);
+    }
+
+    // Stainless roof tank on steel legs, the one thing on every Saigon roof.
+    if (p % 2 === 0) {
+      const tank = new T.Mesh(new T.CylinderGeometry(0.38, 0.38, 0.95, 12), material(0xc8ccce, 0.34, 0.72));
+      tank.rotation.z = Math.PI / 2;
+      tank.position.set(backX + 0.1, h + 0.62, z + (p % 4 === 0 ? 0.5 : -0.4));
+      chunk.add(tank);
     }
   }
-  solids.push(rect(backX, midZ, 0.92, spanZ));
+  solids.push(rect(backX, midZ, 1.04, spanZ));
 
   // ---------------------------------------------------------------------------
   // THE CANOPY FIELD — the district's roof (§1b.6)
