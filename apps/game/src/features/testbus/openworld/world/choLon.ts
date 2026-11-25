@@ -230,6 +230,27 @@ export function buildChoLon(
   box(chunk, [backWallX, 1.35, midZ], [0.32, 2.7, spanZ + 6], createWorldFacadePBR("concrete_wall_007", "#a9a294", 2.4, 0.86, 0.95), false);
   solids.push(rect(backWallX, midZ, 0.32, spanZ + 6));
 
+  // ---------------------------------------------------------------------------
+  // 6a. WHY THERE IS NO PAVEMENT FURNITURE OF OURS ON THE ROAD'S WEST VERGE
+  //
+  // The 6.6 m between the market's paving (-19.2) and the road's west edge (-12.56) looked empty
+  // from the bus door. It is not empty: it is the road's own west pavement, laid by `buildStreet` at
+  // y 0.15-0.17 across x -17..-12, and it already carries 96 objects above knee height — trees, lamp
+  // posts, sign poles — spread over the whole 48 m of the block. A 1 m occupancy sweep of it finds
+  // 145 of 336 cells still free.
+  //
+  // Research on Vietnamese pavements says what should be in those cells: parked bikes, a shop's
+  // overflow, a kitchen, low stools, a tea stall, an altar and a tree. The first version of this
+  // block put all of it there. It was wrong for the same reason the second shop row was wrong: the
+  // strip belongs to the street, the street already put its own furniture on it, and adding ours
+  // stood a market's stock inside a road's pavement. `street-collision.test.ts` caught it as 104
+  // shared 1 m cells.
+  //
+  // The market therefore stops at its own frontage. What the player walks past on the verge is the
+  // street's furniture, which is real, is already placed, and is not ours to move. The vendor strip
+  // — tables, stools, canopies, produce, and the real GLB bikes and stools — stays where the market
+  // owns the ground, under the fabric, between -19.2 and -25.8.
+  //
   // 6b. NO SECOND TERRACE ROW.
   //
   // Round 27 added fourteen tube houses on the east side of this street. `simulation/street.ts`
