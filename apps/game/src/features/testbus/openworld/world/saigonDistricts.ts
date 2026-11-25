@@ -1806,7 +1806,12 @@ export function buildSaigonDistricts(
   // empty corridor. Mission 02's whole destination is this block, so it is authored in `choLon.ts`
   // and stitched in here, before the static-mesh batching pass so it shares its draw calls.
   // =========================================================================
-  const choLon = buildChoLon(root, streamer, solids, districtLights.map((d) => d.spec));
+  // The market and its street share the district's tree batch and potted-plant wind, so the new
+  // pavement planting sways with the rest of the city instead of standing frozen in it.
+  const choLon = buildChoLon(root, streamer, solids, districtLights.map((d) => d.spec), 5173, {
+    batch: botanicalBatch,
+    potWind,
+  });
 
   // Phase 3: 1-Draw-Call Wet-Road Tire Spray Mist System for ALL moving Saigon traffic!
   const tireSpray = createWetTireSpraySystem(dynamicRoot, 32);

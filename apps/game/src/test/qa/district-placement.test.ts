@@ -113,6 +113,34 @@ describe("the Chợ Lớn block in its district (placement, not decoration)", ()
         width: 900,
       },
       {
+        // Stand on the service lane behind the market and look north: is the block's back wall
+        // cutting through the district's existing riverside frontage at x -17..-15?
+        name: "plan-04-behind-the-market",
+        eye: [-20.5, 2.2, CHO_LON_Z - 40.0],
+        target: [-14.0, 2.0, CHO_LON_Z + 6.0],
+        fov: 66,
+        width: 900,
+      },
+      {
+        // Bird's eye: the whole block from 60 m up. This is the frame that answers, at a glance,
+        // whether anything is standing in the road and whether the new houses touch the old ones.
+        name: "plan-06-from-above",
+        eye: [-2.0, 62.0, CHO_LON_Z + 26.0],
+        target: [-2.0, 0.0, CHO_LON_Z - 10.0],
+        fov: 62,
+        width: 1100,
+      },
+      {
+        // The terrace the neighbourhood sees: stand on the far pavement across the road and look back
+        // at the houses this chunk added. This is the frame that must not show a row of identical
+        // grey boxes.
+        name: "plan-05-the-added-terrace",
+        eye: [-7.4, 1.72, CHO_LON_Z + 22.0],
+        target: [6.4, 4.6, CHO_LON_Z - 8.0],
+        fov: 72,
+        width: 900,
+      },
+      {
         // Looking straight across the corridor at the market frontage: is anything standing on the road?
         name: "plan-03-cross-the-road",
         // Stand on the far pavement, at the kerb, where a pedestrian waits to cross. x = 10.5 was

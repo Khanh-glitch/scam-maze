@@ -27,9 +27,12 @@ import { box, contact, contactMaterial, material, plane, random, rod, tube } fro
 import {
   createCorrugatedTinPBR,
   createGranitePlazaPBR,
+  createRealSaigonShophousePBR,
   createSaigonAsphaltPBR,
   createWorldFacadePBR,
 } from "./pbrTextures";
+import { addVietnameseShophouseRelief } from "./gtaRealism";
+import { buildRealisticPottedPlants, SaigonBotanicalBatch } from "./foliageAndProps";
 import type { PooledLightSpec } from "./boardingHouse";
 import type { WorldStreamer } from "./WorldStreamer";
 
@@ -121,6 +124,7 @@ export function buildChoLon(
   solids: Solid[],
   lightSpecs: PooledLightSpec[],
   seed = 5173,
+  botanicals?: { batch: SaigonBotanicalBatch; potWind: { time: { value: number }; amp: { value: number } } },
 ): ChoLonHandles {
   const chunk = new T.Group();
   chunk.name = "ChoLonMarket";
@@ -206,12 +210,18 @@ export function buildChoLon(
   // Modest three-storey terraces, because this is the edge of the block, not its subject: their job
   // is to close the frame, give the far pavement something to be in front of, and let the market be
   // the thing you cross toward.
-  const farFacades = [
-    createWorldFacadePBR("painted_plaster_wall", "#c2b6a2", 3.2, 0.95, 0.9),
-    createWorldFacadePBR("clay_plaster", "#cbb194", 3.2, 0.9, 0.88),
-    createWorldFacadePBR("blue_plaster_weathered", "#a8b3ad", 3.2, 1.0, 0.9),
-    createWorldFacadePBR("grey_plaster_02", "#a49c90", 3.2, 0.9, 0.92),
-  ];
+  // Fourteen tube houses, one per lot, each with its OWN facade photograph.
+  //
+  // The first version of this loop drew fourteen identical grey boxes. In the reference photographs
+  // no two adjacent Saigon tube houses share a colour: a terraced row there reads as a row because
+  // each frontage is a different paint, a different window, a different sign — not because they are
+  // the same object repeated. The district already ships `createRealSaigonShophousePBR` and
+  // `addVietnameseShophouseRelief` (balconies, ironwork, awnings, AC condensers, plinth, parapet);
+  // the neighbouring chunks use both. Using them here is not a flourish, it is the difference
+  // between a street and a wall.
+  const farShopMats = [3, 5, 3, 3, 5, 3].map((v, i) =>
+    createRealSaigonShophousePBR(v as 3 | 5, i % 2 === 0 ? "#ffffff" : "#f2ece0"),
+  );
   const farShutter = material(0x82878b, 0.56, 0.6);
   const farGlass = new T.MeshStandardMaterial({
     color: 0x1d2529,
@@ -222,33 +232,75 @@ export function buildChoLon(
   });
   for (let i = 0; i < 14; i++) {
     const fz = Z0 + 8 - i * 4.6;
-    const h = 8.6 + (i % 3) * 1.5;
+    const h = 11.4 + (i % 3) * 2.2; // three to four storeys, the height of a D5 tube house
     const w = 4.2;
-    const facade = farFacades[i % farFacades.length];
-    // The volume: sits on the far frontage line, opens toward -X onto the pavement.
-    box(chunk, [FAR_FRONT_X + 3.0, h / 2, fz], [6.0, h, w - 0.3], facade);
-    // Ground floor: either a closed roller shutter or a dim shop window, alternating.
+    const d = 6.0;
+    const cx = FAR_FRONT_X + d / 2;
+    void cx;
+    const sign = 1;
+
+    // THE VOLUME MUST STOP AT THE FRONTAGE LINE.
+    //
+    // It used to be a 6 m deep box centred at x = 10.0, i.e. x 7..13. An occupancy scan of the
+    // district without this chunk found existing structures at x = 8, 10 and 11 rising 6.1 m —
+    // 380 vertices — so the new terrace was built straight through them. Only the 0.3 m facade plane
+    // belongs on this side of the line; the mass of the building stays behind its own wall, as a
+    // terrace does.
+    box(chunk, [FAR_FRONT_X + 0.16, h / 2, fz], [0.34, h, w - 0.3], createWorldFacadePBR("concrete_wall_007", "#b9b2a6", 3.0, 0.9, 0.94));
+
+    // The photographic frontage, exactly as the neighbouring rows do it: a 1-bay proportion plane
+    // on the street face, never stretched.
+    plane(chunk, [FAR_FRONT_X - 0.03, h * 0.5, fz], [w - 0.14, h * 0.96], farShopMats[i % farShopMats.length], -Math.PI / 2);
+
+    // Ground floor: roller shutter or dim shop window, alternating, so the row has a rhythm at eye level.
     if (i % 3 === 0) {
       box(chunk, [FAR_FRONT_X - 0.02, 1.35, fz], [0.08, 2.5, w - 1.2], farShutter, false);
     } else {
       box(chunk, [FAR_FRONT_X - 0.02, 1.5, fz], [0.08, 2.2, w - 1.4], farGlass, false);
     }
-    // A floor band and a parapet, so the terrace does not read as one extruded block.
-    box(chunk, [FAR_FRONT_X + 0.01, 2.95, fz], [0.14, 0.22, w - 0.3], facade, false);
-    box(chunk, [FAR_FRONT_X + 2.9, h + 0.16, fz], [6.2, 0.32, w - 0.2], facade, false);
-    // A couple of shuttered upper windows: dark rectangles at the right rhythm read as windows.
-    for (let wy = 0; wy < Math.floor((h - 3.4) / 2.1); wy++) {
-      for (const ox of [-1.2, 1.2]) {
-        box(chunk, [FAR_FRONT_X + 2.2, 4.1 + wy * 2.1, fz + ox], [0.06, 1.3, 0.9], farGlass, false);
-      }
-    }
-    solids.push(rect(FAR_FRONT_X + 3.0, fz, 6.0, w));
+
+    // 3D relief: balconies, railings, awning, AC unit, plinth, parapet — the district's own kit.
+    // Its awning and balcony project toward -X, over the pavement, which is where they belong.
+    addVietnameseShophouseRelief(chunk, FAR_FRONT_X + 0.33, fz, w - 0.08, h, d, "-x", i + 7, true);
+
+    solids.push(rect(FAR_FRONT_X + 0.16, fz, 0.34, w));
+    void sign;
   }
   // A downpipe every third unit: the cheapest vertical that stops a terrace reading as a slab.
   const downpipe = material(0x6e6a63, 0.9, 0.2);
   for (let i = 0; i < 14; i += 3) {
     const fz = Z0 + 8 - i * 4.6 + 2.15;
-    rod(chunk, [FAR_FRONT_X - 0.06, 0.0, fz], [FAR_FRONT_X - 0.06, 9.1, fz], 0.055, downpipe, 0.055, 5);
+    rod(chunk, [FAR_FRONT_X - 0.06, 0.0, fz], [FAR_FRONT_X - 0.06, 11.7, fz], 0.055, downpipe, 0.055, 5);
+  }
+
+  // 6c. THE FAR PAVEMENT IS NOT EMPTY.
+  //
+  // The first cut of this street left 5.7 m of bare grey slab between the kerb and the new shopfronts.
+  // A Saigon pavement of that width is never bare: it is a row of trees in cut-outs, potted plants
+  // outside every door, and whatever the household could not fit indoors. This is also the cheapest
+  // fix for "every house looks the same" that does not touch the houses at all — a staggered row of
+  // trunks breaks the repetition of fourteen identical bay widths in front of the eye.
+  if (botanicals) {
+    const { batch, potWind } = botanicals;
+    const pitMat = material(0x54504a, 0.95, 0.03);
+    for (let i = 0; i < 7; i++) {
+      const tz = Z0 + 5.4 - i * 8.9;
+      const tx = FAR_MIN + 1.25 + (i % 2) * 0.22;
+      // Kerbed tree pit: a sunken concrete collar, not a painted square on the slab.
+      box(chunk, [tx, 0.078, tz], [1.3, 0.155, 1.3], pitMat, false);
+      batch.addShadeTree(tx, 0.0, tz, 0.92 + (i % 4) * 0.06);
+      solids.push(rect(tx, tz, 0.42, 0.42));
+    }
+    // Potted plants crowding the shopfront doors: two per bay, at the plinth line.
+    const pots: { pos: [number, number, number]; scale?: number; hasFlowers?: boolean }[] = [];
+    for (let i = 0; i < 14; i++) {
+      const fz = Z0 + 8 - i * 4.6;
+      pots.push({ pos: [FAR_FRONT_X - 0.44, 0.16, fz - 1.62], scale: 0.85 + ((i * 7) % 5) * 0.09, hasFlowers: i % 4 === 0 });
+      if (i % 2 === 0) {
+        pots.push({ pos: [FAR_FRONT_X - 0.5, 0.16, fz + 1.55], scale: 0.78 + ((i * 3) % 5) * 0.1, hasFlowers: i % 6 === 0 });
+      }
+    }
+    buildRealisticPottedPlants(chunk, pots, potWind);
   }
 
   // 7. The service lane at the back, and the strip of waste ground between it and the market.
@@ -612,14 +664,13 @@ export function buildChoLon(
     lightSpecsLocal.push({ x, y: 2.3, z, color: 0xf2ead6, intensity: 2.6, distance: 6.2, decay: 2 });
     solids.push(rect(x, z, 1.5, 3.5));
   };
-  // The Chợ Lớn stop stands on the FAR pavement, against the far frontage, so the shelter roof covers
-  // the doors when Bus 06 opens them at `ROUTE.curbX = -1.54` on the near side of the carriageway...
-  // which is the near lane. The bus pulls to the far kerb (`curbX` is negative, i.e. the market side),
-  // so the stop belongs on the MARKET pavement, at the kerb, not across the road.
+  // WHERE THE DOORS ACTUALLY ARE, read from the boarding code rather than guessed twice.
   //
-  // Corrected here rather than guessed: the shelter is placed at the kerb on the side the bus is on,
-  // facing the road, with its back to the pavement the player walks along.
-  buildShelter(ROAD_MIN - 0.95, CHO_LON_Z + 1.5, -Math.PI / 2);
+  // `boarding.ts:66` accepts a passenger only at `local.x > 0.82 && local.x < 1.42` — the bus doors
+  // are on its +X side. Bus 06 drives at `ROUTE.curbX = -1.54`, so the doorway lands at x ≈ -0.7,
+  // opening onto the FAR pavement, not the market side. The shelter goes there, at that kerb, and
+  // the market stays across the road: you get off, you cross, you walk under the fabric.
+  buildShelter(ROAD_MAX + 1.05, CHO_LON_Z + 1.5, -Math.PI / 2);
   // Lý Thái Tổ, where the player boards: on the far pavement at the origin end, at the kerb, facing
   // the road. It was at x = 3.1, which is in the middle of the carriageway this round added — the
   // kind of placement error that is invisible until a road exists to be standing in.
@@ -810,9 +861,9 @@ export function buildChoLon(
     cobaStall: { x: FRONT_X + 1.15, z: cobaZ, yaw: -Math.PI / 2 },
     receiptNail: { x: nailX, y: 1.6, z: nailZ },
     busStops: [
-      // Must match `buildShelter` calls above. The Chợ Lớn stop sits at the market-side kerb where
-      // Bus 06 pulls in; Lý Thái Tổ is the far pavement at the origin end.
-      { x: ROAD_MIN - 0.95, z: CHO_LON_Z + 1.5, yaw: -Math.PI / 2 },
+      // Must match `buildShelter` calls above. Chợ Lớn sits on the far kerb because that is where
+      // the bus doors open (+X side of the bus); Lý Thái Tổ is the same side at the origin end.
+      { x: ROAD_MAX + 1.05, z: CHO_LON_Z + 1.5, yaw: -Math.PI / 2 },
       { x: FAR_MIN + 1.0, z: 9.4, yaw: -Math.PI / 2 },
     ],
   };
