@@ -1194,8 +1194,11 @@ export class OpenWorldEngine {
     const rx1 = ROOM_ANCHOR.x + ROOM.x1;
     const rz0 = ROOM_ANCHOR.z + ROOM.z0;
     const rz1 = ROOM_ANCHOR.z + ROOM.z1;
-    const doorMinX = ROOM_ANCHOR.x + 1.2 - 0.36;
-    const doorMaxX = ROOM_ANCHOR.x + 1.2 + 0.36;
+    // The gap the player is allowed to walk through must line up with the leaf, not merely with the
+    // wall. Same 0.45 m hinge offset as `doorWorldPos()`; the opening is 1.02 m wide, so a gap put
+    // 0.45 m to one side was half outside the doorway.
+    const doorMinX = ROOM_ANCHOR.x + 1.65 - 0.51;
+    const doorMaxX = ROOM_ANCHOR.x + 1.65 + 0.51;
 
     // 1. Unified Seamless Staircase Corridor (works smoothly both going DOWN from Floor 2 and UP from Courtyard!)
     const inStairX = x <= STAIR.xTop + 0.15 && x >= STAIR.xBottom - 0.25;
@@ -1295,6 +1298,18 @@ export class OpenWorldEngine {
     }
   }
 
+  /**
+   * Where the room door actually is, in world space.
+   *
+   * `apartment.ts` puts the hinge at `DXc + 0.45` with `DXc = 1.2`, so the door sits at local
+   * x 1.65, z `ROOM.z1`. Both the interact check and the on-screen prompt used to look at
+   * `ROOM_ANCHOR.x + 1.2` — 0.45 m west of a doorway only 1.02 m wide — which made the door
+   * awkward to open from one side and showed no prompt from the other.
+   */
+  private doorWorldPos(): { x: number; z: number } {
+    return { x: ROOM_ANCHOR.x + 1.2 + 0.45, z: ROOM_ANCHOR.z + ROOM.z1 };
+  }
+
   private busDoorWorldPos(): T.Vector3 {
     return new T.Vector3(this.route.x + 1.4, CURB_HEIGHT, this.route.z - 4.4);
   }
@@ -1338,11 +1353,10 @@ export class OpenWorldEngine {
       return;
     }
 
-    const doorWorldX = ROOM_ANCHOR.x + 1.2;
-    const doorWorldZ = ROOM_ANCHOR.z + ROOM.z1;
+    const door = this.doorWorldPos();
     if (
       Math.abs(this.feet.y - ROOM_ANCHOR.y) < 0.6 &&
-      Math.hypot(this.feet.x - doorWorldX, this.feet.z - doorWorldZ) < 2.25
+      Math.hypot(this.feet.x - door.x, this.feet.z - door.z) < 1.9
     ) {
       if (this.external) {
         this.external.onDoor?.();
@@ -1428,11 +1442,10 @@ export class OpenWorldEngine {
       return;
     }
 
-    const doorWorldX = ROOM_ANCHOR.x + 1.2;
-    const doorWorldZ = ROOM_ANCHOR.z + ROOM.z1;
+    const door = this.doorWorldPos();
     if (
       Math.abs(this.feet.y - ROOM_ANCHOR.y) < 0.6 &&
-      Math.hypot(this.feet.x - doorWorldX, this.feet.z - doorWorldZ) < 2.15
+      Math.hypot(this.feet.x - door.x, this.feet.z - door.z) < 1.9
     ) {
       this.currentPrompt = this.external
         ? null
