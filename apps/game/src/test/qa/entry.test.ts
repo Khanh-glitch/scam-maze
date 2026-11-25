@@ -19,6 +19,7 @@ if (typeof HTMLCanvasElement !== "undefined") {
           createLinearGradient: () => ({ addColorStop: noop }),
           createPattern: () => null, fillRect: noop, strokeRect: noop, clearRect: noop,
           beginPath: noop, closePath: noop, moveTo: noop, lineTo: noop, arc: noop, rect: noop,
+          bezierCurveTo: noop, ellipse: noop,
           fill: noop, stroke: noop, save: noop, restore: noop, translate: noop, rotate: noop,
           scale: noop, drawImage: noop, putImageData: noop, fillText: noop, strokeText: noop,
           measureText: () => ({ width: 0 }),

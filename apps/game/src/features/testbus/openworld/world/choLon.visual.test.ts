@@ -48,6 +48,8 @@ const stubContext = () =>
     moveTo: noop,
     lineTo: noop,
     arc: noop,
+    bezierCurveTo: noop,
+    ellipse: noop,
     rect: noop,
     fill: noop,
     stroke: noop,
