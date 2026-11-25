@@ -31,6 +31,7 @@ import {
   createWorldFacadePBR,
 } from "./pbrTextures";
 import { buildRealisticPottedPlants, SaigonBotanicalBatch } from "./foliageAndProps";
+import { hasProp, propSize, queueWorldProp } from "../../../khupho/world/streetFurniture";
 import type { PooledLightSpec } from "./boardingHouse";
 import type { WorldStreamer } from "./WorldStreamer";
 
@@ -466,19 +467,31 @@ export function buildChoLon(
           );
         }
       }
-      // Stools on the customer side, one red one blue: the two colours every pavement in the
-      // country uses, and free local colour.
-      const stoolMat = bay % 2 === 0 ? plasticRed() : plasticBlue();
-      for (const sz of [-0.6, 0.6]) {
+      // Stools on the customer side — the real plastic stools, not a cylinder with four rods.
+      //
+      // `streetFurniture.ts` loads `stool-low` (1 654 triangles, one material, three textures) and
+      // scales it to the 0.27 m seat height a low plastic stool actually has. Two per bay, one red
+      // one blue, which is what every pavement in this country looks like. When the model is not
+      // loaded — a failed download, a headless test — the procedural stool still goes in, so the
+      // market never loses its furniture to a network error.
+      const seatX = x + 1.22;
+      for (const [si, sz] of [-0.6, 0.6].entries()) {
+        if (hasProp("stool-low")) {
+          queueWorldProp("stool-low", seatX, CURB_HEIGHT, z + sz, ((bay + si) % 4) * (Math.PI / 2), 1);
+          const sz3 = propSize("stool-low")!;
+          solids.push(rect(seatX, z + sz, Math.max(0.34, sz3.x), Math.max(0.34, sz3.z)));
+          continue;
+        }
+        const stoolMat = si === 0 ? plasticRed() : plasticBlue();
         const seat = new T.Mesh(new T.CylinderGeometry(0.18, 0.16, 0.05, 10), stoolMat);
-        seat.position.set(x + 1.22, CURB_HEIGHT + 0.44, z + sz);
+        seat.position.set(seatX, CURB_HEIGHT + 0.44, z + sz);
         chunk.add(seat);
         for (const lx of [-1, 1]) {
           for (const lz of [-1, 1]) {
             rod(
               chunk,
-              [x + 1.22 + lx * 0.11, CURB_HEIGHT, z + sz + lz * 0.11],
-              [x + 1.22 + lx * 0.08, CURB_HEIGHT + 0.42, z + sz + lz * 0.08],
+              [seatX + lx * 0.11, CURB_HEIGHT, z + sz + lz * 0.11],
+              [seatX + lx * 0.08, CURB_HEIGHT + 0.42, z + sz + lz * 0.08],
               0.015,
               stoolMat,
               0.015,
@@ -486,6 +499,7 @@ export function buildChoLon(
             );
           }
         }
+        solids.push(rect(seatX, z + sz, 0.36, 0.36));
       }
       // Hanging scale over the produce: the one object that says "this is sold by weight".
       const arm = material(0x9aa0a4, 0.4, 0.7);
@@ -786,22 +800,34 @@ export function buildChoLon(
   }
 
   // 3. A parked scooter, half on the pavement, which is where scooters are parked.
-  const scooter = new T.Group();
-  // On the market's own approach strip, not inside the street's west shop row: FRONT_X + 4.7 put the
-  // parked scooter at x = -15.9, which is 2.1 m inside a stranger's front room.
-  scooter.position.set(FRONT_X + 0.95, 0, -136.5);
-  scooter.rotation.y = 0.38;
-  chunk.add(scooter);
-  box(scooter, [0, 0.58, 0], [0.36, 0.3, 1.24], material(0x1f2a33, 0.4, 0.45));
-  box(scooter, [0, 0.86, 0.34], [0.3, 0.18, 0.5], material(0x1a222a, 0.5, 0.4), false);
-  rod(scooter, [0, 0.78, 0.62], [0, 1.06, 0.5], 0.03, frameMat(), 0.03, 6);
-  for (const wz of [-0.56, 0.6]) {
-    const w = new T.Mesh(new T.CylinderGeometry(0.26, 0.26, 0.1, 12), material(0x181a1b, 0.92, 0.02));
-    w.rotation.z = Math.PI / 2;
-    w.position.set(0, 0.26, wz);
-    scooter.add(w);
+  //
+  // It used to be five primitives: a box for the body, a box for the seat, a rod for the bars and
+  // two cylinders for the wheels. A Honda PCX is 19 306 triangles across five materials with five
+  // scanned textures, and the repository already loads it — so the market parks the real thing, and
+  // falls back to the primitives only when the model is unavailable.
+  const parkedX = FRONT_X + 0.95;
+  if (hasProp("bike-pcx")) {
+    queueWorldProp("bike-pcx", parkedX, 0, -136.5, 0.38, 1);
+    const bz = propSize("bike-pcx")!;
+    solids.push(rect(parkedX, -136.5, Math.max(0.5, bz.x), Math.max(1.2, bz.z)));
+  } else {
+    const scooter = new T.Group();
+    // On the market's own approach strip, not inside the street's west shop row: FRONT_X + 4.7 put
+    // the parked scooter at x = -15.9, which is 2.1 m inside a stranger's front room.
+    scooter.position.set(parkedX, 0, -136.5);
+    scooter.rotation.y = 0.38;
+    chunk.add(scooter);
+    box(scooter, [0, 0.58, 0], [0.36, 0.3, 1.24], material(0x1f2a33, 0.4, 0.45));
+    box(scooter, [0, 0.86, 0.34], [0.3, 0.18, 0.5], material(0x1a222a, 0.5, 0.4), false);
+    rod(scooter, [0, 0.78, 0.62], [0, 1.06, 0.5], 0.03, frameMat(), 0.03, 6);
+    for (const wz of [-0.56, 0.6]) {
+      const w = new T.Mesh(new T.CylinderGeometry(0.26, 0.26, 0.1, 12), material(0x181a1b, 0.92, 0.02));
+      w.rotation.z = Math.PI / 2;
+      w.position.set(0, 0.26, wz);
+      scooter.add(w);
+    }
+    solids.push(rect(parkedX, -136.5, 1.0, 1.5));
   }
-  solids.push(rect(FRONT_X + 0.95, -136.5, 1.0, 1.5));
 
   // 4. A hand-pulled cart parked in the service alley: the block's back door is where the goods
   //    actually come in, and it gives the alley a reason to exist.

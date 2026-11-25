@@ -54,6 +54,7 @@ import {
   type PooledLightSpec,
 } from "./boardingHouse";
 import { BITEXCO_POS, buildSaigonDistricts, LANDMARK81_POS, type SaigonDistricts } from "./saigonDistricts";
+import { placeStreetFurniture } from "../../../khupho/world/streetFurniture";
 import { WorldStreamer, type StreamingStats } from "./WorldStreamer";
 import { AtmosphereSystem, type AtmosphereState, type WeatherPreset } from "./AtmosphereSystem";
 import { freezeStaticMatrices, mergeStaticMeshesByMaterial } from "./meshBatcher";
@@ -1043,6 +1044,17 @@ export class OpenWorldEngine {
       }
     });
     this.renderer.initTexture(this.dropTex);
+
+    // 10. REAL STREET FURNITURE
+    //
+    // The market queue'd genuine GLB models while it was built: a Honda PCX where a scooter is
+    // parked, moulded plastic stools where customers sit. They live in a queue until this call,
+    // which turns every placement into an InstancedMesh chunk (one draw per material per 24 m), and
+    // is a no-op for anything that fell back to procedural geometry.
+    const placedFurniture = placeStreetFurniture(extScene);
+    if (placedFurniture > 0) {
+      console.info(`street furniture: ${placedFurniture} real model instances placed`);
+    }
 
     this.clock.start();
     if (!external) this.tick();
