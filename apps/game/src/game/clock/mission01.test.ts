@@ -321,6 +321,8 @@ describe("way B: verify independently", () => {
     expect(state.resources.evidence).toBe(1);
     expect(state.resources.supportNetwork).toBe(55);
     expect(state.persistent.schoolAccessVerified).toBe(true);
+    // The official channel contradicted the fee claim, so the later missions can read that fact.
+    expect(state.persistent.schoolFeeClaimContradicted).toBe(true);
     const files = selectDeviceView(state, S, "laptop").apps.files.map((item) => item.id);
     expect(files).toEqual(expect.arrayContaining(["file.portal-status", "file.office-confirmation"]));
     expect(ids(selectDeviceView(state, S, "phone").apps.mail)).toContain("mail.office-reply");

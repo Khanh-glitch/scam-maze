@@ -34,6 +34,10 @@ const ProloguePage = lazy(() => import("../features/prologue").then((module) => 
 const KhuphoPage = lazy(() => import("../features/khupho").then((module) => ({ default: module.KhuphoPage })));
 const TestBusPage = lazy(() => import("../features/testbus").then((module) => ({ default: module.TestBusPage })));
 const RoomV2Page = lazy(() => import("../features/roomv2").then((module) => ({ default: module.RoomV2Page })));
+// The journey map of Chapter 1: a reader of the live scenario data, for design and QA.
+const JourneyMapPage = lazy(() =>
+  import("../features/journey/JourneyMapPage").then((module) => ({ default: module.JourneyMapPage })),
+);
 // The rebuilt Chapter 1 page (saved games and ?skip-prologue) is the room plus the chapter layer.
 const RoomChapterPage = lazy(() =>
   import("../features/chapter1/room/RoomChapterPage").then((module) => ({ default: module.RoomChapterPage })),
@@ -64,7 +68,7 @@ function readSavedContinueAvailability(): ContinueAvailability {
 function translateRoomText(key: string, options?: Record<string, unknown>): string {
   return (i18n.t as unknown as (k: string, o?: object) => string)(key, { ...options, ns: "worlds" });
 }
-type AppRoute = "menu" | "testmove" | "ueh" | "hue" | "mientay" | "khupho" | "roomv2" | "testbus";
+type AppRoute = "menu" | "testmove" | "ueh" | "hue" | "mientay" | "khupho" | "roomv2" | "testbus" | "journey";
 
 function getAppRoute(): AppRoute {
   if (typeof window === "undefined") return "menu";
@@ -77,6 +81,7 @@ function getAppRoute(): AppRoute {
   if (path.startsWith("/khupho") || hash.includes("khupho")) return "khupho";
   if (path.startsWith("/roomv2") || hash.includes("roomv2")) return "roomv2";
   if (path.startsWith("/testbus") || hash.includes("testbus")) return "testbus";
+  if (path.startsWith("/journey") || hash.includes("journey")) return "journey";
   return "menu";
 }
 
@@ -125,7 +130,9 @@ export const App: React.FC = () => {
                     ? "/roomv2"
                     : newRoute === "testbus"
                       ? "/testbus"
-                      : "/";
+                      : newRoute === "journey"
+                        ? "/journey"
+                        : "/";
     window.history.pushState(null, "", targetPath);
     setRoute(newRoute);
   };
@@ -589,6 +596,15 @@ export const App: React.FC = () => {
     return (
       <Suspense fallback={<div className="h-screen w-screen bg-black" aria-busy="true" />}>
         <RoomV2Page settings={settings} onBackToMenu={() => navigateTo("menu")} />
+      </Suspense>
+    );
+  }
+
+  // Route: /journey -> The journey map of Chapter 1, read from the live scenario data
+  if (route === "journey") {
+    return (
+      <Suspense fallback={<div className="h-screen w-screen bg-[#0f0d18]" aria-busy="true" />}>
+        <JourneyMapPage onBackToMenu={() => navigateTo("menu")} />
       </Suspense>
     );
   }

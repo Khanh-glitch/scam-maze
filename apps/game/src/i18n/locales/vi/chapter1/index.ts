@@ -12,6 +12,7 @@ import device from "./device";
 import voice from "./voice";
 import ueh from "./ueh";
 import finance from "./finance";
+import journey from "./journey";
 
 const chapter1: LocaleShape<typeof en> = {
   ...hud,
@@ -26,6 +27,7 @@ const chapter1: LocaleShape<typeof en> = {
   ...voice,
   ...ueh,
   ...finance,
+  ...journey,
 };
 
 export default chapter1;

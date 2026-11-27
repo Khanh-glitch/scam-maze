@@ -236,7 +236,12 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
         label: "Sign in to the saved portal and check my account",
         timeCostMinutes: M.checkPortal,
         once: true,
-        effects: [{ kind: "setPersistent", flag: "schoolAccessVerified", value: true }],
+        // The portal's own services page lists no fee: the claim in the email is contradicted, not
+        // merely unproven. The flag is what the later missions read about this decision.
+        effects: [
+          { kind: "setPersistent", flag: "schoolAccessVerified", value: true },
+          { kind: "setPersistent", flag: "schoolFeeClaimContradicted", value: true },
+        ],
       },
       {
         id: "submit-thesis",
@@ -295,6 +300,7 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
         ],
         effects: [
           { kind: "setPersistent", flag: "schoolAccessVerified", value: true },
+          { kind: "setPersistent", flag: "schoolFeeClaimContradicted", value: true },
           { kind: "adjustResource", resource: "evidence", delta: 1 },
           { kind: "adjustResource", resource: "supportNetwork", delta: MISSION_01_CONFIG.officeSupport },
         ],

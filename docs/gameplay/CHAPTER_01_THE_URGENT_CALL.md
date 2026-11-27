@@ -8,7 +8,8 @@
 > is parked in `apps/game/src/legacy/urgent-call-street/` and is not maintained, tested or reachable
 > from the game.
 >
-> **For the current chapter** see [OVERVIEW.md section 4.2.3](../architecture/OVERVIEW.md#423-chapter-1-flow-and-room-v2-host-implemented)
+> **For the current chapter** see [LAST SUBMISSION: 72 GIỜ CUỐI — story and player journey](CHAPTER_01_LAST_SUBMISSION_JOURNEY.md)
+> and [OVERVIEW.md section 4.2.3](../architecture/OVERVIEW.md#423-chapter-1-flow-and-room-v2-host-implemented)
 > and the spec `.kiro/specs/chapter-01-double-deception/` (requirements, design, tasks). The
 > current scenario data is in `apps/game/src/game/narrative/chapter1/`. A player-facing gameplay
 > document for the room version has not been written yet (see

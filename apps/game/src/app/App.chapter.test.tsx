@@ -229,6 +229,15 @@ describe("App chapter routing", () => {
     expect(harness.layerProps).toBeNull();
   });
 
+  it("serves /journey as the chapter's journey map, without the chapter layer", async () => {
+    window.history.replaceState(null, "", "/journey");
+    render(<App />);
+
+    expect(await screen.findByTestId("journey-page")).toBeTruthy();
+    expect(screen.queryByTestId("chapter-layer-stub")).toBeNull();
+    expect(screen.queryByTestId("room-v2-stub")).toBeNull();
+  });
+
   it("renders the placeholder for a chapter whose gameplay is not available", () => {
     harness.sessionChapterId = TEST_CHAPTER.id;
     render(<App />);
