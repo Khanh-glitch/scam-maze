@@ -44,8 +44,8 @@ const mix = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] 
 const WALL: Record<string, string[]> = {
   residential: ["#c8a878", "#d8c39a", "#b98d63", "#cbb492", "#9fb7a4", "#b7a9bd", "#d9b7a0"],
   market: ["#c98f5a", "#b7743f", "#d3a06b", "#a8724a", "#cfae7d"],
-  tourist: ["#8fa3b8", "#a8b6c4", "#7d93a8", "#b7c2cc"],
-  corporate: ["#7d8a99", "#5f6b7a", "#93a0ad", "#6b7684"],
+  tourist: ["#9aa8b4", "#b9b2a0", "#8d9aa6", "#c6b79e", "#a5b0a8"],
+  corporate: ["#8b8f96", "#6f7a86", "#a19c92", "#7b828c", "#8d9aa0"],
   construction: ["#8f8a80", "#a49c8e", "#7c766c"],
   park: ["#9aa88f", "#b3b49a"],
 };
@@ -59,7 +59,7 @@ const SHOP: Record<string, string> = {
 };
 
 const sun = (() => {
-  const v: RGB = [0.42, 0.66, -0.62]; // nắng chiều từ đông-bắc, hơi thấp cho bóng dài
+  const v: RGB = [0.46, 0.46, -0.66]; // nắng chiều thấp: bóng dài gấp ~1,4 lần chiều cao toà
   const l = Math.hypot(...v);
   return [v[0] / l, v[1] / l, v[2] / l] as RGB;
 })();
@@ -151,8 +151,17 @@ const buildScene = (cam: Camera, world: { aerial: boolean }) => {
   };
   const push = (world3: RGB[], color: RGB, normal: RGB, opts: { opacity?: number; stroke?: string; width?: number } = {}) => pushInto(faces, world3, color, normal, opts);
   const pushGround = (world3: RGB[], color: RGB, normal: RGB, opts: { opacity?: number } = {}) => pushInto(ground, world3, color, normal, opts);
+  // Bóng phải bị CẮT vào khung đất. Nắng chiều thấp làm bóng của tháp 461 m dài hàng trăm mét, và
+  // trước khi cắt chúng nằm lơ lửng ngoài đế thành phố như những mảng đen rơi giữa trời.
   const pushShadow = (world3: RGB[]) => {
-    const proj = P.project(world3);
+    const xs = world3.map((p) => p[0]);
+    const zs = world3.map((p) => p[2]);
+    const x0 = Math.max(F.x0, Math.min(...xs));
+    const x1 = Math.min(F.x1, Math.max(...xs));
+    const z0 = Math.max(F.z0, Math.min(...zs));
+    const z1 = Math.min(F.z1, Math.max(...zs));
+    if (x1 - x0 < 0.2 || z1 - z0 < 0.2) return;
+    const proj = P.project([[x0, 0.01, z0], [x1, 0.01, z0], [x1, 0.01, z1], [x0, 0.01, z1]]);
     if (proj) shadows.push({ pts: proj.pts, fill: "#0b0a12", depth: 0 });
   };
   const dist = (x: number, z: number) => Math.hypot(x - cam.x, z - cam.z);
@@ -170,7 +179,7 @@ const buildScene = (cam: Camera, world: { aerial: boolean }) => {
     { x0: F.x0 - m, x1: F.x1 + m, z0: F.z1, z1: F.z1 + m },
     { x0: F.x0 - m, x1: F.x0, z0: F.z0, z1: F.z1 },
     { x0: F.x1, x1: F.x1 + m, z0: F.z0, z1: F.z1 },
-  ]) pushGround(q(band, -0.4), hex2rgb("#15141b"), [0, 1, 0]);
+  ]) pushGround(q(band, -0.4), hex2rgb("#26242e"), [0, 1, 0]);
 
   // Nước
   for (const w of city.water) pushGround(q(w, 0.06), hex2rgb("#12414d"), [0, 1, 0], { opacity: 0.96 });
@@ -269,7 +278,9 @@ const buildScene = (cam: Camera, world: { aerial: boolean }) => {
       ]);
     }
 
-    const atm = (c: RGB) => mix(c, hex2rgb("#4a5568"), Math.min(0.30, Math.max(0, (d - 320) / 1400) * 0.30));
+    // Khí quyển nhẹ và ấm: bản cũ trộn tới 30 % xám-lạnh (#4a5568) nên cả thành phố ra màu thạch
+    // cao xanh xám — mất sạch chất Sài Gòn (vàng đất, ngói, tường vôi).
+    const atm = (c: RGB) => mix(c, hex2rgb("#6e6672"), Math.min(0.14, Math.max(0, (d - 380) / 1500) * 0.14));
 
     // Bốn mặt tường: chỉ vẽ mặt hướng về camera (pháp tuyến · hướng nhìn < 0)
     const walls: Array<{ n: RGB; quad: RGB[] }> = [
@@ -283,10 +294,41 @@ const buildScene = (cam: Camera, world: { aerial: boolean }) => {
       const facing = wall.n[0] * toCam[0] + wall.n[1] * toCam[1] + wall.n[2] * toCam[2] < 0;
       if (!facing) continue;
       push(wall.quad, atm(base), wall.n);
-      if (world.aerial) continue;
+      const along = wall.n[0] === 0 ? w : dd;
+      if (world.aerial) {
+        // Ảnh trên cao từng không có một chi tiết mặt đứng nào: tháp 30 tầng và nhà kho đọc ra
+        // giống nhau — những tảng thạch cao. Nay: tháp có dải kính dọc, nhà nhiều tầng có dải tầng.
+        if (d < 2600 && along > 2.4 && h > 6) {
+          const floorsHere = Math.max(1, Math.round(h / 3.3));
+          const isXw = wall.n[0] !== 0;
+          const planeW = isXw ? (wall.n[0] > 0 ? b.x1 : b.x0) : (wall.n[2] > 0 ? b.z1 : b.z0);
+          const ow = 0.05;
+          const s0w = isXw ? b.z0 : b.x0;
+          const seg = (t0: number, t1: number, y0: number, y1: number): RGB[] => {
+            const p0 = s0w + along * t0;
+            const p1 = s0w + along * t1;
+            return isXw
+              ? [[planeW + ow, y0, p0], [planeW + ow, y0, p1], [planeW + ow, y1, p1], [planeW + ow, y1, p0]]
+              : [[p0, y0, planeW + ow], [p1, y0, planeW + ow], [p1, y1, planeW + ow], [p0, y1, planeW + ow]];
+          };
+          if (floorsHere >= 9) {
+            const strips = Math.max(2, Math.min(5, Math.round(along / 5)));
+            for (let i = 0; i < strips; i += 1) {
+              const t0 = 0.08 + (i / strips) * 0.84;
+              push(seg(t0, t0 + (0.84 / strips) * 0.55, h * 0.07, h * 0.95), mix(GLASS, base, 0.45), wall.n, { opacity: 0.8 });
+            }
+          } else if (floorsHere >= 3) {
+            const bands = Math.min(5, floorsHere - 1);
+            for (let i = 1; i <= bands; i += 1) {
+              const y = (h * i) / (bands + 1);
+              push(seg(0.07, 0.93, y, y + Math.min(0.75, h * 0.045)), mix(base, hex2rgb("#2b2a33"), 0.45), wall.n, { opacity: 0.62 });
+            }
+          }
+        }
+        continue;
+      }
       // Chi tiết tầng chỉ cho nhà gần: ban công, dải cửa kính, tấm biển hiệu.
       if (d > 190) continue;
-      const along = wall.n[0] === 0 ? w : dd;
       const isX = wall.n[0] !== 0;
       const plane = isX ? (wall.n[0] > 0 ? b.x1 : b.x0) : (wall.n[2] > 0 ? b.z1 : b.z0);
       const o = 0.04 * (wall.n[0] + wall.n[2]);
@@ -344,6 +386,15 @@ const buildScene = (cam: Camera, world: { aerial: boolean }) => {
 
     // Mái
     push([[b.x0, h, b.z0], [b.x1, h, b.z0], [b.x1, h, b.z1], [b.x0, h, b.z1]], atm(roofC), [0, 1, 0]);
+    // Sân thượng: một hình chữ nhật thụt vào, đọc ra gờ mái/parapet khi nhìn từ trên.
+    if (world.aerial && h > 11 && w > 6 && dd > 6) {
+      const inx = Math.min(1.1, w * 0.1);
+      const inz = Math.min(1.1, dd * 0.1);
+      push([
+        [b.x0 + inx, h + 0.03, b.z0 + inz], [b.x1 - inx, h + 0.03, b.z0 + inz],
+        [b.x1 - inx, h + 0.03, b.z1 - inz], [b.x0 + inx, h + 0.03, b.z1 - inz],
+      ], mix(atm(roofC), hex2rgb("#20202a"), 0.28), [0, 1, 0], { opacity: 0.9 });
+    }
     // Bồn nước trên mái — chi tiết nhìn từ trên cao, rất Sài Gòn
     if (!b.anchor && b.floors >= 2 && b.floors <= 6 && w > 3 && dd > 3 && (!world.aerial ? d < 160 : d < 420)) {
       const cx = b.x0 + w * 0.28;
@@ -453,6 +504,32 @@ const buildScene = (cam: Camera, world: { aerial: boolean }) => {
     }
   }
 
+  // Nhãn đè nhau: giữ nhãn lớn, đẩy nhãn nhỏ xuống vài bước, không được thì bỏ. Ảnh axon từng có
+  // "Chợ Bến Thành", "Ga Metro Bến Thành", "Phường Bến Thành" chồng lên nhau ở giữa khung.
+  {
+    const placed: Array<{ x0: number; x1: number; y0: number; y1: number }> = [];
+    const kept: typeof texts = [];
+    for (const t of texts.slice().sort((p, q) => q.size - p.size)) {
+      const wText = t.text.length * t.size * 0.56;
+      let ok = false;
+      for (let attempt = 0; attempt < 4 && !ok; attempt += 1) {
+        const y = t.y + attempt * t.size * 1.35;
+        const box = {
+          x0: t.anchor === "middle" ? t.x - wText / 2 : t.x,
+          x1: t.anchor === "middle" ? t.x + wText / 2 : t.x + wText,
+          y0: y - t.size,
+          y1: y + t.size * 0.3,
+        };
+        if (!placed.some((p) => box.x0 < p.x1 && box.x1 > p.x0 && box.y0 < p.y1 && box.y1 > p.y0)) {
+          placed.push(box);
+          kept.push({ ...t, y });
+          ok = true;
+        }
+      }
+    }
+    texts.length = 0;
+    texts.push(...kept);
+  }
   return { faces, ground, shadows, texts };
 };
 
@@ -662,11 +739,11 @@ const svgFor = (cam: Camera, scene: { faces: Face[]; ground: Face[]; shadows: Fa
   out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${cam.w}" height="${cam.h}" viewBox="0 0 ${cam.w} ${cam.h}" font-family="ui-sans-serif, system-ui, sans-serif">`);
   out.push(`<defs>
     <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1c2740"/><stop offset="0.55" stop-color="#3f4a63"/>
-      <stop offset="0.82" stop-color="#7e7286"/><stop offset="1" stop-color="#a98a7a"/>
+      <stop offset="0" stop-color="#243553"/><stop offset="0.55" stop-color="#566478"/>
+      <stop offset="0.82" stop-color="#9b8b8c"/><stop offset="1" stop-color="#c8a68c"/>
     </linearGradient>
-    <radialGradient id="sun" cx="0.78" cy="0.2" r="0.4">
-      <stop offset="0" stop-color="#ffd9a0" stop-opacity="0.55"/><stop offset="1" stop-color="#ffd9a0" stop-opacity="0"/>
+    <radialGradient id="sun" cx="0.80" cy="0.15" r="0.22">
+      <stop offset="0" stop-color="#ffe3b0" stop-opacity="0.40"/><stop offset="1" stop-color="#ffe3b0" stop-opacity="0"/>
     </radialGradient>
   </defs>`);
   out.push(`<rect width="${cam.w}" height="${cam.h}" fill="url(#sky)"/>`);
@@ -681,7 +758,7 @@ const svgFor = (cam: Camera, scene: { faces: Face[]; ground: Face[]; shadows: Fa
   const shadows = (scene.shadows as Face[]).slice().sort((a, b) => a.depth - b.depth);
   if (shadows.length) {
     // Gom bóng vào MỘT nhóm có opacity: bóng chồng nhau không bị sẫm gấp đôi.
-    out.push(`<g fill="#100e18" opacity="0.46">`);
+    out.push(`<g fill="#100e18" opacity="0.52">`);
     for (const s of shadows) out.push(`<polygon points="${s.pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ")}"/>`);
     out.push(`</g>`);
   }
