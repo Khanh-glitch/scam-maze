@@ -26,11 +26,13 @@ interface MainMenuOverlayProps {
   onStartNewGame: () => void;
   onContinue: () => void;
   continueAvailability: ContinueAvailability;
+  /** Mở bản đồ Sài Gòn sinh tự động (`/saigon`). Có thì menu mới hiện mục này. */
+  onOpenSaigon?: () => void;
 }
 
 
 interface MenuEntry {
-  id: "newGame" | "continue" | "settings" | "credits";
+  id: "newGame" | "continue" | "settings" | "credits" | "saigon";
   group: "primary" | "secondary";
   label: string;
   description: string;
@@ -50,6 +52,7 @@ export const MainMenuOverlay: React.FC<MainMenuOverlayProps> = ({
   onStartNewGame,
   onContinue,
   continueAvailability,
+  onOpenSaigon,
 }) => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [creditsOpen, setCreditsOpen] = useState(false);
@@ -85,6 +88,16 @@ export const MainMenuOverlay: React.FC<MainMenuOverlayProps> = ({
       disabled: false,
       onSelect: () => setSettingsOpen(true),
     },
+    ...(onOpenSaigon
+      ? [{
+          id: "saigon" as const,
+          group: "secondary" as const,
+          label: t("menu:buttons.saigon.label"),
+          description: t("menu:buttons.saigon.sublabel"),
+          disabled: false,
+          onSelect: onOpenSaigon,
+        }]
+      : []),
     {
       id: "credits",
       group: "secondary",

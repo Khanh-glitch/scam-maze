@@ -9,6 +9,7 @@ const menu = {
     continue: { label: "CONTINUE", sublabel: "Resume saved progress" },
     settings: { label: "SETTINGS", sublabel: "Graphics quality, camera FOV & audio" },
     credits: { label: "CREDITS & LICENSES", sublabel: "3D city & vehicle pack attribution" },
+    saigon: { label: "SÀI GÒN 2026", sublabel: "The procedurally generated city map" },
   },
   continueReasons: {
     none: "No saved game found.",

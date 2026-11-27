@@ -10,6 +10,7 @@ const menu: LocaleShape<typeof en> = {
     continue: { label: "TIẾP TỤC", sublabel: "Chơi tiếp từ chỗ đã lưu" },
     settings: { label: "CÀI ĐẶT", sublabel: "Chất lượng đồ họa, góc nhìn và âm thanh" },
     credits: { label: "GHI CÔNG & GIẤY PHÉP", sublabel: "Ghi công gói mô hình thành phố và xe 3D" },
+    saigon: { label: "SÀI GÒN 2026", sublabel: "Bản đồ thành phố sinh tự động" },
   },
   continueReasons: {
     none: "Không tìm thấy bản lưu nào.",

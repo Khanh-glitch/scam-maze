@@ -32,6 +32,8 @@ const MientayPage = lazy(() => import("../features/mientay").then((module) => ({
 // The new-game prologue (neighborhood, then the apartment) is also its own chunk.
 const ProloguePage = lazy(() => import("../features/prologue").then((module) => ({ default: module.ProloguePage })));
 const KhuphoPage = lazy(() => import("../features/khupho").then((module) => ({ default: module.KhuphoPage })));
+// Bản đồ Sài Gòn sinh tự động (`cityGen`) — chunk riêng, chỉ tải khi mở /saigon.
+const CityPage = lazy(() => import("../features/citymap/CityPage").then((module) => ({ default: module.CityPage })));
 const TestBusPage = lazy(() => import("../features/testbus").then((module) => ({ default: module.TestBusPage })));
 const RoomV2Page = lazy(() => import("../features/roomv2").then((module) => ({ default: module.RoomV2Page })));
 // The journey map of Chapter 1: a reader of the live scenario data, for design and QA.
@@ -68,7 +70,7 @@ function readSavedContinueAvailability(): ContinueAvailability {
 function translateRoomText(key: string, options?: Record<string, unknown>): string {
   return (i18n.t as unknown as (k: string, o?: object) => string)(key, { ...options, ns: "worlds" });
 }
-type AppRoute = "menu" | "testmove" | "ueh" | "hue" | "mientay" | "khupho" | "roomv2" | "testbus" | "journey";
+type AppRoute = "menu" | "testmove" | "ueh" | "hue" | "mientay" | "khupho" | "roomv2" | "testbus" | "journey" | "saigon";
 
 function getAppRoute(): AppRoute {
   if (typeof window === "undefined") return "menu";
@@ -82,6 +84,8 @@ function getAppRoute(): AppRoute {
   if (path.startsWith("/roomv2") || hash.includes("roomv2")) return "roomv2";
   if (path.startsWith("/testbus") || hash.includes("testbus")) return "testbus";
   if (path.startsWith("/journey") || hash.includes("journey")) return "journey";
+  // Bản đồ Sài Gòn SINH TỰ ĐỘNG (`cityGen`) — khác hoàn toàn world dựng tay ở `/testbus`.
+  if (path.startsWith("/saigon") || hash.includes("saigon")) return "saigon";
   return "menu";
 }
 
@@ -132,7 +136,9 @@ export const App: React.FC = () => {
                       ? "/testbus"
                       : newRoute === "journey"
                         ? "/journey"
-                        : "/";
+                        : newRoute === "saigon"
+                          ? "/saigon"
+                          : "/";
     window.history.pushState(null, "", targetPath);
     setRoute(newRoute);
   };
@@ -609,6 +615,15 @@ export const App: React.FC = () => {
     );
   }
 
+  // Route: /saigon -> the procedurally generated Sài Gòn (cityGen): 4.300 buildings, real massing
+  if (route === "saigon") {
+    return (
+      <Suspense fallback={<div className="h-screen w-screen bg-[#10141c]" aria-busy="true" />}>
+        <CityPage onBackToMenu={() => navigateTo("menu")} />
+      </Suspense>
+    );
+  }
+
   // Route: /testbus -> Prototype Saigon bus stop and Route 06 ride with the game's own characters
   if (route === "testbus") {
     return (
@@ -638,6 +653,7 @@ export const App: React.FC = () => {
           onStartNewGame={handleStartNewGame}
           onContinue={handleContinue}
           continueAvailability={continueAvailability}
+          onOpenSaigon={() => navigateTo("saigon")}
         />
       )}
 
