@@ -70,6 +70,9 @@ Luật license: MIT/BSD dùng thoải mái (giữ notice); GPL/AGPL **không** �
   **footprint thật của từng căn nhà** quanh đó — massing thôi bịa hình chữ nhật.
 - Ngoài ra: Overture Maps / Google Open Buildings (footprint từ vệ tinh) cho chỗ OSM thiếu.
 
+Đường ống đọc PBF + trích theo bbox đã dựng và **đã test trên byte thật** (572 toà, 2.577 đường,
+1.613 POI từ Kamppi): xem [OSM_DATA.md](./OSM_DATA.md).
+
 **Giới hạn của sandbox này (đã test, không đoán):** `download.geofabrik.de` và `overpass-api.de` trả
 `000` — không tải được. `api.github.com` thì được. Nên bước trích xuất OSM phải chạy **trên máy owner**
 (hoặc qua một extract đặt trên GitHub), còn tôi viết script + test bằng fixture nhỏ, để khi có file là

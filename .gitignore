@@ -18,3 +18,7 @@ apps/game/assets-src/vehicles/parked/honda-cg-125.glb
 
 # Long Q9 build script: transpiled author rig code (generated)
 apps/game/scripts/longq9/.build/
+
+# OSM extraction output (regenerable; keep only the plan PNG)
+docs/product/audit/osm-*.json
+docs/product/audit/osm-*.svg

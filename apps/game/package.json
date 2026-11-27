@@ -15,7 +15,8 @@
     "voice:script": "node scripts/generate-chapter1-voice.mjs --print-script",
     "voice:report": "node scripts/generate-chapter1-voice.mjs --report",
     "music:check": "node scripts/check-music.mjs",
-    "audit:world": "node scripts/audit-world.mjs"
+    "audit:world": "node scripts/audit-world.mjs",
+    "osm:extract": "node scripts/osm-extract.ts"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "5.3.0",
