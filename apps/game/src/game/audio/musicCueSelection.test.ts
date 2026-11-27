@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { crossfadeMs, isTense, selectMusicCue } from "./musicCueSelection";
+import { crossfadeMs, endingFamily, isTense, selectMusicCue } from "./musicCueSelection";
 import { MUSIC_MANIFEST } from "./musicManifest";
 
 describe("selectMusicCue", () => {
@@ -77,5 +77,22 @@ describe("crossfadeMs", () => {
   it("fades room to street with the default length", () => {
     expect(crossfadeMs("room.calm", "street")).toBe(MUSIC_MANIFEST.crossfadeMs.default);
     expect(crossfadeMs("street", "ride")).toBe(MUSIC_MANIFEST.crossfadeMs.default);
+  });
+});
+
+describe("endingFamily", () => {
+  it("is null while the run has no outcome", () => {
+    expect(endingFamily(null)).toBeNull();
+    expect(endingFamily(undefined)).toBeNull();
+  });
+
+  it("maps the listed hope outcomes to the hope cue family", () => {
+    expect(endingFamily("honest-submission")).toBe("hope");
+    expect(endingFamily("late-but-saved")).toBe("hope");
+  });
+
+  it("treats every other outcome as the cost family", () => {
+    expect(endingFamily("false-victory")).toBe("cost");
+    expect(endingFamily("missed-deadline")).toBe("cost");
   });
 });

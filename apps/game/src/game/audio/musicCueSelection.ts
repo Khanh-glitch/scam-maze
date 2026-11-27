@@ -80,6 +80,24 @@ export function selectMusicCue(input: MusicSelectionInput): MusicCueId | null {
   }
 }
 
+/**
+ * Which family of ending a run reached. The five endings of Chapter 1 (task T34) will name their
+ * outcome ids; until then every listed id is a "hope" ending and anything else is the "cost"
+ * family, which is the safe default. Kept here so the music layer never guesses.
+ */
+export const HOPE_OUTCOMES: readonly string[] = [
+  "honest-submission",
+  "late-but-saved",
+  "recovered-late",
+];
+
+export function endingFamily(
+  outcome: string | null | undefined,
+): "hope" | "cost" | null {
+  if (!outcome) return null;
+  return HOPE_OUTCOMES.includes(outcome) ? "hope" : "cost";
+}
+
 /** The scene a cue belongs to, from the manifest. */
 export function cueScene(id: MusicCueId): ChapterMusicScene | null {
   return findMusicCue(id)?.scene ?? null;

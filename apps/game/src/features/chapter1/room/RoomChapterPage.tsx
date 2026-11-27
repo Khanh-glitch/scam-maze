@@ -177,6 +177,7 @@ export const RoomChapterPage: React.FC<RoomChapterPageProps> = ({
               onHoverSound={onHoverSound}
               outsideDoor={outside.ready}
               outdoors={outside.outdoors}
+              onBus={outside.onBus ?? false}
               outsideRadar={outside.radar ?? null}
               hideHud={inStreetDialogue}
               onStoryContext={setStoryContext}

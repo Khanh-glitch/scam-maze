@@ -59,13 +59,13 @@ Menu dùng lại file có sẵn `public/assets/audio/menu_music.mp3` — **khôn
 | Cảnh trong game | Cue | Bắt đầu khi | Kết thúc/đổi khi |
 |---|---|---|---|
 | Menu chính | `menu_music.mp3` (có sẵn) | menu hiện ra | bấm New Game/Continue |
-| Intro chương, debrief | `theme.alex` | vào chương; mở debrief | vào phòng / rời debrief |
+| Intro chương | `theme.alex` | thẻ intro mở ra | người chơi bấm bắt đầu |
 | Trong phòng, không có gì gấp | `room.calm` | đứng trong phòng, đọc mail/tài liệu bình thường | mở trang lừa đảo, hoặc security thấp, hoặc gần hạn |
 | Trong phòng, căng thẳng | `room.tense` | mở offer/trang lạ, `security ≤ 60`, còn `≤ 6 giờ`, có cuộc gọi đáng ngờ | hết 8 giây không còn trigger → về `room.calm` |
 | Ngoài phố | `street` | bước ra khỏi cửa | lên xe / vào nhà |
 | Trên buýt 06 hoặc xe ôm | `ride` | xe bắt đầu chạy | xuống xe |
-| Kết thúc tốt | `ending.hope` | outcome "nộp kịp, tỉnh táo" / "gỡ được, chậm" | hết chương |
-| Kết thúc trả giá | `ending.cost` | outcome "trả giá" / "false victory" / "trượt hạn" | hết chương |
+| Kết thúc tốt + debrief | `ending.hope` | outcome "nộp kịp, tỉnh táo" / "gỡ được, chậm" | hết chương |
+| Kết thúc trả giá + debrief | `ending.cost` | outcome "trả giá" / "false victory" / "trượt hạn" | hết chương |
 | Radio trong phone (tùy chọn, làm sau) | `radio.lofi`, `radio.night` | mở app Radio | đóng app → quay lại cue cảnh |
 
 Thứ tự ưu tiên khi nhiều điều kiện cùng đúng:

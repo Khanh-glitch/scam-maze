@@ -75,6 +75,25 @@ ngưỡng. Hiện các số ở T00 được đo tay, nên **chưa được dùn
 | Đồng bộ brief ↔ manifest | test `keeps the composers' brief in sync with the manifest` | Brief chứa đủ 7 id + 7 tên file + thư mục + loudness |
 | Bất biến dữ liệu | test manifest | Không trùng file/priority; loop = đúng số ô; one-shot có cửa sổ độ dài; gain 0..1 |
 
+### T13 · `MusicPlayer` · 27/11/2026
+
+| Việc | Lệnh | Kết quả |
+|---|---|---|
+| Player đọc file theo manifest | `vitest run src/game/audio/musicPlayer.test.ts` | **8 test**: loop đúng cue, không khởi động lại cue đang phát, crossfade dừng source cũ đúng thời điểm, one-shot không loop, volume/mute/duck, file thiếu = im và không fetch lại, dispose dừng + đóng context |
+| Không có AudioContext (jsdom) | test `stays silent without an audio context` | Không throw; `currentCue()` vẫn ghi nhận cue; `isSilent()` = true |
+| Tải file | `fetch(url)` → `decodeAudioData`; cache theo cue; lỗi 404 chỉ cảnh báo một lần | Không có request lặp lại mỗi frame |
+
+### T14 · Nối vào chương · 27/11/2026
+
+| Việc | Lệnh | Kết quả |
+|---|---|---|
+| Hook chọn cue | `vitest run src/features/chapter1/room/useChapterMusic.test.ts` | **7 test**: phòng yên/căng, phố, buýt, kết thúc (fade 4 s), menu = dừng, duck theo voice, mute/volume |
+| Nối vào layer | `RoomChapterLayer.music.test.tsx` | **4 test**: intro → theme; ra phố → street; lên buýt → ride; `engineReady=false` → không phát; settings đi qua đúng |
+| Gắn dữ liệu thật | `state.resources.digitalSecurity`, `state.resources.timeMinutes`, `callOpen`, `alexVoice`, `lineVoiceActive` | Ngưỡng tense lấy từ manifest (`security ≤ 60`, `timeMinutes ≤ 360`) |
+| Nguồn cảnh | `outdoors` + `onBus` (mới thêm vào `OutsideWorldState`, tuỳ chọn) | Buýt 06 dùng cue `ride` |
+| Cổng chung | `vitest run` · `tsc -b` · `vite build` | **285 file / 2.567 test** xanh · tsc sạch · build 10,26 s |
+| Nghe thật | — | **Chưa** (chưa có file nhạc). A5–A7 sẽ nghiệm thu khi owner giao file |
+
 ### T12 · Bộ kiểm tra file · 27/11/2026
 
 | Việc | Lệnh | Kết quả |

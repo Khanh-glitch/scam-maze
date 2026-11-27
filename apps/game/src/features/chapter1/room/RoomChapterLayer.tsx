@@ -82,6 +82,8 @@ import { ThesisPanel, type ThesisPanelProps } from "../world/ThesisPanel";
 import { useWorldClock } from "../world/useWorldClock";
 import { elapsedMinutes, gameplayConfig, selectClosedMissions, selectOpenMissions, selectPendingEvents, selectThesisView } from "../../../game/narrative/world";
 import { CHAPTER_PROTAGONIST, CHAPTER_1_INITIAL_STATE, simulatedClock } from "../../../game/narrative/resources";
+import { endingFamily, isTense, type ChapterMusicScene } from "../../../game/audio/musicCueSelection";
+import { useChapterMusic } from "./useChapterMusic";
 import { setGameClockOverride } from "../../../game/clock/gameClock";
 import { SaveFailureNotice } from "../hud/SaveFailureNotice";
 import { SaveTrimmedNotice } from "../hud/SaveTrimmedNotice";
@@ -224,6 +226,8 @@ export interface RoomChapterLayerProps {
   outsideDoor?: boolean;
   /** True while the player has walked outside Room 6.07 onto Saigon streets. */
   outdoors?: boolean;
+  /** True while the player is aboard Bus 06 (outdoors only): the music switches to the ride cue. */
+  onBus?: boolean;
   /** Live rotating Saigon GPS radar telemetry while outdoors (replaces indoor standby disc). */
   outsideRadar?: SaigonRadarData | null;
   /** Hides room HUD overlays (mission list, bottom chips, top bar) during immersive street conversations. */
@@ -380,6 +384,7 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
   onOpenSettings,
   outsideDoor = false,
   outdoors = false,
+  onBus = false,
   outsideRadar = null,
   hideHud = false,
   onStoryContext,
@@ -559,6 +564,39 @@ const RoomChapterLayerView: React.FC<RoomChapterLayerProps> = ({
     // until it closes, so a line reached by a reply follows the conversation instead of cutting in.
     callOpen: callOpen || lineVoiceActive || hideHud,
     viewing: deviceView,
+  });
+
+  // --- Background music: one cue per scene, tense while the story is tense, ducked under voice.
+  // The owner's tracks come from `musicManifest.json`; a file that does not exist yet is silent.
+  const musicOutcome = useChapterState(store, (state) => state.outcome);
+  const musicSecurity = useChapterState(store, (state) => state.resources.digitalSecurity);
+  // `timeMinutes` is what is left until Friday 17:00, already clamped by the reducer.
+  const musicMinutesLeft = useChapterState(store, (state) =>
+    Math.max(0, state.resources.timeMinutes),
+  );
+  const musicScene: ChapterMusicScene =
+    musicOutcome !== null
+      ? "ending"
+      : introOpen
+        ? "intro"
+        : outdoors
+          ? onBus
+            ? "ride"
+            : "street"
+          : "room";
+  useChapterMusic({
+    scene: musicScene,
+    tense: isTense({
+      scamSurfaceOpen: callOpen,
+      security: musicSecurity,
+      minutesLeft: musicMinutesLeft,
+    }),
+    outcome: endingFamily(musicOutcome),
+    voicePlaying:
+      alexVoice.current !== null || alexVoice.introSpeaking || lineVoiceActive || callOpen,
+    soundEnabled: settings.soundEnabled,
+    volume: settings.musicVolume,
+    enabled: engineReady,
   });
   // --- Port cache (the bridge reads it on every hover frame) --------------------------------
   const cacheRef = useRef<PortCache>(EMPTY_CACHE);

@@ -19,6 +19,8 @@ export interface OutsideWorldState {
   ready: boolean;
   /** The player is out of the room. */
   outdoors: boolean;
+  /** The player is aboard Bus 06. Optional: older callers and tests may leave it out. */
+  onBus?: boolean;
   /** The street's action prompt while outside ("[E] Lên xe buýt ..."). */
   prompt: string | null;
   /** Where the player is while outside. */
@@ -44,6 +46,7 @@ export interface OutsideWorldState {
 const IDLE: OutsideWorldState = {
   ready: false,
   outdoors: false,
+  onBus: false,
   prompt: null,
   zone: null,
   district: null,
@@ -128,13 +131,15 @@ export function useOutsideWorld(
               prev.storyDialogue === null &&
               prev.ambientBark === null &&
               prev.crowdReaction === null &&
-              prev.radar === null
+              prev.radar === null &&
+              !prev.onBus
             ) {
               return prev;
             }
             return {
               ready: true,
               outdoors,
+              onBus: outdoors ? snap.onBus : false,
               prompt,
               zone,
               district,
