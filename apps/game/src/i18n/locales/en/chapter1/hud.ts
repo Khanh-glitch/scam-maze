@@ -127,6 +127,7 @@ const hud = {
       tasksHeading: "Thesis tasks",
       noTasks: "No thesis tasks yet.",
       fatigueNote: {
+        rested: "You are rested. Thesis work runs at its normal pace.",
         tired: "You are tired. Thesis work takes {{percent}}% longer.",
         exhausted: "You are exhausted. Thesis work takes {{percent}}% longer.",
       },

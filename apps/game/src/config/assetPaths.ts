@@ -20,6 +20,24 @@ export const BRAND_LOGO_PNG = "/assets/branding/scammaze-logo.png";
 export const CALL_PHONE_GLB = "/assets/3d/optimized/call-phone.optimized.glb";
 
 /**
+ * Typing motion for the first-person arms: finger and wrist rotations only, retargeted from a Mixamo
+ * `Typing.fbx` onto the arms rig by `scripts/retarget-typing-hands.mjs` (animation-only GLB).
+ */
+export const TYPING_HANDS_GLB = "/assets/3d/characters/typing-hands.glb";
+
+/**
+ * Laptop keypress clips, cut from the owner-supplied Freesound recording 799122 by
+ * `scripts/extract-keyboard-sfx.py`. The recording has no key labels: "space", "enter" and
+ * "backspace" are the presses with the matching sound character, not recordings of those keys.
+ */
+export const KEYBOARD_SFX = {
+  key: ["/assets/audio/keyboard/key-1.wav", "/assets/audio/keyboard/key-2.wav", "/assets/audio/keyboard/key-3.wav"],
+  space: "/assets/audio/keyboard/key-space.wav",
+  enter: "/assets/audio/keyboard/key-enter.wav",
+  backspace: "/assets/audio/keyboard/key-backspace.wav",
+} as const;
+
+/**
  * Low-poly city backdrop (Meshopt + WebP, produced by scripts/optimize-city-packs.cjs):
  * curated buildings from Low Poly City, Low Poly City Game-Ready and Low Poly City Asset Pack,
  * and the single cars of Low Poly Cars Pack.
@@ -51,9 +69,16 @@ export const CHARACTERS_GLB_BASE = "/assets/3d/optimized/characters";
  * produced by scripts/optimize-street-props.cjs). The files are listed in features/khupho/world/streetFurniture.ts.
  */
 export const STREET_PROPS_MODELS_BASE = "/assets/3d/optimized/props";
+/**
+ * Mast-arm traffic signal model with role-named nodes (pole, arm, head_low, head_a, head_b and their lamps), in the
+ * signal frame of world/mastArmSignal.ts. Produced by scripts/optimize-traffic-signal.cjs from assets-src/dengiaothong.glb.
+ */
+export const TRAFFIC_SIGNAL_GLB = `${STREET_PROPS_MODELS_BASE}/traffic-signal.optimized.glb`;
 /** Base URL of the prologue voice clips: `<base>/<locale>/prologue_home<n>_<locale>.mp3` (locale is `en` or `vi`). */
 export const PROLOGUE_VOICE_BASE = "/audio/prologue";
 /** Base URL of Auntie Mai's street conversation clips: `<base>.<locale>/mai.<nodeId>.mp3` (locale is `en` or `vi`). */
 export const MAI_VOICE_BASE = "/assets/audio/mai";
 /** Base URL of the Mission 01 voice of Alex: `<base>/en/alex_<cue>_en.mp3`. Only English clips exist. */
 export const MISSION01_VOICE_BASE = "/audio/mission01";
+/** Base URL of Mission 02 recorded conversation lines: `<base>/<locale>/lines/<stem>.mp3`. */
+export const MISSION02_VOICE_BASE = "/audio/mission02";

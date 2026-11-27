@@ -45,6 +45,8 @@ export const PERSISTENT_FLAG_IDS = [
   "minhTrustsAlex",
   /** Alex confirmed with the Training Office that the submission account is active and no fee exists. */
   "schoolAccessVerified",
+  /** Alex compared the suspicious fee against the saved portal's official services information. */
+  "schoolFeeClaimContradicted",
   /** Alex entered his student login on a page that was not the school's. */
   "loginCredentialsExposed",
   /** Alex gave a verification code to that page. */
@@ -77,6 +79,45 @@ export const PERSISTENT_FLAG_IDS = [
   "goldenFeesPaid",
   /** The full draft was finished (on time or late). */
   "draftFinished",
+  /** The final submission mission reached Friday 17:00 without a submitted receipt. */
+  "submissionDeadlineMissed",
+  /** Alex included the interview finding about checking through a previously known channel in the thesis revision. */
+  "researchSavedChannelIncluded",
+  /** The introduction's claims and sources were checked (Mission 01 thesis desk). */
+  "draftSourcesChecked",
+  /** The findings section was reconciled against its source data (Mission 01 thesis desk). */
+  "findingsReconciled",
+  /** The final draft received a complete review (Mission 01 thesis desk). */
+  "finalDraftReviewed",
+  /** Alex asked the supervisor for feedback on the draft (Mission 01 thesis desk). */
+  "supervisorFeedbackRequested",
+  /** Alex checked the District 5 appointment through a previously known channel. */
+  "rideVerifiedIndependently",
+  "parcelCredentialsExposed",
+  "parcelFeePaid",
+  "parcelAtCounter",
+  /** Alex paid the unofficial driver outside a tracked ride service. */
+  "ridePaidOffPlatform",
+  /** The unofficial ride consumed enough time to affect the appointment. */
+  "rideLostTime",
+  /** Alex reached the Chợ Lớn market office after travelling. */
+  "interviewArrived",
+  /** Alex began the in-person District 5 thesis interview. */
+  "interviewStarted",
+  /** Alex completed the District 5 thesis interview. */
+  "interviewCompleted",
+  /** The District 5 interview window passed without an interview. */
+  "interviewMissed",
+  /** Cô Ba agreed to reschedule after Alex arrived too late. */
+  "interviewRescheduled",
+  /** Alex saved the interview findings as thesis evidence. */
+  "interviewEvidenceSaved",
+  /** Alex saved the ride offer and route details as evidence. */
+  "rideEvidenceSaved",
+  /** Alex shared the unofficial driver's contact with Minh. */
+  "driverContactShared",
+  /** Alex warned Minh about the unofficial ride. */
+  "minhWarnedAboutRide",
 ] as const;
 export type PersistentFlagId = (typeof PERSISTENT_FLAG_IDS)[number];
 export type PersistentFlags = Record<PersistentFlagId, boolean>;
@@ -124,6 +165,7 @@ export const CHAPTER_1_INITIAL_STATE: ChapterInitialState = {
     housingDepositLost: false,
     minhTrustsAlex: true,
     schoolAccessVerified: false,
+    schoolFeeClaimContradicted: false,
     loginCredentialsExposed: false,
     verificationCodeExposed: false,
     accountEverCompromised: false,
@@ -140,6 +182,27 @@ export const CHAPTER_1_INITIAL_STATE: ChapterInitialState = {
     goldenPlatformJoined: false,
     goldenFeesPaid: false,
     draftFinished: false,
+    submissionDeadlineMissed: false,
+    researchSavedChannelIncluded: false,
+    draftSourcesChecked: false,
+    findingsReconciled: false,
+    finalDraftReviewed: false,
+    supervisorFeedbackRequested: false,
+    rideVerifiedIndependently: false,
+    parcelCredentialsExposed: false,
+    parcelFeePaid: false,
+    parcelAtCounter: false,
+    ridePaidOffPlatform: false,
+    rideLostTime: false,
+    interviewArrived: false,
+    interviewStarted: false,
+    interviewCompleted: false,
+    interviewMissed: false,
+    interviewRescheduled: false,
+    interviewEvidenceSaved: false,
+    rideEvidenceSaved: false,
+    driverContactShared: false,
+    minhWarnedAboutRide: false,
   },
 };
 

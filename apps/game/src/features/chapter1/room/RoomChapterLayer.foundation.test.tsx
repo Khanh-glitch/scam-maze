@@ -105,7 +105,7 @@ describe("RoomChapterLayer with LAST SUBMISSION routing", () => {
     fireEvent.click(task);
     const list = screen.getByTestId("task-list");
     expect(within(list).getByTestId("task-mission-m01.missing-access").textContent).toContain("THE MISSING ACCESS");
-    expect(within(list).getByTestId("task-step-intro").getAttribute("data-state")).toBe("current");
+    expect(within(list).getByTestId("task-step-write").getAttribute("data-state")).toBe("current");
     expect(screen.queryByTestId("hud-task-new-mark")).toBeNull();
     // T closes it again, and opens it.
     fireEvent.keyDown(window, { key: "t", code: "KeyT" });
@@ -119,27 +119,43 @@ describe("RoomChapterLayer with LAST SUBMISSION routing", () => {
     finishIntro();
     const tracker = screen.getByTestId("task-tracker");
     expect(tracker.getAttribute("data-fresh")).toBe("true");
-    expect(within(tracker).getByTestId("task-current").textContent).toBe("Edit the introduction and literature review");
-    act(() => void rig.store().dispatch({ type: "COMPLETE_THESIS_TASK", taskId: "draft.intro-review" }));
-    // The task took 90 minutes, so the email of 17:10 has arrived: reading it is the next step.
-    expect(within(screen.getByTestId("task-tracker")).getByTestId("task-current").textContent).toBe("Read the new email about your submission account");
-    expect(screen.getByTestId("task-step-done").textContent).toContain("Edit the introduction and literature review");
+    expect(within(tracker).getByTestId("task-current").textContent).toBe("Type two sentences of your thesis");
+    act(() => void rig.store().dispatch({ type: "COMPLETE_THESIS_TASK", taskId: "draft.final" }));
+    // The draft was the last step of THE MISSING ACCESS: the tracker moves on to the final submission.
+    expect(within(screen.getByTestId("task-tracker")).getByTestId("task-current").textContent).toBe("Finish the draft, verify submission access and resolve any account lock before Friday, 17:00.");
+    expect(rig.store().getState().world.missions["m01.missing-access"].status).toBe("completed");
   });
 
-  it("keeps the HUD over the laptop and marks the app of the current step on its desktop", () => {
+  it("shows one task only, and tracks another task or a sub-task from the list", () => {
+    const rig = mountLayer();
+    finishIntro();
+    // The email of 17:10 gives Mission 01 a second step, so there is a later sub-task to track.
+    act(() => void rig.store().dispatch({ type: "ADVANCE_TIME", minutes: 10 }));
+    const tracker = screen.getByTestId("task-tracker");
+    expect(screen.queryByTestId("task-others")).toBeNull();
+    const firstStep = within(tracker).getByTestId("task-current").textContent;
+    expect(firstStep).toBe("Read the new email about your submission account");
+    // Track a later sub-task of the same mission.
+    fireEvent.click(screen.getByTestId("hud-task-button"));
+    const list = screen.getByTestId("task-list");
+    fireEvent.click(within(list).getByTestId("task-step-track-write"));
+    expect(within(screen.getByTestId("task-tracker")).getByTestId("task-current").textContent).toBe("Type two sentences of your thesis");
+    expect(within(screen.getByTestId("task-list")).getByTestId("task-step-write").getAttribute("data-state")).toBe("current");
+    // Clicking the mission title tracks the mission again (its own current step).
+    fireEvent.click(within(screen.getByTestId("task-list")).getByTestId("task-mission-pick-m01.missing-access"));
+    expect(within(screen.getByTestId("task-tracker")).getByTestId("task-current").textContent).toBe(firstStep);
+  });
+
+  it("hides the room HUD over the laptop while marking the current task app on its desktop", () => {
     const rig = mountLayer();
     finishIntro();
     act(() => rig.store().dispatch({ type: "ADVANCE_TIME", minutes: 10 }));
     act(() => rig.bridge.onProp("laptop", "inspect-ready"));
-    const slot = screen.getByTestId("objective-tracker-slot");
-    expect(slot.style.visibility).toBe("visible");
-    expect(slot.getAttribute("data-over-laptop")).toBe("true");
-    // One row above the laptop: the small ring and the clock, then the step.
-    expect(within(slot).getByTestId("chapter-status-cluster").getAttribute("data-compact")).toBe("true");
-    expect(within(slot).getByTestId("task-tracker").getAttribute("data-compact")).toBe("true");
-    expect(within(slot).getByTestId("task-current").textContent).toBe("Read the new email about your submission account");
+    expect(screen.queryByTestId("objective-tracker-slot")).toBeNull();
     expect(screen.getByTestId("desktop-icon-device-mail").getAttribute("data-task-target")).toBe("true");
     expect(screen.getByTestId("desktop-icon-thesis").getAttribute("data-task-target")).toBeNull();
+    // The laptop retains its own device clock, without the room HUD crossing the title bar.
+    expect(screen.getByTestId("desktop-clock")).toBeTruthy();
   });
 
   it("brings the carried phone up with P, low on the right, and puts it away with P", () => {
@@ -171,7 +187,7 @@ describe("RoomChapterLayer with LAST SUBMISSION routing", () => {
     fireEvent.keyDown(window, { key: "p", code: "KeyP" });
     expect(screen.getByTestId("held-phone")).toBeTruthy();
     expect(screen.getByTestId("desktop-icon-device-mail")).toBeTruthy();
-    expect(screen.getByTestId("objective-tracker-slot").getAttribute("data-over-laptop")).toBe("true");
+    expect(screen.queryByTestId("objective-tracker-slot")).toBeNull();
     const closes = vi.mocked(rig.bridge.commands!.closeInspect).mock.calls.length;
     fireEvent.keyDown(window, { key: "p", code: "KeyP" });
     expect(screen.queryByTestId("held-phone")).toBeNull();
@@ -183,7 +199,7 @@ describe("RoomChapterLayer with LAST SUBMISSION routing", () => {
     applyLocale("vi");
     mountLayer();
     finishIntro();
-    expect(screen.getByTestId("task-current").textContent).toBe("Chỉnh sửa phần mở đầu và tổng quan tài liệu");
+    expect(screen.getByTestId("task-current").textContent).toBe("Gõ 2 câu khóa luận");
     expect(screen.getByTestId("task-where").textContent).toContain("Laptop · Khóa luận");
   });
 

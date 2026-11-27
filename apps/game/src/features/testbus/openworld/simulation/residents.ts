@@ -1,4 +1,5 @@
-import {warmSkin} from "./drive-look";
+import { upgradeHumanMaterials, createHumanRealismRig, type HumanActivity } from "./humanRealism";
+import type { HumanPresenceSystem } from "./humanPresence";
 import { streetClips } from "./streetClips";
 import { actorDetail } from "./detail";
 import type { Solid } from "./boarding";
@@ -14,6 +15,7 @@ import {
   tube,
 } from "./scene-kit";
 import { type BusRouteController } from "./transit";
+import type { SaigonTrafficManager, SmartPedestrianAgent } from "../traffic";
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const names = [
   "npc-alice",
@@ -56,11 +58,16 @@ export function castStreet(
   onChange: () => void,
   onCore: () => void,
   solids: Solid[],
+  trafficMgr?: SaigonTrafficManager,
+  humanPresence?: HumanPresenceSystem,
 ) {
   let disposed = false;
   const details: Awaited<ReturnType<typeof actorDetail>>[] = [];
+  const presenceCleanups: (() => void)[] = [];
   const others: T.Group[] = [];
   const shadow = contactMaterial(0.53);
+  let rainIntensity = 0;
+  const busFocus = new T.Vector3();
   const actors: ((dt: number, t: number, cam: T.Vector3) => void)[] = [];
   async function load(file: string, height: number, parent: T.Object3D) {
     const data = await loader
@@ -92,13 +99,7 @@ export function castStreet(
     root.add(obj);
     parent.add(root);
     root.updateMatrixWorld(true);
-    obj.traverse((n) => {
-      if (n instanceof T.Mesh) {
-        n.castShadow = true;
-        n.receiveShadow = true;
-        if(n.name==='HumanBody')for(const m of Array.isArray(n.material)?n.material:[n.material])if(m instanceof T.MeshStandardMaterial)warmSkin(m);
-      }
-    });
+    upgradeHumanMaterials(obj);
     onChange();
     return { root, obj, data, clips, height };
   }
@@ -142,9 +143,10 @@ export function castStreet(
       });
     }
     for (let i = 0; i < names.length && !disposed; i++) {
+      // The vendor file is authored 1.18 m tall; the neighborhood stands her at 1.55 m beside the cart (khupho humans.ts).
       const actor = await load(
         names[i] + ".optimized",
-        1.62 + (i % 4) * 0.045,
+        names[i] === "banhmi-vendor" ? 1.55 : 1.62 + (i % 4) * 0.045,
         scene,
       );
       if (!actor) {
@@ -153,7 +155,8 @@ export function castStreet(
       }
       const { root, obj, data, clips: streetSet, height: actorHeight } = actor;
       const [x, z] = places[i],
-        walker = i === 4 || i === 5 || i === 6,
+        crosswalkWalker = Boolean(trafficMgr) && (i === 12 || i === 14),
+        walker = i === 4 || i === 5 || i === 6 || crosswalkWalker,
         seated = i === 3,
         queue = i === 0 || i === 2;
       for (const [side, s] of [
@@ -182,50 +185,32 @@ export function castStreet(
           aim(obj, "calf_" + side, "foot_" + side, new T.Vector3(0, -1, -0.14));
         }
       }
-      const held = i === 3 || i === 2 ? new T.Group() : null,
+      // Seated people hold nothing: the old phone box in the hand read as a floating prop (owner).
+      const held = !seated && (i === 3 || i === 2) ? new T.Group() : null,
         hand = obj.getObjectByName("hand_r"),
         handPos = new T.Vector3();
       if (held) {
         root.add(held);
-        if (seated) {
-          aim(obj, "lowerarm_r", "hand_r", new T.Vector3(-0.29, 0.35, 0.9));
-          rounded(
-            held,
-            [0, 0, 0],
-            [0.077, 0.14, 0.014],
-            0.008,
-            material(0x232931),
-          );
-          rounded(
-            held,
-            [0, 0, 0.009],
-            [0.068, 0.123, 0.002],
-            0.003,
-            material(0x6c9095),
-          );
-          held.rotation.x = -0.33;
-        } else {
-          rounded(
-            held,
-            [0, -0.25, 0],
-            [0.22, 0.27, 0.095],
-            0.021,
-            material(0x96532d),
-          );
-          tube(
-            held,
-            [
-              [-0.07, -0.12, 0],
-              [-0.06, -0.045, 0],
-              [0, -0.018, 0],
-              [0.06, -0.045, 0],
-              [0.07, -0.12, 0],
-            ],
-            0.008,
-            material(0x584435),
-            9,
-          );
-        }
+        rounded(
+          held,
+          [0, -0.25, 0],
+          [0.22, 0.27, 0.095],
+          0.021,
+          material(0x96532d),
+        );
+        tube(
+          held,
+          [
+            [-0.07, -0.12, 0],
+            [-0.06, -0.045, 0],
+            [0, -0.018, 0],
+            [0.06, -0.045, 0],
+            [0.07, -0.12, 0],
+          ],
+          0.008,
+          material(0x584435),
+          9,
+        );
       }
       const feetShadow = contact(
         root,
@@ -251,24 +236,103 @@ export function castStreet(
       const thigh = ["thigh_l", "thigh_r"].map((k) => obj.getObjectByName(k)),
         neutral = thigh.map((b) => b?.rotation.x ?? 0);
       let mixer: T.AnimationMixer | undefined;
+      let walkAction: T.AnimationAction | undefined;
+      const walkClipSpeed = streetSet.walkSpeedAt(actorHeight);
       // Walkers borrow a retargeted walk when their file has none; everyone else keeps their own pose / idle.
       const clip = walker ? streetSet.walk : data.animations.find((a) => /idle/i.test(a.name));
       if (clip) {
         mixer = new T.AnimationMixer(obj);
         const action = mixer.clipAction(clip);
-        if (walker) action.timeScale = 0.72 / streetSet.walkSpeedAt(actorHeight);
+        walkAction = action;
+        if (walker) action.timeScale = 0.72 / walkClipSpeed;
         action.play();
         action.time = clip.duration * ((i * 0.618) % 1);
       }
-      const head = obj.getObjectByName("head"),
-        chest = obj.getObjectByName("spine_03");
-      const q = head?.quaternion.clone(),
-        rest = chest?.quaternion.clone(),
-        rot = new T.Quaternion(),
-        axis = new T.Vector3(0, 1, 0);
+      // Register walkers with the unified Social Force + Crosswalk PedestrianBrain!
+      let smartPed: SmartPedestrianAgent | null = null;
+      if (walker && trafficMgr) {
+        const patrolZMin = i === 12 ? -104 : i === 14 ? -152 : z - 7;
+        const patrolZMax = i === 12 ? -88 : i === 14 ? -138 : z + 7;
+        smartPed = trafficMgr.pedestrians.registerSidewalkWalker({
+          id: `LTT_PED_${i}`,
+          x,
+          z: i === 12 ? -95.2 : i === 14 ? -145.5 : z,
+          patrolZMin,
+          patrolZMax,
+          baseSpeed: crosswalkWalker ? 1.05 : 0.78,
+          canCross: crosswalkWalker,
+          seed: i + 1,
+        });
+      }
+      const realism = createHumanRealismRig(root, obj, i + 1);
+      if (humanPresence) {
+        const resLabel =
+          i === 2
+            ? { en: "Bánh Mì Vendor", vi: "Cô bán bánh mì" }
+            : seated
+              ? { en: "Bus Stop Passenger", vi: "Khách chờ xe buýt" }
+              : queue
+                ? { en: "Bus Commuter", vi: "Hành khách xe buýt" }
+                : walker
+                  ? { en: "Passerby", vi: "Người đi bộ" }
+                  : { en: "Resident", vi: "Người dân phố" };
+        presenceCleanups.push(
+          humanPresence.register({
+            id: `resident_${i}`,
+            label: resLabel,
+            object: root,
+            radius: seated ? 0.42 : 0.34,
+            canSidestep: !seated,
+            onBump: (dx, dz, strength) => {
+              realism.triggerBump(dx, dz, strength);
+              if (smartPed && !seated) {
+                smartPed.x += dx * 0.14;
+                smartPed.z += dz * 0.14;
+              }
+            },
+            onPersonalSpace: (closeness) => realism.setPersonalSpace(closeness),
+          }),
+        );
+      }
+      const idleClip = data.animations.find((a) => /idle/i.test(a.name)) ?? streetSet.idle;
+      let idleAction: T.AnimationAction | undefined;
+      if (walker && mixer && idleClip && idleClip !== clip) {
+        idleAction = mixer.clipAction(idleClip);
+        idleAction.setEffectiveWeight(0);
+        idleAction.play();
+      }
+      // The bánh mì vendor works as in the neighborhood (khupho people.ts, Vendor): her own idle, now and then a look
+      // for customers or bread preparation, and a welcome when the player comes close. No procedural layer on top:
+      // her rig is not the street NPCs' one, and the gesture layer bent her arms up.
+      const vendor = names[i] === "banhmi-vendor" && mixer ? mixer : null;
+      const vendorClip = (name: string) => data.animations.find((a) => a.name === name);
+      let vendorNext = 4,
+        vendorGreetT = 0,
+        vendorNear = false,
+        vendorBusy = false;
+      const vendorOnce = (name: string) => {
+        const clipOnce = vendorClip(name);
+        if (!vendor || !clipOnce || !walkAction) return;
+        const one = vendor.clipAction(clipOnce);
+        one.reset().setLoop(T.LoopOnce, 1);
+        one.clampWhenFinished = true;
+        one.crossFadeFrom(walkAction, 0.35, false).play();
+        vendorBusy = true;
+        const done = (ev: { action: T.AnimationAction }) => {
+          if (ev.action !== one) return;
+          vendor.removeEventListener("finished", done);
+          walkAction!.reset().play();
+          walkAction!.crossFadeFrom(one, 0.45, false);
+          vendorBusy = false;
+        };
+        vendor.addEventListener("finished", done);
+      };
+      let moveBlend = walker ? 1 : 0;
       let approach = 0;
       if (i === 3) onCore();
       actors.push((dt, t, cam) => {
+        let curSpeed = 0;
+        let onRoad = false;
         if (queue && route.phase === "approaching") approach = 0;
         if (queue) {
           const active =
@@ -286,6 +350,7 @@ export function castStreet(
             root.position.set(route.x + 0.11, 0.62, route.z - 3.12 + i * 0.48);
             root.rotation.y = Math.PI;
           } else if (active) {
+            curSpeed = 0.8;
             root.rotation.y = -Math.PI / 2;
             thigh.forEach((bone, j) => {
               if (bone)
@@ -295,55 +360,115 @@ export function castStreet(
           }
         }
         if (walker) {
-          const next = walkZ + walkSide * 0.72 * dt;
-          if (Math.abs(next - z) > 7) walkSide *= -1;
-          let lane = x;
-          for (const r of solids) {
-            if (
-              next > r.z0 - 0.5 &&
-              next < r.z1 + 0.5 &&
-              lane > r.x0 - 0.33 &&
-              lane < r.x1 + 0.33
-            )
-              lane =
-                Math.abs(lane - r.x0) < Math.abs(lane - r.x1)
-                  ? r.x0 - 0.48
-                  : r.x1 + 0.48;
+          if (smartPed) {
+            root.position.x = smartPed.x;
+            root.position.z = smartPed.z;
+            // Smooth curb step-down when crossing asphalt roadway (x ∈ [-12.6, -0.2]) vs sidewalk (0.16)
+            onRoad = smartPed.x > -12.6 && smartPed.x < -0.2;
+            const targetY = onRoad ? 0.0 : 0.16;
+            root.position.y += (targetY - root.position.y) * Math.min(1, dt * 10);
+            root.rotation.y = smartPed.yaw;
+            curSpeed = smartPed.speed;
+            const targetMove = smartPed.speed > 0.08 ? 1 : 0;
+            moveBlend = T.MathUtils.damp(moveBlend, targetMove, 7.5, dt);
+            if (walkAction) {
+              walkAction.setEffectiveWeight(moveBlend);
+              walkAction.timeScale = Math.max(0.15, smartPed.speed / walkClipSpeed);
+            }
+            if (idleAction) {
+              idleAction.setEffectiveWeight(1 - moveBlend);
+            }
+          } else {
+            const rainBoost = 1 + rainIntensity * 0.22;
+            curSpeed = 0.72 * rainBoost;
+            const next = walkZ + walkSide * curSpeed * dt;
+            if (Math.abs(next - z) > 7) walkSide *= -1;
+            let lane = x;
+            for (const r of solids) {
+              if (
+                next > r.z0 - 0.5 &&
+                next < r.z1 + 0.5 &&
+                lane > r.x0 - 0.33 &&
+                lane < r.x1 + 0.33
+              )
+                lane =
+                  Math.abs(lane - r.x0) < Math.abs(lane - r.x1)
+                    ? r.x0 - 0.48
+                    : r.x1 + 0.48;
+            }
+            for (const n of others) {
+              if (
+                n !== root &&
+                Math.abs(n.position.z - next) < 0.9 &&
+                Math.abs(n.position.x - lane) < 0.49
+              )
+                lane += n.position.x > lane ? -0.48 : 0.48;
+            }
+            root.position.x = T.MathUtils.damp(root.position.x, lane, 5, dt);
+            walkZ += walkSide * curSpeed * dt;
+            root.position.z = walkZ;
+            const targetYaw = walkSide > 0 ? 0 : Math.PI;
+            let diff = targetYaw - root.rotation.y;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            root.rotation.y += diff * Math.min(1, dt * 6.5);
+            if (walkAction) walkAction.timeScale = curSpeed / walkClipSpeed;
           }
-          for (const n of others) {
-            if (
-              n !== root &&
-              Math.abs(n.position.z - next) < 0.9 &&
-              Math.abs(n.position.x - lane) < 0.49
-            )
-              lane += n.position.x > lane ? -0.48 : 0.48;
-          }
-          root.position.x = T.MathUtils.damp(root.position.x, lane, 5, dt);
-          walkZ += walkSide * 0.72 * dt;
-          root.position.z = walkZ;
-          root.rotation.y = walkSide > 0 ? 0 : Math.PI;
         }
         const distance = root.position.distanceTo(cam);
         root.visible = distance < 52;
         detail.update(distance);
         if (!root.visible) return;
         mixer?.update(dt);
+        if (vendor) {
+          vendorGreetT -= dt;
+          const near = distance < 3.2 && cam.y < 1.9;
+          if (near && !vendorNear && vendorGreetT <= 0 && !vendorBusy) {
+            vendorGreetT = 25;
+            vendorOnce(Math.random() < 0.5 ? "Welcome" : "Invite");
+            vendorNext = 9;
+          }
+          vendorNear = near;
+          vendorNext -= dt;
+          if (vendorNext <= 0 && !vendorBusy) {
+            vendorNext = 9 + Math.random() * 7;
+            vendorOnce(Math.random() < 0.55 ? "LookForCustomer" : "PrepareBread");
+          }
+          return;
+        }
         if (held && hand) {
           root.worldToLocal(hand.getWorldPosition(handPos));
           held.position.copy(handPos);
         }
-        if (head && q)
-          head.quaternion
-            .copy(q)
-            .multiply(
-              rot.setFromAxisAngle(axis, 0.16 * Math.sin(t * 0.59 + i * 1.31)),
-            );
-        if (chest && rest)
-          chest.quaternion
-            .copy(rest)
-            .multiply(
-              rot.setFromAxisAngle(axis, 0.025 * Math.sin(t * 0.87 + i)),
-            );
+        let activity: HumanActivity = "idle";
+        let focusPoint: T.Vector3 | null = null;
+        if (seated) {
+          activity = "idle";
+        } else if (queue && approach < 1) {
+          activity = "waiting_bus";
+          if (route.phase === "approaching" || route.phase === "boarding") {
+            busFocus.set(route.x, 1.5, route.z - 4.2);
+            focusPoint = busFocus;
+          }
+        } else if (onRoad) {
+          activity = "crossing";
+        } else if (curSpeed > 0.12) {
+          activity = "walking";
+        } else if (i % 3 === 1) {
+          activity = "talking";
+        } else if (i % 3 === 2) {
+          activity = "listening";
+        }
+        realism.update({
+          dt,
+          time: t,
+          playerPos: cam,
+          focusPoint,
+          moveSpeed: curSpeed,
+          activity,
+          rain: seated ? rainIntensity * 0.25 : rainIntensity,
+          hasActiveMixer: Boolean(mixer),
+        });
       });
     }
     for (const [name, h, x, z] of [
@@ -363,11 +488,14 @@ export function castStreet(
     onCore();
   });
   return {
-    update(dt: number, t: number, cam: T.Vector3) {
+    update(dt: number, t: number, cam: T.Vector3, rain = 0) {
+      rainIntensity = rain;
       actors.forEach((f) => f(dt, t, cam));
     },
     dispose() {
       disposed = true;
+      for (const cleanup of presenceCleanups) cleanup();
+      presenceCleanups.length = 0;
       details.forEach((d) => d.dispose());
       actors.length = 0;
     },

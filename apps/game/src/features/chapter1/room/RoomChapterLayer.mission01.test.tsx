@@ -64,8 +64,9 @@ describe("Mission 01 in the phone", () => {
   it("shows the current step and the email at 17:10 with a notice", () => {
     const rig = mountLayer();
     // The tracker names the concrete step and where it happens, not only the mission's goal.
-    expect(screen.getByTestId("task-current").textContent).toBe("Edit the introduction and literature review");
+    expect(screen.getByTestId("task-current").textContent).toBe("Type two sentences of your thesis");
     expect(screen.getByTestId("task-where").textContent).toContain("Laptop · Thesis");
+    expect(screen.getByTestId("task-objective").textContent).toBe("Finish the draft by Wednesday, 06:00, and confirm you can sign in to submit by Friday, 17:00.");
     act(() => void rig.store().dispatch({ type: "ADVANCE_TIME", minutes: 10 }));
     expect(screen.getByTestId("event-arrival-notice").textContent).toContain("Graduation Clearance — Action Required");
     expect(screen.getByTestId("task-current").textContent).toBe("Read the new email about your submission account");
@@ -93,6 +94,7 @@ describe("Mission 01 in the phone", () => {
     await within(phone).findByTestId("fake-step-payment");
     expect(rig.store().getState().persistent.loginCredentialsExposed).toBe(true);
     expect(rig.store().getState().world.missions["m01.security-breach"].status).toBe("open");
+    expect(screen.getByTestId("task-objective").textContent).toBe("Secure your accounts first. Finish the draft by Wednesday, 06:00; submit by Friday, 17:00.");
     expect(rig.store().getState().resources.cash).toBe(2_500_000);
     fireEvent.focus(within(phone).getByTestId("pay-number"));
     fireEvent.click(within(phone).getByTestId("pay-fill"));
@@ -120,6 +122,11 @@ describe("Mission 01 in the phone", () => {
     fireEvent.click(within(phone).getByTestId("files-folder-bookmarks"));
     fireEvent.click(within(phone).getByTestId("device-row-portal.saved"));
     fireEvent.click(within(phone).getByTestId("device-action-portal.saved-check-account"));
+    // The saved portal is already an authoritative route: its active status confirms access without requiring a call.
+    expect(rig.store().getState().persistent.schoolAccessVerified).toBe(true);
+    expect(rig.store().getState().world.missions["m01.missing-access"].path).toBe("verified");
+    expect(screen.getByTestId("task-objective").textContent).toBe("Portal access is confirmed. Finish the draft by Wednesday, 06:00; submit by Friday, 17:00.");
+    expect(rig.store().getState().resources.cash).toBe(2_500_000);
     fireEvent.click(within(phone).getByTestId("phone-home-indicator"));
     fireEvent.click(within(phone).getByRole("button", { name: /Calls/ }));
     fireEvent.click(within(phone).getByTestId("calls-tab-contacts"));
@@ -146,6 +153,7 @@ describe("Mission 01 in the phone", () => {
     expect(state.resources.timeMinutes).toBe(72 * 60 - 55);
     // The mission moved to its "verified" path. The email is still unread, so the tracker asks for it before the draft.
     expect(state.world.missions["m01.missing-access"].path).toBe("verified");
+    expect(screen.getByTestId("task-objective").textContent).toBe("Portal access is confirmed. Finish the draft by Wednesday, 06:00; submit by Friday, 17:00.");
     expect(screen.getByTestId("task-current").textContent).toBe("Read the new email about your submission account");
   }, 40_000);
 
@@ -153,8 +161,6 @@ describe("Mission 01 in the phone", () => {
     const rig = mountLayer();
     fireEvent.click(screen.getByTestId("hud-planner-chip"));
     const planner = screen.getByTestId("planner-overlay");
-    fireEvent.click(within(planner).getByTestId("thesis-task-draft.intro-review"));
-    fireEvent.click(within(planner).getByTestId("thesis-task-draft.findings"));
     fireEvent.click(within(planner).getByTestId("thesis-task-draft.final"));
     const state = rig.store().getState();
     expect(state.resources.thesisProgress).toBe(67);
@@ -166,6 +172,7 @@ describe("Mission 01 in the phone", () => {
   it("shows the email in Vietnamese with the Vietnamese amount", () => {
     applyLocale("vi");
     const rig = mountLayer();
+    expect(screen.getByTestId("task-objective").textContent).toBe("Hoàn thành bản thảo trước 06:00 thứ Tư và xác nhận bạn đăng nhập được vào hệ thống nộp bài trước 17:00 thứ Sáu.");
     act(() => void rig.store().dispatch({ type: "ADVANCE_TIME", minutes: 10 }));
     const phone = openPhone(rig);
     fireEvent.click(within(phone).getByTestId("phone-app-mail"));

@@ -12,6 +12,7 @@ const ueh: LocaleShape<typeof en> = {
       navLabel: "Các mục của cổng",
       home: "Cổng sinh viên",
       accessActive: "Đang hoạt động",
+      accessNotChecked: "Chưa xác minh",
       accessLocked: "Quyền truy cập bị khóa",
       nav: {
         dashboard: "Tổng quan",
@@ -59,9 +60,7 @@ const ueh: LocaleShape<typeof en> = {
         supervisorWaiting: "Chờ bản thảo hoàn chỉnh",
         remaining: "Công việc của bản thảo",
         task: {
-          intro: "Phần mở đầu và tổng quan tài liệu",
-          findings: "Phần kết quả",
-          final: "Đọc lại toàn bộ bản thảo",
+          final: "Gõ 2 câu khóa luận",
         },
         taskDone: "Xong",
         taskTodo: "Cần làm",
@@ -70,6 +69,10 @@ const ueh: LocaleShape<typeof en> = {
         deadlineValue: "Thứ Sáu, 17:00",
         timeLeftLabel: "Thời gian còn lại",
         access: "Quyền truy cập hệ thống nộp bài",
+        submitButton: "Nộp khóa luận bản cuối",
+        submittedReceipt: "Đã nhận bài nộp. Hãy lưu biên nhận này.",
+        blockedHint: "Hoàn thành bản thảo, xác minh quyền truy cập và xử lý khóa tài khoản trước khi nộp.",
+        deadlineMissed: "Đã quá hạn mà chưa có biên nhận nộp bài.",
       },
       services: {
         heading: "Dịch vụ sinh viên",
@@ -99,6 +102,8 @@ const ueh: LocaleShape<typeof en> = {
           thesisAmount: "Không thu phí",
         },
         feesNote: "Có thắc mắc về một khoản phí: hãy hỏi Phòng Đào tạo.",
+        paymentPortalLabel: "Cổng thanh toán (được ghi trong sổ tay sinh viên)",
+        paymentPortalDomain: "payment.ueh.edu.vn",
       },
       account: {
         heading: "Tài khoản và bảo mật",
@@ -115,6 +120,15 @@ const ueh: LocaleShape<typeof en> = {
         step2: "Đổi mật khẩu và đăng xuất các thiết bị khác.",
         step3: "Chờ văn phòng xác nhận quyền truy cập của bạn đã hoạt động.",
       },
+    },
+    parcel: {
+      heading: "Xác nhận giao lại",
+      body: "Bưu phẩm chưa giao được vì thiếu thông tin người nhận. Cần xác nhận thông tin trước khi giao lại. Phí giao lại: {{fee}}.",
+      recipient: "Thông tin người nhận",
+      confirmed: "Đã xác nhận thông tin người nhận.",
+      feeLabel: "Phí giao lại — {{fee}}",
+      paid: "Đã trả phí. Bưu phẩm sẽ được giao trong chuyến tới.",
+      disclaimer: "Mạng lưới quầy Tốc Hành 24. Trang này chỉ xác nhận lại điều tin nhắn đã nói.",
     },
     clearance: {
       home: "Trang chủ",
