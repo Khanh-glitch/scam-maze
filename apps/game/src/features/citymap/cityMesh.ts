@@ -9,6 +9,7 @@
 // bằng vát góc) + hộp kỹ thuật. Nhà ống = thân + mái ngói dốc + tum. Chợ = nhà lớn + mái dốc.
 // Độ thụt co theo bề rộng lô, để tháp 9 m không thành cây kim.
 import type { City, CityBuilding } from "./cityGen";
+import { buildCoreStreet } from "./coreStreet.ts";
 
 /** Một khối đặc: hộp (hoặc lăng trụ vát góc / lăng trụ tam giác tuỳ danh sách chứa nó). */
 export interface Part {
@@ -148,8 +149,6 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
       // đoạn đường chéo bị xoay lệch — nhìn ảnh là thấy, đếm mặt thì không.
       const theta = Math.atan2(bz - az, bx - ax);
       const ry = -theta;
-      const cx = (ax + bx) / 2;
-      const cz = (az + bz) / 2;
       // vỉa hè (sáng, thấp) rồi lòng đường (tối) chồng lên
       // Vỉa hè cao 0,17 m, lòng đường 0,08 m ⇒ có bó vỉa. Trước đây đường cao hơn hè 1 cm nên
       // mép đường biến mất, cả mặt phố thành một tấm xám.
@@ -175,6 +174,19 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
           cuts.push({ t, half: (o.widthM / 2 + 1.2) / len });
         }
       }
+      // Khu phố gốc tự vẽ lòng đường + hè của nó: cắt bỏ đoạn tuyến sinh tự động nằm trong vùng đó,
+      // nếu không hai tấm nhựa chồng nhau và mép đường hiện một bậc.
+      if (city.core.streetId === s.id && Math.abs(bz - az) < 1.5) {
+        const lo = Math.min(ax, bx);
+        const span = Math.abs(bx - ax);
+        const g0 = (city.core.x0 - lo) / span;
+        const g1 = (city.core.x1 - lo) / span;
+        if (g0 > -0.1 && g1 < 1.1) {
+          const t0 = Math.max(0, ax < bx ? g0 : 1 - g1);
+          const t1 = Math.min(1, ax < bx ? g1 : 1 - g0);
+          if (t1 > t0) cuts.push({ t: (t0 + t1) / 2, half: (t1 - t0) / 2 });
+        }
+      }
       cuts.sort((a2, b2) => a2.t - b2.t);
       const spans: Array<[number, number]> = [];
       let from = 0;
@@ -198,7 +210,15 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
           });
         }
       }
-      flatBox({ x: cx, y: 0.02, z: cz, sx: len + 0.4, sy: 0.06, sz: w, ry, color: s.klass === "alley" ? "#605e6b" : "#5a5964" });
+      for (const [t0, t1] of spans) {
+        const segLen = (t1 - t0) * len;
+        const mid = (t0 + t1) / 2;
+        flatBox({
+          x: ax + (bx - ax) * mid, y: 0.02, z: az + (bz - az) * mid,
+          sx: segLen + 0.3, sy: 0.06, sz: w, ry,
+          color: s.klass === "alley" ? "#605e6b" : "#5a5964",
+        });
+      }
       // vạch tim đường cho đại lộ / phố: gạch 2 m cách nhau 6 m
       if (s.klass === "avenue" || s.klass === "street") {
         const dash = Math.max(1, Math.floor(len / 7));
@@ -539,6 +559,15 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
   }
   void overhead;
 
+  // --- KHU PHỐ GỐC: bản đồ đang chơi được, đặt nguyên vào giữa thành phố --------------------------
+
+  const core = buildCoreStreet(city.core.x, city.core.z);
+  for (const p of core.flat) push(flat, p);
+  for (const p of core.boxes) push(boxes, p);
+  for (const p of core.details) push(details, p);
+  for (const p of core.gables) push(gables, p);
+  for (const p of core.drums) push(drums, p);
+
   // --- cây, cột đèn, vật thể vỉa hè -----------------------------------------------------------
   let props = 0;
   for (const p of city.props) {
@@ -575,6 +604,16 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
       return t ? { id: a.id, name: a.name, ...t } : null;
     })
     .filter((a): a is { id: string; name: string; x: number; y: number; z: number } => a !== null);
+
+  if (city.core.streetId) {
+    anchors.push({
+      id: "core-street",
+      name: `Khu phố gốc · ${city.core.streetName}`,
+      x: city.core.x,
+      y: 26,
+      z: city.core.z - 14,
+    });
+  }
 
   return {
     boxes, flat, prisms, gables, trunks, canopies, details, drums, anchors,

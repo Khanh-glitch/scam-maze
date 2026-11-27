@@ -323,14 +323,18 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     };
     const tq = (qs.get("t") ?? "").split(",").map(Number);
     const camera = new THREE.PerspectiveCamera(num("fov", 48), W / H, 0.4, 6000);
+    // Mở trang là đứng ngay trên KHU PHỐ GỐC — bản đồ đang chơi được — rồi mới nhìn ra thành phố
+    // sinh tự động mọc quanh nó. Thành phố 1,2 km mà mở màn ở góc bất kỳ thì không ai thấy bản đồ thật.
+    const coreCentre = new THREE.Vector3(city.core.x, 0, city.core.z - 6);
+    const hasCore = Boolean(city.core.streetId);
     const target = new THREE.Vector3(
-      Number.isFinite(tq[0]) ? tq[0] : centre.x,
+      Number.isFinite(tq[0]) ? tq[0] : hasCore ? coreCentre.x : centre.x,
       num("ty", 20),
-      Number.isFinite(tq[1]) ? tq[1] : centre.z,
+      Number.isFinite(tq[1]) ? tq[1] : hasCore ? coreCentre.z : centre.z,
     );
-    let radius = num("r", 900);
-    let yaw = num("yaw", -2.3);
-    let pitch = num("pitch", -0.42);
+    let radius = num("r", hasCore ? 150 : 900);
+    let yaw = num("yaw", hasCore ? -1.35 : -2.3);
+    let pitch = num("pitch", hasCore ? -0.32 : -0.42);
     const applyCamera = () => {
       const cp = Math.cos(pitch);
       camera.position.set(

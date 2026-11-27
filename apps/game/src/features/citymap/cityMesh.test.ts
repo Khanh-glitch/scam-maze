@@ -40,9 +40,11 @@ describe("buildCityMesh", () => {
   });
 
   it("9 mốc thật đều có nhãn đúng độ cao toà", () => {
-    expect(mesh.anchors).toHaveLength(city.anchors.length);
+    expect(mesh.anchors).toHaveLength(city.anchors.length + 1); // +1 nhãn "Khu phố gốc"
     const landmark = mesh.anchors.find((a) => a.id === "landmark81");
     expect(landmark?.y).toBeGreaterThan(400);
+    const core = mesh.anchors.find((a) => a.id === "core-street");
+    expect(core?.name).toContain(city.core.streetName);
   });
 
   it("đường có bó vỉa: vỉa hè cao hơn lòng đường", () => {

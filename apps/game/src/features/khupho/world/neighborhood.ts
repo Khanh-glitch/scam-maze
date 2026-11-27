@@ -1,17 +1,14 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Builder } from './builder';
-import { House, type HouseSpec, type Ground } from './house';
+import { House, type HouseSpec } from './house';
 import type { Ctx } from './types';
 import { mulberry32 } from './util';
+import { MOD, coreLots } from './streetPlan';
 import * as F from './furniture';
 import { makeSign } from './facade';
 import { mat } from './materials';
 
-const MOD = [
-  ['#e7d8b5', '#f4f1ea', '#6b8a8f'], ['#c9dfd2', '#f2f0e8', '#b5533c'], ['#f0cdb8', '#f6f2ea', '#2f5d62'], ['#cfd8e8', '#f1efe9', '#c9a24b'],
-  ['#e9e2d0', '#f5f2ea', '#6b4a3a'], ['#d9c4a8', '#f3efe6', '#4a6a7a'], ['#bfd8d2', '#f2f1ea', '#a8503c'], ['#e6bfae', '#f6f1e8', '#44625a'],
-];
 let hid = 0;
 function spec(o: Partial<HouseSpec> & { W: number; floors: number }): HouseSpec {
   const seed = ++hid * 3 + 1, pal = MOD[seed % MOD.length];
@@ -95,62 +92,17 @@ export function buildNeighborhood(ctx: Ctx) {
   // ---------------- houses ----------------
   const placed: House[] = [];
   const place = (s: HouseSpec, x: number, z: number, rot: number) => { placed.push(new House(s, { x, z, rot }, ctx)); };
-  const frontRow = (list: HouseSpec[], startX: number, dir: 1 | -1, side: 'S' | 'N') => {
-    let cur = startX;
-    for (const s of list) {
-      const yd = s.yard;
-      if (side === 'S') { const x0 = dir < 0 ? cur - s.W : cur; place(s, x0, 6 + yd, 0); cur += dir * s.W; }
-      else { const xr = dir < 0 ? cur : cur + s.W; place(s, xr, -6 - yd, Math.PI); cur += dir * s.W; }
-    }
-    return cur;
-  };
-  const sw: HouseSpec[] = [
-    spec({ W: 4.4, floors: 3, ground: 'living', D: 15, well: true, cage: [2], flag: true, gb: true, solar: false, sign: ['Nhà 4B'] }),
-    spec({ W: 4.0, floors: 2, style: 'french', ground: 'grocery', D: 14, sign: ['TẠP HÓA BÀ NĂM', 'Bia · Nước ngọt · Gạo · Mì tôm'], signBg: '#1f6b3a', signFg: '#fff6c0', shutterColor: '#b9b29d' }),
-    spec({ W: 5.2, floors: 1, style: 'cap4', ground: 'living', D: 13, gb: true }),
-    spec({ W: 3.8, floors: 3, ground: 'cafe', D: 15, well: true, solar: true, cage: [1, 2], sign: ['CÀ PHÊ CÓC', 'Cà phê phin · Trà đá · Sinh tố'], signBg: '#4a2c1c', signFg: '#ffd37a', shutterColor: '#7f8c8d' }),
-    spec({ W: 4.6, floors: 2, ground: 'pho', D: 14, sign: ['PHỞ BÒ GIA TRUYỀN', 'Phở tái · Phở chín · Quẩy'], signBg: '#b3191a', signFg: '#ffe8a0', shutterColor: '#a9a28f', flag: true }),
-  ];
-  let ex = frontRow(sw, 8.5, -1, 'S');
-  const lightFill = (n: number, from: number, dir: 1 | -1, side: 'S' | 'N') => {
-    const ws = [4.2, 3.8, 4.6, 4.0, 4.4, 3.9, 4.5, 4.2, 4.0, 4.3, 3.7, 4.4];
-    const list: HouseSpec[] = [];
-    for (let i = 0; i < n; i++) {
-      const st = i % 4 === 1 ? 'french' : 'modern';
-      list.push(spec({ W: ws[(i * 5 + (side === 'N' ? 3 : 0)) % ws.length], floors: 2 + ((i + (side === 'N' ? 1 : 0)) % 3), style: st, lite: true, D: 14, ground: (['living', 'grocery', 'garage', 'cafe', 'repair'] as Ground[])[(i + hid) % 5], sign: i % 3 === 0 ? ['TẠP HÓA', 'Mở cửa cả ngày'] : undefined, cage: i % 2 ? [1] : undefined, flag: i % 4 === 2 }));
-    }
-    return frontRow(list, from, dir, side);
-  };
-  lightFill(6, ex, -1, 'S');
-  frontRow([
-    spec({ W: 4.2, floors: 4, ground: 'living', D: 15, well: true, flag: true, cage: [3] }),
-    spec({ W: 3.9, floors: 2, style: 'french', ground: 'repair', D: 14, sign: ['SỬA XE MÁY ANH BA', 'Vá · Thay nhớt · Rửa xe'], signBg: '#1d3f7a', signFg: '#ffffff', shutterColor: '#7f8c8d' }),
-    spec({ W: 4.8, floors: 3, ground: 'garage', D: 15, well: true, solar: true }),
-  ], 11.5, 1, 'S');
-  lightFill(5, 11.5 + 4.2 + 3.9 + 4.8, 1, 'S');
-  const nx = frontRow([
-    spec({ W: 4.2, floors: 3, ground: 'hair', D: 14, sign: ['CẮT TÓC NAM', 'Gội đầu · Cạo mặt · Uốn tóc'], signBg: '#0f3d6b', signFg: '#ffffff', shutterColor: '#b7b2a5', cage: [2] }),
-    spec({ W: 4.0, floors: 2, style: 'french', ground: 'living', D: 14 }),
-    spec({ W: 5.2, floors: 1, style: 'cap4', ground: 'living', D: 13, yard: 2.4 }),
-    spec({ W: 4.4, floors: 3, ground: 'garage', D: 15, well: true, flag: true }),
-    spec({ W: 4.0, floors: 3, ground: 'grocery', D: 14, sign: ['TẠP HÓA 24/7', 'Đại lý vé số · Thẻ cào'], signBg: '#e5b012', signFg: '#7a1010', shutterColor: '#8f9aa3', cage: [1, 2] }),
-    spec({ W: 4.6, floors: 2, ground: 'living', D: 14, solar: true }),
-  ], 34, -1, 'N');
-  lightFill(6, nx, -1, 'N');
-  lightFill(5, 34, 1, 'N');
-  // alley houses
-  const alleyW: HouseSpec[] = [
-    spec({ W: 3.8, floors: 2, ground: 'living', D: 13 }), spec({ W: 4.2, floors: 3, ground: 'grocery', D: 13, sign: ['TẠP HÓA HẺM', 'Gần nhà ai cũng quen'], signBg: '#2a6d4a', signFg: '#fff3c0', shutterColor: '#a8a28f' }),
-    spec({ W: 4.4, floors: 1, style: 'cap4', ground: 'living', D: 13, yard: 2.0 }), spec({ W: 4.0, floors: 3, ground: 'living', D: 13, cage: [2] }),
-  ];
-  const alleyE: HouseSpec[] = [
-    spec({ W: 4.0, floors: 3, ground: 'living', D: 13, flag: true }), spec({ W: 3.8, floors: 2, style: 'french', ground: 'living', D: 13 }),
-    spec({ W: 4.4, floors: 2, ground: 'cafe', D: 13, sign: ['QUÁN TRÀ ĐÁ', 'Trà đá · Nước mía · Hạt dưa'], signBg: '#2d5f2d', signFg: '#fff3a0', shutterColor: '#8f9aa3' }), spec({ W: 4.0, floors: 3, ground: 'living', D: 13, solar: true }),
-  ];
-  let cz = 24;
-  for (const s of alleyW) { place(s, 8.5 - s.yard, cz, -Math.PI / 2); cz += s.W; }
-  cz = 24;
-  for (const s of alleyE) { cz += s.W; place(s, 11.5 + s.yard, cz, Math.PI / 2); }
+  // Bố cục lấy từ `streetPlan.ts` — cùng dữ liệu mà `/saigon` dùng để đặt khu phố này vào giữa
+  // thành phố. Ở đây chỉ còn việc dựng hình cho từng lô.
+  for (const lot of coreLots()) {
+    const { seq, side, x0, x1, z0, z1, rot, ...opts } = lot;
+    void seq;
+    void side;
+    if (lot.side === 'S') place(spec(opts), x0, z0, rot);
+    else if (lot.side === 'N') place(spec(opts), x1, z1, rot);
+    else if (lot.side === 'alleyW') place(spec(opts), x1, z0, rot);
+    else place(spec(opts), x0, z0, rot);
+  }
 
   // ---------------- street furniture ----------------
   // street trees

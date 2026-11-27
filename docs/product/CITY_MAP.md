@@ -325,3 +325,24 @@ Sau mỗi lần đổi `cityPlan.ts` (mốc, quận, đại lộ) hoặc đổi 
 chạy `node apps/game/scripts/city-audit.ts`, rồi sửa bảng ở §2. Nếu cổng đổi, ghi rõ lý do vào §3 —
 ngưỡng chỉ được đổi khi **cách đo** sai, không phải khi kết quả xấu. Sau khi đổi hình học nhìn thấy
 được (mái, tường, biển hiệu, ánh sáng): chạy `city-render.ts` và **mở ảnh ra nhìn** trước khi commit.
+
+## 4f. Kế thừa bản đồ đang chơi (khu phố gốc) — 27/11/2026
+
+Bản đồ của `features/khupho` (phố 140 m, 44 căn nhà ống, hẻm cụt, sân chung) **không còn là một màn
+riêng**: nó được đặt nguyên vào thành phố sinh tự động, đúng tỉ lệ, đúng thứ tự căn, đúng màu/mái/hiên
+vì hình học lẫn dữ liệu đều đọc từ cùng một nguồn `features/khupho/world/streetPlan.ts`.
+
+- `streetPlan.ts` tách khỏi `neighborhood.ts`: `STREET`, `MOD`, `appearance()`, `coreLots()`,
+  `coreFootprint()`. Không có three.js → dùng được cả trong sinh thành phố.
+- `cityGen` chọn một tuyến phố **ngang, dài > 175 m, rộng 6–9,5 m, không vướng mốc**, dành riêng
+  đúng hình chữ nhật của khu phố (≈ 92 × 74 m) rồi để lưới sinh tiếp tục hai đầu — không có khoảng
+  trống. Hiện tại: `{x: 260, z: −133,35, streetName: "Lê Thánh Tôn"}`, `core.id = st-z--133`.
+- `cityMesh` cắt lòng đường/vỉa hè của tuyến phố đó theo `spans` (vỉa hè dừng ở khu phố và ở ngã tư),
+  rồi ghép `buildCoreStreet()` vào cùng danh sách khối.
+- `coreStreet.ts` vẽ mặt đường, rãnh, vỉa hè chia đôi ở hẻm, vạch tim đường, sân hẻm/sân chung và
+  từng căn nhà ống: hiên, băng hiệu, chuồng cu, bồn nước, mái ngói / mặt tiền giả.
+- `/saigon` mở màn **ngay trên khu phố gốc**, có nhãn "Khu phố gốc · Lê Thánh Tôn".
+- Bất biến mới: sau khi lưới đi lại chốt, mọi POI bị đè được nắn sang ô đứng được gần nhất
+  (≤ 18 m, 32 hướng) — kiểm bằng **cả** hình học chính xác và lưới 0,5 m.
+
+Ảnh: `docs/product/audit/_core.png` (mặt phố trong khu phố gốc), `_g-core.jpg` (màn mở đầu `/saigon`).

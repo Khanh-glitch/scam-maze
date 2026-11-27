@@ -15,6 +15,7 @@
 //     từ chính hình học này — không cộng đại số các hình chữ nhật (lần đầu cộng ra 72% mái trên
 //     khung 47% đi được, vô nghĩa).
 import { cityPlan, type CityPlan } from "./cityPlan.ts";
+import { coreLots, STREET } from "../khupho/world/streetPlan.ts";
 
 export type CityClass = "residential" | "market" | "tourist" | "corporate" | "construction" | "park";
 
@@ -216,6 +217,20 @@ export interface City {
   streets: CityStreet[];
   pois: CityPoi[];
   props: CityProp[];
+  /**
+   * KHU PHỐ GỐC — bản đồ đang chơi được của game (`features/khupho`), đặt nguyên vào thành phố.
+   * `x`/`z` là gốc toạ độ (tim phố, chính giữa); hình chữ nhật là vùng đã dành riêng cho nó.
+   */
+  core: {
+    x: number;
+    z: number;
+    x0: number;
+    x1: number;
+    z0: number;
+    z1: number;
+    streetId?: string;
+    streetName: string;
+  };
   walk: CityWalkGrid;
   metrics: CityMetrics;
 }
@@ -658,6 +673,52 @@ export function generateCity(seedOverride?: string): City {
   for (const acc of pruneTooClose(xAcc)) mergedX.set(keyOf(acc.at), acc);
   for (const acc of pruneTooClose(zAcc)) mergedZ.set(keyOf(acc.at), acc);
   const lineWidth = (axis: "x" | "z", at: number) => (axis === "x" ? mergedX.get(keyOf(at)) : mergedZ.get(keyOf(at)))?.width ?? GRID.residential.street;
+  // --- 2b. KHU PHỐ GỐC --------------------------------------------------------------------------
+  // Bản đồ đang chơi (`features/khupho`) là một phố 140 m: 44 căn nhà ống, một hẻm cụt, một sân
+  // chung. Nó không tự mọc thành thành phố 1,2 km, nhưng thành phố thì mọc QUANH nó được: chọn một
+  // tuyến phố ngang đủ dài, dành riêng đúng hình chữ nhật của khu phố, rồi để lưới sinh tự động
+  // tiếp tục hai đầu. Mọi con số về căn nào/mấy tầng/màu gì đọc từ `streetPlan.ts`.
+  const coreFoot = (() => {
+    const lots = coreLots();
+    let fx0 = Infinity;
+    let fx1 = -Infinity;
+    let fz0: number = -STREET.walkOuter;
+    let fz1: number = STREET.walkOuter;
+    for (const l of lots) {
+      fx0 = Math.min(fx0, l.x0);
+      fx1 = Math.max(fx1, l.x1);
+      fz0 = Math.min(fz0, l.z0);
+      fz1 = Math.max(fz1, l.z1);
+    }
+    fz1 = Math.max(fz1, STREET.court.z1, STREET.alley.z1);
+    return { fx0, fx1, fz0, fz1 };
+  })();
+  const clearOfAnchors = (z: number) => anchors.every((a) => Math.abs(a.z - z) > 45 || Math.abs(a.x) > 90);
+  const coreStreet = streets
+    .filter((st) => {
+      const [ax, az] = st.points[0];
+      const [bx, bz] = st.points[st.points.length - 1];
+      const horizontal = Math.abs(bz - az) < 1.5;
+      const span = Math.abs(bx - ax);
+      return horizontal && span > 175 && st.widthM >= 6 && st.widthM <= 9.5 && clearOfAnchors(az);
+    })
+    .sort((a, b) => Math.abs(a.points[0][1]) - Math.abs(b.points[0][1]))[0];
+  const coreSpanX = coreStreet ? coreStreet.points.map((q) => q[0]) : [0, 0];
+  const core = {
+    x: (Math.min(...coreSpanX) + Math.max(...coreSpanX)) / 2,
+    z: coreStreet ? coreStreet.points[0][1] : 0,
+    x0: 0,
+    x1: 0,
+    z0: 0,
+    z1: 0,
+    streetId: coreStreet?.id,
+    streetName: coreStreet?.name ?? "",
+  };
+  core.x0 = core.x + coreFoot.fx0;
+  core.x1 = core.x + coreFoot.fx1;
+  core.z0 = core.z + coreFoot.fz0;
+  core.z1 = core.z + coreFoot.fz1;
+
   // --- 3. Khối, hẻm, và mặt phố rải TỪ ĐƯỜNG RA -----------------------------------------------
   // Đổi hướng: trước đây nhà được rải từ chu vi khối vào, nên chỗ nào lưới khối không phủ tới là
   // một dải chết (đo được 48% mặt tiền trống, có đoạn 1,1 km không nhà). Giờ thứ tự ngược lại:
@@ -701,6 +762,7 @@ export function generateCity(seedOverride?: string): City {
       }
     }
   };
+  occupy({ x0: core.x0 - 1, x1: core.x1 + 1, z0: core.z0 - 1, z1: core.z1 + 1 });
   let rejectedOverlap = 0;
   let rejectedWater = 0;
   let hemSkipped = 0;
@@ -1635,6 +1697,40 @@ export function generateCity(seedOverride?: string): City {
 
   // --- 7. Đo bằng raster -----------------------------------------------------------------------
   const walk = rasterize({ frame, water, buildings, decks });
+  // Bất biến cuối: điểm POI phải đứng được theo CẢ HAI cách đo — hình học chính xác (không nằm trong
+  // hình chữ nhật toà nào) và lưới 0,5 m của engine. POI được nắn lúc đặt, nhưng lô mọc sau vẫn đè
+  // lên được (đổi thứ tự rải lô là đổi kết quả) — nắn lại sau khi lưới chốt thì bất biến luôn đúng.
+  {
+    const solidPts = buildRectIndex(buildings.filter((b) => !b.walkable), 16);
+    const waterPts = buildRectIndex(water, 16);
+    const deckPts = buildRectIndex(decks, 16);
+    const cellValue = (x: number, z: number) => {
+      const i = Math.floor((x - frame.x0) / walk.step);
+      const j = Math.floor((z - frame.z0) / walk.step);
+      if (i < 0 || j < 0 || i >= walk.nx || j >= walk.nz) return -1;
+      return walk.cells[j * walk.nx + i];
+    };
+    const standable = (x: number, z: number) =>
+      x > frame.x0 && x < frame.x1 && z > frame.z0 && z < frame.z1 &&
+      (deckPts.some(x, z) || (!waterPts.some(x, z) && !solidPts.some(x, z))) &&
+      cellValue(x, z) === 0;
+    for (const poi of pois) {
+      if (standable(poi.x, poi.z)) continue;
+      let best: { x: number; z: number } | null = null;
+      for (let r = 0.5; r <= 18 && !best; r += 0.5) {
+        for (let k = 0; k < 32 && !best; k += 1) {
+          const a = (k / 32) * Math.PI * 2;
+          const px = +(poi.x + Math.cos(a) * r).toFixed(2);
+          const pz = +(poi.z + Math.sin(a) * r).toFixed(2);
+          if (standable(px, pz)) best = { x: px, z: pz };
+        }
+      }
+      if (best) {
+        poi.x = best.x;
+        poi.z = best.z;
+      }
+    }
+  }
   const stats = measure(walk, { frame, districts, buildings, streets, pois, blocks, water, anchors }, start);
   stats.rejectedOverlap = rejectedOverlap;
   stats.connectionRepairs = connectionRepairs;
@@ -1661,6 +1757,7 @@ export function generateCity(seedOverride?: string): City {
     streets,
     pois,
     props,
+    core,
     walk,
     decks,
     metrics: stats,
