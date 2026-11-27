@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-11-27T13:19:12.770Z",
+  "generatedAt": "2026-11-27T13:46:09.275Z",
   "seed": "scammaze-saigon-2026",
-  "generateMs": 3902,
+  "generateMs": 3933,
   "frame": {
     "x0": -420,
     "x1": 800,
@@ -12,9 +12,9 @@
     "km2": 0.964
   },
   "walkable": {
-    "m2": 487148.5,
-    "km2": 0.4871,
-    "pctOfLand": 55,
+    "m2": 478963.5,
+    "km2": 0.479,
+    "pctOfLand": 54,
     "components": 1,
     "largestPct": 100,
     "reachableFromRoomPct": 100,
@@ -22,14 +22,14 @@
     "worstMetres": 98
   },
   "built": {
-    "roofM2": 399052,
-    "roofPctOfLand": 45,
-    "buildings": 4350,
+    "roofM2": 407237,
+    "roofPctOfLand": 46,
+    "buildings": 4345,
     "blocks": 55,
     "courts": 108,
     "medianFloors": 4,
     "maxHeightM": 461,
-    "grossFloorKm2": 3.537
+    "grossFloorKm2": 3.635
   },
   "streets": {
     "segments": 140,
@@ -40,29 +40,29 @@
     "functionsPer100m": 7.3,
     "medianByClass": {
       "construction": 16,
-      "residential": 16.8,
-      "tourist": 9.8,
+      "residential": 16.9,
+      "tourist": 9.7,
       "park": 9.1,
       "corporate": 6.1,
       "market": 18
     },
-    "builtPct": 49.5,
+    "builtPct": 49.4,
     "deadM": 610,
-    "deadPct": 47.7,
+    "deadPct": 48,
     "deadStreet": "Cầu Thị Nghè"
   },
   "pois": {
-    "total": 2147,
+    "total": 2159,
     "venues": 32,
-    "shops": 2115,
-    "perKm2": 4403,
+    "shops": 2127,
+    "perKm2": 4503,
     "unreachable": [],
     "medianMetresFromRoom": 414.5,
     "withBeat": 12
   },
   "props": {
-    "total": 8341,
-    "per100m": 30.8
+    "total": 8151,
+    "per100m": 30.1
   },
   "districts": [
     {
@@ -70,10 +70,10 @@
       "ward": "Phường Vườn Lài",
       "old": "Quận 10",
       "klass": "residential",
-      "walkableM2": 69309,
-      "roofPct": 45.7,
-      "pois": 617,
-      "buildings": 1259,
+      "walkableM2": 69158,
+      "roofPct": 45.8,
+      "pois": 629,
+      "buildings": 1257,
       "streets": 26,
       "story": "nơi bị lừa",
       "verb": "trốn / nợ / gọi vay"
@@ -83,10 +83,10 @@
       "ward": "Phường Hòa Hưng",
       "old": "Quận 10",
       "klass": "construction",
-      "walkableM2": 100589,
-      "roofPct": 45.8,
-      "pois": 705,
-      "buildings": 1338,
+      "walkableM2": 100411,
+      "roofPct": 45.9,
+      "pois": 694,
+      "buildings": 1320,
       "streets": 37,
       "story": "tiền chảy qua công trình",
       "verb": "chui rào / bán hàng rong / hối lộ"
@@ -96,10 +96,10 @@
       "ward": "Phường Chợ Lớn",
       "old": "Quận 5",
       "klass": "market",
-      "walkableM2": 36473,
-      "roofPct": 45.7,
-      "pois": 216,
-      "buildings": 381,
+      "walkableM2": 33248,
+      "roofPct": 50.5,
+      "pois": 230,
+      "buildings": 397,
       "streets": 14,
       "story": "tiền mặt, vàng, cầm đồ",
       "verb": "mặc cả / đổi tiền / cầm cố"
@@ -109,10 +109,10 @@
       "ward": "Phường An Đông",
       "old": "Quận 5",
       "klass": "market",
-      "walkableM2": 25740,
-      "roofPct": 44.3,
-      "pois": 111,
-      "buildings": 224,
+      "walkableM2": 24676,
+      "roofPct": 46.6,
+      "pois": 112,
+      "buildings": 228,
       "streets": 9,
       "story": "hàng hoá và tiền mặt",
       "verb": "mua bán / đổi trả / cầm"
@@ -122,10 +122,10 @@
       "ward": "Phường Bến Thành",
       "old": "Quận 1",
       "klass": "tourist",
-      "walkableM2": 90153,
-      "roofPct": 47,
-      "pois": 331,
-      "buildings": 674,
+      "walkableM2": 86699,
+      "roofPct": 49.1,
+      "pois": 329,
+      "buildings": 670,
       "streets": 23,
       "story": "khách du lịch và tiền sạch",
       "verb": "chụp ảnh / mua tour / đổi tiền"
@@ -135,10 +135,10 @@
       "ward": "Phường Sài Gòn",
       "old": "Quận 1",
       "klass": "corporate",
-      "walkableM2": 116686,
-      "roofPct": 40,
-      "pois": 86,
-      "buildings": 193,
+      "walkableM2": 116573,
+      "roofPct": 40.1,
+      "pois": 84,
+      "buildings": 192,
       "streets": 23,
       "story": "tiền được hợp pháp hoá",
       "verb": "ký hợp đồng / mở công ty / rửa tiền"

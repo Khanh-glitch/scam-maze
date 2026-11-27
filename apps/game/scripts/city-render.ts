@@ -170,16 +170,18 @@ const buildScene = (cam: Camera, world: { aerial: boolean }) => {
     [r.x0, y, r.z0], [r.x1, y, r.z0], [r.x1, y, r.z1], [r.x0, y, r.z1],
   ];
 
-  // Nền: đất khung hình
+  // Nền: đất khung hình, và đất chạy tiếp ra ngoài khung.
+  // Trước đây mép bản đồ là một dải đen dày 60 m ⇒ ảnh đọc ra "sa bàn đặt trên bàn" chứ không ra
+  // thành phố. Nay đất liền một mảng ra tới ngoài khung hình, chỉ khác tông ở phần đất khung.
+  const skirt = { x0: F.x0 - 2600, x1: F.x1 + 2600, z0: F.z0 - 2600, z1: F.z1 + 2600 };
+  pushGround(q(skirt, -0.06), hex2rgb("#43473f"), [0, 1, 0]);
   pushGround(q(F, 0), hex2rgb("#6a6774"), [0, 1, 0]);
-  // Viền ngoài khung: một dải tối để mép bản đồ không lơ lửng giữa trời.
-  const m = 60;
   for (const band of [
-    { x0: F.x0 - m, x1: F.x1 + m, z0: F.z0 - m, z1: F.z0 },
-    { x0: F.x0 - m, x1: F.x1 + m, z0: F.z1, z1: F.z1 + m },
-    { x0: F.x0 - m, x1: F.x0, z0: F.z0, z1: F.z1 },
-    { x0: F.x1, x1: F.x1 + m, z0: F.z0, z1: F.z1 },
-  ]) pushGround(q(band, -0.4), hex2rgb("#26242e"), [0, 1, 0]);
+    { x0: F.x0 - 5, x1: F.x1 + 5, z0: F.z0 - 5, z1: F.z0 },
+    { x0: F.x0 - 5, x1: F.x1 + 5, z0: F.z1, z1: F.z1 + 5 },
+    { x0: F.x0 - 5, x1: F.x0, z0: F.z0, z1: F.z1 },
+    { x0: F.x1, x1: F.x1 + 5, z0: F.z0, z1: F.z1 },
+  ]) pushGround(q(band, -0.02), hex2rgb("#3a3742"), [0, 1, 0]);
 
   // Nước
   for (const w of city.water) pushGround(q(w, 0.06), hex2rgb("#12414d"), [0, 1, 0], { opacity: 0.96 });
@@ -197,8 +199,10 @@ const buildScene = (cam: Camera, world: { aerial: boolean }) => {
     const nz = ux;
     const half = s.widthM / 2;
     const walkW = s.klass === "avenue" ? 3.2 : s.klass === "alley" ? 0.7 : 1.7;
-    const road = hex2rgb(s.klass === "alley" ? "#4c4a55" : s.klass === "avenue" ? "#3a3945" : "#43424e");
-    const kerb = hex2rgb(s.klass === "alley" ? "#8a8794" : "#9a97a4");
+    // Nhìn từ trên cao, đường phải TỐI hơn mái và vỉa hè phải SÁNG hơn mái thì mạng phố mới đọc
+    // ra; bản cũ để ba tông xấp xỉ nhau nên nửa thành phố thành một khối liền.
+    const road = hex2rgb(s.klass === "alley" ? "#3b3946" : s.klass === "avenue" ? "#282731" : "#302f3a");
+    const kerb = hex2rgb(s.klass === "alley" ? "#7e7b88" : "#918e9b");
     pushGround([
       [ax + nx * half, 0.02, az + nz * half], [bx + nx * half, 0.02, bz + nz * half],
       [bx - nx * half, 0.02, bz - nz * half], [ax - nx * half, 0.02, az - nz * half],
@@ -208,7 +212,7 @@ const buildScene = (cam: Camera, world: { aerial: boolean }) => {
       pushGround([
         [ax + nx * o * side, 0.09, az + nz * o * side], [bx + nx * o * side, 0.09, bz + nz * o * side],
         [bx + nx * (o + walkW) * side, 0.09, bz + nz * (o + walkW) * side], [ax + nx * (o + walkW) * side, 0.09, az + nz * (o + walkW) * side],
-      ], kerb, [0, 1, 0], { opacity: 0.9 });
+      ], kerb, [0, 1, 0], { opacity: world.aerial ? 1 : 0.9 });
     }
     // Vết vá / khe bê tông: vài mảng sáng tối dọc mặt đường, rải theo vị trí nên tất định.
     if (!world.aerial) {
@@ -238,7 +242,7 @@ const buildScene = (cam: Camera, world: { aerial: boolean }) => {
   }
 
   // Sân chung: nền đất
-  for (const block of city.blocks) for (const c of block.courts) pushGround(q(c, 0.07), hex2rgb("#5d5c4e"), [0, 1, 0], { opacity: 0.75 });
+  for (const block of city.blocks) for (const c of block.courts) pushGround(q(c, 0.07), hex2rgb("#4f4e42"), [0, 1, 0], { opacity: 0.8 });
 
   // --- toà nhà --------------------------------------------------------------------------------
   const near = (b: { x0: number; z0: number; x1: number; z1: number }) => {
@@ -248,17 +252,44 @@ const buildScene = (cam: Camera, world: { aerial: boolean }) => {
   };
   const buildings = city.buildings
     .filter((b) => !b.walkable)
-    .map((b) => ({ b, d: near(b) }))
-    .filter(() => true)
+    .flatMap((b) => {
+      if (b.anchor !== "landmark81") return [{ b, d: near(b) }];
+      // Landmark 81 thật là một CỤM ba tháp so le (461 m + hai tháp thấp hơn), không phải một hộp
+      // dựng đứng. Một hộp 461 m ở tỉ lệ này đọc ra như cái cột trắng — thứ duy nhất trong khung
+      // hình trông chưa làm xong.
+      const w = b.x1 - b.x0;
+      const dd2 = b.z1 - b.z0;
+      const gap = Math.max(1.2, w * 0.05);
+      const share = [0.5, 0.28, 0.22];
+      const hs = [b.heightM, b.heightM * 0.66, b.heightM * 0.5];
+      // Trục x chia 0,5/0,28/0,22; tháp phụ lùi theo trục sâu để cụm so le chứ không phải hàng rào.
+      const zs: Array<[number, number]> = [[0, 1], [0.06, 0.94], [0.18, 0.86]];
+      let cursor = b.x0;
+      return hs.map((hh, i) => {
+        const tw = (w - gap * 2) * share[i];
+        const x0 = cursor;
+        cursor += tw + gap;
+        const rec = {
+          ...b, x0, x1: x0 + tw,
+          z0: b.z0 + dd2 * zs[i][0], z1: b.z0 + dd2 * zs[i][1],
+          heightM: hh, floors: Math.round(hh / 3.9), anchor: undefined, glass: true,
+        };
+        return { b: rec, d: near(rec) };
+      });
+    })
     .sort((p, q2) => q2.d - p.d); // vẽ xa trước
 
-  for (const { b, d } of buildings) {
+  for (const item of buildings) {
+    const b = item.b;
+    const d = item.d;
     const district = city.districts.find((dd) => dd.id === b.district);
     const palette = WALL[district?.klass ?? "residential"] ?? WALL.residential;
     const seed = Number.isFinite(b.x0 + b.z0) ? Math.abs(Math.round(b.x0 * 7919 + b.z0 * 104729)) % palette.length : 0;
-    const base = hex2rgb(b.anchor ? "#9aa3ad" : palette[seed] ?? "#8a8578");
+    const glassy = (item as { b: { glass?: boolean } }).b.glass === true;
+    const base = hex2rgb(glassy ? "#a3b6c6" : b.anchor ? "#9aa3ad" : palette[seed] ?? "#8a8578");
     const h = b.heightM;
-    const roofC = hex2rgb(b.floors <= 2 ? ROOF[seed % ROOF.length] : "#6d6a72");
+    // Mái chợ/kho lớn: tôn rỉ. Mái bê tông xám đọc ra "bãi đỗ xe" đúng nghĩa đen.
+    const roofC = hex2rgb(b.kind === "market" ? "#8b6a52" : b.floors <= 2 ? ROOF[seed % ROOF.length] : "#6d6a72");
     const lot: Rect = { x0: b.x0, x1: b.x1, z0: b.z0, z1: b.z1 };
     const w = b.x1 - b.x0;
     const dd = b.z1 - b.z0;
@@ -386,6 +417,18 @@ const buildScene = (cam: Camera, world: { aerial: boolean }) => {
 
     // Mái
     push([[b.x0, h, b.z0], [b.x1, h, b.z0], [b.x1, h, b.z1], [b.x0, h, b.z1]], atm(roofC), [0, 1, 0]);
+    // Mái tôn có gân cho nhà LỚN mà THẤP (chợ, kho, xưởng): một tấm phẳng 53×43 m đọc ra ô trống
+    // chứ không ra mái chợ. Sáu–mười vệt sáng tối là đủ để mắt nhận ra tấm tôn.
+    if (w > 13 && dd > 13 && b.floors <= 4) {
+      const ribs = Math.max(4, Math.min(11, Math.round(dd / 3.2)));
+      const rh = h + 0.02;
+      for (let i = 0; i < ribs; i += 1) {
+        const z0r = b.z0 + (dd * i) / ribs;
+        const z1r = b.z0 + (dd * (i + 0.55)) / ribs;
+        push([[b.x0 + 0.4, rh, z0r], [b.x1 - 0.4, rh, z0r], [b.x1 - 0.4, rh, z1r], [b.x0 + 0.4, rh, z1r]],
+          mix(atm(roofC), hex2rgb(i % 2 ? "#ffffff" : "#101018"), i % 2 ? 0.13 : 0.16), [0, 1, 0], { opacity: 0.85 });
+      }
+    }
     // Sân thượng: một hình chữ nhật thụt vào, đọc ra gờ mái/parapet khi nhìn từ trên.
     if (world.aerial && h > 11 && w > 6 && dd > 6) {
       const inx = Math.min(1.1, w * 0.1);
@@ -633,8 +676,8 @@ const shots: Record<string, () => { cam: Camera; title: string; sub: string; aer
     cam: fitCamera({
       target: [(F.x0 + F.x1) / 2, 40, (F.z0 + F.z1) / 2],
       yaw: Math.atan2(-0.52, -0.86),
-      pitch: (-31 * Math.PI) / 180,
-      fov: 32, w: 2200, h: 1400, margin: 70,
+      pitch: (-32 * Math.PI) / 180,
+      fov: 32, w: 2200, h: 1400, margin: 40,
       points: [
         [F.x0, 0, F.z0], [F.x1, 0, F.z0], [F.x1, 0, F.z1], [F.x0, 0, F.z1],
         [F.x0, 0, F.z1], [F.x1, 461, F.z0], [F.x0, 461, F.z0],
@@ -666,32 +709,21 @@ const shots: Record<string, () => { cam: Camera; title: string; sub: string; aer
   })(),
   market: () => ({
     cam: (() => {
-      // Tìm chỗ đứng thật: vòng tròn bán kính 42 m quanh mốc, lấy điểm đi được đầu tiên.
-      let best: { x: number; z: number } | null = null;
-      // Không chỉ "đứng được": tia nhìn tới chợ phải TRỐNG, nếu không khung hình là một bức tường
-      // bên cạnh che mất chính chủ đề của ảnh.
-      const seesMarket = (x: number, z: number) => {
-        const dx = market.x - x;
-        const dz = market.z - z;
-        const len = Math.hypot(dx, dz);
-        for (let t = 2; t < len - 12; t += 3) {
-          if (solidNear(x + (dx / len) * t, z + (dz / len) * t, 0.4)) return false;
-        }
-        return true;
-      };
-      for (let r = 42; r < 76 && !best; r += 2) {
-        for (let k = 0; k < 72 && !best; k += 1) {
-          const a = (k / 72) * Math.PI * 2;
-          const x = market.x + Math.cos(a) * r;
-          const z = market.z + Math.sin(a) * r;
-          if (clearEye(x, z) && seesMarket(x, z)) best = { x, z };
-        }
-      }
-      const at = best ?? { x: market.x + 46, z: market.z + 58 };
-      return { x: at.x, y: 1.65, z: at.z, yaw: Math.atan2(market.x - at.x, market.z - at.z), pitch: 0.03, fov: 62, w: W, h: H } satisfies Camera;
+      // Ba cách trước đều hỏng: vòng tròn 42–88 m cho ra 2/3 khung là mặt đường trống và cái chợ
+      // chỉ là một dải ở chân trời; tầm mắt bên kia đường thì cột đèn chắn giữa ống kính, rồi hàng
+      // cây che sạch chợ. Nay chụp TỪ TRÊN XUỐNG ở góc chéo qua chợ: chợ, dãy sạp, dù, và mạng phố
+      // quanh nó cùng vào khung trong một ảnh — đúng thứ ảnh này phải chứng minh.
+      // Lùi đủ xa để khung hình là "chợ TRONG khu phố": chợ chiếm ~1/4 khung, phần còn lại là
+      // dãy nhà, hẻm, dù sạp quanh nó. Ở cự ly 44 m chợ phủ kín 2/3 khung thành một tấm tôn gân.
+      const cam = { x: market.x - 96, y: 104, z: market.z + 104 };
+      return {
+        x: cam.x, y: cam.y, z: cam.z,
+        yaw: Math.atan2(market.x - cam.x, market.z - cam.z),
+        pitch: (-30 * Math.PI) / 180, fov: 48, w: W, h: H,
+      } satisfies Camera;
     })(),
     title: `${market.name} — sạp chợ`,
-    sub: `mốc ${market.footprintM} m · ${market.kind} · tầm mắt 1,65 m`,
+    sub: `mốc ${market.footprintM} m · ${market.kind} · mái tôn chợ nằm trong mạng phố Chợ Lớn`,
     aerial: false,
   }),
   room: () => {

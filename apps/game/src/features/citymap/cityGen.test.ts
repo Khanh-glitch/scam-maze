@@ -124,6 +124,14 @@ describe("generateCity", () => {
     expect(cellAt(city, city.start.x, city.start.z)).toBe(0);
   });
 
+  it("mỗi mốc thật đều có toà trên bản đồ", () => {
+    // Sáu trong chín mốc từng KHÔNG có toà nào: hình chữ nhật của mốc đè lên lòng đường nên
+    // `addBuilding` từ chối, và mốc biến mất im lặng. Chợ Bến Thành còn bị ga metro đặt sau xoá sạch.
+    const missing = city.anchors.filter((a) => !city.buildings.some((b) => b.anchor === a.id));
+    expect(missing.map((a) => a.id)).toEqual([]);
+    expect(city.metrics.anchorsMissing).toEqual([]);
+  });
+
   it("có đủ mốc thật để người chơi nhận ra Sài Gòn", () => {
     const anchors = new Set(city.pois.filter((p) => p.anchor).map((p) => p.anchor));
     for (const id of ["landmark81", "bitexco", "ben-thanh", "binh-tay", "tao-dan"]) {

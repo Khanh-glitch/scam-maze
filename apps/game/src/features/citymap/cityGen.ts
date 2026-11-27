@@ -178,6 +178,10 @@ export interface CityMetrics {
   streetPhase: Record<string, { tried: number; placed: number; mouth: number; water: number }>;
   /** Số tuyến hẻm bị bỏ vì quá sát một hẻm cùng phương đã có. */
   hemSkipped: number;
+  /** Số mốc thật dựng được toà (phải bằng số mốc trong plan). */
+  anchorsPlaced: number;
+  /** Mốc nào không dựng được — rỗng mới đạt. */
+  anchorsMissing: string[];
   /** Số toà bị loại vì rơi vào lòng đường (bất biến: lòng đường không có nhà). */
   rejectedRoad: number;
   /** Vài ví dụ bị loại vì lòng đường (để điều tra). */
@@ -1102,6 +1106,9 @@ export function generateCity(seedOverride?: string): City {
     for (let i = buildings.length - 1; i >= 0; i -= 1) {
       const b = buildings[i];
       if (!overlaps(b, rect)) continue;
+      // Mốc thật không bao giờ bị mốc khác dọn: Ga Metro Bến Thành (đặt sau) từng xoá sạch chợ
+      // Bến Thành (đặt trước) vì hai mốc nằm sát nhau — chợ biến mất mà không cổng nào báo.
+      if (b.anchor) continue;
       // Công viên/quảng trường nằm SAU dãy nhà mặt phố: không xoá tường phố, chỉ dọn ruột khối.
       if (keepStreetWall && b.on === "street") continue;
       buildings.splice(i, 1);
@@ -1121,6 +1128,9 @@ export function generateCity(seedOverride?: string): City {
   // bản đồ, mà lưới đại lộ lại đi qua gốc — nên nhà phải trượt ra lô trống gần nhất, còn POI/điểm
   // xuất phát theo nhà mới.
   let roomCenter = { x: ROOM.x, z: ROOM.z };
+  /** Mốc thật đã dựng được toà; mốc nào không dựng được thì ghi tên (cổng kiểm toán đòi 9/9). */
+  let anchorsPlaced = 0;
+  const anchorsMissing: string[] = [];
   const offRoad = (rect: CityRect): CityRect => {
     const w = rect.x1 - rect.x0;
     const d = rect.z1 - rect.z0;
@@ -1160,36 +1170,115 @@ export function generateCity(seedOverride?: string): City {
         clearArea(inflate(piece, 2), true);
         addBuilding({ district: ward, ...piece, floors: 0, heightM: 0.25, kind: "park", facing: "n", on: "anchor", anchor: anchor.id, walkable: true });
       }
+      if (pieces.length) anchorsPlaced += 1;
+      else anchorsMissing.push(`park ${anchor.id}`);
       pois.push({ id: `poi-${poiSeq++}`, name: anchor.name, kind: "park", x: anchor.x, z: anchor.z, district: ward, tier: "venue", story: "chỗ gặp kín", anchor: anchor.id });
       continue;
     }
     if (anchor.kind === "metro-site") {
-      const site: CityRect = { x0: anchor.x - half, x1: anchor.x + half, z0: anchor.z - half * 0.62, z1: anchor.z + half * 0.62 };
-      clearArea(inflate(site, 3));
-      addBuilding({ district: ward, ...site, floors: 1, heightM: 4.2, kind: "metro-site", facing: "n", on: "anchor", anchor: anchor.id });
-      pois.push({ id: `poi-${poiSeq++}`, name: anchor.name, kind: "metro-site", x: anchor.x, z: site.z1 + 2, district: ward, tier: "venue", story: "rào tôn, lối tắt, hối lộ", anchor: anchor.id });
+      // Ga Hòa Hưng rộng 90 m: không có ô trống nào 90 m trong nội thành, nên phải THU NHỎ dần
+      // chứ không bỏ — ga là mốc cốt truyện, mất ga là mất cảnh.
+      const site0: CityRect = { x0: anchor.x - half, x1: anchor.x + half, z0: anchor.z - half * 0.62, z1: anchor.z + half * 0.62 };
+      let placed: CityRect | null = null;
+      for (const scale of [1, 0.78, 0.6, 0.46, 0.34]) {
+        const w0 = (site0.x1 - site0.x0) * scale;
+        const d0 = (site0.z1 - site0.z0) * scale;
+        const cx0 = (site0.x0 + site0.x1) / 2;
+        const cz0 = (site0.z0 + site0.z1) / 2;
+        const cand = offRoad({ x0: cx0 - w0 / 2, x1: cx0 + w0 / 2, z0: cz0 - d0 / 2, z1: cz0 + d0 / 2 });
+        clearArea(inflate(cand, 1.4));
+        if (addBuilding({ district: ward, ...cand, floors: 1, heightM: 4.2, kind: "metro-site", facing: "n", on: "anchor", anchor: anchor.id })) {
+          placed = cand;
+          break;
+        }
+      }
+      if (placed) anchorsPlaced += 1;
+      else anchorsMissing.push(`metro-site ${anchor.id}`);
+      pois.push({ id: `poi-${poiSeq++}`, name: anchor.name, kind: "metro-site", x: anchor.x, z: (placed?.z1 ?? anchor.z) + 2, district: ward, tier: "venue", story: "rào tôn, lối tắt, hối lộ", anchor: anchor.id });
+      continue;
+    }
+    if (anchor.kind === "market") {
+      // Chợ lớn hơn một khối (Bình Tây 70 m, Bến Thành 66 m) thì CẮT THEO KHỐI như công viên. Bản
+      // cũ đặt một hình chữ nhật 70 m đè lên phố ⇒ `addBuilding` từ chối vì đè lòng đường, và cả
+      // ba cái chợ BIẾN MẤT khỏi bản đồ trong khi bài kiểm toán vẫn báo "đạt toàn bộ cổng".
+      const marketRect: CityRect = { x0: anchor.x - half, x1: anchor.x + half, z0: anchor.z - half * 0.8, z1: anchor.z + half * 0.8 };
+      let built = 0;
+      let frontEdge: CityRect | null = null;
+      // Thu nhỏ dần cho tới khi có mảng nào rời được lòng đường. Bình Tây 70 m nằm giữa hai phố:
+      // hình chữ nhật đầy đủ luôn chạm mặt nạ đường, và trước đây chợ bị bỏ im lặng.
+      for (const scale of [1, 0.88, 0.76, 0.64, 0.52]) {
+        const w0 = (marketRect.x1 - marketRect.x0) * scale;
+        const d0 = (marketRect.z1 - marketRect.z0) * scale;
+        const cx0 = (marketRect.x0 + marketRect.x1) / 2;
+        const cz0 = (marketRect.z0 + marketRect.z1) / 2;
+        const src: CityRect = { x0: cx0 - w0 / 2, x1: cx0 + w0 / 2, z0: cz0 - d0 / 2, z1: cz0 + d0 / 2 };
+        const parts = blocks
+          .map((k) => ({ x0: Math.max(src.x0, k.x0), x1: Math.min(src.x1, k.x1), z0: Math.max(src.z0, k.z0), z1: Math.min(src.z1, k.z1) }))
+          .filter((q) => q.x1 - q.x0 > 7 && q.z1 - q.z0 > 7 && !onRoad(inflate(q, 1)));
+        // Không mảng nào rời lòng đường (chợ nằm trọn trong một khối) thì trượt cả hình chữ nhật
+        // ra ô trống gần nhất, đừng bỏ chợ.
+        const pieces = parts.length ? parts : [offRoad(src)];
+        for (const piece of pieces) {
+          // Chợ THAY dãy nhà, không nằm sau nó: giữ tường phố thì chính tường đó chặn chợ và
+          // `addBuilding` từ chối — đúng lý do Bến Thành/Bình Tây từng biến mất.
+          clearArea(inflate(piece, 1.6));
+          if (addBuilding({ district: ward, ...piece, floors: 3, heightM: 12, kind: "market", facing: "n", on: "anchor", anchor: anchor.id })) {
+            built += 1;
+            if (!frontEdge) frontEdge = piece;
+          }
+        }
+        if (built) break;
+      }
+      if (built) anchorsPlaced += 1;
+      else anchorsMissing.push(`market ${anchor.id}`);
+      // POI đứng TRƯỚC cửa chợ, không nằm trong lòng chợ (POI trong toà là POI không tới được).
+      const mFront = frontEdge as CityRect | null;
+      pois.push({
+        id: `poi-${poiSeq++}`,
+        name: anchor.name,
+        kind: "market",
+        x: mFront ? (mFront.x0 + mFront.x1) / 2 : anchor.x,
+        z: mFront ? mFront.z1 + 1.8 : anchor.z,
+        district: ward,
+        tier: "venue",
+        anchor: anchor.id,
+        story: "chợ thật, giá thật, người thật",
+      });
       continue;
     }
     let footprint: CityRect = { x0: anchor.x - half, x1: anchor.x + half, z0: anchor.z - half, z1: anchor.z + half };
+    clearArea(inflate(footprint, 2.2));
     if (anchor.kind === "home" || anchor.id === "room") {
-      clearArea(inflate(footprint, 2.2));
       footprint = offRoad(footprint);
       clearArea(inflate(footprint, 1.0));
       roomCenter = { x: (footprint.x0 + footprint.x1) / 2, z: (footprint.z0 + footprint.z1) / 2 };
-    } else {
-      clearArea(inflate(footprint, 2.2));
     }
-    const floors = anchor.kind === "market" ? 3 : anchor.kind === "metro" ? 3 : Math.max(6, Math.round(anchor.heightM / 3.9));
-    addBuilding({
-      district: ward,
-      ...footprint,
-      floors,
-      heightM: anchor.heightM || 12,
-      kind: anchor.kind,
-      facing: "n",
-      on: "anchor",
-      anchor: anchor.id,
-    });
+    const floors = anchor.kind === "metro" ? 3 : Math.max(6, Math.round(anchor.heightM / 3.9));
+    // Toà mốc không bao giờ được lặng lẽ biến mất: nếu lô vẫn đè lòng đường thì thu nhỏ dần, chứ
+    // không bỏ. Sáu trong chín mốc (Bitexco, Bến Thành, Bình Tây, An Đông, hai ga metro) từng
+    // không có toà nào trên bản đồ mà không cổng nào bắt được.
+    let placedRect = offRoad(footprint);
+    let towerOk = false;
+    for (let shrink = 0; shrink < 5 && !towerOk; shrink += 1) {
+      const cxr = (placedRect.x0 + placedRect.x1) / 2;
+      const czr = (placedRect.z0 + placedRect.z1) / 2;
+      const k = 1 - shrink * 0.14;
+      const tryRect: CityRect = {
+        x0: cxr - ((placedRect.x1 - placedRect.x0) / 2) * k,
+        x1: cxr + ((placedRect.x1 - placedRect.x0) / 2) * k,
+        z0: czr - ((placedRect.z1 - placedRect.z0) / 2) * k,
+        z1: czr + ((placedRect.z1 - placedRect.z0) / 2) * k,
+      };
+      const fitted = shrink === 0 ? placedRect : offRoad(tryRect);
+      clearArea(inflate(fitted, 1.2), true);
+      if (addBuilding({ district: ward, ...fitted, floors, heightM: anchor.heightM || 12, kind: anchor.kind, facing: "n", on: "anchor", anchor: anchor.id })) {
+        placedRect = fitted;
+        towerOk = true;
+      }
+    }
+    if (towerOk) anchorsPlaced += 1;
+    else anchorsMissing.push(`${anchor.kind} ${anchor.id}`);
+    footprint = placedRect;
     pois.push({
       id: `poi-${poiSeq++}`,
       name: anchor.name,
@@ -1543,6 +1632,8 @@ export function generateCity(seedOverride?: string): City {
   stats.streetPhase = streetPhase;
   stats.phaseById = phaseById;
   stats.hemSkipped = hemSkipped;
+  stats.anchorsPlaced = anchorsPlaced;
+  stats.anchorsMissing = anchorsMissing;
   stats.rejectedRoad = rejectedRoad;
   stats.rejectedRoadSamples = rejectedRoadSamples;
   stats.relocatedPois = relocated;
@@ -1983,6 +2074,8 @@ function measure(
     streetPhase: {},
     phaseById: {},
     hemSkipped: 0,
+    anchorsPlaced: 0,
+    anchorsMissing: [],
     rejectedRoad: 0,
     rejectedRoadSamples: [],
   };

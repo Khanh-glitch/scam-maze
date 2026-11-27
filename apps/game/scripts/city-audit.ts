@@ -383,6 +383,13 @@ if (metrics.props.per100m < 25) defects.push(`${metrics.props.per100m} vật th�
 if (metrics.built.roofPctOfLand < 42 || metrics.built.roofPctOfLand > 68) defects.push(`mái ${metrics.built.roofPctOfLand}% đất ngoài khoảng 42–68`);
 if (m.streetKmPerKm2 < 24 || m.streetKmPerKm2 > 70) defects.push(`${m.streetKmPerKm2} km đường/km² ngoài khoảng 24–70`);
 if (m.maxHeightM !== 461) defects.push(`mốc cao nhất ${m.maxHeightM} m, phải là Landmark 81 = 461 m`);
+// Mốc thật PHẢI có toà. Bảy trong chín mốc (Bitexco, Bến Thành, Bình Tây, An Đông, hai ga metro,
+// nhà của người chơi) từng không có toà nào trên bản đồ, trong khi mọi cổng khác vẫn "đạt".
+for (const a of city.anchors) {
+  const built = city.buildings.filter((b) => b.anchor === a.id);
+  if (!built.length) defects.push(`mốc ${a.name} (${a.id}) không có toà nào trên bản đồ`);
+}
+if (city.metrics.anchorsMissing.length) defects.push(`mốc không dựng được: ${city.metrics.anchorsMissing.join(", ")}`);
 if (city.pois.filter((p) => p.beat).length < 6) defects.push(`chỉ ${city.pois.filter((p) => p.beat).length} POI mang beat cốt truyện`);
 for (const d of city.districts) {
   const dm = m.districtMetrics.find((x) => x.id === d.id);
