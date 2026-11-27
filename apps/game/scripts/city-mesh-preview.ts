@@ -221,6 +221,7 @@ const gY = -0.06;
 }
 
 for (const p of mesh.boxes) addBox(p);
+for (const p of mesh.flat) addBox(p);
 if (!args.has("nodetail")) for (const p of mesh.details) addBox(p);
 for (const p of mesh.prisms) addPrism(p, 8);
 if (!args.has("nogable")) for (const p of mesh.gables) addGable(p);

@@ -46,35 +46,38 @@ const gableGeometry = (): THREE.BufferGeometry => {
  * "khối hình học ghép lại" cần tránh. Vân tô trắng để màu từng toà (instance colour) còn nhân lên.
  */
 const facadeTexture = (): THREE.Texture => {
+  const S = 256;
   const c = document.createElement("canvas");
-  c.width = 128;
-  c.height = 128;
+  c.width = S;
+  c.height = S;
   const g = c.getContext("2d");
   if (g) {
-    g.fillStyle = "#f2efe9";
-    g.fillRect(0, 0, 128, 128);
-    // nhiễu nhẹ: tường vôi không phẳng tuyệt đối
-    for (let i = 0; i < 700; i += 1) {
-      g.fillStyle = `rgba(120,110,100,${0.02 + Math.random() * 0.04})`;
-      g.fillRect(Math.random() * 128, Math.random() * 128, 2, 2);
+    g.fillStyle = "#f4f1ea";
+    g.fillRect(0, 0, S, S);
+    for (let i = 0; i < 2200; i += 1) {
+      g.fillStyle = `rgba(120,110,100,${0.015 + Math.random() * 0.03})`;
+      g.fillRect(Math.random() * S, Math.random() * S, 3, 3);
     }
-    // lưới cửa sổ 4 × 4, mỗi ô có bậu và bóng dưới
+    // 4 × 4 ô cửa: khung đậm, kính xám xanh, bệ cửa sáng. Tương phản vừa phải — cửa sổ đen tuyền
+    // lặp lại trên mọi toà làm cả thành phố đọc ra "tấm lưới chấm".
     for (let r = 0; r < 4; r += 1) {
       for (let col = 0; col < 4; col += 1) {
-        const x = 8 + col * 30;
-        const y = 10 + r * 30;
-        g.fillStyle = "rgba(28,34,44,0.62)";
-        g.fillRect(x, y, 20, 18);
-        g.fillStyle = "rgba(255,255,255,0.25)";
-        g.fillRect(x, y + 18, 20, 2);
-        g.fillStyle = "rgba(20,24,32,0.18)";
-        g.fillRect(x, y - 2, 20, 2);
+        const x = 14 + col * 60;
+        const y = 18 + r * 60;
+        g.fillStyle = "rgba(56,64,76,0.30)";
+        g.fillRect(x, y, 34, 30);
+        g.fillStyle = "rgba(255,255,255,0.35)";
+        g.fillRect(x, y + 30, 34, 3);
+        g.fillStyle = "rgba(40,44,52,0.12)";
+        g.fillRect(x, y - 3, 34, 3);
+        g.fillStyle = "rgba(150,160,172,0.22)";
+        g.fillRect(x + 2, y + 2, 14, 11);
       }
     }
     // dải sàn giữa các tầng
     for (let r = 0; r < 4; r += 1) {
-      g.fillStyle = "rgba(90,86,80,0.18)";
-      g.fillRect(0, 4 + r * 30, 128, 2);
+      g.fillStyle = "rgba(90,86,80,0.13)";
+      g.fillRect(0, 8 + r * 60, S, 3);
     }
   }
   const t = new THREE.CanvasTexture(c);
@@ -169,13 +172,20 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     const W = el.clientWidth || window.innerWidth;
     const H = el.clientHeight || window.innerHeight;
 
+    const qs = new URLSearchParams(window.location.search);
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     renderer.setSize(W, H);
     renderer.setClearColor(SKY_BOTTOM);
+    // Nắng + trời tán xạ cộng lại từng vượt 1,0 → tường bê tông thành màu be, mất sắc xám.
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = qs.has("expo") ? Number(qs.get("expo")) || 1.45 : 1.45;
     // Bóng đổ: một nguồn nắng chiều thấp. Không có bóng thì mọi mặt đứng sáng đều nhau và cả
     // thành phố đọc ra "các khối màu dán lên nền" — đúng thứ cần tránh.
     renderer.shadowMap.enabled = true;
+    // Thành phố tĩnh: chỉ vẽ lại bản đồ bóng khi camera pan đủ xa, nếu không mỗi khung hình phải
+    // dựng lại cả 43.000 khối thêm một lần nữa.
+    renderer.shadowMap.autoUpdate = !qs.has("noshadow");
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     el.appendChild(renderer.domElement);
 
@@ -184,18 +194,29 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     const centre = new THREE.Vector3((F.x0 + F.x1) / 2, 0, (F.z0 + F.z1) / 2);
     scene.fog = new THREE.Fog(SKY_BOTTOM, 900, 3200);
 
-    // Nền trời: một vòm lớn tô gradient bằng đỉnh màu (không cần shader riêng).
+    // Nền trời: gradient vẽ vào canvas rồi dán lên vòm cầu. Bản cũ (cầu một màu + dải trụ mờ) tạo
+    // đúng một đường kẻ ngang giữa trời — trông như tấm phông, không như bầu trời.
+    const skyCanvas = document.createElement("canvas");
+    skyCanvas.width = 8;
+    skyCanvas.height = 256;
+    const sg = skyCanvas.getContext("2d");
+    if (sg) {
+      const grad = sg.createLinearGradient(0, 0, 0, 256);
+      grad.addColorStop(0, "#1e3450");
+      grad.addColorStop(0.42, SKY_TOP);
+      grad.addColorStop(0.72, "#7d8ea6");
+      grad.addColorStop(0.9, SKY_BOTTOM);
+      grad.addColorStop(1, "#e6cfb4");
+      sg.fillStyle = grad;
+      sg.fillRect(0, 0, 8, 256);
+    }
+    const skyTex = new THREE.CanvasTexture(skyCanvas);
+    skyTex.colorSpace = THREE.SRGBColorSpace;
     const sky = new THREE.Mesh(
-      new THREE.SphereGeometry(5200, 24, 16),
-      new THREE.MeshBasicMaterial({ color: SKY_TOP, side: THREE.BackSide, fog: false }),
+      new THREE.SphereGeometry(5200, 32, 24),
+      new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false }),
     );
     scene.add(sky);
-    const horizon = new THREE.Mesh(
-      new THREE.CylinderGeometry(5000, 5000, 1200, 32, 1, true),
-      new THREE.MeshBasicMaterial({ color: SKY_BOTTOM, side: THREE.BackSide, fog: false, transparent: true, opacity: 0.65 }),
-    );
-    horizon.position.y = 520;
-    scene.add(horizon);
 
     // Đất ngoài đô thị: một tấm lớn, cùng tông với nền xám lục của ảnh kiểm toán.
     const ground = new THREE.Mesh(
@@ -215,9 +236,33 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
 
     // Mặt đứng có cửa sổ, mái có vân: hộp nhà đọc ra toà nhà.
     const facade = new THREE.MeshLambertMaterial({ map: facadeTexture() });
+    // Sửa UV theo kích thước THẬT của từng instance: hộp 60 m cao mà dán 4 cửa sổ thì đọc ra "tường
+    // trơn có 4 ô đen". Một ô vân = 4 cửa sổ ≈ 13,5 m ngang, 14,5 m đứng.
+    facade.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          "#include <common>",
+          `#include <common>
+          float facadePitch(float size, float tile) { return max(1.0, floor(size / tile + 0.5)); }`,
+        )
+        .replace(
+          "#include <uv_vertex>",
+          `#include <uv_vertex>
+          #ifdef USE_INSTANCING
+            float fSX = length(instanceMatrix[0].xyz);
+            float fSY = length(instanceMatrix[1].xyz);
+            float fSZ = length(instanceMatrix[2].xyz);
+            float fU = abs(normal.x) > 0.5 ? fSZ : fSX;
+            vMapUv *= vec2(facadePitch(fU, 13.5), facadePitch(fSY, 14.5));
+          #endif`,
+        );
+    };
     const roofMat = new THREE.MeshLambertMaterial({ map: roofTexture() });
     // BoxGeometry có 6 nhóm mặt: +x, -x, +y, -y, +z, -z
     addInstanced(scene, cube, meshData.boxes, [facade, facade, roofMat, roofMat, facade, facade]);
+    // Đường, hè, nước, sân, vật thể: màu phẳng. Dán vân cửa sổ lên mặt đường là biến phố thành
+    // một tấm lưới đen (lỗi nhìn thấy ngay ở khung ngang tầm mắt).
+    addInstanced(scene, cube, meshData.flat, new THREE.MeshLambertMaterial());
     addInstanced(scene, prism, meshData.prisms);
     addInstanced(scene, gableGeometry(), meshData.gables);
     // Chi tiết mặt tiền (cửa cuốn, biển hiệu, mái hiên, ban công) không vân, màu phẳng.
@@ -234,27 +279,38 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
 
     // Nắng chiều thấp: một nguồn chính + trời tán xạ. Bóng đổ thật (shadow map) cho 20.000 khối
     // thì vượt ngân sách khung hình của máy yếu, nên dùng sáng hai chiều + sương làm độ sâu.
-    const sun = new THREE.DirectionalLight("#ffe0b8", 2.1);
+    const sunLevel = Number(new URLSearchParams(window.location.search).get("sun"));
+    const sun = new THREE.DirectionalLight("#ffe6c8", Number.isFinite(sunLevel) && qs.has("sun") ? sunLevel : 1.9);
     sun.position.set(-600, 700, 900);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.left = -700;
-    sun.shadow.camera.right = 700;
-    sun.shadow.camera.top = 700;
-    sun.shadow.camera.bottom = -700;
+    sun.shadow.camera.left = -900;
+    sun.shadow.camera.right = 900;
+    sun.shadow.camera.top = 900;
+    sun.shadow.camera.bottom = -900;
     sun.shadow.camera.near = 1;
     sun.shadow.camera.far = 3000;
     sun.shadow.bias = -0.0008;
     sun.shadow.normalBias = 0.6;
     scene.add(sun);
     scene.add(sun.target);
-    scene.add(new THREE.HemisphereLight("#8fa6c4", "#4a4438", 1.35));
+    const hemiLevel = Number(qs.get("hemi"));
+    scene.add(new THREE.HemisphereLight("#b7cbe2", "#5c5343", qs.has("hemi") && Number.isFinite(hemiLevel) ? hemiLevel : 2.0));
 
-    const camera = new THREE.PerspectiveCamera(48, W / H, 1, 6000);
-    const target = new THREE.Vector3(centre.x, 20, centre.z);
-    let radius = 900;
-    let yaw = -2.3;
-    let pitch = -0.42;
+    const num = (k: string, d: number) => {
+      const v = Number(qs.get(k));
+      return Number.isFinite(v) && qs.get(k) !== null && qs.get(k) !== "" ? v : d;
+    };
+    const tq = (qs.get("t") ?? "").split(",").map(Number);
+    const camera = new THREE.PerspectiveCamera(num("fov", 48), W / H, 0.4, 6000);
+    const target = new THREE.Vector3(
+      Number.isFinite(tq[0]) ? tq[0] : centre.x,
+      num("ty", 20),
+      Number.isFinite(tq[1]) ? tq[1] : centre.z,
+    );
+    let radius = num("r", 900);
+    let yaw = num("yaw", -2.3);
+    let pitch = num("pitch", -0.42);
     const applyCamera = () => {
       const cp = Math.cos(pitch);
       camera.position.set(
@@ -349,10 +405,12 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
       if (keys.has("e")) target.y += step * 0.6;
       if (keys.size) applyCamera();
       // nguồn nắng đi theo điểm nhìn để bản đồ bóng luôn phủ vùng đang xem
+      if (sun.target.position.distanceToSquared(new THREE.Vector3(target.x, 0, target.z)) > 400) {
+        renderer.shadowMap.needsUpdate = true;
+      }
       sun.position.set(target.x - 700, 850, target.z + 900);
       sun.target.position.set(target.x, 0, target.z);
       sky.position.set(camera.position.x, 0, camera.position.z);
-      horizon.position.set(camera.position.x, 520, camera.position.z);
       renderer.render(scene, camera);
 
       // nhãn mốc: chiếu vào màn hình mỗi khung (9 nhãn, không đáng kể)

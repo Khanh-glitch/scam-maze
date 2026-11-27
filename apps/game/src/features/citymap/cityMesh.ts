@@ -25,8 +25,10 @@ export interface Part {
 }
 
 export interface CityMesh {
-  /** Hộp: nhà, bệ, đỉnh kỹ thuật, đường, vỉa hè, nước, biển hiệu. */
+  /** Hộp: nhà, bệ, đỉnh kỹ thuật. Được dán vân mặt đứng + vân mái. */
   boxes: Part[];
+  /** Hộp phẳng: mặt đường, vỉa hè, mặt nước, sân, cột đèn, sạp, xe — một màu, không vân. */
+  flat: Part[];
   /** Lăng trụ tám cạnh (bán kính 1, cao 1, đáy ở y=0): thân tháp vát góc. */
   prisms: Part[];
   /** Lăng trụ tam giác, sống nóc dọc trục x (rộng 1, sâu 1, cao 1): mái ngói. */
@@ -102,6 +104,9 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
   const trunks: Part[] = [];
   const canopies: Part[] = [];
   const details: Part[] = [];
+  // Khối "phẳng": mặt đường, vỉa hè, mặt nước, sân, cột đèn, sạp, xe. Trước đây chúng nằm chung
+  // `boxes` nên bị dán vân cửa sổ của toà nhà — mặt đường vì thế thành một tấm lưới đen.
+  const flat: Part[] = [];
   const drums: Part[] = [];
   const byDistrict = new Map(city.districts.map((d) => [d.id, d]));
   let towers = 0;
@@ -118,6 +123,7 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
     maxY = Math.max(maxY, p.y + p.sy);
   };
   const box = (p: Part) => push(boxes, p);
+  const flatBox = (p: Part) => push(flat, p);
 
   // --- nền: đường, vỉa hè, nước ---------------------------------------------------------------
   let roads = 0;
@@ -141,34 +147,67 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
       // mép đường biến mất, cả mặt phố thành một tấm xám.
       // Vỉa hè là HAI DẢI hai bên, không phải một tấm phủ cả mặt đường: tấm phủ rộng hơn và cao
       // hơn lòng đường nên nó che mất đường, cả phố ra một dải xám.
+      // Vỉa hè phải DỪNG ở ngã tư: chạy suốt chiều dài đoạn thì dải hè băng ngang lòng đường của
+      // phố cắt qua — nhìn như một thanh xám nổi giữa ngã tư.
+      const cuts: Array<{ t: number; half: number }> = [];
+      for (const o of city.streets) {
+        if (o === s) continue;
+        for (let j = 0; j < o.points.length - 1; j += 1) {
+          const [ox0, oz0] = o.points[j];
+          const [ox1, oz1] = o.points[j + 1];
+          const dx = bx - ax;
+          const dz = bz - az;
+          const ex = ox1 - ox0;
+          const ez = oz1 - oz0;
+          const den = dx * ez - dz * ex;
+          if (Math.abs(den) < 1e-6) continue;
+          const t = ((ox0 - ax) * ez - (oz0 - az) * ex) / den;
+          const u = ((ox0 - ax) * dz - (oz0 - az) * dx) / den;
+          if (t <= 0 || t >= 1 || u < 0 || u > 1) continue;
+          cuts.push({ t, half: (o.widthM / 2 + 1.2) / len });
+        }
+      }
+      cuts.sort((a2, b2) => a2.t - b2.t);
+      const spans: Array<[number, number]> = [];
+      let from = 0;
+      for (const c of cuts) {
+        const to = Math.max(from, c.t - c.half);
+        if (to - from > 0.004) spans.push([from, to]);
+        from = Math.max(from, c.t + c.half);
+      }
+      if (1 - from > 0.004) spans.push([from, 1]);
       const off = w / 2 + walk / 2;
       for (const sgn of [-1, 1]) {
-        // dịch theo trục ngang của tấm đường: cục bộ +z → (sin ry, cos ry)
-        box({
-          x: cx + Math.sin(ry) * off * sgn,
-          y: 0.05,
-          z: cz + Math.cos(ry) * off * sgn,
-          sx: len + 0.4, sy: 0.12, sz: walk, ry, color: "#9a97a1",
-        });
+        for (const [t0, t1] of spans) {
+          const segLen = (t1 - t0) * len;
+          const mid = (t0 + t1) / 2;
+          // dịch theo trục ngang của tấm đường: cục bộ +z → (sin ry, cos ry)
+          flatBox({
+            x: ax + (bx - ax) * mid + Math.sin(ry) * off * sgn,
+            y: 0.05,
+            z: az + (bz - az) * mid + Math.cos(ry) * off * sgn,
+            sx: segLen, sy: 0.12, sz: walk, ry, color: "#9b98a1",
+          });
+        }
       }
-      box({ x: cx, y: 0.02, z: cz, sx: len + 0.4, sy: 0.06, sz: w, ry, color: s.klass === "alley" ? "#3a3842" : "#2e2d37" });
+      flatBox({ x: cx, y: 0.02, z: cz, sx: len + 0.4, sy: 0.06, sz: w, ry, color: s.klass === "alley" ? "#605e6b" : "#5a5964" });
       // vạch tim đường cho đại lộ / phố: gạch 2 m cách nhau 6 m
       if (s.klass === "avenue" || s.klass === "street") {
         const dash = Math.max(1, Math.floor(len / 7));
         for (let k = 0; k < dash; k += 1) {
           const t = (k + 0.5) / dash;
-          box({ x: ax + (bx - ax) * t, y: 0.085, z: az + (bz - az) * t, sx: 2.2, sy: 0.02, sz: 0.18, ry, color: "#c9c08a" });
+          flatBox({ x: ax + (bx - ax) * t, y: 0.085, z: az + (bz - az) * t, sx: 2.2, sy: 0.02, sz: 0.18, ry, color: "#c9c08a" });
         }
       }
       roads += 1;
     }
   }
   for (const wt of city.water) {
-    box({ x: (wt.x0 + wt.x1) / 2, y: -0.1, z: (wt.z0 + wt.z1) / 2, sx: wt.x1 - wt.x0, sy: 0.16, sz: wt.z1 - wt.z0, color: "#12414d" });
+    flatBox({ x: (wt.x0 + wt.x1) / 2, y: -0.1, z: (wt.z0 + wt.z1) / 2, sx: wt.x1 - wt.x0, sy: 0.16, sz: wt.z1 - wt.z0, color: "#12414d" });
   }
   // cầu: mặt bê tông đi được bên trên nước
   for (const d of city.decks) {
-    box({ x: (d.x0 + d.x1) / 2, y: 0.1, z: (d.z0 + d.z1) / 2, sx: d.x1 - d.x0, sy: 0.2, sz: d.z1 - d.z0, color: "#6c6a63" });
+    flatBox({ x: (d.x0 + d.x1) / 2, y: 0.1, z: (d.z0 + d.z1) / 2, sx: d.x1 - d.x0, sy: 0.2, sz: d.z1 - d.z0, color: "#6c6a63" });
   }
 
   // --- toà nhà --------------------------------------------------------------------------------
@@ -362,14 +401,14 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
       push(canopies, { x: p.x, y: trunkH - 0.4, z: p.z, sx: 1.9, sy: hh - trunkH + 0.6, sz: 1.9, color: "#4f7046" });
       props += 1;
     } else if (p.kind === "lamp") {
-      box({ x: p.x, y: 0, z: p.z, sx: 0.16, sy: 4.6, sz: 0.16, color: "#8a8f96" });
+      flatBox({ x: p.x, y: 0, z: p.z, sx: 0.16, sy: 4.6, sz: 0.16, color: "#8a8f96" });
       props += 1;
     } else if (p.kind === "stall") {
-      box({ x: p.x, y: 0, z: p.z, sx: 1.5, sy: 2.1, sz: 1.5, color: "#b06a4a" });
-      box({ x: p.x, y: 2.1, z: p.z, sx: 2.1, sy: 0.16, sz: 2.1, color: "#c94f3a" });
+      flatBox({ x: p.x, y: 0, z: p.z, sx: 1.5, sy: 2.1, sz: 1.5, color: "#b06a4a" });
+      flatBox({ x: p.x, y: 2.1, z: p.z, sx: 2.1, sy: 0.16, sz: 2.1, color: "#c94f3a" });
       props += 1;
     } else if (p.kind === "moto") {
-      box({ x: p.x, y: 0, z: p.z, sx: 0.8, sy: 1.05, sz: 1.9, ry: hash01(p.x) * 3.14, color: "#5a5f6a" });
+      flatBox({ x: p.x, y: 0, z: p.z, sx: 0.8, sy: 1.05, sz: 1.9, ry: hash01(p.x) * 3.14, color: "#5a5f6a" });
       props += 1;
     }
   }
@@ -390,7 +429,7 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
     .filter((a): a is { id: string; name: string; x: number; y: number; z: number } => a !== null);
 
   return {
-    boxes, prisms, gables, trunks, canopies, details, drums, anchors,
+    boxes, flat, prisms, gables, trunks, canopies, details, drums, anchors,
     stats: {
       buildings: city.buildings.filter((b) => !b.walkable).length,
       towers, gabledRoofs, parts, roads, props,

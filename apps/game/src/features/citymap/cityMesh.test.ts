@@ -10,7 +10,7 @@ describe("buildCityMesh", () => {
   const city = generateCity();
   const mesh = buildCityMesh(city);
   const all = [
-    ...mesh.boxes, ...mesh.details, ...mesh.prisms, ...mesh.gables,
+    ...mesh.boxes, ...mesh.flat, ...mesh.details, ...mesh.prisms, ...mesh.gables,
     ...mesh.trunks, ...mesh.canopies, ...mesh.drums,
   ];
 
@@ -46,8 +46,8 @@ describe("buildCityMesh", () => {
   });
 
   it("đường có bó vỉa: vỉa hè cao hơn lòng đường", () => {
-    const road = mesh.boxes.filter((b) => b.color === "#2e2d37" || b.color === "#3a3842");
-    const walk = mesh.boxes.filter((b) => b.color === "#9a97a1");
+    const road = mesh.flat.filter((b) => b.color === "#5a5964" || b.color === "#605e6b");
+    const walk = mesh.flat.filter((b) => b.color === "#9b98a1");
     expect(road.length).toBeGreaterThan(50);
     expect(walk.length).toBeGreaterThan(50);
     const roadTop = Math.max(...road.map((b) => b.y + b.sy));

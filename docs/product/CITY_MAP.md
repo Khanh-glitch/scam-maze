@@ -242,11 +242,54 @@ Cờ: `--street`, `--x/--y/--z`, `--tx/--ty/--tz`, `--fov`, `--out`, `--nogable`
 bóng đổ nhiều nguồn hay sương mù, nên dùng để bắt lỗi hình học (đường lệch góc, mái lật, chi tiết nằm sai
 phía) chứ không phải để duyệt "đẹp".
 
+## 4d. Chụp khung hình THẬT của `/saigon` (không cần trình duyệt trên máy bạn)
+
+Máy dựng tài liệu này không có Chrome, không có WebGL. Cách đã dùng để **nhìn đúng trang game** (ảnh
+`_g-street.jpg`, `_g-air.jpg`):
+
+```bash
+# 1. Chromium headless + SwiftShader lấy từ npm (không cần apt, không cần mạng ngoài registry)
+mkdir -p /tmp/shot && npm i --prefix /tmp/shot @sparticuz/chromium puppeteer-core
+node -e 'const {brotliDecompressSync}=require("zlib"),{readFileSync,writeFileSync,chmodSync,mkdirSync}=require("fs");
+  const b="/tmp/shot/node_modules/@sparticuz/chromium/bin";mkdirSync("/tmp/chr",{recursive:true});
+  writeFileSync("/tmp/chr/chromium",brotliDecompressSync(readFileSync(b+"/chromium.br")));chmodSync("/tmp/chr/chromium",0o755);
+  for (const t of ["swiftshader","al2023"]) { writeFileSync("/tmp/"+t+".tar", brotliDecompressSync(readFileSync(b+"/"+t+".tar.br"))); }'
+tar -xf /tmp/swiftshader.tar -C /tmp/chr && tar -xf /tmp/al2023.tar -C /tmp/al2023-x
+# libEGL/libGLESv2 phải nằm CẠNH binary, nếu không WebGL trả về null
+
+# 2. Dựng bản build rồi phục vụ tĩnh
+cd apps/game && npx vite build            # rồi phục vụ thư mục dist ở cổng bất kỳ
+
+# 3. Chụp
+node apps/game/scripts/city-shot.mjs \
+  --url="http://127.0.0.1:4173/saigon?t=-250,-33.9&ty=2&r=10&yaw=-1.5708&pitch=-0.06&fov=56" \
+  --out=docs/product/audit/_g-street.jpg --w=1152 --h=720 --wait=12000
+```
+
+Tham số QA trên trang (chỉ để kiểm bằng mắt, mặc định vẫn là góc nhìn của game): `t=x,z` `ty` `r` `yaw`
+`pitch` `fov` `noshadow` `sun` `hemi` `expo`.
+
+**Những gì lần nhìn thật này phát hiện và đã sửa** (đều không thấy được qua ảnh mesh):
+
+1. Mặt đường / vỉa hè / mặt nước / vật thể vỉa hè nằm chung danh sách `boxes` nên bị dán **vân cửa sổ**
+   của toà nhà: lòng đường thành một tấm lưới đen. Nay tách danh sách `flat` (một màu, không vân).
+2. Vân mặt đứng là 4 × 4 cửa sổ kéo lên cả mặt tường 60 m → cửa sổ cao 8 m. Nay sửa UV theo kích thước
+   từng instance (`onBeforeCompile`, một ô vân = 4 cửa sổ ≈ 13,5 m).
+3. Bầu trời cũ = cầu một màu + dải trụ mờ → đúng một đường kẻ ngang giữa trời. Nay gradient dán lên vòm.
+4. Phơi sáng: nắng + trời cộng lại quá thấp, cả phố đọc ra chạng vạng. Nay ACES, nắng 1,9, trời 2,0,
+   exposure 1,45.
+5. Vỉa hè chạy suốt chiều dài đoạn nên **băng ngang lòng đường ở ngã tư**. Nay cắt theo giao lộ.
+6. Vân mái phẳng + chi tiết mặt tiền đứng sai phía (thấy rõ khi đứng ngang tầm mắt), chợ không có cửa trời.
+
+**Vẫn chưa đạt** (nhìn ảnh là thấy, chưa sửa): mặt tiền hông nhà (không quay ra phố) vẫn là tường trơn;
+mái bằng chiếm ưu thế làm ảnh trên không hơi "sa bàn"; hàng cây và vật thể vỉa hè còn thưa; chưa có
+người/xe máy chuyển động.
+
 ## 5. Giới hạn — cái bài đo này **không** nói được
 
-- Cả `city-render.ts` lẫn `city-mesh-preview.ts` đều là **renderer phần mềm trong repo**, không chụp
-  được khung hình WebGL của `/saigon`: bố cục hình học đã nhìn, còn **texture mặt tiền, bóng đổ, sương và
-  FPS trên trang `/saigon` thì chưa ai nhìn bằng mắt** — cần một lần mở trình duyệt thật.
+- Khung hình `/saigon` đã được chụp thật (§4d) bằng Chromium + SwiftShader ở 1152 × 720. Nhưng đó là
+  **dựng bằng phần mềm**: 20 fps, không có MSAA thật như máy có GPU, và **chưa đo fps trên máy người dùng**.
+- Ảnh chụp chỉ là **một vài góc**; chưa duyệt hết 1 220 × 790 m của thành phố.
 - Ảnh 3D là **renderer phần mềm trong repo**, không phải engine của game. Nó đúng về hình học, tỉ lệ,
   va chạm và ánh sáng một nguồn; nó **không** nói gì về shader, vật liệu, hay khung hình/giây trên máy
   owner.
