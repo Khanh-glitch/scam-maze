@@ -3,6 +3,7 @@
 // indoor "No Signal" disc the moment the player steps out of Room 6.07 onto Hẻm 462/14.
 import React, { useEffect, useRef } from "react";
 import type { StoryNpcRadarBlip } from "../../testbus/openworld/simulation/storyNpcs";
+import { SAIGON_ROADS } from "./saigonRoads";
 
 export interface SaigonRadarData {
   position: { x: number; z: number };
@@ -25,32 +26,6 @@ export interface SaigonMinimapProps {
   /** Visible radar radius in metres. */
   radiusM?: number;
 }
-
-interface RoadSegment {
-  x0: number;
-  z0: number;
-  x1: number;
-  z1: number;
-  widthM: number;
-  kind: "avenue" | "alley" | "boulevard";
-}
-
-// Architectural Saigon street layout matching `OpenWorldEngine`, `boardingHouse`, and `saigonDistricts`.
-const SAIGON_ROADS: readonly RoadSegment[] = [
-  // Lý Thái Tổ & Northern Riverside Avenue
-  { x0: -6, z0: 42, x1: -6, z1: -365, widthM: 12, kind: "avenue" },
-  // Hẻm 462/14 Lý Thái Tổ into the boarding-house courtyard
-  { x0: -2, z0: -11.2, x1: 23, z1: -11.2, widthM: 4.8, kind: "alley" },
-  { x0: 20.5, z0: -11.2, x1: 20.5, z1: -19.5, widthM: 5.5, kind: "alley" },
-  // East Boulevards (3/2 & District 1 approach)
-  { x0: -6, z0: -76, x1: 126, z1: -76, widthM: 11, kind: "boulevard" },
-  { x0: -6, z0: -147, x1: 126, z1: -147, widthM: 11, kind: "boulevard" },
-  // Hải Triều connector toward Bitexco
-  { x0: 56, z0: -72, x1: 56, z1: -242, widthM: 9.5, kind: "boulevard" },
-  { x0: 56, z0: -186, x1: 118, z1: -186, widthM: 8.5, kind: "boulevard" },
-  // Riverside promenade toward Landmark 81
-  { x0: -6, z0: -348, x1: 68, z1: -348, widthM: 9.5, kind: "boulevard" },
-];
 
 const LANDMARKS = [
   { id: "room", x: 22, z: -16.8, color: "#b9a5f5", label: "6.07" },

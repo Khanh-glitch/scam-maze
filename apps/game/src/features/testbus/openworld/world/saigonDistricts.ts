@@ -50,6 +50,7 @@ import {
   type LongQ9TrafficReading,
 } from "../simulation/longQ9";
 import type { WorldStreamer } from "./WorldStreamer";
+import { isWithinOpenWorld as isWithinOpenWorldData } from "./openWorldBounds";
 import type { PooledLightSpec } from "./boardingHouse";
 import {
   createCorrugatedTinPBR,
@@ -2403,17 +2404,10 @@ export function buildSaigonDistricts(
       if (x >= -54 && x <= 106 && z >= -400 && z <= -316.4) return true;
       return false;
     },
+    // The footprint lives in `openWorldBounds.json` so the audit script, the bounds tests and the
+    // game all read the same rectangles. Edit the data, not this function.
     isWithinOpenWorld(x: number, z: number) {
-      // Widen just the market block; leave the upstream neighbourhood boundaries elsewhere.
-      if (x >= -19.5 && x <= 7.0 && z >= -316 && z <= 48) return true;
-      if (x >= -25.0 && x < -19.5 && z >= -152 && z <= -104) return true;
-      if (x >= 4.5 && x <= 31.8 && z >= -19.2 && z <= -6.6) return true;
-      if (x >= 0 && x <= 132 && (Math.abs(z + 76) <= 10.6 || Math.abs(z + 147) <= 10.6)) return true;
-      if (x >= 46 && x <= 66 && z >= -236 && z <= -65.6) return true;
-      if (x >= 66 && x <= 122 && z >= -213 && z <= -157) return true;
-      if (x >= -18 && x <= 96 && z >= -316.4 && z <= -295.6) return true;
-      if (x >= -54 && x <= 106 && z >= -400 && z <= -316.4) return true;
-      return false;
+      return isWithinOpenWorldData(x, z);
     },
     setEnvironment(
       nightFactor: number,

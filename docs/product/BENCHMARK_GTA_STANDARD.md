@@ -44,15 +44,15 @@ Nguồn: bảng tổng hợp diện tích GTA ([freecash](https://freecash.com/a
 [u7buy](https://www.u7buy.com/blog/how-big-is-gta-5-map/)), Gangstar Vegas ~9 km² và 80+ nhiệm vụ
 ([Grokipedia](https://grokipedia.com/page/Gangstar_Vegas), [Sportskeeda](https://www.sportskeeda.com/esports/10-open-world-games-mobile-phones-massive-engaging)).
 
-**Đối chiếu hiện tại:** vùng đi bộ liên tục của SCAMMAZE đo từ `isWithinOpenWorld`
-(`apps/game/src/features/testbus/openworld/world/saigonDistricts.ts:2406-2412`) là
-**x ∈ [−25, 132], z ∈ [−356, 48]** → **157 m × 404 m ≈ 0,063 km²**.
+**Đối chiếu hiện tại:** vùng đi bộ liên tục của SCAMMAZE, đo bằng `node apps/game/scripts/audit-world.mjs`
+(lưới 0,5 m trên `openWorldBounds.json`, xem `MAP_AUDIT.md`) là **x ∈ [−54, 132], z ∈ [−400, 48]** →
+bao **186 m × 448 m = 0,0833 km²**, trong đó **phần đi được thật 0,0364 km² (43,7 %)**.
 
 | So với | Tỉ lệ diện tích | Nói thẳng |
 |---|---|---|
-| Vice City (9,11 km²) | **1/144** | Nhỏ hơn ~2 bậc độ lớn |
-| Gangstar Vegas (~9 km²) | **1/142** | Cùng khoảng cách |
-| GTA V (75,84 km²) | **1/1.203** | Không cùng hạng |
+| Vice City (9,11 km²) | **1/250** | Nhỏ hơn ~2 bậc độ lớn |
+| Gangstar Vegas (~9 km²) | **1/247** | Cùng khoảng cách |
+| GTA V (75,84 km²) | **1/2.084** | Không cùng hạng |
 
 Nhưng **diện tích không phải thứ để đua**. GTA IV nhỏ hơn San Andreas 2,4 lần mà vẫn "đã" hơn vì
 mật độ. Vì vậy chuẩn của mình là **mật độ + độ liền mạch + số thứ để làm**, không phải km².
@@ -111,7 +111,7 @@ mình bằng điểm kỹ thuật cao.)
 
 | # | Chiều | Điểm | Thanh | Bằng chứng chính |
 |---|---|---|---|---|
-| D1 | Quy mô & liền mạch | **2** | ██░░░░░░░░ | 0,063 km²; 1 vùng liên tục; `khupho`, `testbus`, `roomv2` vẫn là **route riêng**, chưa nối thành một bản đồ |
+| D1 | Quy mô & liền mạch | **2** | ██░░░░░░░░ | 0,0364 km² đi được (bao 0,0833); 1 vùng liên tục; `khupho`, `testbus`, `roomv2` vẫn là **route riêng**, chưa nối thành một bản đồ |
 | D2 | Mật độ môi trường | **3** | ███░░░░░░░ | PBR thật (`pbrTextures.ts`), biển hiệu neon, mưa ướt, Chợ Lớn, Landmark 81, Bitexco; nhưng mặt tiền lặp mẫu |
 | D3 | Sinh hoạt & AI | **3** | ███░░░░░░░ | Traffic manager + làn xe, `humanPresence`, `storyNpcs`, phản ứng va chạm; thiếu lịch trình theo giờ/ quận |
 | D4 | Di chuyển & phương tiện | **3** | ███░░░░░░░ | đi/chạy, xe máy Q9, buýt 06, xe ôm; camera & đèn tốt; thiếu ô tô tự lái trong chương, physics va chạm nông |
@@ -179,7 +179,7 @@ mình bằng điểm kỹ thuật cao.)
 | Khoảng trống | Chiều | Việc vá (task trong plan) |
 |---|---|---|
 | Không có nhạc trong chương; `musicVolume` chết | D9 | T10–T17 |
-| Ba thế giới rời rạc, 0,063 km² | D1, D5 | T20–T23 |
+| Ba thế giới rời rạc, 0,0364 km² đi được | D1, D5 | T20–T23 |
 | Mặt tiền lặp, thiếu điểm vào | D2, D5 | T21–T24 |
 | Thiếu lịch sinh hoạt theo giờ/quận | D3 | T25 |
 | Không có lớp nhiệm vụ lẻ/hoạt động | D6, D11 | T30–T38 |
@@ -196,7 +196,7 @@ Không đặt mục tiêu 9 km². Đặt mục tiêu **mật độ ngang Gangsta
 
 | Chỉ số | Hiện tại | M1 (sau W1) | M2 (sau W2) | M3 (sau W3) |
 |---|---|---|---|---|
-| Diện tích liên tục | 0,063 km² | 0,063 | **0,35 km²** (≈ 5,5×) | 0,35 |
+| Diện tích liên tục | 0,0364 km² | 0,0364 | **0,35 km²** (≈ 9,6×) | 0,35 |
 | Quận liên tục | 2 (Q10, Q1) + Chợ Lớn | 2 | **7** | 7 |
 | Địa điểm vào được (nội thất) | 1 (phòng trọ) | 1 | **5** | 5 |
 | Điểm tương tác có tên (POI) | ~12 | 12 | **40** | 55 |

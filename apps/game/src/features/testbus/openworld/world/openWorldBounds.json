@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "units": "metres",
+  "note": "The walkable footprint of the Saigon open world, as axis-aligned rectangles in world XZ. This is the same data `isWithinOpenWorld` uses; the audit script and the bounds tests read it too, so the number in the docs cannot drift from the number in the game.",
+  "rects": [
+    { "id": "ly-thai-to", "name": "Hẻm 462/14 · Lý Thái Tổ", "district": "Quận 10", "x0": -19.5, "x1": 7.0, "z0": -316, "z1": 48 },
+    { "id": "market-pocket", "name": "Hẻm chợ phía tây", "district": "Quận 10", "x0": -25.0, "x1": -19.5, "z0": -152, "z1": -104 },
+    { "id": "courtyard", "name": "Sân nhà trọ 59", "district": "Quận 10", "x0": 4.5, "x1": 31.8, "z0": -19.2, "z1": -6.6 },
+    { "id": "dai-lo-1", "name": "Đại lộ 3/2 (bắc)", "district": "Quận 10 → Quận 1", "x0": 0, "x1": 132, "z0": -86.6, "z1": -65.4 },
+    { "id": "dai-lo-2", "name": "Đại lộ 3/2 (nam)", "district": "Quận 3 → Quận 1", "x0": 0, "x1": 132, "z0": -157.6, "z1": -136.4 },
+    { "id": "hai-trieu", "name": "Hải Triều", "district": "Quận 1", "x0": 46, "x1": 66, "z0": -236, "z1": -65.6 },
+    { "id": "east-boulevard", "name": "Đại lộ Đông", "district": "Quận 1", "x0": 66, "x1": 122, "z0": -213, "z1": -157 },
+    { "id": "riverside", "name": "Bến sông", "district": "Bình Thạnh", "x0": -18, "x1": 96, "z0": -316.4, "z1": -295.6 },
+    { "id": "landmark-plaza", "name": "Quảng trường Landmark 81", "district": "Bình Thạnh", "x0": -54, "x1": 106, "z0": -400, "z1": -316.4 }
+  ],
+  "pois": [
+    { "id": "room", "name": "Phòng 6.07", "x": 22, "z": -16.8 },
+    { "id": "bus-stop", "name": "Trạm buýt 06", "x": 1.6, "z": -2 },
+    { "id": "cho-lon", "name": "Chợ Lớn", "x": -20.6, "z": -128 },
+    { "id": "bitexco", "name": "Bitexco", "x": 94, "z": -186 },
+    { "id": "landmark81", "name": "Landmark 81", "x": 26, "z": -356 }
+  ],
+  "walkSpeedMetresPerSecond": 1.4
+}

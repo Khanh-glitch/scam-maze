@@ -1,0 +1,108 @@
+{
+  "generatedAt": "2026-11-27T10:38:05.707Z",
+  "units": "metres",
+  "bbox": {
+    "x0": -54,
+    "x1": 132,
+    "z0": -400,
+    "z1": 48,
+    "width": 186,
+    "depth": 448,
+    "areaKm2": 0.0833
+  },
+  "walkable": {
+    "areaM2": 36392,
+    "areaKm2": 0.0364,
+    "percentOfBbox": 43.7,
+    "components": 1,
+    "largestComponentM2": 36392,
+    "rectAreaSumM2": 38142,
+    "doubleCountedM2": 1750
+  },
+  "rectGraph": {
+    "nodes": 9,
+    "edges": [
+      [
+        "ly-thai-to",
+        "market-pocket"
+      ],
+      [
+        "ly-thai-to",
+        "courtyard"
+      ],
+      [
+        "ly-thai-to",
+        "dai-lo-1"
+      ],
+      [
+        "ly-thai-to",
+        "dai-lo-2"
+      ],
+      [
+        "ly-thai-to",
+        "riverside"
+      ],
+      [
+        "dai-lo-1",
+        "hai-trieu"
+      ],
+      [
+        "dai-lo-2",
+        "hai-trieu"
+      ],
+      [
+        "dai-lo-2",
+        "east-boulevard"
+      ],
+      [
+        "hai-trieu",
+        "east-boulevard"
+      ],
+      [
+        "riverside",
+        "landmark-plaza"
+      ]
+    ],
+    "cycleRank": 2
+  },
+  "pois": {
+    "room": {
+      "metres": 0,
+      "minutes": 0
+    },
+    "bus-stop": {
+      "metres": 36,
+      "minutes": 0.4
+    },
+    "cho-lon": {
+      "metres": 154,
+      "minutes": 1.8
+    },
+    "bitexco": {
+      "metres": 272,
+      "minutes": 3.2
+    },
+    "landmark81": {
+      "metres": 374,
+      "minutes": 4.5
+    }
+  },
+  "farthestFromRoomMetres": 498,
+  "poiDensityPerKm2": 137.4,
+  "meanPoiSpacingMetres": 85,
+  "poiCoverage": {
+    "fortyFiveSecondsMetres": 63,
+    "within30mM2": 6187,
+    "within45sM2": 18782,
+    "within90mM2": 28176,
+    "pctWithin45s": 52,
+    "uncoveredM2": 17610,
+    "medianNearestPoiMetres": 61.5,
+    "meanNearestPoiMetres": 65.6,
+    "worstNearestPoiMetres": 202
+  },
+  "roads": {
+    "count": 8,
+    "blockedRuns": []
+  }
+}

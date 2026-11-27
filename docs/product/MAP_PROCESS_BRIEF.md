@@ -5,7 +5,8 @@
 > quy trình; kết quả từng bước ghi vào [EVIDENCE_LOG.md](./EVIDENCE_LOG.md).
 >
 > **Liên quan:** [BENCHMARK_GTA_STANDARD.md](./BENCHMARK_GTA_STANDARD.md) (chuẩn & điểm),
-> [UPGRADE_PLAN_MUSIC_MAP_MISSIONS.md](./UPGRADE_PLAN_MUSIC_MAP_MISSIONS.md) (§5 — W2, task T20–T29).
+> [UPGRADE_PLAN_MUSIC_MAP_MISSIONS.md](./UPGRADE_PLAN_MUSIC_MAP_MISSIONS.md) (§5 — W2, task T20–T29),
+> [MAP_AUDIT.md](./MAP_AUDIT.md) (bản đồ đã đo + ảnh + danh sách lỗi D1–D8).
 > **Ngày:** 27/11/2026 · **Nhánh:** `arena/f56eaa67-scam-maze` · **Mốc code:** `86725f2`.
 
 ---
@@ -172,7 +173,8 @@ Ba điều rút ra, không phải để copy bản đồ:
 ### M1 — Đo trước khi vẽ (baseline, 1 phiên)
 
 - Script đếm: diện tích bao, số quận, POI, địa danh, số dòng world, số GLB, draw call/fps ở 3 điểm.
-- Kết quả hiện tại: **0,063 km²**, 157 × 404 m, **4 quận có tên** (Q10, Q5, Q1, Bình Thạnh),
+- Kết quả hiện tại: **0,0364 km² đi được** trong bao 186 × 448 m (**0,0833 km²**), **4 quận có tên**
+  (Q10, Q5, Q1, Bình Thạnh),
   6 landmark (`room/balcony/hem/bus/bitexco/landmark81`), ~13.300 dòng trong `openworld/world` (kể cả test), 41 GLB/73 MB.
 - **Không có baseline thì mọi so sánh sau đó là cảm tính.**
 
@@ -267,7 +269,8 @@ V1 là **lát cắt dọc**: một quận đầy đủ còn hơn bảy quận d�
 
 | Chỉ số | Giá trị | Nguồn |
 |---|---|---|
-| Bao vùng chơi | x ∈ [−25, 132], z ∈ [−356, 48] → **0,063 km²** | `saigonDistricts.ts:2406` |
+| Bao vùng chơi | x ∈ [−54, 132], z ∈ [−400, 48] → 186 × 448 m = **0,0833 km²** | `node apps/game/scripts/audit-world.mjs` |
+| Diện tích đi được | **36.392 m² = 0,0364 km²** (43,7 % bao), 1 vùng liên tục, 9 hình chữ nhật | `openWorldBounds.json` + audit (xem `MAP_AUDIT.md`) |
 | Quận có tên | Q10, Q5, Q1, Bình Thạnh (+ "Q10 → Q1") | `grep district` trong `openworld/world` |
 | Landmark | 6 (`room, balcony, hem, bus, bitexco, landmark81`) | `OpenWorldEngine.ts:81` |
 | Dòng code world | `saigonDistricts` 2.665 + `choLon` 1.339 + riverside 284 + streamer 161 + PBR 531 | `wc -l` |

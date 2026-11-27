@@ -14,7 +14,8 @@ Máy đo: workspace này, `pnpm@10.26.0`, Node 22, Chromium (qua Vite dev server
 
 | Việc | Lệnh / cách đo | Kết quả |
 |---|---|---|
-| Diện tích vùng chơi liên tục | đọc `isWithinOpenWorld` trong `apps/game/src/features/testbus/openworld/world/saigonDistricts.ts:2406-2412` | x ∈ [−25, 132], z ∈ [−356, 48] → 157 × 404 m = **0,0634 km²** |
+| Diện tích vùng chơi liên tục | `node apps/game/scripts/audit-world.mjs` (lưới 0,5 m trên `openWorldBounds.json`) | Bao x ∈ [−54, 132], z ∈ [−400, 48] → 186 × 448 m = **0,0833 km²**; phần đi được thật **36.392 m² = 0,0364 km² (43,7 % bao)** |
+| Hình dạng vùng chơi | `docs/product/audit/openworld-plan.png` | 9 hình chữ nhật, 1 vùng liên tục, **0** đoạn đường vẽ bị chặn (sau khi sửa 3 lỗi ghi ở `MAP_AUDIT.md`) |
 | Số flag khai báo | `sed -n 33,122p apps/game/src/game/narrative/resources.ts \| grep -c '^  "'` | **45** |
 | Flag đã được ghi | `grep -rho 'setPersistent", flag: "[a-zA-Z]*"' apps/game/src/game/narrative/chapter1/*.ts \| sort -u \| wc -l` | **37** (8 để dành) |
 | Nhiệm vụ đang chạy | `apps/game/src/game/narrative/activeScenario.ts` → `LAST_SUBMISSION_SCENARIO` | M01, 2 offer, M02, parcel |

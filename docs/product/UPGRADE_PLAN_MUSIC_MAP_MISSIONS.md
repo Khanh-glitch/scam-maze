@@ -104,7 +104,7 @@ Ngân sách hiệu năng áp cho **mọi** task W2/W3 (đo trên máy dev, Chrom
 | **T00** | Chốt rubric 10 chiều + điểm gốc | Đo từ code như §3 benchmark; mỗi điểm kèm bằng chứng file/dòng | `docs/product/BENCHMARK_GTA_STANDARD.md` | Bảng điểm có ≥ 1 bằng chứng/chiều; trung bình 2,2/5 khớp số liệu |
 | **T01** | Chuẩn hoá nhãn trạng thái & nguồn chuẩn | Rà `docs/`: tài liệu nào canonical, tài liệu nào cũ; gắn nhãn | Mục "Canonical" trong 2 tài liệu mới; sửa chỗ mâu thuẫn | Không còn 2 tài liệu cùng nhận là chuẩn cho một chủ đề |
 | **T02** | Sổ bằng chứng (evidence log) | Mỗi task một dòng: ID, ngày, lệnh đã chạy, số test, số đo | `docs/product/EVIDENCE_LOG.md` | Có dòng cho T00–T02; mỗi dòng tái lập được |
-| **T03** | Cổng đo tự động | Script đếm nội dung (nhiệm vụ/flag/POI/diện tích) + probe fps/memory trong dev | `apps/game/src/game/devtools/contentMetrics.ts` + test; `docs` ghi ngưỡng | Test đếm ra đúng số hiện tại (2 mission chính, 2 offer, 45 flag, 0,063 km²) |
+| **T03** | Cổng đo tự động | Script đếm nội dung (nhiệm vụ/flag/POI/diện tích) + probe fps/memory trong dev | `apps/game/src/game/devtools/contentMetrics.ts` + test; `docs` ghi ngưỡng | Test đếm ra đúng số hiện tại (2 mission chính, 2 offer, 45 flag, 0,0364 km² đi được) |
 | **T04** | Backlog chuẩn hoá | Bảng task ID + phụ thuộc + DoD + ước lượng (chính tài liệu này, §4–§6) | Tài liệu này | Mỗi task có ID, phụ thuộc, kết quả, nghiệm thu; không task nào mồ côi |
 
 ### 3.2 Định nghĩa "task" từ nay
@@ -190,6 +190,8 @@ chủ đích ở cảnh căng thẳng cao nhất (dừng nhạc 2 s trước khi
 
 **Quy trình thi công (phi tuyến, đọc gì, dùng gì, nghiệm thu tầng nào):**
 [MAP_PROCESS_BRIEF.md](./MAP_PROCESS_BRIEF.md).
+**Kiểm toán bản đồ hiện tại (số đo, ảnh plan, 8 lỗi D1–D8, ngưỡng đạt):**
+[MAP_AUDIT.md](./MAP_AUDIT.md) — chạy lại bằng `node apps/game/scripts/audit-world.mjs` (exit 1 nếu lỗi).
 
 ### 5.1 Nguyên tắc
 
