@@ -1,5 +1,9 @@
 # Chuẩn thẩm mỹ & độ thật — Sài Gòn 2026, ngang tầm GTA
 
+> **Đọc kèm:** [WORKING_PRINCIPLES.md](./WORKING_PRINCIPLES.md) — 4 nguyên tắc làm việc (phi tuyến,
+> nghiên cứu ở mọi mắt xích, thừa kế trước khi viết, thế giới không phải checklist). Các ngưỡng dưới
+> đây là **sàn**, không phải trần.
+>
 > **Vì sao có file này:** tiêu chí cũ ("đẹp, thật, usable, không lỗi") vẫn cho phép một đầu ra là
 > **những khối ô rời rạc có chữ** — và đúng là bản đồ audit hôm trước trông như vậy. File này tách
 > hai thứ ra, rồi đặt chuẩn riêng cho từng thứ. Chuẩn thẩm mỹ lấy **GTA VI (ra 19/11/2026)** làm mốc;

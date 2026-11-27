@@ -4,7 +4,9 @@
 > thẳng "vẽ thêm đường → xong", mà là một vòng lặp có ràng buộc chéo. Tài liệu này là hợp đồng
 > quy trình; kết quả từng bước ghi vào [EVIDENCE_LOG.md](./EVIDENCE_LOG.md).
 >
-> **Liên quan:** [BENCHMARK_GTA_STANDARD.md](./BENCHMARK_GTA_STANDARD.md) (chuẩn & điểm),
+> **Liên quan:** [WORKING_PRINCIPLES.md](./WORKING_PRINCIPLES.md) (4 nguyên tắc: phi tuyến, nghiên cứu
+> liên tục, thừa kế, thế giới phải đứng độc lập),
+> [BENCHMARK_GTA_STANDARD.md](./BENCHMARK_GTA_STANDARD.md) (chuẩn & điểm),
 > [UPGRADE_PLAN_MUSIC_MAP_MISSIONS.md](./UPGRADE_PLAN_MUSIC_MAP_MISSIONS.md) (§5 — W2, task T20–T29),
 > [MAP_AUDIT.md](./MAP_AUDIT.md) (bản đồ đã đo + ảnh + danh sách lỗi D1–D8).
 > **Ngày:** 27/11/2026 · **Nhánh:** `arena/f56eaa67-scam-maze` · **Mốc code:** `86725f2`.
