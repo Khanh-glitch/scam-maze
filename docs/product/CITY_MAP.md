@@ -285,6 +285,25 @@ Tham số QA trên trang (chỉ để kiểm bằng mắt, mặc định vẫn l
 mái bằng chiếm ưu thế làm ảnh trên không hơi "sa bàn"; hàng cây và vật thể vỉa hè còn thưa; chưa có
 người/xe máy chuyển động.
 
+## 4e. Đưa "phố" vào hình học: dây điện, xe máy, tầng trệt chia căn
+
+Ảnh tham chiếu (phố Phan Tôn, quận 1) cho thấy ba thứ quyết định cảm giác "phố Sài Gòn", mà bản dựng
+trước đó **không có cái nào**:
+
+| Thứ | Trước | Nay |
+|---|---|---|
+| Dây điện | không có | cột bê tông 8,4 m cách 26 m, 3 sợi dọc hè + sợi bắc ngang phố, võng 0,4–0,6 m (`rz` mới trong `Part`) |
+| Xe máy dựng hè | 0 | ~2 800 xe dựng nghiêng 26° sát bó vỉa, 2 bánh là trụ nằm ngang (`rx`) |
+| Tầng trệt | một dải xám liền suốt mặt tiền | chia 3–4 m một căn, mỗi căn cửa cuốn + băng hiệu màu riêng |
+| Mặt đứng | 4 × 4 cửa sổ kéo lên cả tường | UV theo mét; dầm sàn, máy lạnh, ống thoát nước nằm trong vân |
+| Mái hiên | 0,72 m | 1,5 m, che hè, có bóng đổ |
+
+`Part` có thêm `rx`/`rz` (quay theo thứ tự X → Z → Y) nên dây võng và bánh xe nằm ngang dựng được bằng
+đúng một instance mỗi khối. Trình xem trước `city-mesh-preview.ts` **bỏ qua** hai góc này (chỉ ảnh hưởng
+dây/bánh) — kiểm bằng ảnh chụp thật.
+
+Số khối: 44 175 → **97 331** (vẫn dưới ngưỡng `maxParts` 120 000).
+
 ## 5. Giới hạn — cái bài đo này **không** nói được
 
 - Khung hình `/saigon` đã được chụp thật (§4d) bằng Chromium + SwiftShader ở 1152 × 720. Nhưng đó là

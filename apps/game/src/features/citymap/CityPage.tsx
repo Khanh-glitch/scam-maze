@@ -52,32 +52,51 @@ const facadeTexture = (): THREE.Texture => {
   c.height = S;
   const g = c.getContext("2d");
   if (g) {
-    g.fillStyle = "#f4f1ea";
+    g.fillStyle = "#efebe2";
     g.fillRect(0, 0, S, S);
-    for (let i = 0; i < 2200; i += 1) {
-      g.fillStyle = `rgba(120,110,100,${0.015 + Math.random() * 0.03})`;
-      g.fillRect(Math.random() * S, Math.random() * S, 3, 3);
+    // vôi loang
+    for (let i = 0; i < 2600; i += 1) {
+      g.fillStyle = `rgba(118,108,96,${0.012 + Math.random() * 0.03})`;
+      g.fillRect(Math.random() * S, Math.random() * S, 3 + Math.random() * 4, 3);
     }
-    // 4 × 4 ô cửa: khung đậm, kính xám xanh, bệ cửa sáng. Tương phản vừa phải — cửa sổ đen tuyền
-    // lặp lại trên mọi toà làm cả thành phố đọc ra "tấm lưới chấm".
+    // Dầm sàn: đường ngang mỗi 60 px ≈ 3,4 m. Đây là chi tiết quyết định — thiếu nó, mặt tường
+    // 20 m chỉ là một mảng phẳng dán hình cửa sổ.
+    for (let r = 0; r < 4; r += 1) {
+      const y = 8 + r * 60;
+      g.fillStyle = "rgba(96,90,82,0.30)";
+      g.fillRect(0, y, S, 3);
+      g.fillStyle = "rgba(255,255,255,0.30)";
+      g.fillRect(0, y + 3, S, 2);
+    }
+    // 4 × 4 ô cửa: khung đậm, kính xám xanh, bệ cửa sáng, có ô lắp máy lạnh
     for (let r = 0; r < 4; r += 1) {
       for (let col = 0; col < 4; col += 1) {
-        const x = 14 + col * 60;
-        const y = 18 + r * 60;
-        g.fillStyle = "rgba(56,64,76,0.30)";
-        g.fillRect(x, y, 34, 30);
-        g.fillStyle = "rgba(255,255,255,0.35)";
-        g.fillRect(x, y + 30, 34, 3);
-        g.fillStyle = "rgba(40,44,52,0.12)";
-        g.fillRect(x, y - 3, 34, 3);
-        g.fillStyle = "rgba(150,160,172,0.22)";
-        g.fillRect(x + 2, y + 2, 14, 11);
+        const x = 16 + col * 60;
+        const y = 20 + r * 60;
+        g.fillStyle = "rgba(44,52,64,0.46)";
+        g.fillRect(x, y, 33, 29);
+        g.fillStyle = "rgba(150,163,175,0.30)";
+        g.fillRect(x + 2, y + 2, 13, 11);
+        g.fillStyle = "rgba(255,255,255,0.40)";
+        g.fillRect(x, y + 29, 33, 3);
+        g.fillStyle = "rgba(38,42,50,0.16)";
+        g.fillRect(x, y - 3, 33, 3);
+        if (Math.random() > 0.78) {
+          g.fillStyle = "rgba(206,206,200,0.85)";
+          g.fillRect(x + 4, y + 32, 15, 8);
+          g.fillStyle = "rgba(70,72,74,0.5)";
+          g.fillRect(x + 4, y + 38, 15, 2);
+        }
       }
     }
-    // dải sàn giữa các tầng
-    for (let r = 0; r < 4; r += 1) {
-      g.fillStyle = "rgba(90,86,80,0.13)";
-      g.fillRect(0, 8 + r * 60, S, 3);
+    // ống thoát nước chạy dọc mép tấm vân: mỗi 13,5 m một ống, đúng nhịp nhà phố
+    g.fillStyle = "rgba(104,100,94,0.55)";
+    g.fillRect(0, 0, 5, S);
+    g.fillStyle = "rgba(255,255,255,0.22)";
+    g.fillRect(5, 0, 1, S);
+    for (let k = 0; k < 4; k += 1) {
+      g.fillStyle = "rgba(70,68,64,0.5)";
+      g.fillRect(0, 14 + k * 60, 8, 4);
     }
   }
   const t = new THREE.CanvasTexture(c);
@@ -123,7 +142,8 @@ const addInstanced = (
   const scale = new THREE.Vector3();
   const color = new THREE.Color();
   parts.forEach((p, i) => {
-    e.set(0, p.ry ?? 0, 0);
+    // Thứ tự quay: X (bánh xe nằm ngang) → Z (dây võng) → Y (hướng phố).
+    e.set(p.rx ?? 0, p.ry ?? 0, p.rz ?? 0, "YZX");
     q.setFromEuler(e);
     pos.set(p.x, p.y, p.z);
     scale.set(p.sx, p.sy, p.sz);
@@ -281,7 +301,7 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     // thì vượt ngân sách khung hình của máy yếu, nên dùng sáng hai chiều + sương làm độ sâu.
     const sunLevel = Number(new URLSearchParams(window.location.search).get("sun"));
     const sun = new THREE.DirectionalLight("#ffe6c8", Number.isFinite(sunLevel) && qs.has("sun") ? sunLevel : 1.9);
-    sun.position.set(-600, 700, 900);
+    sun.position.set(-520, 1150, 640);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.camera.left = -900;
@@ -295,7 +315,7 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     scene.add(sun);
     scene.add(sun.target);
     const hemiLevel = Number(qs.get("hemi"));
-    scene.add(new THREE.HemisphereLight("#b7cbe2", "#5c5343", qs.has("hemi") && Number.isFinite(hemiLevel) ? hemiLevel : 2.0));
+    scene.add(new THREE.HemisphereLight("#b3c0cf", "#5f5748", qs.has("hemi") && Number.isFinite(hemiLevel) ? hemiLevel : 2.0));
 
     const num = (k: string, d: number) => {
       const v = Number(qs.get(k));
@@ -408,7 +428,7 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
       if (sun.target.position.distanceToSquared(new THREE.Vector3(target.x, 0, target.z)) > 400) {
         renderer.shadowMap.needsUpdate = true;
       }
-      sun.position.set(target.x - 700, 850, target.z + 900);
+      sun.position.set(target.x - 520, 1150, target.z + 640);
       sun.target.position.set(target.x, 0, target.z);
       sky.position.set(camera.position.x, 0, camera.position.z);
       renderer.render(scene, camera);

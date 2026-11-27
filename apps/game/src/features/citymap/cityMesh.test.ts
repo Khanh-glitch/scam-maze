@@ -47,7 +47,7 @@ describe("buildCityMesh", () => {
 
   it("đường có bó vỉa: vỉa hè cao hơn lòng đường", () => {
     const road = mesh.flat.filter((b) => b.color === "#5a5964" || b.color === "#605e6b");
-    const walk = mesh.flat.filter((b) => b.color === "#9b98a1");
+    const walk = mesh.flat.filter((b) => b.color === "#8e8b86");
     expect(road.length).toBeGreaterThan(50);
     expect(walk.length).toBeGreaterThan(50);
     const roadTop = Math.max(...road.map((b) => b.y + b.sy));

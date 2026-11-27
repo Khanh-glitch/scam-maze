@@ -21,6 +21,10 @@ export interface Part {
   sz: number;
   /** Góc quay quanh trục đứng (radian). */
   ry?: number;
+  /** Quay quanh trục z cục bộ — dùng cho dây điện võng xuống (radian). */
+  rz?: number;
+  /** Quay quanh trục x cục bộ — dùng cho bánh xe nằm ngang (radian). */
+  rx?: number;
   color: string;
 }
 
@@ -54,7 +58,7 @@ export interface CityMesh {
 }
 
 const WALL: Record<string, string[]> = {
-  residential: ["#c8a878", "#d8c39a", "#b98d63", "#cbb492", "#9fb7a4", "#b7a9bd", "#d9b7a0"],
+  residential: ["#ddd6c6", "#cfd6c9", "#c4d0d3", "#dcc9bd", "#c8a878", "#c0b2c4", "#e4e0d5", "#b9c6b9"],
   market: ["#c98f5a", "#b7743f", "#d3a06b", "#a8724a", "#cfae7d"],
   tourist: ["#9aa8b4", "#b9b2a0", "#8d9aa6", "#c6b79e", "#a5b0a8"],
   corporate: ["#8b8f96", "#6f7a86", "#a19c92", "#7b828c", "#8d9aa0"],
@@ -80,6 +84,10 @@ const SHOP_COLOR: Record<string, string> = {
   boarding: "#7a5f52", room: "#8a6a52", market: "#b7743f", office: "#4a5a6a",
 };
 const AWNING = ["#b8452f", "#2f6b7a", "#c2762f", "#3f7a55", "#a8443f"];
+/** Biển dọc (banner) trước cửa hàng: đỏ–xanh–vàng bão hoà, đúng kiểu phố buôn bán. */
+const BANNER = ["#c0392b", "#1f4e79", "#d4a017", "#20694f", "#a12b4a", "#2d6ca8", "#c25a12"];
+const BIKE = ["#22242a", "#2e3440", "#8b1f24", "#1f3f6b", "#c9c9cc", "#3a4a3a", "#6b6f76"];
+const WIRE_SHADES = ["#24262b", "#2b2f36", "#1d2024"];
 
 const hash01 = (n: number): number => {
   const s = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
@@ -186,7 +194,7 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
             x: ax + (bx - ax) * mid + Math.sin(ry) * off * sgn,
             y: 0.05,
             z: az + (bz - az) * mid + Math.cos(ry) * off * sgn,
-            sx: segLen, sy: 0.12, sz: walk, ry, color: "#9b98a1",
+            sx: segLen, sy: 0.12, sz: walk, ry, color: "#8e8b86",
           });
         }
       }
@@ -235,15 +243,26 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
       const wallPlane = side === "n" ? b.z0 : side === "s" ? b.z1 : side === "w" ? b.x0 : b.x1;
       const outDir = side === "n" || side === "w" ? -1 : 1;
       const shopC = SHOP_COLOR[b.kind] ?? "#6a6472";
-      const decal = (y: number, hh: number, deep: number, out: number, szAlong: number, color: string) => {
+      const decal = (y: number, hh: number, deep: number, out: number, szAlong: number, color: string, along = 0) => {
         const off = wallPlane + outDir * (out + deep / 2);
         push(details, alongX
-          ? { x: cx, y, z: off, sx: szAlong, sy: hh, sz: deep, color }
-          : { x: off, y, z: cz, sx: deep, sy: hh, sz: szAlong, color });
+          ? { x: cx + along, y, z: off, sx: szAlong, sy: hh, sz: deep, color }
+          : { x: off, y, z: cz + along, sx: deep, sy: hh, sz: szAlong, color });
       };
       if (facadeH > 3.2) {
-        decal(0.16, Math.min(2.75, facadeH * 0.6), 0.12, 0.02, faceLen, shopC);
-        decal(Math.min(2.9, facadeH * 0.6), Math.min(0.85, facadeH * 0.2), 0.14, 0.02, faceLen, mixHex(shopC, "#ffffff", 0.18));
+        // Chân tường bẩn: mọi bức tường phố thật đều có vệt ẩm/moss ở 0,8 m sát đất.
+        decal(0.0, 0.85, 0.05, 0.0, faceLen, mixHex(base, "#3a352e", 0.34));
+        // Tầng trệt KHÔNG phải một dải liền: mỗi mặt tiền là 3–6 căn hộ nhỏ 3–4 m, mỗi căn một màu
+        // cửa cuốn và một băng hiệu riêng. Một dải liền suốt 20 m đọc ra "toà nhà có chân màu xám".
+        const shops = Math.max(1, Math.round(faceLen / 3.7));
+        const segLen = faceLen / shops;
+        for (let k = 0; k < shops; k += 1) {
+          const along = -faceLen / 2 + (k + 0.5) * segLen;
+          const pick = SHOP_COLOR[Object.keys(SHOP_COLOR)[Math.floor(hash01(b.x0 * 2.7 + b.z1 + k * 3.1) * Object.keys(SHOP_COLOR).length)]];
+          const shutter = mixHex(mixHex(shopC, pick, 0.5), k % 2 === 0 ? "#ffffff" : "#2a2a2a", 0.14 + hash01(b.x1 + k) * 0.2);
+          decal(0.16, Math.min(2.75, facadeH * 0.6), 0.12, 0.02, segLen * 0.84, shutter, along);
+          decal(Math.min(2.9, facadeH * 0.6), Math.min(0.8, facadeH * 0.19), 0.14, 0.02, segLen * 0.9, mixHex(pick, "#ffffff", 0.15), along);
+        }
       }
       // Mái hiên bạt: TỪNG TẤM 3–4 m có khe, không phải một tấm dài bằng cả dãy nhà.
       if ((klass === "residential" || klass === "market") && facadeH > 4.6 && facadeH < 26) {
@@ -252,11 +271,17 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
         for (let k = 0; k < pieces; k += 1) {
           const segLen = (faceLen / pieces) * 0.82;
           const centreT = (k + 0.5) / pieces;
-          const off = wallPlane + outDir * 0.34;
+          // Mái hiên bạt vươn 1,5 m ra hè: che nắng và tạo bóng đổ trên vỉa hè — đúng ảnh tham chiếu.
+          const off = wallPlane + outDir * 0.72;
           push(details, alongX
-            ? { x: b.x0 + 0.25 + faceLen * centreT, y: 3.55, z: off, sx: segLen, sy: 0.1, sz: 0.72, color: aw }
-            : { x: off, y: 3.55, z: b.z0 + 0.25 + faceLen * centreT, sx: 0.72, sy: 0.1, sz: segLen, color: aw });
+            ? { x: b.x0 + 0.25 + faceLen * centreT, y: 3.25, z: off, sx: segLen, sy: 0.09, sz: 1.5, color: aw }
+            : { x: off, y: 3.25, z: b.z0 + 0.25 + faceLen * centreT, sx: 1.5, sy: 0.09, sz: segLen, color: aw });
         }
+      }
+      // biển dọc trước cửa: mảng màu bão hoà, đúng chất phố buôn bán
+      if (facadeH > 4.4 && hash01(b.x0 * 2.3 + b.z1 * 6.1) > 0.42) {
+        const bc = BANNER[Math.floor(hash01(b.x1 + b.z0) * BANNER.length) % BANNER.length];
+        decal(3.25, 2.15, 0.09, 0.05, 0.8, bc);
       }
       // biển hiệu nhô vuông góc
       if (facadeH > 5 && hash01(b.z0 + b.x1) > 0.55) {
@@ -264,6 +289,17 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
         push(details, alongX
           ? { x: b.x0 + w * 0.35, y: 3.6, z: off, sx: 0.16, sy: 1.25, sz: 0.85, color: shopC }
           : { x: off, y: 3.6, z: b.z0 + d * 0.35, sx: 0.85, sy: 1.25, sz: 0.16, color: shopC });
+      }
+      // Dầm sàn hằn ngang mặt đứng + máy lạnh: ở khoảng cách 5 m, một mặt tường chỉ có vân cửa sổ
+      // vẫn đọc ra "tấm bê tông dán hình". Dầm sàn là đường ngang thật, máy lạnh là khối thật.
+      const floorCount = Math.max(1, Math.round(facadeH / 3.2));
+      for (let f = 1; f < floorCount; f += 1) {
+        const fy = f * 3.2;
+        decal(fy - 0.07, 0.17, 0.24, 0.0, faceLen, mixHex(base, "#ffffff", 0.16));
+        if (hash01(b.x0 * 1.9 + b.z1 * 4.3 + f * 7.7) > 0.5 && faceLen > 4) {
+          const along = (hash01(b.x1 + f * 3.3) - 0.5) * (faceLen - 2.2);
+          decal(fy + 0.75, 0.55, 0.36, 0.1, 0.78, "#cfd0cb", along);
+        }
       }
       // ban công nhà ở (2–4 tầng)
       if ((klass === "residential" || klass === "market") && b.floors >= 2 && b.floors <= 4 && faceLen > 3.4) {
@@ -390,6 +426,118 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
       });
     }
   }
+
+
+  // --- điện trên không + xe máy dựng hè: hai thứ "nhìn là biết Sài Gòn" -----------------------------
+  // Ảnh tham chiếu phố Phan Tôn (quận 1): bó dây điện võng ngang mặt phố, xe máy dựng kín hai bên hè.
+  // Thiếu hai thứ này thì phố chỉ là dãy hộp có cửa sổ.
+  let overhead = 0;
+  let bikes = 0;
+  const spanWire = (a: [number, number, number], b: [number, number, number], thick: number, color: string) => {
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const dz = b[2] - a[2];
+    const L = Math.hypot(Math.hypot(dx, dz), dy);
+    if (L < 0.05) return;
+    flatBox({
+      x: (a[0] + b[0]) / 2,
+      y: (a[1] + b[1]) / 2 - thick / 2,
+      z: (a[2] + b[2]) / 2,
+      sx: L, sy: thick, sz: thick,
+      ry: Math.atan2(-dz, dx),
+      rz: Math.asin(Math.max(-1, Math.min(1, dy / L))),
+      color,
+    });
+    overhead += 1;
+  };
+  const parkBike = (x: number, z: number, ry: number, seed: number) => {
+    const dx = Math.cos(ry);
+    const dz = -Math.sin(ry);
+    const c = BIKE[Math.floor(hash01(seed) * BIKE.length) % BIKE.length];
+    flatBox({ x, y: 0.44, z, sx: 1.5, sy: 0.32, sz: 0.4, ry, color: c });
+    flatBox({ x: x - dx * 0.12, y: 0.76, z: z - dz * 0.12, sx: 0.72, sy: 0.1, sz: 0.34, ry, color: "#2a2a2e" });
+    flatBox({ x: x + dx * 0.6, y: 0.92, z: z + dz * 0.6, sx: 0.1, sy: 0.46, sz: 0.62, ry, color: "#3a3a41" });
+    for (const k of [-0.62, 0.6]) {
+      push(drums, {
+        x: x + dx * k, y: 0.31, z: z + dz * k,
+        sx: 0.31, sy: 0.1, sz: 0.31, ry, rx: Math.PI / 2, color: "#232327",
+      });
+    }
+    bikes += 1;
+  };
+
+  for (const s of city.streets) {
+    const w = s.widthM;
+    const walk = s.klass === "alley" ? 0.45 : s.klass === "avenue" ? 2.8 : 1.6;
+    for (let i = 0; i < s.points.length - 1; i += 1) {
+      const [ax, az] = s.points[i];
+      const [bx, bz] = s.points[i + 1];
+      const len = Math.hypot(bx - ax, bz - az);
+      if (len < 10) continue;
+      const ry = -Math.atan2(bz - az, bx - ax);
+      const side = hash01(ax * 3.1 + bz * 1.7 + len) > 0.5 ? 1 : -1;
+      const poleOff = w / 2 + walk * 0.55;
+      const nx = Math.sin(ry) * poleOff * side;
+      const nz = Math.cos(ry) * poleOff * side;
+      // Cột điện bê tông + 4 sợi dây võng giữa hai cột liền nhau.
+      const gaps = Math.max(1, Math.round(len / 26));
+      let prev: [number, number, number] | null = null;
+      for (let k = 0; k <= gaps; k += 1) {
+        const t = k / gaps;
+        const px = ax + (bx - ax) * t + nx;
+        const pz = az + (bz - az) * t + nz;
+        flatBox({ x: px, y: 0, z: pz, sx: 0.24, sy: 8.4, sz: 0.24, color: "#8f8c85" });
+        const here: [number, number, number] = [px, 8.0, pz];
+        // sợi bắc ngang phố, chùng 0,6 m — không có nó thì dây chỉ chạy song song một bên hè
+        if (k % 2 === 0) {
+          const across = w + walk * 2;
+          const ox = px - Math.sin(ry) * across * side;
+          const oz = pz - Math.cos(ry) * across * side;
+          spanWire([px, 7.9, pz], [(px + ox) / 2, 7.3, (pz + oz) / 2], 0.032, "#26282d");
+          spanWire([(px + ox) / 2, 7.3, (pz + oz) / 2], [ox, 7.7, oz], 0.032, "#26282d");
+        }
+        if (prev) {
+          for (let wi = 0; wi < 3; wi += 1) {
+            const h = wi * 0.34;
+            const sag = 0.42 + wi * 0.06;
+            const mid: [number, number, number] = [(prev[0] + here[0]) / 2, (prev[1] + here[1]) / 2 + h - sag, (prev[2] + here[2]) / 2];
+            const a: [number, number, number] = [prev[0], prev[1] + h, prev[2]];
+            const b: [number, number, number] = [here[0], here[1] + h, here[2]];
+            const col = WIRE_SHADES[wi % WIRE_SHADES.length];
+            spanWire(a, mid, 0.034, col);
+            spanWire(mid, b, 0.034, col);
+          }
+        }
+        prev = here;
+      }
+      // Xe máy dựng nghiêng ở hai bên hè (phố ở / phố chính; hẻm thì thưa hơn).
+      if (s.klass !== "bridge") {
+        const step = s.klass === "alley" ? 9 : 6;
+        const n = Math.floor(len / step);
+        for (let k = 0; k < n; k += 1) {
+          const seed = ax * 0.7 + az * 1.3 + k * 2.7 + i;
+          if (hash01(seed) > (s.klass === "alley" ? 0.5 : 0.78)) continue;
+          const sideB = hash01(seed + 11) > 0.5 ? 1 : -1;
+          const bOff = w / 2 + walk * 0.3;
+          const t = (k + 0.5) / n;
+          const px = ax + (bx - ax) * t + Math.sin(ry) * bOff * sideB;
+          const pz = az + (bz - az) * t + Math.cos(ry) * bOff * sideB;
+          const lean = sideB > 0 ? 0.46 : -0.46;
+          parkBike(px, pz, ry + lean + (hash01(seed + 3) - 0.5) * 0.22, seed);
+          if (hash01(seed + 5) > 0.55) {
+            const t2 = t + 1.15 / n;
+            parkBike(
+              ax + (bx - ax) * t2 + Math.sin(ry) * (bOff + 0.1) * sideB,
+              az + (bz - az) * t2 + Math.cos(ry) * (bOff + 0.1) * sideB,
+              ry + lean + (hash01(seed + 7) - 0.5) * 0.22,
+              seed + 17,
+            );
+          }
+        }
+      }
+    }
+  }
+  void overhead;
 
   // --- cây, cột đèn, vật thể vỉa hè -----------------------------------------------------------
   let props = 0;
