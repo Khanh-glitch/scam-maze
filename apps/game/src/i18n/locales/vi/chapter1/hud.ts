@@ -121,6 +121,7 @@ const hud: LocaleShape<typeof en> = {
       tasksHeading: "Nhiệm vụ khóa luận",
       noTasks: "Chưa có nhiệm vụ khóa luận nào.",
       fatigueNote: {
+        rested: "Bạn đang khỏe. Việc khóa luận diễn ra với nhịp bình thường.",
         tired: "Bạn đang mệt. Làm khóa luận mất thêm {{percent}}% thời gian.",
         exhausted: "Bạn đã kiệt sức. Làm khóa luận mất thêm {{percent}}% thời gian.",
       },

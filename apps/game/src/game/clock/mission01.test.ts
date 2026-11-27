@@ -56,9 +56,11 @@ describe("the scenario", () => {
     let state = run([START]);
     expect(status(state, "m01.missing-access")).toBe("open");
     expect(path(state, "m01.missing-access")).toBe("default");
-    expect(selectOpenMissions(state, S).map((mission) => mission.objective)).toEqual([
-      "Finish the draft and confirm that you can reach the submission system.",
-    ]);
+    const openMissions = selectOpenMissions(state, S);
+    expect(openMissions.find((mission) => mission.id === "m01.missing-access")?.objective).toBe(
+      "Finish the draft by Wednesday, 06:00, and confirm you can sign in to submit by Friday, 17:00.",
+    );
+    expect(openMissions.map((mission) => mission.id)).toContain("m01.final-submission");
     expect(Object.hasOwn(state.device.items, "mail.clearance")).toBe(false);
     state = step(state, advance(10));
     const email = selectDeviceView(state, S, "phone").apps.mail.find((item) => item.id === "mail.clearance")!;
@@ -73,23 +75,28 @@ describe("the scenario", () => {
     const phone = selectDeviceView(state, S, "phone");
     expect(ids(phone.apps.messages)).toEqual(["msg.minh"]);
     expect(ids(phone.apps.mail).sort()).toEqual(["mail.library", "mail.print-shop", "mail.supervisor"]);
-    expect(ids(phone.apps.calendar)).toEqual(["cal.draft-deadline", "cal.interview", "cal.final-deadline"]);
+    expect(ids(phone.apps.calendar)).toEqual(["cal.draft-deadline", "cal.interview", "cal.m02-interview", "cal.final-deadline"]);
   });
 });
 
 describe("the draft on the laptop", () => {
-  it("is edited through thesis tasks that cost time and add progress", () => {
+  it("is one task, typing two sentences, that costs time and adds progress", () => {
     let state = run([START]);
-    expect(selectThesisView(state, S).tasks.map((item) => [item.id, item.blocked])).toEqual([
-      ["draft.intro-review", null],
-      ["draft.findings", null],
-      ["draft.final", "locked"],
-    ]);
-    expect(rejection(state, task("draft.final"))).toBe("This thesis task is not available now.");
-    state = run([task("draft.intro-review"), task("draft.findings"), task("draft.final")], state);
+    expect(selectThesisView(state, S).tasks.map((item) => [item.id, item.blocked])).toEqual([["draft.final", null]]);
+    state = run([task("draft.final")], state);
     expect(state.resources.thesisProgress).toBe(67);
-    expect(state.resources.timeMinutes).toBe(CHAPTER_DURATION_MINUTES - 240);
+    expect(state.resources.timeMinutes).toBe(CHAPTER_DURATION_MINUTES - 60);
+    expect(state.persistent.draftFinished).toBe(true);
     expect(status(state, "m01.missing-access")).toBe("completed");
+  });
+
+  it("no longer knows the three reviews it replaced", () => {
+    const state = run([START]);
+    for (const removed of ["draft.intro-review", "draft.findings"]) {
+      const attempt = chapterReducer(state, task(removed), S);
+      expect(attempt.accepted).toBe(false);
+      expect(attempt.state).toBe(state);
+    }
   });
 
   it("goes on after the internal deadline, with the cost of working through the night", () => {
@@ -98,13 +105,13 @@ describe("the draft on the laptop", () => {
     expect(late.persistent.overnightWork).toBe(true);
     expect(late.resources.timeMinutes).toBe(CHAPTER_DURATION_MINUTES - MISSION_01_CONFIG.draftDeadlineMinute - MISSION_01_CONFIG.overnightWorkMinutes);
     // The draft can still be finished, and the overnight work is not reset.
-    const after = run([task("draft.intro-review"), task("draft.findings"), task("draft.final")], late);
+    const after = run([task("draft.final")], late);
     expect(after.resources.thesisProgress).toBe(67);
     expect(after.persistent.overnightWork).toBe(true);
   });
 
   it("does not fail when the draft is done in time", () => {
-    const state = run([START, task("draft.intro-review"), task("draft.findings"), task("draft.final"), advance(MISSION_01_CONFIG.draftDeadlineMinute)]);
+    const state = run([START, task("draft.final"), advance(MISSION_01_CONFIG.draftDeadlineMinute)]);
     expect(status(state, "m01.missing-access")).toBe("completed");
     expect(state.persistent.overnightWork).toBe(false);
   });
@@ -175,9 +182,13 @@ describe("way A: follow the link", () => {
     expect(state.device.ledger.map((entry) => entry.amount)).toEqual([-FEE, -T1.amountVnd, -T2.amountVnd, -T3.amountVnd]);
     expect(state.resources.cash).toBe(2_500_000 - FEE - T1.amountVnd - T2.amountVnd - T3.amountVnd);
     expect(state.resources.cash).toBeLessThan(2_500_000 / 4);
-    expect(ids(selectDeviceView(state, S, "phone").apps.messages)).toEqual(
-      expect.arrayContaining(["msg.bank-alert-1", "msg.bank-alert-2", "msg.bank-alert-3"]),
-    );
+    const alerts = selectDeviceView(state, S, "phone").apps.messages;
+    expect(ids(alerts)).toEqual(expect.arrayContaining(["msg.bank-alert-1", "msg.bank-alert-2", "msg.bank-alert-3"]));
+    [T1, T2, T3].forEach((transfer, index) => {
+      expect(alerts.find((item) => item.id === `msg.bank-alert-${index + 1}`)?.body).toContain(
+        `${transfer.amountVnd.toLocaleString("en-US")} VND`,
+      );
+    });
   });
 
   it("puts every transfer in the ledger at its scheduled minute, even after one long wait", () => {
@@ -318,7 +329,7 @@ describe("way B: verify independently", () => {
   });
 
   it("still lets the player finish the draft and complete the mission", () => {
-    const state = run([...VERIFIED, task("draft.intro-review"), task("draft.findings"), task("draft.final")]);
+    const state = run([...VERIFIED, task("draft.final")]);
     expect(status(state, "m01.missing-access")).toBe("completed");
     expect(state.persistent.schoolAccessVerified).toBe(true);
     // Access was verified, so the question never comes back on Friday.
@@ -370,7 +381,7 @@ describe("way B: verify independently", () => {
 });
 
 describe("way C: ignore the email", () => {
-  const WRITING: CoreAction[] = [START, advance(10), task("draft.intro-review"), task("draft.findings"), task("draft.final")];
+  const WRITING: CoreAction[] = [START, advance(10), task("draft.final")];
 
   it("loses no money and no security, and the mission completes with the access unverified", () => {
     const state = run(WRITING);
@@ -402,7 +413,7 @@ describe("way C: ignore the email", () => {
 
 describe("consequences that last and sync", () => {
   it("restores everything from a save: time, money, security, evidence, flags, missions and the ledger", () => {
-    const actions = [...CODE_GIVEN, advance(T1.afterMinutes + 1), ...REPORT, task("draft.intro-review"), use("contact.bank", "ask-next"), { type: "REST", mode: "nap" } as CoreAction];
+    const actions = [...CODE_GIVEN, advance(T1.afterMinutes + 1), ...REPORT, task("draft.final"), use("contact.bank", "ask-next"), { type: "REST", mode: "nap" } as CoreAction];
     const state = run(actions);
     expect(state.device.ledger).toHaveLength(2);
     const progress = encodeProgress(state, null, "start");
@@ -424,7 +435,7 @@ describe("consequences that last and sync", () => {
   it("never calls an item safe, unsafe or a scam, and shows no score", () => {
     const state = run([...CODE_GIVEN, advance(200)]);
     const views = JSON.stringify([selectDeviceView(state, S, "phone"), selectDeviceView(state, S, "laptop"), selectOpenMissions(state, S)]);
-    expect(views).not.toMatch(/\bsafe\b|unsafe|scam|phish|fake|good|bad|score/i);
+    expect(views).not.toMatch(/\b(safe|unsafe|scam|phish|fake|good|bad|score)\b/i);
   });
 });
 
@@ -448,8 +459,10 @@ describe("Vietnamese text", () => {
     const format = (amount: number) => amount.toLocaleString("de-DE");
     expect(vi_["device/mail.clearance/body"]).toContain(format(FEE));
     expect(vi_["device/page.fee/body"]).toContain(format(FEE));
-    // The alerts never repeat an amount: the ledger is the one place that shows what left.
-    [1, 2, 3].forEach((index) => expect(vi_[`device/msg.bank-alert-${index}/body`]).not.toMatch(/\d/));
+    // Each alert states the exact transfer amount, with Vietnamese thousands separators.
+    [T1, T2, T3].forEach((transfer, index) =>
+      expect(vi_[`device/msg.bank-alert-${index + 1}/body`]).toContain(`${transfer.amountVnd.toLocaleString("de-DE")} VNĐ`),
+    );
   });
 });
 

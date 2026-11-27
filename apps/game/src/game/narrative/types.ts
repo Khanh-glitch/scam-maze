@@ -56,14 +56,22 @@ export type CoreAction =
   | { type: "COMBINE_EVIDENCE"; evidenceIds: EvidenceId[] }
   /** Lets simulated time pass (free roam). Whole minutes, 1 to 4320. Scheduled events and deadlines run in time order. */
   | { type: "ADVANCE_TIME"; minutes: number }
-  /** Works on the thesis for `minutes`. Costs that time and adds progress at the configured rate. */
-  | { type: "WORK_ON_THESIS"; minutes: number }
+  /** Works on the thesis for `minutes`. Optional `focusMode` engages the non-linear Warm-up -> Flow -> Burnout deep-work model. */
+  | { type: "WORK_ON_THESIS"; minutes: number; focusMode?: "normal" | "deep" | "rush"; sessionElapsedMinutes?: number }
+  /** Starts a core-owned work block; any interruption and remaining minutes are persisted in WorldState. */
+  | { type: "START_THESIS_SESSION"; minutes: number; mode: "normal" | "deep" | "rush" }
+  /** Continues the saved remainder of a paused work block. */
+  | { type: "RESUME_THESIS_SESSION" }
+  /** Ends a paused block without losing already committed work. */
+  | { type: "END_THESIS_SESSION" }
+  /** Stores manuscript text in replayable ChapterState for save/load and review validation. */
+  | { type: "SAVE_THESIS_DRAFT"; sectionId: ThesisDraftSectionId; content: string }
   /** Rests: a short break or a night of sleep. Costs the time of the option and lowers fatigue. */
   | { type: "REST"; mode: RestMode }
   /** Answers a pending event with one of its responses: act on it, postpone it or ignore it. */
   | { type: "RESPOND_EVENT"; eventId: string; response: string }
-  /** Completes one thesis task (interview, revision, document check, supervisor confirmation, final version). Costs its time and adds its progress. */
-  | { type: "COMPLETE_THESIS_TASK"; taskId: string }
+  /** Completes one thesis task (optionally using a deliberate review approach). Costs its time and adds its progress. */
+  | { type: "COMPLETE_THESIS_TASK"; taskId: string; approachId?: string }
   /** Opens a message, email, listing, file or appointment on the phone or laptop. The first time it marks it read. Reading costs no time. */
   | { type: "OPEN_DEVICE_ITEM"; itemId: string }
   /** Uses one action of a device item: reply, pay, travel, apply, submit, call. Costs time and cash as the item says. */
@@ -163,11 +171,35 @@ export interface MissionState {
   openedAtMinute: number | null;
   closedAtMinute: number | null;
 }
+export type ThesisDraftSectionId = "introduction" | "findings" | "full-draft";
+export type ThesisInterruptionKind = "story_event" | "device_item" | "eye_strain" | "minh_ping" | "citation_gap";
+export interface ThesisWorkInterruption {
+  id: string;
+  atSessionMinute: number;
+  kind: ThesisInterruptionKind;
+  urgent: boolean;
+  title: { en: string; vi: string };
+  body: { en: string; vi: string };
+  appHint?: "email" | "chat" | "bank" | "phone";
+}
+export interface ThesisWorkSessionState {
+  mode: "normal" | "deep" | "rush";
+  plannedMinutes: number;
+  elapsedMinutes: number;
+  remainingMinutes: number;
+  interruption: ThesisWorkInterruption;
+}
 export interface WorldState {
   /** Only events that have arrived. */
   events: Record<string, EventState>;
   /** Thesis tasks the player completed, in order. */
   thesisTasksDone: string[];
+  /** Sub-percent progress retained between work actions (1 unit = 0.001 percentage point). */
+  thesisWorkRemainderUnits: number;
+  /** Paused work block, persisted by action replay so closing the editor cannot erase its remainder. */
+  thesisWorkSession: ThesisWorkSessionState | null;
+  /** Saved manuscript sections are chapter state, not component-local text. */
+  thesisDraft: Partial<Record<ThesisDraftSectionId, string>>;
   /** Every mission of the scenario. */
   missions: Record<string, MissionState>;
   /** Minutes slept since the last night check. Absent in old states (0). */
@@ -631,6 +663,12 @@ export interface EventResponseDef {
   timeCostMinutes?: number;
   effects?: Effect[];
 }
+export interface ThesisInterruptionMetadata {
+  /** Routine notices may be suppressed by the player's deep-focus mode; urgent notices break through. */
+  urgent: boolean;
+  appHint?: "email" | "chat" | "bank" | "phone";
+}
+
 /** Something that happens to Alex while the clock runs: a message, call, offer or request. */
 export interface GameEventDef {
   id: string;
@@ -642,6 +680,8 @@ export interface GameEventDef {
   optional: boolean;
   /** True: the event resolves as soon as it arrives and waits for no answer (a consequence, such as a bank alert). */
   autoResolve?: boolean;
+  /** Explicit work-session interruption policy; absence means the event does not interrupt writing. */
+  thesisInterruption?: ThesisInterruptionMetadata;
   /** Minutes after it arrives before it expires while still pending. Omit for no expiry. */
   deadlineAfterMinutes?: number;
   onFire?: Effect[];
@@ -704,6 +744,8 @@ export type DeviceKind = "phone" | "laptop";
 export interface ConversationLine {
   speaker: "alex" | "other";
   text: string;
+  /** Stable recording key when this line is voiced; absent lines remain subtitle-only. */
+  voiceId?: string;
 }
 
 export interface DeviceItemActionDef {
@@ -765,6 +807,14 @@ export interface DeviceItemDef {
   folder?: string;
   /** When it arrives. Absent: it is there from the start. */
   arrives?: WorldTrigger;
+  /** Explicit work-session interruption policy; absence means the item does not interrupt writing. */
+  thesisInterruption?: ThesisInterruptionMetadata;
+  /**
+   * A contact who calls Alex (`app: "contacts"`). When it arrives the phone rings until its `call`
+   * action (answered, or called back) or its `decline` action is done. Ringing is presentation only:
+   * the state changes only through those two actions, which the player chooses.
+   */
+  incomingCall?: boolean;
   /** Appointments: start and end, minutes since the chapter started. */
   startsAtMinute?: number;
   endsAtMinute?: number;
@@ -776,10 +826,21 @@ export interface DeviceItemDef {
   figures?: PlatformFiguresDef[];
   actions?: DeviceItemActionDef[];
 }
+/** One way to handle a thesis review: how long it takes, what it gains and what it leaves behind. */
+export interface ThesisApproachDef {
+  id: string;
+  label: string;
+  description?: string;
+  /** Simulated minutes. Falls back to the task's own time cost. */
+  timeCostMinutes?: number;
+  /** Percent added to the thesis progress. Falls back to the task's own gain. */
+  progressGain?: number;
+  effects?: Effect[];
+}
 /**
  * A piece of thesis work that moves the thesis forward by what it achieves, not by waiting. The brief
  * lists them: interviews, editing, document checks, the supervisor's confirmation and the final submission.
- * Each task can be done once.
+ * Each task can be done once. A task with `approaches` is resolved by choosing one of them.
  */
 export interface ThesisTaskDef {
   id: string;
@@ -791,6 +852,8 @@ export interface ThesisTaskDef {
   /** Percent added to the thesis progress. */
   progressGain: number;
   effects?: Effect[];
+  /** Ways to handle the task. When present, `COMPLETE_THESIS_TASK` must name one. */
+  approaches?: ThesisApproachDef[];
 }
 /** Pacing values the brief does not state. Placeholders, configurable per scenario. */
 export interface GameplayConfig {

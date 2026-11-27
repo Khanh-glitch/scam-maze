@@ -55,10 +55,11 @@ describe("routing", () => {
     expect(ACTIVE_SCENARIO).not.toBe(CHAPTER_1_SCENARIO);
   });
 
-  it("defines no story mission yet", () => {
-    for (const key of ["objectives", "interactables", "evidence", "calls", "dialogues", "decisions", "endings", "deviceActions"] as const) {
+  it("does not import the parked story’s fixtures", () => {
+    for (const key of ["objectives", "evidence", "calls", "dialogues", "decisions", "endings", "deviceActions"] as const) {
       expect(Object.keys(ACTIVE_SCENARIO[key]), key).toEqual([]);
     }
+    expect(Object.keys(ACTIVE_SCENARIO.interactables)).toEqual(["obj.note"]);
     expect(ACTIVE_SCENARIO.beats).toEqual([]);
     expect(ACTIVE_SCENARIO.phone.messages).toEqual({});
   });
@@ -101,6 +102,28 @@ describe("a new game", () => {
       goldenPlatformJoined: false,
       goldenFeesPaid: false,
       draftFinished: false,
+      researchSavedChannelIncluded: false,
+      schoolFeeClaimContradicted: false,
+      submissionDeadlineMissed: false,
+      draftSourcesChecked: false,
+      findingsReconciled: false,
+      finalDraftReviewed: false,
+      supervisorFeedbackRequested: false,
+      rideVerifiedIndependently: false,
+      parcelCredentialsExposed: false,
+      parcelFeePaid: false,
+      parcelAtCounter: false,
+      ridePaidOffPlatform: false,
+      rideLostTime: false,
+      interviewArrived: false,
+      interviewStarted: false,
+      interviewCompleted: false,
+      interviewMissed: false,
+      interviewRescheduled: false,
+      interviewEvidenceSaved: false,
+      rideEvidenceSaved: false,
+      driverContactShared: false,
+      minhWarnedAboutRide: false,
     });
   });
 
@@ -286,6 +309,18 @@ describe("determinism, save and load", () => {
       progress: { checkpointId: "start", actions: [], playerPose: null },
     });
     expect(parsed).toMatchObject({ status: "invalid", code: "incompatible" });
-    expect(SAVE_CONTENT_VERSION).toBe("ch1-last-submission-2");
+    expect(SAVE_CONTENT_VERSION).toBe("ch1-last-submission-4");
+  });
+
+  it("reports a save from before the draft became one task (-3) as incompatible", () => {
+    const parsed = parseSaveEnvelopeV3({
+      formatVersion: SAVE_FORMAT_VERSION_V3,
+      contentVersion: "ch1-last-submission-3",
+      chapterId: "chapter-1",
+      sceneId: "apartment",
+      savedAt: "2026-11-24T08:00:00.000Z",
+      progress: { checkpointId: "start", actions: [], playerPose: null },
+    });
+    expect(parsed).toMatchObject({ status: "invalid", code: "incompatible" });
   });
 });

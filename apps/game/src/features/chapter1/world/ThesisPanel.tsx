@@ -46,7 +46,8 @@ export interface ThesisPanelProps {
   timeLeftMinutes: number;
   tasks: readonly ThesisTaskView[];
   onWork: (minutes: number) => void;
-  onTask: (taskId: string) => void;
+  /** Completes a thesis task; the laptop may provide a deliberate review approach. */
+  onTask: (taskId: string, approachId?: string) => boolean | void;
   /** Present when the scenario has fatigue rules: how tired Alex is and how much longer work takes. */
   fatigue?: { level: FatigueLevel; slowdownPercent: number };
   /** Present when the scenario has fatigue rules: the rest options and their length. */

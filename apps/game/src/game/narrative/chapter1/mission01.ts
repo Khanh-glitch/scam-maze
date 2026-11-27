@@ -5,8 +5,9 @@
 //   A. Speed: follow the link. Opening the page costs nothing. Entering the student login can expose it
 //      and opens the SECURITY BREACH sub-mission. Going on to pay and give the verification code
 //      leads to unauthorized transfers until the player reports to the bank on its official line.
-//   B. Verification: use the saved portal and call the Training Office (a conversation of several
-//      turns). It costs time, creates evidence and no money is lost.
+//   B. Verification: check the account through the saved portal; this alone confirms access. The
+//      Training Office can also corroborate the fee in a multi-turn call and leave a written record.
+//      These checks cost time; no money is lost.
 //   C. Ignore the email and keep writing. No money is lost, the access stays unverified, and the
 //      question comes back on Friday morning.
 // Everything is simulated: no real login, card, code or URL is used, and addresses are plain text on
@@ -18,7 +19,7 @@
 //   - A step that stops a consequence only counts when it finished at or before that minute.
 //   - Money that leaves without approval can only take the cash that is there, and never twice.
 //   - Nothing gives money back: the bank can block and review, it never refunds in the game.
-import { minutesFromStart, type PersistentFlagId } from "../resources";
+import { CHAPTER_DURATION_MINUTES, minutesFromStart, type PersistentFlagId } from "../resources";
 import type { Condition, DeviceItemDef, GameEventDef, MissionDef, MissionStepDef, ThesisTaskDef } from "../types";
 
 /**
@@ -72,6 +73,7 @@ export const MISSION_01_CONFIG = {
     changePasswords: 20,
     recoverAccess: 60,
     bankCall: 5,
+    submitThesis: 5,
     bankReport: 15,
     bankNext: 5,
     /** Saving a record of the email, the page address or a bank transaction as evidence. */
@@ -101,29 +103,23 @@ const flag = (name: PersistentFlagId, value = true): Condition => ({ kind: "pers
 const CODE_GIVEN = flag("verificationCodeExposed");
 const CREDENTIALS_GIVEN = flag("loginCredentialsExposed");
 
+/**
+ * The draft is one task: Alex types two sentences of the thesis in Writing Mode (owner decision,
+ * 2026-11-25). The desk dispatches it once the second sentence is typed. Its gain is the sum of the
+ * three reviews it replaced, so the thesis still reaches the same percent.
+ */
 export const MISSION_01_THESIS_TASKS: ThesisTaskDef[] = [
   {
-    id: "draft.intro-review",
-    label: "Edit the introduction and literature review",
-    description: "Tighten the argument and fix the citations.",
-    timeCostMinutes: 90,
-    progressGain: 2,
-  },
-  {
-    id: "draft.findings",
-    label: "Revise the findings section",
-    description: "Merge the interview notes and check every figure.",
-    timeCostMinutes: 90,
-    progressGain: 2,
-  },
-  {
     id: "draft.final",
-    label: "Finish the full draft",
-    description: "Read the whole draft once and mark it ready for your supervisor.",
-    requires: [{ kind: "thesisTaskDone", taskId: "draft.intro-review" }, { kind: "thesisTaskDone", taskId: "draft.findings" }],
+    label: "Type two sentences of your thesis",
+    description: "Open Writing Mode and type two sentences of the draft.",
     timeCostMinutes: 60,
-    progressGain: 3,
-    effects: [{ kind: "setPersistent", flag: "draftFinished", value: true }],
+    progressGain: 7,
+    effects: [
+      { kind: "setPersistent", flag: "finalDraftReviewed", value: true },
+      { kind: "setPersistent", flag: "supervisorFeedbackRequested", value: true },
+      { kind: "setPersistent", flag: "draftFinished", value: true },
+    ],
   },
 ];
 
@@ -136,9 +132,9 @@ export const MISSION_01_LEDGER_LABELS: Record<string, string> = {
 
 /** The bank's one-time code text (English); the code itself is `MISSION_01_CONFIG.paymentCode`. */
 const MISSION_01_CODE_TEXT = `${MISSION_01_CONFIG.paymentCode} is your code to approve a card payment of ${FEE} VND to UNI GRADUATION OFFICE. Never share this code with anyone. The bank will never ask you for it.`;
-/** The alert never repeats an amount: the ledger is the one place that shows what actually left. */
-const TRANSFER_ALERT =
-  "A transfer from your account to an account you do not know was approved. The amount is in your bank app. If this was not you, call the bank's official line.";
+/** Each alert names the amount that moved, as a bank notification would, and points to an official contact route. */
+const transferAlert = (amountVnd: number): string =>
+  `A transfer of ${amountVnd.toLocaleString("en-US")} VND to an unfamiliar recipient was completed. If this wasn't you, call the number on your bank card.`;
 
 export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
   // --- The email and the page it leads to ---------------------------------------------------------
@@ -154,6 +150,7 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
       "Pay now to unlock your account: https://payment-ueh.vn/confirm\n\n" +
       "If the fee is not paid today, your account will stay locked and you may miss the graduation period.\n\nGraduation Office",
     arrives: { atMinute: 10 },
+    thesisInterruption: { urgent: true, appHint: "email" },
     actions: [
       { id: "open-link", label: "Open the payment link", timeCostMinutes: M.openLink, once: true },
       // Reporting is a choice, never a side effect of opening the mail. The report keeps a copy of the
@@ -233,7 +230,27 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
     title: "Student portal (saved)",
     detail: "student.ueh.edu.vn",
     body: "The bookmark you saved for the submission portal when you registered.",
-    actions: [{ id: "check-account", label: "Sign in to the saved portal and check my account", timeCostMinutes: M.checkPortal, once: true }],
+    actions: [
+      {
+        id: "check-account",
+        label: "Sign in to the saved portal and check my account",
+        timeCostMinutes: M.checkPortal,
+        once: true,
+        effects: [{ kind: "setPersistent", flag: "schoolAccessVerified", value: true }],
+      },
+      {
+        id: "submit-thesis",
+        label: "Submit the final thesis and save the receipt",
+        requires: [
+          { kind: "thesisTaskDone", taskId: "draft.final" },
+          flag("schoolAccessVerified"),
+          flag("accountCompromised", false),
+        ],
+        timeCostMinutes: M.submitThesis,
+        once: true,
+        effects: [{ kind: "setSubmission", status: "submitted" }],
+      },
+    ],
   },
   {
     id: "file.portal-status",
@@ -471,6 +488,7 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
     from: "Account Security <no-reply@ueh.edu.vn>",
     body: "A sign-in to your student account from a device we do not know was recorded. If this was not you, change your password.",
     arrives: { afterAction: { itemId: "page.fee", actionId: "sign-in", minutes: MISSION_01_CONFIG.loginAlertAfterMinutes } },
+    thesisInterruption: { urgent: true, appHint: "email" },
   },
   // The bank's one-time code for the card payment on the page. The text says what the code approves
   // and that nobody should ask for it: the same words a real bank uses, and the lesson of this step.
@@ -481,6 +499,7 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
     from: "Bank",
     body: `${MISSION_01_CODE_TEXT}`,
     arrives: { when: [done("page.fee", "pay-card")] },
+    thesisInterruption: { urgent: true, appHint: "bank" },
   },
   ...([1, 2, 3] as const).map(
     (index): DeviceItemDef => ({
@@ -488,8 +507,9 @@ export const MISSION_01_DEVICE_ITEMS: DeviceItemDef[] = [
       app: "messages",
       title: "Bank alerts",
       from: "Bank",
-      body: TRANSFER_ALERT,
+      body: transferAlert(MISSION_01_CONFIG.unauthorizedTransfers[index - 1].amountVnd),
       arrives: { when: [{ kind: "eventStatus", eventId: `m01.transfer-${index}`, status: "resolved" }] },
+      thesisInterruption: { urgent: true, appHint: "bank" },
     }),
   ),
 
@@ -575,6 +595,7 @@ const transfer = (index: 1 | 2 | 3): GameEventDef => {
     channel: "notification",
     autoResolve: true,
     optional: false,
+    thesisInterruption: { urgent: true, appHint: "bank" },
     trigger: {
       afterAction: { itemId: "page.fee", actionId: "enter-code", minutes: afterMinutes },
       cancelledBy: [{ itemId: "contact.bank", actionId: "report-fraud" }],
@@ -599,6 +620,7 @@ export const MISSION_01_EVENTS: GameEventDef[] = [
     channel: "notification",
     autoResolve: true,
     optional: false,
+    thesisInterruption: { urgent: true, appHint: "email" },
     trigger: {
       afterAction: { itemId: "page.fee", actionId: "sign-in", minutes: MISSION_01_CONFIG.takeoverAfterMinutes },
       // Changing the passwords in time stops it. Giving the code is a different path (the transfers).
@@ -620,6 +642,7 @@ export const MISSION_01_EVENTS: GameEventDef[] = [
     body: "You never confirmed that your thesis submission account is active. The final deadline is today at 17:00.",
     channel: "notification",
     optional: false,
+    thesisInterruption: { urgent: true, appHint: "email" },
     trigger: { atMinute: MISSION_01_CONFIG.lateAccessCheckMinute, when: [flag("schoolAccessVerified", false)] },
     responses: [
       {
@@ -647,6 +670,7 @@ export const MISSION_01_LATE_RECOVERY_EVENT: GameEventDef = {
   body: "Your student account was taken over and never recovered, so you cannot sign in to the submission system. The final deadline is today at 17:00.",
   channel: "notification",
   optional: false,
+  thesisInterruption: { urgent: true, appHint: "email" },
   trigger: { atMinute: MISSION_01_CONFIG.lateAccessCheckMinute, when: [flag("accountCompromised")] },
   responses: [
     {
@@ -668,11 +692,7 @@ const draftStep = (id: string, taskId: string, label: string): MissionStepDef =>
   app: "thesis",
   doneWhen: [{ kind: "thesisTaskDone", taskId }],
 });
-const DRAFT_STEPS: MissionStepDef[] = [
-  draftStep("intro", "draft.intro-review", "Edit the introduction and literature review"),
-  draftStep("findings", "draft.findings", "Revise the findings section"),
-  draftStep("final", "draft.final", "Finish the full draft"),
-];
+const DRAFT_STEPS: MissionStepDef[] = [draftStep("write", "draft.final", "Type two sentences of your thesis")];
 const READ_MAIL_STEP: MissionStepDef = {
   id: "read-mail",
   label: "Read the new email about your submission account",
@@ -703,6 +723,18 @@ const BANK_STEP: MissionStepDef = {
   app: "contacts",
   doneWhen: [done("contact.bank", "report-fraud")],
 };
+const SUBMIT_THESIS_STEP: MissionStepDef = {
+  id: "submit-thesis",
+  label: "Submit the final thesis through the saved portal and keep the receipt",
+  target: "laptop",
+  app: "files",
+  visibleWhen: [
+    { kind: "thesisTaskDone", taskId: "draft.final" },
+    flag("schoolAccessVerified"),
+    flag("accountCompromised", false),
+  ],
+  doneWhen: [done("portal.saved", "submit-thesis")],
+};
 
 export const MISSION_01_MISSIONS: MissionDef[] = [
   {
@@ -721,20 +753,47 @@ export const MISSION_01_MISSIONS: MissionDef[] = [
       {
         id: "breach",
         when: [CREDENTIALS_GIVEN, { kind: "missionStatus", missionId: "m01.security-breach", status: "open" }],
-        objective: "Your accounts are at risk. Secure them first, then finish the draft.",
+        objective: "Secure your accounts first. Finish the draft by Wednesday, 06:00; submit by Friday, 17:00.",
         steps: [PASSWORDS_STEP, ...DRAFT_STEPS],
       },
       {
         id: "verified",
         when: [flag("schoolAccessVerified")],
-        objective: "Access is confirmed with the Training Office. Finish the draft.",
+        objective: "Portal access is confirmed. Finish the draft by Wednesday, 06:00; submit by Friday, 17:00.",
         steps: [READ_MAIL_STEP, ...DRAFT_STEPS],
       },
       {
         id: "default",
         when: [],
-        objective: "Finish the draft and confirm that you can reach the submission system.",
+        objective: "Finish the draft by Wednesday, 06:00, and confirm you can sign in to submit by Friday, 17:00.",
         steps: [READ_MAIL_STEP, CONFIRM_ACCESS_STEP, ...DRAFT_STEPS],
+      },
+    ],
+  },
+  {
+    id: "m01.final-submission",
+    title: "FINAL SUBMISSION",
+    optional: false,
+    opensWhen: { atMinute: 0 },
+    deadlineAtMinute: CHAPTER_DURATION_MINUTES,
+    completeWhen: [{ kind: "submission", status: "submitted" }],
+    onFail: [{ kind: "setPersistent", flag: "submissionDeadlineMissed", value: true }],
+    paths: [
+      {
+        id: "ready",
+        when: [
+          { kind: "thesisTaskDone", taskId: "draft.final" },
+          flag("schoolAccessVerified"),
+          flag("accountCompromised", false),
+        ],
+        objective: "Your final draft and account are ready. Submit through the saved portal by Friday, 17:00.",
+        steps: [SUBMIT_THESIS_STEP],
+      },
+      {
+        id: "blocked",
+        when: [],
+        objective: "Finish the draft, verify submission access and resolve any account lock before Friday, 17:00.",
+        steps: [SUBMIT_THESIS_STEP],
       },
     ],
   },

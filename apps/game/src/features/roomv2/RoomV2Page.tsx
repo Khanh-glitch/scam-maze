@@ -35,6 +35,8 @@ interface RoomV2PageProps {
    */
   preloaded?: Engine;
   onAdopted?: (engine: Engine) => void;
+  /** Hides the center targeting reticle & room prompt (e.g. during cinematic street NPC conversations). */
+  hideCrosshair?: boolean;
 }
 
 type RoomQuality = "high" | "low";
@@ -59,7 +61,7 @@ const SHADOW = { textShadow: "0 1px 6px rgba(0,0,0,.9)" } as const;
  * Prototype route `/roomv2`: the player's apartment, "After the Rain". It is a standalone engine
  * kept apart from the story chapters until it is integrated.
  */
-export const RoomV2Page: React.FC<RoomV2PageProps> = ({ settings, onBackToMenu, onReady, embedded = false, onUI, options, story, overlay, renderPrompt, preloaded, onAdopted }) => {
+export const RoomV2Page: React.FC<RoomV2PageProps> = ({ settings, onBackToMenu, onReady, embedded = false, onUI, options, story, overlay, renderPrompt, preloaded, onAdopted, hideCrosshair = false }) => {
   const { t } = useTranslation("worlds");
   const mountRef = useRef<HTMLDivElement | null>(null);
   const engineRef = useRef<Engine | null>(null);
@@ -144,7 +146,7 @@ export const RoomV2Page: React.FC<RoomV2PageProps> = ({ settings, onBackToMenu, 
       </button>
       )}
 
-      {ui.started && (ui.locked || ui.cursorMode) && !ui.inspecting && !ui.ended && (
+      {ui.started && (ui.locked || ui.cursorMode) && !ui.inspecting && !ui.ended && !hideCrosshair && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className={`rounded-full transition-all duration-300 ${ui.focus ? "h-5 w-5 border border-white/70" : "h-1 w-1 bg-white/60"}`} />
           {ui.prompt && ui.anchor && renderPrompt ? (
@@ -222,7 +224,7 @@ export const RoomV2Page: React.FC<RoomV2PageProps> = ({ settings, onBackToMenu, 
       {!embedded && !hasStory && !ui.started && (
         <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(ellipse_at_center,rgba(10,12,20,0.55),rgba(0,0,0,0.92))]">
           <div className="max-w-xl px-8 text-center">
-            <p className="mb-6 text-[11px] uppercase tracking-[0.45em] text-amber-200/60">{t("roomv2.intro.kicker")}</p>
+            <p className="mb-6 text-[11px] uppercase tracking-[0.45em] text-lilac/60">{t("roomv2.intro.kicker")}</p>
             <h1 className="text-5xl font-extralight tracking-tight text-stone-100 md:text-6xl">{t("roomv2.intro.title")}</h1>
             <p className="mt-6 text-[15px] leading-relaxed text-stone-300/75">{t("roomv2.intro.description")}</p>
             <button
@@ -255,7 +257,7 @@ export const RoomV2Page: React.FC<RoomV2PageProps> = ({ settings, onBackToMenu, 
       {ui.ended && !hasStory && (
         <div className="absolute inset-0 flex animate-[cap_2.5s_ease-out] items-center justify-center">
           <div className="max-w-lg px-8 text-center">
-            <p className="mb-5 text-[11px] uppercase tracking-[0.45em] text-amber-200/55">
+            <p className="mb-5 text-[11px] uppercase tracking-[0.45em] text-lilac/55">
               {ui.ended === "answered" ? t("roomv2.ending.answeredTime") : t("roomv2.ending.declinedTime")}
             </p>
             <h2 className="text-3xl font-extralight leading-snug text-stone-100 md:text-4xl">{t("roomv2.ending.title")}</h2>

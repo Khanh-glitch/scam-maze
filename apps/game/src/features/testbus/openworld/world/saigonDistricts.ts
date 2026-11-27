@@ -1,11 +1,16 @@
 import * as T from "three";
 import { streetClips } from "../simulation/streetClips";
-import { addHeadlightBeam, markLampParts, setVehicleLightLevel } from "../simulation/vehicleLights";
+import { createHumanRealismRig, upgradeHumanMaterials, type HumanActivity, type HumanRealismRig } from "../simulation/humanRealism";
+import type { HumanPresenceSystem } from "../simulation/humanPresence";
+import { addHeadlightBeam, attachDynamicLamps, markLampParts, mountGrabLamps, mountRoundLamp, setVehicleLightLevel } from "../simulation/vehicleLights";
+import { sampleEdge, type SaigonTrafficManager, type VehicleAgent } from "../traffic";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { CURB_HEIGHT, rect, type Solid } from "../simulation/boarding";
+import { buildIntersectionSignals } from "./signalBuilder";
 import {
+  asset,
   box,
   contact,
   contactMaterial,
@@ -19,10 +24,31 @@ import {
   tube,
   write,
 } from "../simulation/scene-kit";
-import { warmSkin } from "../simulation/drive-look";
 import { equipVehicle, wheelRadius, wheelSpinSigns, type CrewMember } from "../simulation/vehicleCrew";
 import { fixVanWheels, simplifyInPlace } from "../simulation/vehicleLod";
 import { VAN_LENGTH } from "../simulation/vehicles";
+import { GRAB_DRIVER_FILE, pickGrabClip, type GrabClipName } from "../simulation/grabDriver";
+import {
+  LONG_Q9_CRUISE_MIN_SECONDS,
+  LONG_Q9_FILE,
+  LONG_Q9_HEIGHT,
+  LONG_Q9_KICKSTAND_DEPLOYED_DEG,
+  LONG_Q9_KICKSTAND_FOLDED_DEG,
+  LONG_Q9_NPC_V,
+  LONG_Q9_PARK_V,
+  LONG_Q9_RIG_HEIGHT,
+  LONG_Q9_SEAT_OFFSET,
+  LONG_Q9_SITES,
+  WAVE_LONGQ9_FILE,
+  createLongQ9State,
+  longQ9SitePoint,
+  longQ9TakeoverWindow,
+  stepLongQ9,
+  type LongQ9Clip,
+  type LongQ9Frame,
+  type LongQ9State,
+  type LongQ9TrafficReading,
+} from "../simulation/longQ9";
 import type { WorldStreamer } from "./WorldStreamer";
 import type { PooledLightSpec } from "./boardingHouse";
 import {
@@ -48,6 +74,7 @@ import {
 } from "./gtaRealism";
 import { buildSaigonStreetProps, createWetTireSpraySystem } from "./saigonProps";
 import { buildSaigonRiversideWorld } from "./saigonRiverside";
+import { buildChoLon, type ChoLonHandles } from "./choLon";
 
 export const BITEXCO_POS = new T.Vector3(94, 0, -186);
 export const LANDMARK81_POS = new T.Vector3(26, 0, -356);
@@ -56,6 +83,8 @@ export interface SaigonDistricts {
   root: T.Group;
   solids: Solid[];
   lightSpecs: PooledLightSpec[];
+  /** The Chợ Lớn block: Cô Ba's stall and the two bus shelters, addressed by name, not by prompt. */
+  choLon: ChoLonHandles;
   isWalkableSidewalk: (x: number, z: number) => boolean;
   isWithinOpenWorld: (x: number, z: number) => boolean;
   setWindowPreviewMode: (enabled: boolean) => void;
@@ -111,12 +140,51 @@ function neonSignMat(title: string, sub: string, bg: string, fg: string, glow: s
   return mat as T.MeshStandardMaterial;
 }
 
+/** Width / height of signs made from a supplied image, so their planes keep the artwork's proportions. */
+const signAspect = new WeakMap<T.Material, number>();
+/** Height (m) of a retail sign plane `width` m wide; image signs keep their aspect, the generated ones use `fallback`. */
+const signHeight = (mat: T.Material, width: number, fallback: number) => {
+  const aspect = signAspect.get(mat);
+  return aspect ? width / aspect : fallback;
+};
+
+/**
+ * A lit sign drawn from an image file (same glow treatment as neonSignMat). The material starts with a 1x1 placeholder
+ * map and gets the real texture when it has loaded, so the shader is not recompiled when it arrives.
+ */
+function imageSignMat(file: string, aspect: number, fill: string, glow: string) {
+  const hex = new T.Color(fill).getHex();
+  const placeholder = new T.DataTexture(new Uint8Array([(hex >> 16) & 255, (hex >> 8) & 255, hex & 255, 255]), 1, 1);
+  placeholder.colorSpace = T.SRGBColorSpace;
+  placeholder.needsUpdate = true;
+  const mat = new T.MeshStandardMaterial({
+    map: placeholder,
+    color: 0xd4d2cc,
+    roughness: 0.42,
+    metalness: 0.12,
+    emissiveMap: placeholder,
+    emissive: new T.Color(glow).lerp(new T.Color(0xffe8cc), 0.35),
+    emissiveIntensity: 0.85,
+  });
+  new T.TextureLoader().load(asset(file), (texture) => {
+    texture.colorSpace = T.SRGBColorSpace;
+    texture.anisotropy = 4;
+    mat.map = texture;
+    mat.emissiveMap = texture;
+  });
+  signAspect.set(mat, aspect);
+  return mat;
+}
+
 export function buildSaigonDistricts(
   scene: T.Scene,
   streamer: WorldStreamer,
   software: boolean,
   onAssetLoaded?: (obj: T.Object3D) => void,
+  trafficMgr?: SaigonTrafficManager,
+  humanPresence?: HumanPresenceSystem,
 ): SaigonDistricts {
+  const presenceCleanups: (() => void)[] = [];
   const root = new T.Group();
   root.name = "SaigonOpenWorldDistricts";
   scene.add(root);
@@ -139,9 +207,20 @@ export function buildSaigonDistricts(
   let envWetness = 0.86;
   let envRain = 0.36;
   const animMixers: T.AnimationMixer[] = [];
+  // Solids of the bikes of the roadside rescue (see loadLongQ9Repair). They are shared by reference with the engine, which copies
+  // this array once, so they exist from the start and are moved off the map (x = 1e6) while their bike is not standing there.
+  const OFF_MAP: Solid = { x0: 1e6, x1: 1e6, z0: 1e6, z1: 1e6 };
+  const longQ9BikeSolid: Solid = { ...OFF_MAP };
+  const strangerBikeSolids: Solid[] = LONG_Q9_SITES.map(() => ({ ...OFF_MAP }));
+  solids.push(longQ9BikeSolid, ...strangerBikeSolids);
   const roamingActors: {
     group: T.Group;
     mixer?: T.AnimationMixer;
+    walkAction?: T.AnimationAction;
+    walkClipSpeed: number;
+    realism: HumanRealismRig;
+    activity: HumanActivity;
+    partnerPos?: T.Vector3;
     axis: "x" | "z" | "idle";
     min: number;
     max: number;
@@ -149,6 +228,7 @@ export function buildSaigonDistricts(
     speed: number;
     targetYaw: number;
   }[] = [];
+  const _npcPlayerPos = new T.Vector3();
   const boulevardVehicles: {
     group: T.Group;
     wheels: { node: T.Object3D; sign: number }[];
@@ -301,11 +381,12 @@ export function buildSaigonDistricts(
   const haloMat = createSoftVolumetricLampHaloMaterial();
   haloMats.push(haloMat);
 
-  // Authentic illuminated Saigon ground-floor tower retail signage (Highlands, Vietcombank, GS25, Phở 24, FamilyMart, Trung Nguyên)
+  // Authentic illuminated Saigon ground-floor tower retail signage (Highlands, Vietcombank, GS36, Phở 24, FamilyMart, Trung Nguyên)
   const retailSignMats = [
     neonSignMat("HIGHLANDS COFFEE", "CÀ PHÊ · TRÀ SEN VÀNG", "#5a1414", "#fff4dc", "#ff5238"),
     neonSignMat("VIETCOMBANK", "PGD QUẬN 1 · ATM 24/7", "#0d4a26", "#f0ffe8", "#3ce878"),
-    neonSignMat("GS25 · 24/7", "CỬA HÀNG TIỆN LỢI", "#0c3568", "#e8f6ff", "#44b8ff"),
+    // Supplied artwork (signs/gs36.webp, 1459 x 198): the convenience store is GS36 now.
+    imageSignMat("signs/gs36.webp", 1459 / 198, "#004ccc", "#44b8ff"),
     neonSignMat("PHỞ 24 · SÀI GÒN", "HƯƠNG VỊ TRUYỀN THỐNG", "#164632", "#fff6d8", "#48e090"),
     neonSignMat("TRUNG NGUYÊN LEGEND", "CÀ PHÊ NĂNG LƯỢNG", "#2c1e16", "#f7e2b8", "#ffb648"),
     neonSignMat("FAMILYMART 24H", "MỞ CỬA SUỐT ĐÊM", "#0c4252", "#ecfff6", "#3ae8a6"),
@@ -373,31 +454,6 @@ export function buildSaigonDistricts(
     solids.push(rect(x, z, 0.5 * scale, 0.5 * scale));
   };
 
-  // Helper: Animated 3-Aspect Vietnamese Traffic Light Pole + Crosswalk Zebra Stripes
-  const addTrafficSignal = (parent: T.Group, x: number, z: number, rotY: number) => {
-    const g = new T.Group();
-    g.position.set(x, CURB_HEIGHT, z);
-    g.rotation.y = rotY;
-    rod(g, [0, 0, 0], [0, 5.6, 0], 0.085, steel, 0.065, 8);
-    rod(g, [0, 5.45, 0], [3.6, 5.45, 0], 0.055, steel, 0.045, 8);
-    box(g, [2.4, 5.45, 0.12], [0.36, 0.98, 0.26], darkMetal, false);
-    const r = lamp(0xff2a20, 2.8);
-    const y = lamp(0xffb824, 2.4);
-    const gr = lamp(0x28eb68, 2.6);
-    const mkLens = (ly: number, m: T.MeshStandardMaterial) => {
-      const disc = new T.Mesh(new T.CylinderGeometry(0.11, 0.11, 0.04, 14), m);
-      disc.rotation.x = Math.PI / 2;
-      disc.position.set(2.4, ly, 0.26);
-      g.add(disc);
-    };
-    mkLens(5.74, r);
-    mkLens(5.45, y);
-    mkLens(5.16, gr);
-    trafficSignalMats.push({ r, y, g: gr });
-    parent.add(g);
-    solids.push(rect(x, z, 0.28, 0.28));
-  };
-
   const addCrosswalk = (parent: T.Group, cx: number, cz: number, horizontal: boolean) => {
     for (let i = -4; i <= 4; i++) {
       if (horizontal) {
@@ -460,12 +516,12 @@ export function buildSaigonDistricts(
       const s = canopySide === "+z" ? 1 : -1;
       box(nearParent, [x, 4.15, z + s * (pd * 0.5 + canDepth * 0.48)], [Math.min(w * 0.56, 8.0), 0.18, canDepth], bronzeMetal, false);
       box(nearParent, [x, 4.02, z + s * (pd * 0.5 + canDepth * 0.45)], [Math.min(w * 0.52, 7.6), 0.05, canDepth * 0.85], warmSoffitMat, false);
-      plane(nearParent, [x, 5.25, z + s * (pd * 0.5 + 0.06)], [Math.min(w * 0.58, 6.2), 1.35], retailMat, s > 0 ? 0 : Math.PI);
+      plane(nearParent, [x, 5.25, z + s * (pd * 0.5 + 0.06)], [Math.min(w * 0.58, 6.2), signHeight(retailMat, Math.min(w * 0.58, 6.2), 1.35)], retailMat, s > 0 ? 0 : Math.PI);
     } else {
       const s = canopySide === "+x" ? 1 : -1;
       box(nearParent, [x + s * (pw * 0.5 + canDepth * 0.48), 4.15, z], [canDepth, 0.18, Math.min(d * 0.56, 8.0)], bronzeMetal, false);
       box(nearParent, [x + s * (pw * 0.5 + canDepth * 0.45), 4.02, z], [canDepth * 0.85, 0.05, Math.min(d * 0.52, 7.6)], warmSoffitMat, false);
-      plane(nearParent, [x + s * (pw * 0.5 + 0.06), 5.25, z], [Math.min(d * 0.58, 6.2), 1.35], retailMat, s > 0 ? Math.PI / 2 : -Math.PI / 2);
+      plane(nearParent, [x + s * (pw * 0.5 + 0.06), 5.25, z], [Math.min(d * 0.58, 6.2), signHeight(retailMat, Math.min(d * 0.58, 6.2), 1.35)], retailMat, s > 0 ? Math.PI / 2 : -Math.PI / 2);
     }
 
     // 3. Stepped Upper Tower Shaft (distinct architectural silhouette per archetype!)
@@ -718,8 +774,6 @@ export function buildSaigonDistricts(
   addCrosswalk(chunkEastBlvd, 5.6, -76, true);
   addCrosswalk(chunkEastBlvd, 48.0, -76, true);
   addCrosswalk(chunkEastBlvd, 64.0, -76, true);
-  addTrafficSignal(chunkEastBlvd, 8.0, -68.6, 0);
-  addTrafficSignal(chunkEastBlvd, 48.2, -68.6, 0);
 
   // Boulevard street sign on south sidewalk corner
   rod(chunkEastBlvd, [9.6, CURB_HEIGHT, -68.2], [9.6, 3.1, -68.2], 0.045, steel);
@@ -752,7 +806,6 @@ export function buildSaigonDistricts(
   addCrosswalk(chunkEastBlvd, 5.6, -147, true);
   addCrosswalk(chunkEastBlvd, 48.0, -147, true);
   addCrosswalk(chunkEastBlvd, 64.0, -147, true);
-  addTrafficSignal(chunkEastBlvd, 48.2, -139.6, 0);
 
   // --- North-South Connector Avenue: Đường Hải Triều (X ∈ [50, 62], Z ∈ [-236, -65.6]) ---
   plane(chunkEastBlvd, [56, 0.003, -150.8], [12.0, 170.4], roadMat, 0, -Math.PI / 2);
@@ -773,21 +826,31 @@ export function buildSaigonDistricts(
     if (Math.abs(z + 147) < 8 || Math.abs(z + 76) < 8) continue;
     plane(chunkEastBlvd, [56, 0.008, z], [0.16, 2.8], whitePaint, 0, -Math.PI / 2);
   }
+  // Every signal of every signalized intersection is built here, once, from the road graph.
+  const signals = buildIntersectionSignals({ trafficMgr, streamer, solids, curbHeight: CURB_HEIGHT, parent: root, onAssetLoaded });
+  trafficSignalMats.push(...signals.staticLamps);
+  const nearSignalPole = (x: number, z: number) => signals.poles.some((p) => Math.hypot(p.x - x, p.z - z) < 2.0);
+  const addTreeClearOfSignals = (parent: T.Group, x: number, z: number, scale: number, isPalm: boolean) => {
+    if (!nearSignalPole(x, z)) addSaigonTree(parent, x, z, scale, isPalm);
+  };
+  const addLampClearOfSignals = (parent: T.Group, x: number, z: number, dx: number, dz: number, light: boolean) => {
+    if (!nearSignalPole(x, z)) addLampPost(parent, x, z, dx, dz, light);
+  };
   addCrosswalk(chunkEastBlvd, 56, -84, false);
   addCrosswalk(chunkEastBlvd, 56, -155, false);
 
   // Botanical Saigon trees, royal palms & volumetric streetlamps strictly on boulevard sidewalks (never on intersections!)
   for (const x of [12, 18, 25, 32, 38, 44, 70, 77, 86, 95, 102, 110, 118, 125]) {
-    addSaigonTree(chunkEastBlvd, x, -67.8, 1.02, x % 3 === 0);
-    addSaigonTree(chunkEastBlvd, x, -84.2, 0.98, x % 3 === 1);
-    if (x % 2 === 0) addLampPost(chunkEastBlvd, x + 3.2, -83.0, 0, 1, x === 32 || x === 86);
-    addSaigonTree(chunkEastBlvd, x, -138.8, 1.0, x % 3 === 2);
-    if (x % 2 === 0) addLampPost(chunkEastBlvd, x + 3.2, -154.0, 0, 1, x === 32 || x === 102);
+    addTreeClearOfSignals(chunkEastBlvd, x, -67.8, 1.02, x % 3 === 0);
+    addTreeClearOfSignals(chunkEastBlvd, x, -84.2, 0.98, x % 3 === 1);
+    if (x % 2 === 0) addLampClearOfSignals(chunkEastBlvd, x + 3.2, -83.0, 0, 1, x === 32 || x === 86);
+    addTreeClearOfSignals(chunkEastBlvd, x, -138.8, 1.0, x % 3 === 2);
+    if (x % 2 === 0) addLampClearOfSignals(chunkEastBlvd, x + 3.2, -154.0, 0, 1, x === 32 || x === 102);
   }
   // Trees & lamps along Đường Hải Triều west sidewalk (X = 48.0)
   for (const z of [-90, -100, -112, -124, -162, -174, -192, -204]) {
-    addSaigonTree(chunkEastBlvd, 48.0, z, 1.0, z % 2 === 0);
-    if (z % 2 === 0) addLampPost(chunkEastBlvd, 49.0, z + 8, 1, 0, z === -174);
+    addTreeClearOfSignals(chunkEastBlvd, 48.0, z, 1.0, z % 2 === 0);
+    if (z % 2 === 0) addLampClearOfSignals(chunkEastBlvd, 49.0, z + 8, 1, 0, z === -174);
   }
 
   // District 1 / District 3 Commercial High-Rises — EVERY lot mathematically cleared from all roads, sidewalks & neighbors!
@@ -862,9 +925,9 @@ export function buildSaigonDistricts(
     const signM = retailSignMats[(i + 2) % retailSignMats.length];
     const s = side === "+z" || side === "+x" ? 1 : -1;
     if (side === "+z" || side === "-z") {
-      plane(chunkEastBlvd, [x, 3.8, z + s * (d * 0.5 + 0.08)], [Math.min(w * 0.62, 5.8), 1.2], signM, s > 0 ? 0 : Math.PI);
+      plane(chunkEastBlvd, [x, 3.8, z + s * (d * 0.5 + 0.08)], [Math.min(w * 0.62, 5.8), signHeight(signM, Math.min(w * 0.62, 5.8), 1.2)], signM, s > 0 ? 0 : Math.PI);
     } else {
-      plane(chunkEastBlvd, [x + s * (w * 0.5 + 0.08), 3.8, z], [Math.min(d * 0.62, 5.8), 1.2], signM, s > 0 ? Math.PI / 2 : -Math.PI / 2);
+      plane(chunkEastBlvd, [x + s * (w * 0.5 + 0.08), 3.8, z], [Math.min(d * 0.62, 5.8), signHeight(signM, Math.min(d * 0.62, 5.8), 1.2)], signM, s > 0 ? Math.PI / 2 : -Math.PI / 2);
     }
     solids.push(rect(x, z, w + 0.2, d + 0.2));
   });
@@ -1361,6 +1424,8 @@ export function buildSaigonDistricts(
   taillightMats.push(taillightMat);
   vehicleBeamMats.push(beamMat);
 
+  const managedCrews: { root: T.Object3D; vehRoot: T.Object3D }[] = [];
+
   const loadExpandedFleet = async () => {
     const base = `/assets/testbus/ow/models/`;
     const [taxiGltf, sedanGltf, suvGltf, vanGltf, truckGltf, motoGltf, riderGltf, baothuGltf] = await Promise.all([
@@ -1376,6 +1441,8 @@ export function buildSaigonDistricts(
     if (disposed) return;
 
     let crewIndex = 4;
+    let managedVehIdx = 0;
+
     const addVehicle = async (
       source: T.Object3D,
       targetLength: number,
@@ -1387,9 +1454,12 @@ export function buildSaigonDistricts(
       dir: number,
       speed: number,
       kind: "car" | "truck" | "moto" | "rider",
+      managedSpawn?: { edgeId: string; s: number; laneIndex?: 0 | 1 },
     ) => {
       if (disposed) return;
+      const vehRoot = new T.Group();
       const holder = new T.Group();
+      vehRoot.add(holder);
       const obj = source.clone(true);
       const b = new T.Box3().setFromObject(obj, true);
       const sz = b.getSize(new T.Vector3());
@@ -1452,6 +1522,58 @@ export function buildSaigonDistricts(
       const radius = wheels[0] ? wheelRadius(wheels[0], 0.3) : 0.3;
       if (lamps.head) addHeadlightBeam(holder, obj, new T.Vector3(0, 0, 1), kind === "car" ? "car" : kind === "truck" ? "truck" : "moto");
 
+      const contactW = kind === "truck" ? 2.6 : kind === "car" ? 2.15 : 1.0;
+      const contactL = kind === "truck" ? targetLength : kind === "car" ? targetLength : 2.15;
+      contact(holder, 0, 0.01, 0, contactW, contactL, shade);
+
+      if (trafficMgr && managedSpawn) {
+        dynamicRoot.add(vehRoot);
+        onAssetLoaded?.(vehRoot);
+
+        const isMoto = kind === "moto" || kind === "rider";
+        const halfWidth = kind === "truck" ? 0.98 : kind === "car" ? 0.92 : 0.44;
+        const halfLength = isMoto ? 1.04 : targetLength * 0.5;
+        const dynamicLights = attachDynamicLamps(holder, halfWidth, halfLength, isMoto);
+
+        holder.updateWorldMatrix(true, true);
+        const invHolder = new T.Matrix4().copy(holder.matrixWorld).invert();
+        const tmp = new T.Vector3();
+        const detailedWheels = wheels.map((node, i) => {
+          node.getWorldPosition(tmp).applyMatrix4(invHolder);
+          // In holder local space, forward is +Z -> front wheels have local z > +0.15 (or name matches Front)
+          const isFront = /front|_fl|_fr|wheel_f/i.test(node.name) || tmp.z > 0.15;
+          return { node, sign: spinSigns[i], isFront, baseYaw: node.rotation.y };
+        });
+
+        let crewHead: T.Object3D | undefined;
+        if (crew) {
+          crew.root.traverse((o) => {
+            if (!crewHead && o instanceof T.Bone && /head$/i.test(o.name)) crewHead = o;
+          });
+          managedCrews.push({ root: crew.root, vehRoot });
+        }
+
+        trafficMgr.spawnVehicle({
+          id: `DIST_VEH_${managedVehIdx++}`,
+          category: isMoto ? "moto" : kind === "truck" ? "van" : "car",
+          edgeId: managedSpawn.edgeId,
+          s: managedSpawn.s,
+          laneIndex: managedSpawn.laneIndex,
+          halfWidth,
+          halfLength,
+          rig: {
+            root: vehRoot,
+            chassis: holder,
+            wheels: detailedWheels,
+            wheelRadius: radius,
+            lights: dynamicLights,
+            crewHead,
+            crewHeadRestQ: crewHead ? crewHead.quaternion.clone() : undefined,
+          },
+        });
+        return;
+      }
+
       if (axis === "x") {
         holder.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
         holder.position.set(start, 0, lane);
@@ -1459,9 +1581,6 @@ export function buildSaigonDistricts(
         holder.rotation.y = dir > 0 ? 0 : Math.PI;
         holder.position.set(lane, 0, start);
       }
-      const contactW = kind === "truck" ? 2.6 : kind === "car" ? 2.15 : 1.0;
-      const contactL = kind === "truck" ? targetLength : kind === "car" ? targetLength : 2.15;
-      contact(holder, 0, 0.01, 0, contactW, contactL, shade);
       dynamicRoot.add(holder);
       onAssetLoaded?.(holder);
       boulevardVehicles.push({
@@ -1480,47 +1599,561 @@ export function buildSaigonDistricts(
       });
     };
 
-    // Traffic strictly confined to valid roadway lanes & bounds!
+    // Traffic strictly on TRUE VIETNAM RIGHT-HAND TRAFFIC edges across Đường 3/2, Điện Biên Phủ, Hải Triều, Ven Sông & Vinhomes!
     if (taxiGltf) {
-      await addVehicle(taxiGltf.scene, 4.45, "x", -79.0, 8, 122, 28, 1, 7.2, "car");
-      await addVehicle(taxiGltf.scene, 4.45, "x", -150.0, 8, 124, 42, 1, 7.6, "car");
-      await addVehicle(taxiGltf.scene, 4.45, "z", 59.0, -230, -72, -185, 1, 6.8, "car");
+      await addVehicle(taxiGltf.scene, 4.45, "x", -73.0, 8, 122, 28, 1, 7.2, "car", { edgeId: "D32_W_EB", s: 12, laneIndex: 0 });
+      await addVehicle(taxiGltf.scene, 4.45, "x", -144.0, 8, 124, 42, 1, 7.6, "car", { edgeId: "DBP_W_EB", s: 18, laneIndex: 0 });
+      await addVehicle(taxiGltf.scene, 4.45, "z", 53.0, -230, -72, -185, 1, 6.8, "car", { edgeId: "HT_N_SB", s: 25, laneIndex: 0 });
     }
     if (sedanGltf) {
-      await addVehicle(sedanGltf.scene, 4.45, "x", -73.0, 8, 122, 92, -1, 6.8, "car");
-      await addVehicle(sedanGltf.scene, 4.45, "z", -3.2, -304, -198, -240, -1, 8.0, "car");
+      await addVehicle(sedanGltf.scene, 4.45, "x", -79.0, 8, 122, 92, -1, 6.8, "car", { edgeId: "D32_E_WB", s: 20, laneIndex: 0 });
+      await addVehicle(sedanGltf.scene, 4.45, "z", -3.2, -304, -198, -240, -1, 8.0, "car", { edgeId: "LTT_N_NB", s: 64, laneIndex: 0 });
     }
     if (suvGltf) {
-      await addVehicle(suvGltf.scene, 4.55, "x", -79.0, 8, 122, 76, 1, 6.9, "car");
-      await addVehicle(suvGltf.scene, 4.55, "z", 53.0, -230, -72, -110, -1, 6.5, "car");
+      await addVehicle(suvGltf.scene, 4.55, "x", -73.0, 8, 122, 76, 1, 6.9, "car", { edgeId: "D32_E_EB", s: 18, laneIndex: 1 });
+      await addVehicle(suvGltf.scene, 4.55, "z", 59.0, -230, -72, -110, -1, 6.5, "car", { edgeId: "HT_S_NB", s: 22, laneIndex: 0 });
     }
     if (vanGltf) {
       fixVanWheels(vanGltf.scene);
-      await addVehicle(vanGltf.scene, VAN_LENGTH, "x", -144.0, 8, 124, 88, -1, 6.7, "car");
-      await addVehicle(vanGltf.scene, VAN_LENGTH, "z", -9.6, -304, -198, -285, 1, 7.0, "car");
+      await addVehicle(vanGltf.scene, VAN_LENGTH, "x", -150.0, 8, 124, 88, -1, 6.7, "car", { edgeId: "DBP_E_WB", s: 24, laneIndex: 0 });
+      await addVehicle(vanGltf.scene, VAN_LENGTH, "z", -9.6, -304, -198, -285, 1, 7.0, "car", { edgeId: "LTT_N_SB", s: 20, laneIndex: 0 });
     }
     if (truckGltf) {
       fixVanWheels(truckGltf.scene);
-      await addVehicle(truckGltf.scene, VAN_LENGTH, "x", -150.0, 8, 124, 96, 1, 5.6, "truck");
-      await addVehicle(truckGltf.scene, VAN_LENGTH, "z", -9.6, -304, -198, -230, 1, 5.4, "truck");
+      await addVehicle(truckGltf.scene, VAN_LENGTH, "x", -144.0, 8, 124, 96, 1, 5.6, "truck", { edgeId: "DBP_E_EB", s: 20, laneIndex: 1 });
+      await addVehicle(truckGltf.scene, VAN_LENGTH, "z", -9.6, -304, -198, -230, 1, 5.4, "truck", { edgeId: "LTT_N_SB", s: 72, laneIndex: 0 });
     }
     if (motoGltf) {
-      await addVehicle(motoGltf.scene, 2.1, "x", -77.4, 8, 122, 52, 1, 6.6, "moto");
-      await addVehicle(motoGltf.scene, 2.1, "x", -145.4, 8, 124, 82, -1, 7.0, "moto");
-      await addVehicle(motoGltf.scene, 2.1, "z", 58.6, -230, -72, -175, 1, 6.1, "moto");
-      await addVehicle(motoGltf.scene, 2.1, "z", -4.4, -304, -198, -260, -1, 6.8, "moto");
+      await addVehicle(motoGltf.scene, 2.1, "x", -72.0, 8, 122, 52, 1, 6.6, "moto", { edgeId: "D32_W_EB", s: 26, laneIndex: 1 });
+      await addVehicle(motoGltf.scene, 2.1, "x", -151.0, 8, 124, 82, -1, 7.0, "moto", { edgeId: "DBP_W_WB", s: 14, laneIndex: 1 });
+      await addVehicle(motoGltf.scene, 2.1, "z", 59.8, -230, -72, -175, -1, 6.1, "moto", { edgeId: "HT_N_NB", s: 18, laneIndex: 1 });
+      await addVehicle(motoGltf.scene, 2.1, "z", -2.4, -304, -198, -260, -1, 6.8, "moto", { edgeId: "LTT_N_NB", s: 105, laneIndex: 1 });
     }
     const riderLod =
       riderGltf?.scene.getObjectByName("BikeRider_LOD1") ?? riderGltf?.scene.getObjectByName("BikeRider_LOD0");
     const baothuLod =
       baothuGltf?.scene.getObjectByName("BikeRider_LOD1") ?? baothuGltf?.scene.getObjectByName("BikeRider_LOD0");
     if (riderLod) {
-      await addVehicle(riderLod, 1.9, "x", -77.4, 8, 122, 102, 1, 6.8, "rider");
-      await addVehicle(riderLod, 1.9, "x", -148.6, 8, 124, 25, 1, 7.1, "rider");
+      await addVehicle(riderLod, 1.9, "x", -72.2, 8, 122, 102, 1, 6.8, "rider", { edgeId: "D32_E_EB", s: 32, laneIndex: 1 });
+      await addVehicle(riderLod, 1.9, "x", -143.0, 8, 124, 25, 1, 7.1, "rider", { edgeId: "DBP_W_EB", s: 8, laneIndex: 1 });
     }
     if (baothuLod) {
-      await addVehicle(baothuLod, 1.9, "x", -74.6, 8, 122, 48, -1, 7.4, "rider");
-      await addVehicle(baothuLod, 1.9, "z", -9.6, -304, -198, -275, 1, 7.1, "rider");
+      await addVehicle(baothuLod, 1.9, "x", -80.0, 8, 122, 48, -1, 7.4, "rider", { edgeId: "D32_W_WB", s: 16, laneIndex: 1 });
+      await addVehicle(baothuLod, 1.9, "z", 52.2, -230, -72, -120, 1, 7.1, "rider", { edgeId: "HT_S_SB", s: 20, laneIndex: 1 });
+    }
+  };
+
+  let longQ9Actor: { update(dt: number, time: number, playerX: number, playerZ: number, rangeSq: number): void } | null = null;
+  let longQ9Spawned = false;
+  const grabAnimators: { id: string; mixer: T.AnimationMixer; actions: Map<GrabClipName, T.AnimationAction>; current: GrabClipName | null; root: T.Object3D }[] = [];
+
+  const LONG_Q9_AGENT_ID = "DIST_LONG_Q9";
+  /**
+   * The stranded riders of the rescue sites: ordinary street NPC models (the same files as the pedestrians of
+   * loadExpandedNPCs) next to the same parked-bike models as the boarding house courtyard. Not Long Q9.
+   */
+  const LONG_Q9_STRANGERS = [
+    { npc: "manvn.optimized.glb", height: 1.68, bike: "bike-supercub.optimized.glb" },
+    { npc: "npc-alan.optimized.glb", height: 1.74, bike: "bike-pcx.optimized.glb" },
+    { npc: "rowan.optimized.glb", height: 1.73, bike: "vehicles/motorbike.glb" },
+  ] as const;
+  /** Half extents (m) of the solid of a parked bike: along its length and across. */
+  const BIKE_SOLID_HALF = { along: 0.95, across: 0.38 };
+  const setBikeSolid = (solid: Solid, x: number, z: number, alongX: boolean) => {
+    const hx = alongX ? BIKE_SOLID_HALF.along : BIKE_SOLID_HALF.across;
+    const hz = alongX ? BIKE_SOLID_HALF.across : BIKE_SOLID_HALF.along;
+    solid.x0 = x - hx;
+    solid.x1 = x + hx;
+    solid.z0 = z - hz;
+    solid.z1 = z + hz;
+  };
+  const clearSolid = (solid: Solid) => {
+    solid.x0 = solid.x1 = solid.z0 = solid.z1 = 1e6;
+  };
+
+  /**
+   * Long Q9's roadside rescue. The pure routine is simulation/longQ9.ts; this function loads the models and applies each frame:
+   * the Wave (a managed traffic agent while he cruises, moved by the routine while he pulls over, parks and rides off),
+   * Long on the seat or on foot, and the stranded rider and bike of each site.
+   */
+  const loadLongQ9Repair = async () => {
+    // Long Q9 is unique: one body, one spawn per world, never a pool or config entry.
+    if (longQ9Spawned) return;
+    longQ9Spawned = true;
+    const base = `/assets/testbus/ow/models/`;
+    const [qGltf, waveGltf] = await Promise.all([
+      loader.loadAsync(`${base}${LONG_Q9_FILE}`).catch(() => null),
+      loader.loadAsync(`${base}${WAVE_LONGQ9_FILE}`).catch(() => null),
+    ]);
+    if (disposed || !qGltf || !waveGltf) return;
+
+    // ---- The yellow Wave: pivots are rotated, the *_Mesh children are left alone.
+    const wave = cloneSkinned(waveGltf.scene);
+    wave.traverse((n) => {
+      if (n instanceof T.Mesh) {
+        n.castShadow = false;
+        n.receiveShadow = true;
+        n.frustumCulled = false;
+      }
+    });
+    const node = (name: string) => wave.getObjectByName(name) ?? null;
+    const steering = node("Wave_Steering");
+    const frontWheel = node("Wave_FrontWheel");
+    const rearWheel = node("Wave_RearWheel");
+    const kickstand = node("Wave_Kickstand");
+    const steerRest = steering ? steering.quaternion.clone() : new T.Quaternion();
+    const steerRestInv = steerRest.clone().invert();
+    const frontRadius = (frontWheel?.userData.radius as number | undefined) ?? 0.284;
+    const rearRadius = (rearWheel?.userData.radius as number | undefined) ?? 0.272;
+    const forwardIn = (x: number, z: number, inSteering: boolean) => {
+      const f = new T.Vector3(x, 0, z).normalize();
+      return inSteering ? f.applyQuaternion(steerRestInv) : f;
+    };
+    // Lamps at the anchors of the GLB, like every other vehicle: lenses that follow the node they sit on (the head lamp and the
+    // front signals turn with the handlebar), bound to the shared night level, brake light and blinker code.
+    const headAnchor = node("Wave_HeadLamp");
+    if (headAnchor) {
+      mountRoundLamp(headAnchor, { role: "head", name: "WaveHeadlamp", position: new T.Vector3(), radius: 0.055, depth: 0.02, facing: forwardIn(0, 1, true) });
+    }
+    const tailAnchor = node("Wave_TailLamp");
+    if (tailAnchor) {
+      mountRoundLamp(tailAnchor, { role: "tail", name: "WaveTaillamp", position: new T.Vector3(), radius: 0.04, depth: 0.018, facing: forwardIn(0, -1, false) });
+    }
+    for (const [anchorName, side, front] of [
+      ["Wave_SignalFL", 1, true],
+      ["Wave_SignalFR", -1, true],
+      ["Wave_SignalRL", 1, false],
+      ["Wave_SignalRR", -1, false],
+    ] as const) {
+      const anchor = node(anchorName);
+      if (!anchor) continue;
+      mountRoundLamp(anchor, {
+        role: side > 0 ? "signal_left" : "signal_right",
+        name: anchorName,
+        position: new T.Vector3(),
+        radius: 0.024,
+        depth: 0.012,
+        facing: forwardIn(side * 0.4, front ? 1 : -1, front),
+      });
+    }
+
+    const vehRoot = new T.Group();
+    vehRoot.name = "LongQ9Wave";
+    const holder = new T.Group();
+    holder.add(wave);
+    vehRoot.add(holder);
+    const seat = new T.Group();
+    seat.name = "LongQ9Seat";
+    seat.position.set(LONG_Q9_SEAT_OFFSET.x, 0, LONG_Q9_SEAT_OFFSET.z);
+    holder.add(seat);
+    addHeadlightBeam(holder, wave, new T.Vector3(0, 0, 1), "moto");
+    contact(holder, 0, 0.01, 0, 1.0, 2.15, shade);
+    const dynamicLights = attachDynamicLamps(holder, 0.4, 0.95, true);
+    dynamicRoot.add(vehRoot);
+    onAssetLoaded?.(vehRoot);
+
+    // ---- Long on foot or on the seat.
+    const obj = cloneSkinned(qGltf.scene);
+    obj.scale.setScalar(LONG_Q9_HEIGHT / LONG_Q9_RIG_HEIGHT);
+    upgradeHumanMaterials(obj);
+    obj.traverse((n) => {
+      if (n instanceof T.Mesh) {
+        n.castShadow = false;
+        n.receiveShadow = true;
+        n.frustumCulled = false; // the crouch and sit poses leave the bind-pose bounds
+      }
+    });
+    const mixer = new T.AnimationMixer(obj);
+    const actions = new Map<LongQ9Clip, T.AnimationAction>();
+    for (const clip of qGltf.animations) actions.set(clip.name as LongQ9Clip, mixer.clipAction(clip));
+    const person = new T.Group();
+    person.name = "LongQ9";
+    person.add(obj);
+    seat.add(person);
+    let onFoot = false;
+    let currentClip: LongQ9Clip | null = null;
+
+    // With traffic he starts on the road before the second site (D32_W_EB, no rescue window there beyond s 4) and drives into
+    // it, so he is seen cruising before the first rescue. Without traffic the scripted fallback starts at the first site.
+    const startSite = trafficMgr ? 1 : 0;
+    const state: LongQ9State = createLongQ9State(LONG_Q9_SITES, startSite);
+    if (trafficMgr) state.t = 0;
+    const ride = actions.get("Ride");
+    if (ride) {
+      ride.play();
+      currentClip = "Ride";
+    }
+
+    // ---- Traffic: a managed moto agent while cruising.
+    let agent: VehicleAgent | null = null;
+    if (trafficMgr) {
+      agent = trafficMgr.spawnVehicle({
+        id: LONG_Q9_AGENT_ID,
+        category: "moto",
+        edgeId: LONG_Q9_SITES[0].edgeId,
+        s: 8,
+        // Strongly prefer the straight turn at the next junction: it leads onto the edge of the second site.
+        preferStraightBias: 1000,
+        laneIndex: 1,
+        latOffset: 1.5,
+        speed: 6.5,
+        halfWidth: 0.4,
+        halfLength: 0.95,
+        wheelBase: 1.2,
+        // The wheels turn in the per-frame code below (they are pivots of the GLB), so the traffic rig spins none.
+        rig: { root: vehRoot, chassis: holder, wheels: [], wheelRadius: rearRadius, lights: dynamicLights },
+      });
+    }
+    const placeAgent = (v: VehicleAgent, siteIdx: number, s: number, lat: number, speed: number) => {
+      const edge = trafficMgr?.graph.edges.get(LONG_Q9_SITES[siteIdx].edgeId);
+      if (!edge) return;
+      const p = sampleEdge(edge, s, lat);
+      v.externalControl = false;
+      v.edgeId = edge.id;
+      v.onTurn = false;
+      v.turnId = null;
+      v.nextTurnId = null;
+      v.s = s;
+      v.latOffset = lat;
+      v.targetLatOffset = lat;
+      v.latVel = 0;
+      v.x = p.x;
+      v.z = p.z;
+      v.yaw = p.yaw;
+      v.yawRate = 0;
+      v.speed = speed;
+      v.accel = 0;
+      v.blinker = 0;
+    };
+
+    // ---- Stranded riders, one per site (loaded after Long starts, so the scenario never waits for them).
+    const strangers: ({ group: T.Group; mixer?: T.AnimationMixer; yaw: number } | null)[] = LONG_Q9_SITES.map(() => null);
+
+    if (humanPresence) {
+      presenceCleanups.push(
+        humanPresence.register({
+          id: "street_long_q9",
+          label: { en: "Long Q9, bike mechanic", vi: "Chú Long Q9, thợ sửa xe" },
+          object: person,
+          radius: 0.36,
+          canSidestep: false,
+          // Bumping him changes nothing: he keeps working (the state machine ignores the player).
+          onBump: () => {},
+          onPersonalSpace: () => {},
+        }),
+      );
+    }
+
+    const _tmpQ = new T.Quaternion();
+    const _yAxis = new T.Vector3(0, 1, 0);
+    let frontSpin = 0;
+    let rearSpin = 0;
+    let lastExternal = false;
+    let solidOn = false;
+
+    longQ9Actor = {
+      update(dt, time, playerX, playerZ, rangeSq) {
+        // 1. The routine. During cruise it reads the traffic agent (null on a junction arc; undefined without traffic).
+        let reading: LongQ9TrafficReading | null | undefined;
+        if (agent) {
+          reading =
+            !agent.externalControl && !agent.onTurn
+              ? { edgeId: agent.edgeId, s: agent.s, latOffset: agent.latOffset, x: agent.x, z: agent.z, yaw: agent.yaw, speed: agent.speed }
+              : null;
+        }
+        // Before riding off he waits while a vehicle is closing in from behind on the merge spot.
+        let rideOffClear = true;
+        if (trafficMgr && state.phase === "kickstand_up") {
+          const sIdx = LONG_Q9_SITES[state.site];
+          const mergeS = sIdx.parkU + 6;
+          for (const v of trafficMgr.vehicles) {
+            if (v.id === LONG_Q9_AGENT_ID || v.edgeId !== sIdx.edgeId || v.onTurn) continue;
+            const behind = mergeS - v.s;
+            if (behind > -2 && behind < 8 + v.speed * 2.5 && v.speed > 0.5) {
+              rideOffClear = false;
+              break;
+            }
+          }
+        }
+        const frame: LongQ9Frame = stepLongQ9(state, dt, LONG_Q9_SITES, reading, rideOffClear);
+        const site = LONG_Q9_SITES[frame.site];
+
+        // 2. The traffic agent: owned by the routine while it is not cruising, given back on the road afterwards.
+        if (agent) {
+          if (frame.external) {
+            agent.externalControl = true;
+            agent.edgeId = LONG_Q9_SITES[state.site].edgeId;
+            agent.onTurn = false;
+            agent.s = state.u;
+            agent.latOffset = state.v;
+            agent.targetLatOffset = state.v;
+            agent.x = frame.bike.x;
+            agent.z = frame.bike.z;
+            agent.yaw = frame.bike.yaw;
+            agent.speed = frame.speed;
+            agent.accel = 0;
+            agent.steerAngle = frame.steer;
+            agent.blinker = frame.blinker;
+          } else if (frame.handback) {
+            const h = frame.handback;
+            placeAgent(agent, state.site === 0 ? LONG_Q9_SITES.length - 1 : state.site - 1, h.s, h.latOffset, h.speed);
+          } else if (frame.relocate) {
+            // A cruise that never met the next site: bring him to its approach, but only where nobody can see it.
+            const { sLo } = longQ9TakeoverWindow(site);
+            const target = longQ9SitePoint(site, sLo, 1.5);
+            const far = (x: number, z: number) => (x - playerX) ** 2 + (z - playerZ) ** 2 > 110 * 110;
+            if (far(agent.x, agent.z) && far(target.x, target.z)) {
+              placeAgent(agent, frame.site, sLo, 1.5, 6.5);
+              state.relocate = false;
+              state.t = LONG_Q9_CRUISE_MIN_SECONDS;
+            }
+          }
+        }
+        if (frame.external || !agent) {
+          // Rig pose, lamps and tilt are applied by the traffic step only for managed agents; without traffic the routine
+          // places the bike in every phase, cruise included.
+          vehRoot.position.set(frame.bike.x, frame.bike.y, frame.bike.z);
+          vehRoot.rotation.y = frame.bike.yaw;
+          holder.rotation.x = 0;
+          holder.rotation.z = frame.lean;
+          dynamicLights.setBrake(frame.brake ? 0.9 : 0);
+          dynamicLights.setBlinker(frame.blinker, frame.blinker !== 0 && Math.floor(time * 3.2) % 2 === 0);
+        } else if (lastExternal) {
+          vehRoot.position.y = 0;
+          holder.rotation.z = 0;
+        }
+        lastExternal = frame.external;
+        const bikeDistSq = (frame.bike.x - playerX) ** 2 + (frame.bike.z - playerZ) ** 2;
+        vehRoot.visible = frame.bikeVisible && bikeDistSq < 155 * 155;
+
+        // 3. Wheels, handlebar and kickstand (pivots of the GLB).
+        const speed = frame.external || !agent ? frame.speed : agent.speed;
+        const steer = frame.external || !agent ? frame.steer : agent.steerAngle;
+        frontSpin += (speed * dt) / frontRadius;
+        rearSpin += (speed * dt) / rearRadius;
+        if (frontWheel) frontWheel.rotation.x = frontSpin % (Math.PI * 2);
+        if (rearWheel) rearWheel.rotation.x = rearSpin % (Math.PI * 2);
+        if (steering) steering.quaternion.copy(steerRest).multiply(_tmpQ.setFromAxisAngle(_yAxis, steer));
+        if (kickstand) {
+          kickstand.rotation.x = T.MathUtils.degToRad(
+            LONG_Q9_KICKSTAND_FOLDED_DEG + (LONG_Q9_KICKSTAND_DEPLOYED_DEG - LONG_Q9_KICKSTAND_FOLDED_DEG) * frame.kickstand,
+          );
+        }
+
+        // 4. Solid of the parked Wave while he works (the player cannot walk through it), none while it rides.
+        // It is not switched on while the player stands where the bike is (he would be inside the rect); once on it stays on.
+        const parked = frame.phase !== "cruise" && frame.speed === 0 && frame.kickstand > 0 && frame.bike.y > 0;
+        if (parked) {
+          if (!solidOn) {
+            const px = frame.bike.x - playerX;
+            const pz = frame.bike.z - playerZ;
+            if (px * px + pz * pz > 1.6 * 1.6) {
+              setBikeSolid(longQ9BikeSolid, frame.bike.x, frame.bike.z, Math.abs(site.dir.x) > 0.5);
+              solidOn = true;
+            }
+          }
+        } else if (solidOn) {
+          clearSolid(longQ9BikeSolid);
+          solidOn = false;
+        }
+
+        // 5. Long: parented to the seat while riding, in the world while on foot.
+        if (frame.standingOnFoot !== onFoot) {
+          onFoot = frame.standingOnFoot;
+          if (onFoot) {
+            dynamicRoot.add(person);
+          } else {
+            seat.add(person);
+            person.position.set(0, 0, 0);
+            person.rotation.set(0, 0, 0);
+          }
+        }
+        let inRange = vehRoot.visible && bikeDistSq < rangeSq;
+        if (onFoot) {
+          person.position.set(frame.person.x, frame.person.y, frame.person.z);
+          person.rotation.y = frame.person.yaw;
+          const dx = frame.person.x - playerX;
+          const dz = frame.person.z - playerZ;
+          inRange = dx * dx + dz * dz < rangeSq;
+        }
+        person.visible = onFoot ? inRange : vehRoot.visible;
+        if (inRange) {
+          if (frame.clip !== currentClip) {
+            const next = actions.get(frame.clip);
+            if (next) {
+              const prev = currentClip ? actions.get(currentClip) : undefined;
+              next.reset().play();
+              if (prev) prev.crossFadeTo(next, 0.35, false);
+              currentClip = frame.clip;
+            }
+          }
+          mixer.update(dt);
+        }
+
+        // 6. The stranded riders face Long while he works on foot next to the bike, otherwise their own bike.
+        for (let i = 0; i < strangers.length; i++) {
+          const st = strangers[i];
+          if (!st) continue;
+          const sSite = LONG_Q9_SITES[i];
+          const sp = longQ9SitePoint(sSite, sSite.npcU, LONG_Q9_NPC_V);
+          const dx = sp.x - playerX;
+          const dz = sp.z - playerZ;
+          st.group.visible = dx * dx + dz * dz < rangeSq;
+          if (!st.group.visible) continue;
+          let target = st.yaw;
+          if (frame.strangerFacesLong && frame.site === i) target = Math.atan2(frame.person.x - sp.x, frame.person.z - sp.z);
+          let dy = target - st.group.rotation.y;
+          while (dy > Math.PI) dy -= Math.PI * 2;
+          while (dy < -Math.PI) dy += Math.PI * 2;
+          st.group.rotation.y += dy * Math.min(1, dt * 4);
+          st.mixer?.update(dt);
+        }
+      },
+    };
+
+    // Stranded riders and their bikes.
+    for (let i = 0; i < LONG_Q9_SITES.length; i++) {
+      if (disposed) return;
+      const site = LONG_Q9_SITES[i];
+      const cfg = LONG_Q9_STRANGERS[i % LONG_Q9_STRANGERS.length];
+      const alongYaw = Math.atan2(site.dir.x, site.dir.z);
+      const bikeGltf = await loader.loadAsync(`${base}${cfg.bike}`).catch(() => null);
+      if (disposed) return;
+      if (bikeGltf) {
+        const bike = bikeGltf.scene.clone(true);
+        const b0 = new T.Box3().setFromObject(bike, true);
+        const sz0 = b0.getSize(new T.Vector3());
+        if (sz0.x > sz0.z) bike.rotation.y += Math.PI / 2;
+        bike.updateMatrixWorld(true);
+        const b1 = new T.Box3().setFromObject(bike, true);
+        bike.scale.setScalar(1.9 / Math.max(b1.max.z - b1.min.z, 0.5));
+        bike.updateMatrixWorld(true);
+        const b2 = new T.Box3().setFromObject(bike, true);
+        const c2 = b2.getCenter(new T.Vector3());
+        bike.position.set(-c2.x, -b2.min.y, -c2.z);
+        bike.traverse((n) => {
+          if (n instanceof T.Mesh) {
+            n.castShadow = false;
+            n.receiveShadow = true;
+          }
+        });
+        const bikeHolder = new T.Group();
+        bikeHolder.add(bike);
+        const bp = longQ9SitePoint(site, site.strangerBikeU, LONG_Q9_PARK_V);
+        bikeHolder.position.set(bp.x, CURB_HEIGHT, bp.z);
+        bikeHolder.rotation.y = alongYaw;
+        contact(bikeHolder, 0, 0.01, 0, 1.0, 2.15, shade);
+        dynamicRoot.add(bikeHolder);
+        onAssetLoaded?.(bikeHolder);
+        setBikeSolid(strangerBikeSolids[i], bp.x, bp.z, Math.abs(site.dir.x) > 0.5);
+      }
+      const npcGltf = await loader.loadAsync(`${base}${cfg.npc}`).catch(() => null);
+      if (!npcGltf || disposed) continue;
+      // A failed clip build must not end the loop: the remaining sites still get their bike and rider.
+      const clips = await streetClips(cfg.npc, npcGltf.scene, npcGltf.animations).catch(() => null);
+      if (disposed) return;
+      if (!clips) continue;
+      const npc = cloneSkinned(npcGltf.scene);
+      const nb = new T.Box3().setFromObject(npc, true);
+      const ns = cfg.height / Math.max(0.1, nb.max.y - nb.min.y);
+      npc.scale.setScalar(ns);
+      npc.position.set(-((nb.max.x + nb.min.x) * ns) / 2, -nb.min.y * ns, -((nb.max.z + nb.min.z) * ns) / 2);
+      upgradeHumanMaterials(npc);
+      npc.traverse((n) => {
+        if (n instanceof T.Mesh) {
+          n.castShadow = false;
+          n.receiveShadow = true;
+        }
+      });
+      const group = new T.Group();
+      group.add(npc);
+      const np = longQ9SitePoint(site, site.npcU, LONG_Q9_NPC_V);
+      group.position.set(np.x, CURB_HEIGHT, np.z);
+      // He first looks at his own bike: toward the road side of the curb (the -right direction).
+      const yaw = Math.atan2(site.dir.z, -site.dir.x);
+      group.rotation.y = yaw;
+      contact(group, 0, 0.01, 0, 0.65, 0.65, shade);
+      dynamicRoot.add(group);
+      onAssetLoaded?.(group);
+      let npcMixer: T.AnimationMixer | undefined;
+      if (clips.idle) {
+        npcMixer = new T.AnimationMixer(npc);
+        const action = npcMixer.clipAction(clips.idle);
+        action.timeScale = 0.85;
+        action.time = Math.random() * clips.idle.duration;
+        action.play();
+      }
+      strangers[i] = { group, mixer: npcMixer, yaw };
+      if (humanPresence) {
+        presenceCleanups.push(
+          humanPresence.register({
+            id: `street_long_q9_customer_${i}`,
+            label: { en: "Stranded rider", vi: "Người đi xe bị hỏng" },
+            object: group,
+            radius: 0.34,
+            canSidestep: false,
+            onBump: () => {},
+            onPersonalSpace: () => {},
+          }),
+        );
+      }
+    }
+  };
+
+  const loadGrabDrivers = async () => {
+    if (!trafficMgr) return;
+    const gltf = await loader.loadAsync(`/assets/testbus/ow/models/${GRAB_DRIVER_FILE}`).catch(() => null);
+    if (disposed || !gltf) return;
+    const spawns: { edgeId: string; s: number; laneIndex: 0 | 1 }[] = [
+      { edgeId: "D32_W_EB", s: 60, laneIndex: 1 },
+      { edgeId: "HT_N_NB", s: 40, laneIndex: 1 },
+      { edgeId: "DBP_E_WB", s: 50, laneIndex: 1 },
+    ];
+    let idx = 0;
+    for (const sp of spawns) {
+      if (disposed) return;
+      const id = `DIST_GRAB_${idx++}`;
+      const obj = cloneSkinned(gltf.scene);
+      const b = new T.Box3().setFromObject(obj, true);
+      const ctr = b.getCenter(new T.Vector3());
+      // Real-world scale (scale 1); the scooter faces +Z like every other vehicle rig.
+      obj.position.set(-ctr.x, -b.min.y, -ctr.z);
+      obj.traverse((n) => {
+        if (n instanceof T.Mesh) {
+          n.castShadow = false;
+          n.receiveShadow = true;
+          n.frustumCulled = false;
+        }
+      });
+      const vehRoot = new T.Group();
+      const holder = new T.Group();
+      holder.add(obj);
+      vehRoot.add(holder);
+      const lamps = markLampParts(holder, obj, new T.Vector3(0, 0, 1));
+      // The model has no lamp mesh: mount round lenses on its bones so the head lamp turns with the handlebar.
+      const grabLamps = mountGrabLamps(obj);
+      if (lamps.head || grabLamps.head) addHeadlightBeam(holder, obj, new T.Vector3(0, 0, 1), "moto");
+      contact(holder, 0, 0.01, 0, 1.0, 2.15, shade);
+      const dynamicLights = attachDynamicLamps(holder, 0.44, 1.04, true);
+      dynamicRoot.add(vehRoot);
+      onAssetLoaded?.(vehRoot);
+
+      const mixer = new T.AnimationMixer(obj);
+      const actions = new Map<GrabClipName, T.AnimationAction>();
+      for (const clip of gltf.animations) actions.set(clip.name as GrabClipName, mixer.clipAction(clip));
+      grabAnimators.push({ id, mixer, actions, current: null, root: vehRoot });
+
+      trafficMgr.spawnVehicle({
+        id,
+        category: "moto",
+        edgeId: sp.edgeId,
+        s: sp.s,
+        laneIndex: sp.laneIndex,
+        halfWidth: 0.44,
+        halfLength: 1.04,
+        // The clips turn the wheels, so the traffic rig spins none of its own.
+        rig: { root: vehRoot, chassis: holder, wheels: [], wheelRadius: 0.275, lights: dynamicLights },
+      });
     }
   };
 
@@ -1539,7 +2172,7 @@ export function buildSaigonDistricts(
       { file: "manvn.optimized.glb", pos: [17.4, CURB_HEIGHT, -9.8], axis: "x", min: 15.2, max: 22.0, speed: 0.72, height: 1.68 },
       { file: "npc-sofia.optimized.glb", pos: [11.2, CURB_HEIGHT, -11.4], axis: "x", min: 6.2, max: 13.0, speed: 0.68, height: 1.64 },
       // Đường 3/2 Commercial Boulevard pedestrians + stationary sidewalk café pair!
-      { file: "npc-alan.optimized.glb", pos: [26.0, CURB_HEIGHT, -67.6], axis: "x", min: 14.0, max: 45.0, speed: 0.88, height: 1.74 },
+      { file: "npc-alan.optimized.glb", pos: [26.0, CURB_HEIGHT, -67.6], axis: "x", min: 14.0, max: 33.0, speed: 0.88, height: 1.74 },
       { file: "npc-linmei.optimized.glb", pos: [34.0, CURB_HEIGHT, -84.0], axis: "x", min: 14.0, max: 45.0, speed: 0.82, height: 1.62 },
       { file: "npc-sofia.optimized.glb", pos: [25.6, CURB_HEIGHT, -66.5], axis: "idle", min: 0, max: 0, speed: 0, height: 1.63, idleYaw: 1.2 },
       { file: "rowan.optimized.glb", pos: [27.3, CURB_HEIGHT, -66.5], axis: "idle", min: 0, max: 0, speed: 0, height: 1.73, idleYaw: -1.4 },
@@ -1555,6 +2188,7 @@ export function buildSaigonDistricts(
       { file: "npc-freya.optimized.glb", pos: [LANDMARK81_POS.x + 12, CURB_HEIGHT, -314.2], axis: "x", min: -6, max: 56, speed: 0.76, height: 1.65 },
     ];
 
+    let actorSeed = 21;
     for (const cfg of npcConfigs) {
       if (disposed) return;
       const gltf = await loader.loadAsync(`/assets/testbus/ow/models/${cfg.file}`).catch(() => null);
@@ -1566,16 +2200,11 @@ export function buildSaigonDistricts(
       const s = cfg.height / Math.max(0.1, b.max.y - b.min.y);
       obj.scale.setScalar(s);
       obj.position.set(-((b.max.x + b.min.x) * s) / 2, -b.min.y * s, -((b.max.z + b.min.z) * s) / 2);
+      upgradeHumanMaterials(obj);
       obj.traverse((n) => {
         if (n instanceof T.Mesh) {
           n.castShadow = false;
           n.receiveShadow = true;
-          if (n.name === "HumanBody") {
-            const mats = Array.isArray(n.material) ? n.material : [n.material];
-            mats.forEach((m) => {
-              if (m instanceof T.MeshStandardMaterial) warmSkin(m);
-            });
-          }
         }
       });
       const holder = new T.Group();
@@ -1586,12 +2215,15 @@ export function buildSaigonDistricts(
       onAssetLoaded?.(holder);
 
       let mixer: T.AnimationMixer | undefined;
+      let walkAction: T.AnimationAction | undefined;
+      const walkClipSpeed = clips.walkSpeedAt(cfg.height);
       const clip = cfg.axis === "idle" ? clips.idle : clips.walk;
       if (clip) {
         mixer = new T.AnimationMixer(obj);
         const action = mixer.clipAction(clip);
+        walkAction = action;
         // Feet stay planted: the clip plays at the speed the NPC actually walks.
-        action.timeScale = cfg.axis === "idle" ? 0.8 : cfg.speed / clips.walkSpeedAt(cfg.height);
+        action.timeScale = cfg.axis === "idle" ? 0.85 : cfg.speed / walkClipSpeed;
         action.time = Math.random() * clip.duration;
         action.play();
         animMixers.push(mixer);
@@ -1600,9 +2232,43 @@ export function buildSaigonDistricts(
       const initYaw =
         cfg.axis === "idle" ? (cfg.idleYaw ?? 0) : cfg.axis === "x" ? Math.PI / 2 : 0;
       holder.rotation.y = initYaw;
+      const seed = actorSeed++;
+      const activity: HumanActivity =
+        cfg.axis === "idle"
+          ? seed % 2 === 0
+            ? "talking"
+            : "listening"
+          : "walking";
+      const realism = createHumanRealismRig(holder, obj, seed);
+      if (humanPresence) {
+        presenceCleanups.push(
+          humanPresence.register({
+            id: `district_ped_${seed}`,
+            label:
+              cfg.axis === "idle"
+                ? { en: "Saigon Local", vi: "Người dân Sài Gòn" }
+                : { en: "Pedestrian", vi: "Người đi bộ" },
+            object: holder,
+            radius: 0.34,
+            canSidestep: true,
+            onBump: (dx, dz, strength) => {
+              realism.triggerBump(dx, dz, strength);
+              if (cfg.axis !== "idle") {
+                holder.position.x += dx * 0.14;
+                holder.position.z += dz * 0.14;
+              }
+            },
+            onPersonalSpace: (closeness) => realism.setPersonalSpace(closeness),
+          }),
+        );
+      }
       roamingActors.push({
         group: holder,
         mixer,
+        walkAction,
+        walkClipSpeed,
+        realism,
+        activity,
         axis: cfg.axis,
         min: cfg.min,
         max: cfg.max,
@@ -1611,16 +2277,43 @@ export function buildSaigonDistricts(
         targetYaw: initYaw,
       });
     }
+    // Pair nearby stationary conversing NPCs so they maintain natural eye contact unless Alex approaches.
+    for (let i = 0; i < roamingActors.length; i++) {
+      const a = roamingActors[i];
+      if (a.axis !== "idle") continue;
+      for (let j = 0; j < roamingActors.length; j++) {
+        if (i === j || roamingActors[j].axis !== "idle") continue;
+        if (a.group.position.distanceTo(roamingActors[j].group.position) < 3.2) {
+          a.partnerPos = roamingActors[j].group.position.clone().add(new T.Vector3(0, 1.56, 0));
+          break;
+        }
+      }
+    }
   };
 
   // Phase 3 & 4: Thủ Thiêm Skyline, Cable-Stayed Ba Son Bridge, Illuminated Saigon River Boats & Living Sky!
   const riversideWorld = buildSaigonRiversideWorld(chunkHorizon, dynamicRoot, towerMats);
 
-  // Phase 3: 1-Draw-Call Wet-Road Tire Spray Mist System for all moving Q.1 traffic!
-  const tireSpray = createWetTireSpraySystem(dynamicRoot, 24);
+  // =========================================================================
+  // CHUNK 5: CHỢ LỚN, QUẬN 5 — the market at the end of Route 06.
+  //
+  // `WorldStreamer.getZone` has named this stop (`zone.choLonStop` / `district.d5`) since the bus was
+  // built, but nothing was ever built here: the bus arrived at z = -128 and the doors opened onto an
+  // empty corridor. Mission 02's whole destination is this block, so it is authored in `choLon.ts`
+  // and stitched in here, before the static-mesh batching pass so it shares its draw calls.
+  // =========================================================================
+  // The market and its street share the district's tree batch and potted-plant wind, so the new
+  // pavement planting sways with the rest of the city instead of standing frozen in it.
+  const choLon = buildChoLon(root, streamer, solids, districtLights.map((d) => d.spec), 5173, {
+    batch: botanicalBatch,
+    potWind,
+  });
+
+  // Phase 3: 1-Draw-Call Wet-Road Tire Spray Mist System for ALL moving Saigon traffic!
+  const tireSpray = createWetTireSpraySystem(dynamicRoot, 32);
 
   // Batch static district meshes across all 6 chunks down to minimal GPU draw calls!
-  for (const ch of [chunkNorthView, chunkEastBlvd, chunkEastBlvdLod, chunkBitexco, chunkLandmark, chunkHorizon]) {
+  for (const ch of [chunkNorthView, chunkEastBlvd, chunkEastBlvdLod, chunkBitexco, chunkLandmark, chunkHorizon, choLon.root]) {
     mergeStaticMeshesByMaterial(ch);
     freezeStaticMatrices(ch);
   }
@@ -1661,7 +2354,7 @@ export function buildSaigonDistricts(
     potWind,
   );
 
-  void Promise.all([loadExpandedFleet(), loadExpandedNPCs()]);
+  void Promise.all([loadExpandedFleet(), loadExpandedNPCs(), loadLongQ9Repair(), loadGrabDrivers()]);
 
   let savedVis = { eb: true, ebLod: false, bx: true, lm: true };
 
@@ -1669,6 +2362,7 @@ export function buildSaigonDistricts(
     root,
     solids,
     lightSpecs: districtLights.map((d) => d.spec),
+    choLon,
     setWindowPreviewMode(enabled: boolean) {
       if (enabled) {
         savedVis = {
@@ -1710,7 +2404,9 @@ export function buildSaigonDistricts(
       return false;
     },
     isWithinOpenWorld(x: number, z: number) {
+      // Widen just the market block; leave the upstream neighbourhood boundaries elsewhere.
       if (x >= -19.5 && x <= 7.0 && z >= -316 && z <= 48) return true;
+      if (x >= -25.0 && x < -19.5 && z >= -152 && z <= -104) return true;
       if (x >= 4.5 && x <= 31.8 && z >= -19.2 && z <= -6.6) return true;
       if (x >= 0 && x <= 132 && (Math.abs(z + 76) <= 10.6 || Math.abs(z + 147) <= 10.6)) return true;
       if (x >= 46 && x <= 66 && z >= -236 && z <= -65.6) return true;
@@ -1782,27 +2478,34 @@ export function buildSaigonDistricts(
       const pulse = Math.sin(time * 2.6) > 0.2 ? 1.0 : 0.08;
       for (const b of beacons) b.color.setRGB(4.5 * pulse, 0.2 * pulse, 0.1 * pulse);
 
-      // Alternating E-W (0..10s green, 10..12.5s yellow) vs N-S (12.5..22.5s green) traffic cycle!
+      // Legacy fallback signal cycle ONLY when trafficMgr is absent
       const cyc = time % 25.0;
       const ewGreen = cyc < 10.0;
       const ewYellow = cyc >= 10.0 && cyc < 12.5;
       const nsGreen = cyc >= 12.5 && cyc < 22.5;
-      for (const ts of trafficSignalMats) {
-        ts.r.emissiveIntensity = !ewGreen && !ewYellow ? 3.2 : 0.05;
-        ts.y.emissiveIntensity = ewYellow ? 3.0 : 0.05;
-        ts.g.emissiveIntensity = ewGreen ? 3.0 : 0.05;
+      if (!trafficMgr) {
+        for (const ts of trafficSignalMats) {
+          ts.r.emissiveIntensity = !ewGreen && !ewYellow ? 3.2 : 0.05;
+          ts.y.emissiveIntensity = ewYellow ? 3.0 : 0.05;
+          ts.g.emissiveIntensity = ewGreen ? 3.0 : 0.05;
+        }
       }
 
       const npcRangeSq = 75 * 75;
+      _npcPlayerPos.set(playerX, 1.68, playerZ);
+      const rainPace = 1 + envRain * 0.2;
       for (const a of roamingActors) {
         const dx = a.group.position.x - playerX;
         const dz = a.group.position.z - playerZ;
-        const visible = dx * dx + dz * dz < npcRangeSq;
+        const dSq = dx * dx + dz * dz;
+        const visible = dSq < npcRangeSq;
         a.group.visible = visible;
 
+        let curSpeed = 0;
         if (a.axis !== "idle") {
+          curSpeed = a.speed * rainPace;
           const cur = a.axis === "x" ? a.group.position.x : a.group.position.z;
-          let next = cur + a.dir * a.speed * dt;
+          let next = cur + a.dir * curSpeed * dt;
           if (next > a.max) {
             next = a.max;
             a.dir = -1;
@@ -1822,11 +2525,64 @@ export function buildSaigonDistricts(
           while (diff > Math.PI) diff -= Math.PI * 2;
           while (diff < -Math.PI) diff += Math.PI * 2;
           a.group.rotation.y += diff * Math.min(1, dt * 6.5);
+          if (a.walkAction) a.walkAction.timeScale = curSpeed / a.walkClipSpeed;
         }
-        if (visible && a.mixer) a.mixer.update(dt);
+        if (visible) {
+          if (a.mixer) a.mixer.update(dt);
+          // Conversing café/plaza pairs keep eye contact with each other unless Alex walks within 3.6m!
+          const focusPoint = a.partnerPos && dSq > 3.6 * 3.6 ? a.partnerPos : null;
+          a.realism.update({
+            dt,
+            time,
+            playerPos: _npcPlayerPos,
+            focusPoint,
+            moveSpeed: curSpeed,
+            activity: a.activity,
+            rain: envRain,
+            hasActiveMixer: Boolean(a.mixer),
+          });
+        }
       }
 
-      // Smart Intersection Traffic AI: real red-light stop lines + same-lane headway braking (ZERO cross-clipping!)
+      longQ9Actor?.update(dt, time, playerX, playerZ, npcRangeSq);
+
+      if (trafficMgr) {
+        for (const ga of grabAnimators) {
+          const agent = trafficMgr.vehicles.find((v) => v.id === ga.id);
+          if (!agent || !ga.root.visible || agent.lodTier > 1) continue;
+          const choice = pickGrabClip(agent.speed, agent.steerAngle);
+          if (choice.clip !== ga.current) {
+            const next = ga.actions.get(choice.clip);
+            if (next) {
+              next.reset().play();
+              if (ga.current) ga.actions.get(ga.current)?.crossFadeTo(next, 0.35, false);
+              else next.fadeIn(0.1);
+              ga.current = choice.clip;
+            }
+          }
+          const act = ga.current ? ga.actions.get(ga.current) : undefined;
+          if (act) act.timeScale = choice.timeScale;
+          ga.mixer.update(dt);
+        }
+        // Distance-cull managed boulevard vehicles & driver crews cleanly, then drive wet-road tire spray!
+        const vehRangeSq = 155 * 155;
+        const crewRangeSq = 72 * 72;
+        for (const v of trafficMgr.vehicles) {
+          if (!v.rig || v.externalControl) continue;
+          const dx = v.x - playerX;
+          const dz = v.z - playerZ;
+          v.rig.root.visible = dx * dx + dz * dz < vehRangeSq;
+        }
+        for (const c of managedCrews) {
+          const dx = c.vehRoot.position.x - playerX;
+          const dz = c.vehRoot.position.z - playerZ;
+          c.root.visible = dx * dx + dz * dz < crewRangeSq;
+        }
+        tireSpray.updateFromAgents(trafficMgr.vehicles, envWetness, envRain, time);
+        return;
+      }
+
+      // Legacy Smart Intersection Traffic AI fallback (when trafficMgr is not passed)
       const vehRangeSq = 135 * 135;
       for (let i = 0; i < boulevardVehicles.length; i++) {
         const v = boulevardVehicles[i];
@@ -1897,6 +2653,8 @@ export function buildSaigonDistricts(
       tireSpray.update(boulevardVehicles, envWetness, envRain, time);
     },
     dispose() {
+      for (const cleanup of presenceCleanups) cleanup();
+      presenceCleanups.length = 0;
       disposed = true;
       realisticGrass.dispose();
       tireSpray.dispose();

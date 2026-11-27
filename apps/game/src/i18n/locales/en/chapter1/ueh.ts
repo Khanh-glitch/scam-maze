@@ -14,6 +14,7 @@ const ueh = {
       navLabel: "Portal sections",
       home: "Student Portal",
       accessActive: "Active",
+      accessNotChecked: "Not yet checked",
       accessLocked: "Access locked",
       nav: {
         dashboard: "Dashboard",
@@ -61,9 +62,7 @@ const ueh = {
         supervisorWaiting: "Waiting for the finished draft",
         remaining: "Work on the draft",
         task: {
-          intro: "Introduction and literature review",
-          findings: "Findings section",
-          final: "Full draft read-through",
+          final: "Two sentences of the thesis",
         },
         taskDone: "Done",
         taskTodo: "To do",
@@ -72,6 +71,10 @@ const ueh = {
         deadlineValue: "Friday, 17:00",
         timeLeftLabel: "Time left",
         access: "Submission system access",
+        submitButton: "Submit final thesis",
+        submittedReceipt: "Submission received. Keep this receipt.",
+        blockedHint: "Finish the draft, confirm access and resolve any account lock before submitting.",
+        deadlineMissed: "Deadline passed without a submission receipt.",
       },
       services: {
         heading: "Student services",
@@ -101,6 +104,8 @@ const ueh = {
           thesisAmount: "No fee",
         },
         feesNote: "Questions about a fee: ask the Training Office.",
+        paymentPortalLabel: "Payment portal (listed in the student handbook)",
+        paymentPortalDomain: "payment.ueh.edu.vn",
       },
       account: {
         heading: "Account and security",
@@ -117,6 +122,15 @@ const ueh = {
         step2: "Change your passwords and sign out other devices.",
         step3: "Wait for the office to confirm that your access works.",
       },
+    },
+    parcel: {
+      heading: "Redelivery confirmation",
+      body: "The parcel could not be delivered because the recipient's details are incomplete. Confirm the details before the next attempt. Redelivery fee: {{fee}}.",
+      recipient: "Recipient details",
+      confirmed: "Recipient details confirmed.",
+      feeLabel: "Redelivery fee — {{fee}}",
+      paid: "Fee paid. The parcel will be sent out on the next run.",
+      disclaimer: "Toc Hanh 24 counter network. This page only confirms what the message already says.",
     },
     clearance: {
       home: "Home",

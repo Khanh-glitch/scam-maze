@@ -38,8 +38,8 @@ describe("Mission 01 steps", () => {
 
   it("start on the laptop's thesis and bring the email in as the current step when it arrives", () => {
     let state = run([START]);
-    expect(main(state).steps.map((step) => step.id)).toEqual(["intro", "findings", "final"]);
-    expect(main(state).current).toMatchObject({ id: "intro", target: "laptop", app: "thesis", done: false });
+    expect(main(state).steps.map((step) => step.id)).toEqual(["write"]);
+    expect(main(state).current).toMatchObject({ id: "write", label: "Type two sentences of your thesis", target: "laptop", app: "thesis", done: false });
 
     state = run([START, advance(10)]);
     expect(main(state).current).toMatchObject({ id: "read-mail", target: "laptop", app: "mail" });
@@ -50,18 +50,15 @@ describe("Mission 01 steps", () => {
     expect(view.steps.map((step) => [step.id, step.done, step.optional])).toEqual([
       ["read-mail", true, false],
       ["confirm-access", false, true],
-      ["intro", false, false],
-      ["findings", false, false],
-      ["final", false, false],
+      ["write", false, false],
     ]);
-    expect(view.current?.id).toBe("intro");
+    expect(view.current?.id).toBe("write");
   });
 
   it("follow the thesis tasks and move the mission to completed", () => {
     const base = [START, advance(10), open("mail.clearance")];
-    expect(main(run([...base, task("draft.intro-review")])).current?.id).toBe("findings");
-    expect(main(run([...base, task("draft.intro-review"), task("draft.findings")])).current?.id).toBe("final");
-    const state = run([...base, task("draft.intro-review"), task("draft.findings"), task("draft.final")]);
+    expect(main(run(base)).current?.id).toBe("write");
+    const state = run([...base, task("draft.final")]);
     expect(selectOpenMissions(state, S).some((mission) => mission.id === "m01.missing-access")).toBe(false);
     expect(selectClosedMissions(state, S)).toContainEqual({ id: "m01.missing-access", title: "THE MISSING ACCESS", optional: false, status: "completed" });
   });
@@ -79,6 +76,6 @@ describe("Mission 01 steps", () => {
     expect(keys.length).toBeGreaterThan(0);
     for (const key of keys) expect(LAST_SUBMISSION_NARRATIVE_VI[key], key).toBeTruthy();
     const vi = localizeScenario(S, LAST_SUBMISSION_NARRATIVE_VI);
-    expect(main(run([START], vi), vi).current?.label).toBe("Chỉnh sửa phần mở đầu và tổng quan tài liệu");
+    expect(main(run([START], vi), vi).current?.label).toBe("Gõ 2 câu khóa luận");
   });
 });
