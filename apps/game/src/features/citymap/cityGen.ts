@@ -318,6 +318,12 @@ interface ClassGrid {
   ring: [number, number];
   lot: [number, number];
   floors: [number, number];
+  /**
+   * Tỉ lệ lô bị "hạ tầng" xuống 3–5 tầng dù cả khu là tháp. Phố Lê Lợi/Nguyễn Huệ thật có nhà ống
+   * 4 tầng chen giữa hai tháp 20 tầng; cả dãy cùng một chiều cao thì ảnh trên cao đọc ra "rừng
+   * khối hộp giống nhau" — đúng thứ làm bản đồ trông máy sinh.
+   */
+  lowRise?: number;
   floorHeight: number;
   /** Tỉ lệ lô mặt tiền là cửa hàng có tên (phần còn lại là nhà ở/kho). */
   commercial: number;
@@ -331,10 +337,10 @@ interface ClassGrid {
 const GRID: Record<CityClass, ClassGrid> = {
   residential: { cell: [124, 158], street: 12, minor: 6.5, hem: [2.6, 3.4], sidewalk: 1.5, ring: [12, 16], lot: [3.6, 5.0], floors: [2, 5], floorHeight: 3.25, commercial: 0.5, streets: STREET_NAMES },
   market: { cell: [112, 142], street: 10, minor: 5.5, hem: [2.4, 3.2], sidewalk: 1.2, ring: [10, 13], lot: [3.2, 4.4], floors: [2, 3], floorHeight: 3.3, commercial: 0.58, streets: MARKET_STREETS },
-  tourist: { cell: [140, 178], street: 16, minor: 8, hem: [3, 4], sidewalk: 2.4, ring: [16, 22], lot: [6, 11], floors: [5, 14], floorHeight: 3.4, commercial: 0.55, streets: TOURIST_STREETS },
-  corporate: { cell: [152, 195], street: 20, minor: 10, hem: [3.6, 5], sidewalk: 3, ring: [22, 30], lot: [11, 23], floors: [8, 30], floorHeight: 3.9, commercial: 0.42, streets: CORPORATE_STREETS },
+  tourist: { cell: [140, 178], street: 16, minor: 8, hem: [3, 4], sidewalk: 2.4, ring: [16, 22], lot: [6, 11], floors: [5, 14], lowRise: 0.38, floorHeight: 3.4, commercial: 0.55, streets: TOURIST_STREETS },
+  corporate: { cell: [152, 195], street: 20, minor: 10, hem: [3.6, 5], sidewalk: 3, ring: [22, 30], lot: [11, 23], floors: [8, 30], lowRise: 0.34, floorHeight: 3.9, commercial: 0.42, streets: CORPORATE_STREETS },
   construction: { cell: [124, 160], street: 13, minor: 6.5, hem: [2.8, 3.6], sidewalk: 1.8, ring: [12, 16], lot: [3.8, 5.6], floors: [3, 8], floorHeight: 3.35, commercial: 0.55, streets: STREET_NAMES },
-  park: { cell: [165, 210], street: 16, minor: 8, hem: [3, 4], sidewalk: 2.6, ring: [18, 24], lot: [8, 14], floors: [4, 12], floorHeight: 3.35, commercial: 0.3, streets: PARK_STREETS },
+  park: { cell: [165, 210], street: 16, minor: 8, hem: [3, 4], sidewalk: 2.6, ring: [18, 24], lot: [8, 14], floors: [4, 12], lowRise: 0.3, floorHeight: 3.35, commercial: 0.3, streets: PARK_STREETS },
 };
 
 const asClass = (density: string): CityClass =>
@@ -803,7 +809,11 @@ export function generateCity(seedOverride?: string): City {
       const commercial = opts.commercial ?? g.commercial;
       const isShop = random() < commercial;
       const kind = isShop ? pick(random, Object.keys(KIND_NAMES)) : pick(random, PLAIN_KINDS);
-      const floors = Math.max(1, Math.round(between(random, g.floors[0], g.floors[1])));
+      // Tháp hay nhà ống? Khu văn phòng có ~1/3 lô là nhà thấp chen giữa (xem `lowRise`).
+      const lowRise = g.lowRise !== undefined && random() < g.lowRise && g.floors[0] >= 6;
+      const floors = lowRise
+        ? Math.max(1, Math.round(between(random, 3, Math.min(5, g.floors[1]))))
+        : Math.max(1, Math.round(between(random, g.floors[0], g.floors[1])));
       const b: CityRect =
         opts.side === "n"
           ? { x0: cursor, x1: cursor + lotW, z0: rect.z0 - facade, z1: rect.z0 + depth }

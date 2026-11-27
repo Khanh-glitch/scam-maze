@@ -81,19 +81,19 @@ Hai lỗi renderer đã sửa trong vòng này, ghi lại để không lặp:
 | Chỉ số | Giá trị | Cổng |
 |---|---|---|
 | Khung / diện tích đất | 1.220 × 790 m = **0,96 km²** | — |
-| Đi được | **478.964 m² = 0,4790 km²** (54 % đất) | 0,30–0,52 km² (xem §3a) |
+| Đi được | **477.588 m² = 0,4776 km²** (54 % đất) | 0,30–0,52 km² (xem §3a) |
 | Vùng rời rạc | **1** · lớn nhất 100 % · từ phòng tới được 100 % | 1 vùng, ≥99 % |
-| Mái che | **0,407 km² = 46,0 % đất** · **4.345 toà** · trung vị 4 tầng | 42–68 % (xem §3a) |
+| Mái che | **0,409 km² = 46,1 % đất** · **4.327 toà** · trung vị 4 tầng | 42–68 % (xem §3a) |
 | Khối / sân chung | **55 khối · 108 sân** | — |
 | Đường | **27,1 km** (12,0 km hẻm) = **28,1 km/km²** | 24–70 km/km² |
 | **Tim đường trống** | **100 %** · 0 tuyến bị chặn | **100 %** |
-| **Mốc thật có toà** | **9 / 9** (Bitexco 262 m · Landmark 461 m · 3 chợ · 2 ga · Tao Đàn 4 mảng · phòng 6.07) | **9 / 9** |
+| **Mốc thật có toà** | **9 / 9** (Bitexco 262 m · Landmark 461 m trên đế 84 m · 3 chợ · 2 ga · Tao Đàn 4 mảng · phòng 6.07) | **9 / 9** |
 | Mặt tiền (trung vị theo tuyến) | **14,6 đơn vị + 7,4 chức năng / 100 m** · p10 5,6 · **49,4 % mét mặt tiền có nhà** | xem §3b |
 | Mặt tiền theo phường | nhà ở **16,9 + 7,9** · chợ **18,0 + 9,4** · đang xây **16,0 + 8,5** · khách sạn **9,7 + 5,0** · công viên **9,1 + 2,3** · văn phòng **6,1 + 2,5** | ≥12 + ≥6 cho nhà ở/chợ/đang xây; ≥3 + sàn 3 cho đại lộ tháp/khách sạn |
 | Đoạn mặt tiền chết dài nhất | **610 m** (Cầu Thị Nghè — đoạn cầu vắt qua kênh) | báo cáo, không phải cổng — xem §3b |
-| POI | **2.159** (32 venue + 2.127 cửa hàng) = **4.503 POI/km²** · 0 POI kẹt | 0 POI kẹt |
+| POI | **2.161** (32 venue + 2.129 cửa hàng) = **4.520 POI/km²** · 0 POI kẹt | 0 POI kẹt |
 | Đi bộ 45 s tới POI | **97,8 %** diện tích · xa nhất **98 m** | ≥80 % |
-| Chi tiết vỉa hè | **8.151 vật thể = 30,1 / 100 m** đường | ≥25 |
+| Chi tiết vỉa hè | **8.154 vật thể = 30,1 / 100 m** đường | ≥25 |
 | Cao nhất | 461 m (Landmark 81) | ≥300 m |
 | Thời gian sinh | **3,9 s** | — |
 
@@ -110,9 +110,9 @@ phần đất dưới chân chúng bị raster đánh dấu là vật cản, dù
 
 Nay số đo đổi theo hướng trung thực hơn:
 
-- đi được **0,3834 → 0,4790 km²**: phần tăng là đất đường bộ vốn bị nhà chiếm chỗ, không phải thành
+- đi được **0,3834 → 0,4776 km²**: phần tăng là đất đường bộ vốn bị nhà chiếm chỗ, không phải thành
   phố mới mở rộng. Trần cổng 0,43 → **0,52** vì lý do đó, sàn 0,30 giữ nguyên.
-- mái che **56,7 % → 46,0 %**: cùng một lý do. Sàn 45 → **42**.
+- mái che **56,7 % → 46,1 %**: cùng một lý do. Sàn 45 → **42**.
 - "mét mặt tiền có nhà" **61,3 % → 49,4 %**: con số cũ bị thổi lên bởi đúng những lô nằm trong lòng
   đường. Cổng 55 → **45**.
 
@@ -148,6 +148,34 @@ Thành (đặt sau, sát bên) xoá sạch vì `clearArea` dọn cả toà mốc
 Đã sửa: mốc **không bao giờ bị bỏ** (thu nhỏ dần tới khi vừa lô trống), chợ lớn **cắt theo khối** như
 công viên, và `clearArea` **không đụng vào toà mốc**. Cổng mới: `anchorsMissing` phải rỗng và **mỗi
 mốc phải có ≥1 toà**. Đây là loại lỗi mà mọi con số tổng hợp đều bỏ qua — chỉ ảnh chụp mới lộ ra.
+
+## 3d. Công trình, không phải khối hộp
+
+Ảnh dựng đầu tiên đọc ra "các khối hình học xếp cạnh nhau": mỗi toà là một hộp chữ nhật dựng
+đứng, tô một màu phẳng, cửa sổ là những ô tối. Bốn thứ đã thay đổi hẳn điều đó:
+
+**1. Toà nhà là nhiều khối, không phải một.** Tháp văn phòng = bệ thấp (rộng bằng lô) + thân
+**lăng trụ vát tám cạnh** thụt dần theo hai cấp + hộp kỹ thuật trên đỉnh. Nhà ống = khối thân +
+**mái ngói dốc hai mái** có hàng ngói + **tum thang** + bồn inox. Chợ = nhà lớn + mái tôn gân +
+hàng cửa gió. Độ thụt của tháp **co theo bề rộng lô**: tháp 9 m thụt 20 % thành cây kim — đó
+chính là thứ trông "máy sinh" nhất trong bản dựng đầu.
+
+**2. Mặt đứng có chiều sâu.** Tường chia chín dải dọc: chân tường tối (đất, ẩm, bóng hắt), lên
+cao sáng dần, sát mái ngả xanh trời. Cửa hàng tầng trệt là **cửa cuốn 3–6 tấm** + tấm biển +
+**biển hiệu nhô vuông góc** 0,85 m. Tháp kính có **lưới mullion dọc + dải sàn ngang**.
+
+**3. Thành phố có bóng.** Bóng đổ trước đây chỉ vẽ ở ảnh trên cao; ở tầm mắt mặt đường và mặt
+tường sáng đều nhau nên cả cảnh ra hình phẳng. Nay bóng vẽ ở mọi khung (đậm 0,52 trên cao, 0,34
+ở tầm mắt).
+
+**4. Không phải lô nào cũng là tháp.** Khu văn phòng có **34 % lô là nhà 3–5 tầng** chen giữa
+(`lowRise` trong `GRID`), khách sạn 37 %, công viên 30 %. Phố Lê Lợi thật có nhà ống 4 tầng nằm
+cạnh tháp 20 tầng; cả dãy cùng chiều cao thì ảnh trên cao đọc ra rừng khối giống nhau.
+
+Hai lỗi nền đã sửa trong cùng vòng: **đất ngoài khung chưa từng được vẽ** (một tứ giác 5,8 km có
+đỉnh nằm sau camera bị cắt thành đa giác tự cắt rồi biến mất ⇒ thành phố lơ lửng trên trời), nay
+chia thành lưới 64×64 ô; và **đế Landmark 81 là 44 m cho tháp 461 m** (tỉ lệ 10:1, đọc ra cái ống
+khói) — nay đế 84 m như bản thật.
 
 ## 4. Quyết định thiết kế đã chốt (và vì sao)
 

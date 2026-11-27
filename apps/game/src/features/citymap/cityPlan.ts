@@ -117,7 +117,9 @@ export const cityPlan: CityPlan = {
       lat: 10.795,
       lon: 106.7218,
       heightM: 461,
-      footprintM: 44,
+      // Bản thật: đế (podium + ba tháp) rộng ~84 m, không phải 44. Đế 44 m cho tháp 461 m là tỉ lệ
+      // 10:1 — mọi ảnh dựng đều ra "cái ống khói", không ra toà nhà.
+      footprintM: 84,
       kind: "tower",
       year2026: "720A Điện Biên Phủ, Phường Thạnh Mỹ Tây"
     },

@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-11-27T13:46:09.275Z",
+  "generatedAt": "2026-11-27T14:10:07.584Z",
   "seed": "scammaze-saigon-2026",
-  "generateMs": 3933,
+  "generateMs": 4320,
   "frame": {
     "x0": -420,
     "x1": 800,
@@ -12,24 +12,24 @@
     "km2": 0.964
   },
   "walkable": {
-    "m2": 478963.5,
-    "km2": 0.479,
-    "pctOfLand": 54,
+    "m2": 477588.25,
+    "km2": 0.4776,
+    "pctOfLand": 53.9,
     "components": 1,
     "largestPct": 100,
     "reachableFromRoomPct": 100,
-    "coverage45sPct": 97.8,
-    "worstMetres": 98
+    "coverage45sPct": 97.2,
+    "worstMetres": 98.5
   },
   "built": {
-    "roofM2": 407237,
-    "roofPctOfLand": 46,
-    "buildings": 4345,
+    "roofM2": 408612,
+    "roofPctOfLand": 46.1,
+    "buildings": 4327,
     "blocks": 55,
-    "courts": 108,
+    "courts": 105,
     "medianFloors": 4,
     "maxHeightM": 461,
-    "grossFloorKm2": 3.635
+    "grossFloorKm2": 4.013
   },
   "streets": {
     "segments": 140,
@@ -37,7 +37,7 @@
     "hemKm": 12,
     "kmPerKm2": 28.1,
     "frontagePer100m": 8.8,
-    "functionsPer100m": 7.3,
+    "functionsPer100m": 7.4,
     "medianByClass": {
       "construction": 16,
       "residential": 16.9,
@@ -48,20 +48,20 @@
     },
     "builtPct": 49.4,
     "deadM": 610,
-    "deadPct": 48,
+    "deadPct": 47.9,
     "deadStreet": "Cầu Thị Nghè"
   },
   "pois": {
-    "total": 2159,
+    "total": 2161,
     "venues": 32,
-    "shops": 2127,
-    "perKm2": 4503,
+    "shops": 2129,
+    "perKm2": 4520,
     "unreachable": [],
-    "medianMetresFromRoom": 414.5,
+    "medianMetresFromRoom": 415,
     "withBeat": 12
   },
   "props": {
-    "total": 8151,
+    "total": 8154,
     "per100m": 30.1
   },
   "districts": [
@@ -122,10 +122,10 @@
       "ward": "Phường Bến Thành",
       "old": "Quận 1",
       "klass": "tourist",
-      "walkableM2": 86699,
-      "roofPct": 49.1,
-      "pois": 329,
-      "buildings": 670,
+      "walkableM2": 86852,
+      "roofPct": 49,
+      "pois": 334,
+      "buildings": 667,
       "streets": 23,
       "story": "khách du lịch và tiền sạch",
       "verb": "chụp ảnh / mua tour / đổi tiền"
@@ -135,10 +135,10 @@
       "ward": "Phường Sài Gòn",
       "old": "Quận 1",
       "klass": "corporate",
-      "walkableM2": 116573,
-      "roofPct": 40.1,
-      "pois": 84,
-      "buildings": 192,
+      "walkableM2": 116418,
+      "roofPct": 40.2,
+      "pois": 83,
+      "buildings": 190,
       "streets": 23,
       "story": "tiền được hợp pháp hoá",
       "verb": "ký hợp đồng / mở công ty / rửa tiền"
@@ -148,10 +148,10 @@
       "ward": "Phường Thạnh Mỹ Tây",
       "old": "Quận Bình Thạnh",
       "klass": "park",
-      "walkableM2": 48198,
-      "roofPct": 49.2,
-      "pois": 81,
-      "buildings": 281,
+      "walkableM2": 46826,
+      "roofPct": 50.6,
+      "pois": 79,
+      "buildings": 268,
       "streets": 8,
       "story": "đỉnh của thang tiền",
       "verb": "gặp người giàu / bán dự án / bị tống tiền"
