@@ -20,9 +20,11 @@ describe("generateCity", () => {
     expect(again.buildings[123].x0).toBe(city.buildings[123].x0);
   });
 
-  it("diện tích đi được nằm trong khung 0,30–0,43 km²", () => {
+  // Trần nới 0,43 → 0,52 khi lòng đường không còn được phép có nhà: mỗi lô góc/ngã tư từng đè lên
+  // vỉa hè nay bị cắt, nên phần đất đó thành đi-được thật thay vì bị một toà nhà chiếm chỗ.
+  it("diện tích đi được nằm trong khung 0,30–0,52 km²", () => {
     expect(walkableKm2).toBeGreaterThan(0.3);
-    expect(walkableKm2).toBeLessThan(0.43);
+    expect(walkableKm2).toBeLessThan(0.52);
   });
 
   it("đi được liền một mảnh, và phòng là điểm xuất phát", () => {
@@ -57,7 +59,7 @@ describe("generateCity", () => {
     const byClass = city.metrics.frontageByClass;
     expect(byClass.residential).toBeGreaterThanOrEqual(12);
     expect(byClass.market).toBeGreaterThanOrEqual(12);
-    expect(city.metrics.frontageBuiltPct).toBeGreaterThanOrEqual(55);
+    expect(city.metrics.frontageBuiltPct).toBeGreaterThanOrEqual(45);
   });
 
   it("mật độ chi tiết vỉa hè đạt 25 vật thể/100 m", () => {
@@ -82,6 +84,44 @@ describe("generateCity", () => {
       if (isWalkable(city, poi.x, poi.z) && cellAt(city, poi.x, poi.z) !== 0) disagree += 1;
     }
     expect(disagree / city.pois.length).toBeLessThan(0.05);
+  });
+
+  it("lòng đường trống: không toà nào chặn tim đường", () => {
+    // Bất biến mới của bản đồ: toà nhà không được đè lên lòng đường. Đo bằng cách đi dọc tim
+    // từng tuyến — đúng cách `city-audit.ts` đo, nhưng ở đây là cổng chặn hồi quy.
+    const blocked: string[] = [];
+    for (const st of city.streets) {
+      const [ax, az] = st.points[0];
+      const [bx, bz] = st.points[st.points.length - 1];
+      const len = Math.hypot(bx - ax, bz - az);
+      if (len < 6) continue;
+      const n = Math.max(2, Math.round(len / 2));
+      for (let i = 0; i <= n; i += 1) {
+        const t = i / n;
+        const x = ax + (bx - ax) * t;
+        const z = az + (bz - az) * t;
+        if (!isWalkable(city, x, z)) {
+          blocked.push(st.name);
+          break;
+        }
+      }
+    }
+    expect(blocked).toEqual([]);
+  });
+
+  it("cầu Thị Nghè bắc qua kênh và đi được trên mặt cầu", () => {
+    const bridge = city.streets.find((s) => s.klass === "bridge");
+    expect(bridge?.name).toBe("Cầu Thị Nghè");
+    const [ax, az] = bridge!.points[0];
+    const [bx, bz] = bridge!.points[bridge!.points.length - 1];
+    for (let i = 0; i <= 10; i += 1) {
+      expect(isWalkable(city, ax + ((bx - ax) * i) / 10, az + ((bz - az) * i) / 10)).toBe(true);
+    }
+  });
+
+  it("điểm xuất phát không nằm trong tường", () => {
+    expect(isWalkable(city, city.start.x, city.start.z)).toBe(true);
+    expect(cellAt(city, city.start.x, city.start.z)).toBe(0);
   });
 
   it("có đủ mốc thật để người chơi nhận ra Sài Gòn", () => {

@@ -176,6 +176,12 @@ export interface CityMetrics {
   rejectedStreetPhase: number;
   /** Thống kê theo lớp tuyến: thử / đặt được / bị cửa hẻm chặn (chẩn đoán). */
   streetPhase: Record<string, { tried: number; placed: number; mouth: number; water: number }>;
+  /** Số tuyến hẻm bị bỏ vì quá sát một hẻm cùng phương đã có. */
+  hemSkipped: number;
+  /** Số toà bị loại vì rơi vào lòng đường (bất biến: lòng đường không có nhà). */
+  rejectedRoad: number;
+  /** Vài ví dụ bị loại vì lòng đường (để điều tra). */
+  rejectedRoadSamples: string[];
   /** Cùng bộ đếm nhưng theo id tuyến — để soi một con phố cụ thể. */
   phaseById: Record<string, { tried: number; placed: number; mouth: number; water: number; occ: number }>;
 }
@@ -195,7 +201,11 @@ export interface City {
   frame: CityRect;
   compression: number;
   districts: Array<{ id: string; ward: string; old: string; character: string; story: string; verb: string; klass: CityClass; tiles: CityRect[]; areaM2: number }>;
+  /** Chỗ người chơi thật sự đứng được lúc mở màn (ngưỡng cửa phòng 6.07). */
+  start: { x: number; z: number; distanceFromRoomM: number };
   water: Array<CityRect & { id: string; name: string }>;
+  /** Mặt cầu: đi được dù bên dưới là nước. */
+  decks: CityRect[];
   anchors: CityAnchor[];
   blocks: CityBlock[];
   buildings: CityBuilding[];
@@ -366,10 +376,11 @@ export function generateCity(seedOverride?: string): City {
   // Ba tuyến chéo (Nguyễn Thị Minh Khai, Hải Thượng Lãn Ông, Điện Biên Phủ đoạn bắc) đã bị bỏ khỏi
   // lưới: bậc thang hoá chúng sinh hàng trăm tuyến vụn và khối không đủ chỗ cho nhà. Hướng chéo của
   // Sài Gòn còn lại ở sông Sài Gòn và kênh Thị Nghè — chỗ duy nhất nó không phá vỡ hình học nhà.
-  const avenues: Array<{ id: string; name: string; widthM: number; points: Array<[number, number]> }> = PLAN.avenues.map((a) => ({
+  const avenues: Array<{ id: string; name: string; widthM: number; klass?: "bridge"; points: Array<[number, number]> }> = PLAN.avenues.map((a) => ({
     id: a.id,
     name: a.name,
     widthM: a.widthM,
+    klass: a.class === "bridge" ? ("bridge" as const) : undefined,
     points: a.points.map(([x, z]) => [x, z] as [number, number]),
   }));
 
@@ -378,6 +389,7 @@ export function generateCity(seedOverride?: string): City {
     at: number;
     width: number;
     name: string;
+    klass?: "bridge";
     from: number;
     to: number;
   }
@@ -389,15 +401,73 @@ export function generateCity(seedOverride?: string): City {
     const flatX = Math.max(...xs) - Math.min(...xs);
     const median = (v: number[]) => v.slice().sort((p, q) => p - q)[Math.floor(v.length / 2)];
     if (flatZ <= 26 && flatX > 26) {
-      avenueLines.push({ axis: "z", at: median(zs), width: a.widthM, name: a.name, from: Math.min(...xs), to: Math.max(...xs) });
+      avenueLines.push({ axis: "z", at: median(zs), width: a.widthM, name: a.name, klass: a.klass, from: Math.min(...xs), to: Math.max(...xs) });
     } else if (flatX <= 26 && flatZ > 26) {
-      avenueLines.push({ axis: "x", at: median(xs), width: a.widthM, name: a.name, from: Math.min(...zs), to: Math.max(...zs) });
+      avenueLines.push({ axis: "x", at: median(xs), width: a.widthM, name: a.name, klass: a.klass, from: Math.min(...zs), to: Math.max(...zs) });
     }
   }
 
   // --- 2. Lưới đường: mỗi tile một lưới, có đại lộ cắm vào làm chuẩn -----------------------------
   const streets: CityStreet[] = [];
   const streetByKey = new Map<string, CityStreet>();
+  // --- mặt nạ lòng đường -------------------------------------------------------------------
+  // Lô nhà rải từ một tuyến có thể sâu 20–30 m và tràn sang tuyến bên cạnh: kết quả là 117/142
+  // tuyến có tim đường bị nhà chặn (88/110 hẻm). Ảnh phẳng không thấy, đứng ở tầm mắt thì thấy
+  // ngay — một bức tường giữa hẻm. Nên lòng đường (đúng bề rộng xe chạy) là vùng CẤM XÂY.
+  // Hẻm được thêm vào mặt nạ NGAY khi tuyến hẻm ra đời, nên ruột khối cũng không lách được.
+  const roadCell = 1;
+  const roadNX = Math.ceil((frame.x1 - frame.x0) / roadCell);
+  const roadNZ = Math.ceil((frame.z1 - frame.z0) / roadCell);
+  const road = new Uint8Array(roadNX * roadNZ);
+  const paintRoad = (st: CityStreet) => {
+    const [ax, az] = st.points[0];
+    const [bx, bz] = st.points[st.points.length - 1];
+    const len = Math.hypot(bx - ax, bz - az);
+    if (len < 1) return;
+    const ux = (bx - ax) / len;
+    const uz = (bz - az) / len;
+    const half = Math.max(0.6, st.widthM / 2 - 0.15);
+    const steps = Math.ceil(len / (roadCell * 0.5));
+    for (let i = 0; i <= steps; i += 1) {
+      const t = (i / steps) * len;
+      const cx = ax + ux * t;
+      const cz = az + uz * t;
+      const i0 = Math.floor((cx - half - frame.x0) / roadCell);
+      const i1 = Math.floor((cx + half - frame.x0) / roadCell);
+      const j0 = Math.floor((cz - half - frame.z0) / roadCell);
+      const j1 = Math.floor((cz + half - frame.z0) / roadCell);
+      for (let ii = i0; ii <= i1; ii += 1) {
+        for (let jj = j0; jj <= j1; jj += 1) {
+          if (ii < 0 || jj < 0 || ii >= roadNX || jj >= roadNZ) continue;
+          const px = frame.x0 + (ii + 0.5) * roadCell;
+          const pz = frame.z0 + (jj + 0.5) * roadCell;
+          const perp = Math.abs((px - ax) * -uz + (pz - az) * ux);
+          const along = (px - ax) * ux + (pz - az) * uz;
+          if (perp <= half && along >= -half && along <= len + half) {
+            road[jj * roadNX + ii] = 1;
+            roadOwner.set(jj * roadNX + ii, `${st.name}/${st.klass}/w${st.widthM.toFixed(0)}`);
+          }
+        }
+      }
+    }
+  };
+  const roadOwner = new Map<number, string>();
+  const onRoad = (r: CityRect, ownerOut?: string[]) => {
+    const i0 = Math.max(0, Math.floor((r.x0 - frame.x0) / roadCell));
+    const i1 = Math.min(roadNX - 1, Math.floor((r.x1 - frame.x0) / roadCell));
+    const j0 = Math.max(0, Math.floor((r.z0 - frame.z0) / roadCell));
+    const j1 = Math.min(roadNZ - 1, Math.floor((r.z1 - frame.z0) / roadCell));
+    let hit = false;
+    for (let ii = i0; ii <= i1; ii += 1) {
+      for (let jj = j0; jj <= j1; jj += 1) {
+        if (!road[jj * roadNX + ii]) continue;
+        hit = true;
+        if (ownerOut) ownerOut.push(roadOwner.get(jj * roadNX + ii) ?? "?");
+      }
+    }
+    return hit;
+  };
+
   // Đường mà quá nửa lòng đường nằm trên sông/kênh là đường sai — bỏ. (Tuyến x=720 chạy đúng mép
   // sông Saigon: nửa lòng đường chìm dưới nước, cả dải mặt tiền phía đông không tồn tại.)
   const streetOnWater = (s: CityStreet) => {
@@ -426,6 +496,7 @@ export function generateCity(seedOverride?: string): City {
     }
     streetByKey.set(s.id, s);
     streets.push(s);
+    paintRoad(s);
     return s;
   };
 
@@ -433,25 +504,30 @@ export function generateCity(seedOverride?: string): City {
     at: number;
     width: number;
     name: string;
+    klass?: "bridge";
     from: number;
     to: number;
   }
   const xAcc = new Map<string, LineAcc>();
   const zAcc = new Map<string, LineAcc>();
   const keyOf = (at: number) => (Math.round(at * 10) / 10).toFixed(1);
-  const reserve = (acc: Map<string, LineAcc>, at: number, width: number, from: number, to: number, name: string) => {
+  const reserve = (acc: Map<string, LineAcc>, at: number, width: number, from: number, to: number, name: string, klass?: "bridge") => {
     const key = keyOf(at);
     const cur = acc.get(key);
     if (!cur) {
-      acc.set(key, { at, width, name, from, to });
+      acc.set(key, { at, width, name, klass, from, to });
       return;
     }
     cur.width = Math.max(cur.width, width);
     cur.from = Math.min(cur.from, from);
     cur.to = Math.max(cur.to, to);
+    if (klass) {
+      cur.klass = klass;
+      cur.name = name;
+    }
   };
   for (const line of avenueLines) {
-    reserve(line.axis === "x" ? xAcc : zAcc, line.at, line.width, line.from, line.to, line.name);
+    reserve(line.axis === "x" ? xAcc : zAcc, line.at, line.width, line.from, line.to, line.name, line.klass);
   }
   const avenueAt = (axis: "x" | "z", at: number, range: [number, number] | null = null, within = 11) => {
     let best: AvLine | null = null;
@@ -520,12 +596,12 @@ export function generateCity(seedOverride?: string): City {
       for (let i = 0; i < xs.length; i += 1) {
         const edge = i === 0 || i === xs.length - 1;
         const av = avenueAt("x", xs[i], [tile.z0, tile.z1], 2);
-        reserve(xAcc, xs[i], av ? Math.max(av.width, g.street) : edge ? g.street : i % 3 === 0 ? g.street : g.minor, tile.z0, tile.z1, av?.name ?? pick(random, g.streets));
+        reserve(xAcc, xs[i], av ? Math.max(av.width, g.street) : edge ? g.street : i % 3 === 0 ? g.street : g.minor, tile.z0, tile.z1, av?.name ?? pick(random, g.streets), av?.klass);
       }
       for (let j = 0; j < zs.length; j += 1) {
         const edge = j === 0 || j === zs.length - 1;
         const av = avenueAt("z", zs[j], [tile.x0, tile.x1], 2);
-        reserve(zAcc, zs[j], av ? Math.max(av.width, g.street) : edge ? g.street : j % 3 === 0 ? g.street : g.minor, tile.x0, tile.x1, av?.name ?? pick(random, g.streets));
+        reserve(zAcc, zs[j], av ? Math.max(av.width, g.street) : edge ? g.street : j % 3 === 0 ? g.street : g.minor, tile.x0, tile.x1, av?.name ?? pick(random, g.streets), av?.klass);
       }
       tileGrids.push({ district: district.id, klass: district.klass, rect: tile, xs, zs });
     }
@@ -540,22 +616,37 @@ export function generateCity(seedOverride?: string): City {
         prev.from = Math.min(prev.from, line.from);
         prev.to = Math.max(prev.to, line.to);
         prev.width = Math.max(prev.width, line.width);
+        if (line.klass) prev.klass = line.klass;
         continue;
       }
       out.push({ ...line });
     }
     return out;
   };
-  for (const acc of mergeClose(xAcc)) {
-    addStreet({ id: `st-x-${Math.round(acc.at)}`, name: acc.name, klass: acc.width >= 14 ? "avenue" : "street", widthM: acc.width, points: [[acc.at, acc.from], [acc.at, acc.to]] });
+  // Hai tuyến song song quá sát nhau thì không có chỗ cho một dãy nhà giữa chúng: lô nhà của tuyến
+  // này rơi vào lòng tuyến kia và bị loại (đo được 6.328 lần loại chỉ vì một tuyến cách đại lộ
+  // 8 m). Giữ tuyến rộng hơn, bỏ tuyến sát nó.
+  const pruneTooClose = (acc: Map<string, LineAcc>) => {
+    const list = mergeClose(acc).sort((p, q) => q.width - p.width || p.at - q.at);
+    const keep: LineAcc[] = [];
+    for (const line of list) {
+      const clash = keep.some((other) =>
+        Math.abs(other.at - line.at) < (other.width + line.width) / 2 + 24 &&
+        Math.min(other.to, line.to) - Math.max(other.from, line.from) > 8);
+      if (!clash || line.klass === "bridge") keep.push(line);
+    }
+    return keep.sort((p, q) => p.at - q.at);
+  };
+  for (const acc of pruneTooClose(xAcc)) {
+    addStreet({ id: `st-x-${Math.round(acc.at)}`, name: acc.name, klass: acc.klass ?? (acc.width >= 14 ? "avenue" : "street"), widthM: acc.width, points: [[acc.at, acc.from], [acc.at, acc.to]] });
   }
-  for (const acc of mergeClose(zAcc)) {
-    addStreet({ id: `st-z-${Math.round(acc.at)}`, name: acc.name, klass: acc.width >= 14 ? "avenue" : "street", widthM: acc.width, points: [[acc.from, acc.at], [acc.to, acc.at]] });
+  for (const acc of pruneTooClose(zAcc)) {
+    addStreet({ id: `st-z-${Math.round(acc.at)}`, name: acc.name, klass: acc.klass ?? (acc.width >= 14 ? "avenue" : "street"), widthM: acc.width, points: [[acc.from, acc.at], [acc.to, acc.at]] });
   }
   const mergedX = new Map<string, LineAcc>();
   const mergedZ = new Map<string, LineAcc>();
-  for (const acc of mergeClose(xAcc)) mergedX.set(keyOf(acc.at), acc);
-  for (const acc of mergeClose(zAcc)) mergedZ.set(keyOf(acc.at), acc);
+  for (const acc of pruneTooClose(xAcc)) mergedX.set(keyOf(acc.at), acc);
+  for (const acc of pruneTooClose(zAcc)) mergedZ.set(keyOf(acc.at), acc);
   const lineWidth = (axis: "x" | "z", at: number) => (axis === "x" ? mergedX.get(keyOf(at)) : mergedZ.get(keyOf(at)))?.width ?? GRID.residential.street;
   // --- 3. Khối, hẻm, và mặt phố rải TỪ ĐƯỜNG RA -----------------------------------------------
   // Đổi hướng: trước đây nhà được rải từ chu vi khối vào, nên chỗ nào lưới khối không phủ tới là
@@ -602,9 +693,19 @@ export function generateCity(seedOverride?: string): City {
   };
   let rejectedOverlap = 0;
   let rejectedWater = 0;
+  let hemSkipped = 0;
+  let rejectedRoad = 0;
+  const rejectedRoadSamples: string[] = [];
   const addBuilding = (b: Omit<CityBuilding, "id">): CityBuilding | null => {
     if (!fits(b)) {
       rejectedOverlap += 1;
+      return null;
+    }
+    // Bất biến: không toà nào đè lên lòng đường. Đây là lỗi từng làm 88/110 hẻm bị chặn giữa.
+    const owners: string[] = [];
+    if (!b.walkable && b.anchor !== "room" && onRoad(b, owners)) {
+      rejectedRoad += 1;
+      if (rejectedRoadSamples.length < 10) rejectedRoadSamples.push(`${b.kind}/${b.on}${b.anchor ? "/" + b.anchor : ""} ${b.x0.toFixed(0)},${b.z0.toFixed(0)} ${(b.x1 - b.x0).toFixed(0)}x${(b.z1 - b.z0).toFixed(0)} street=${b.street ?? "-"} ⟵ ${[...new Set(owners)].slice(0, 3).join(" | ")}`);
       return null;
     }
     // Chặn cuối: không đặt toà xuống lòng sông/kênh, kể cả khi lô được sinh từ ruột khối hay mốc.
@@ -799,8 +900,27 @@ export function generateCity(seedOverride?: string): City {
         const hemX = block.x0 + W * between(random, 0.3, 0.7);
         const hemZ = block.z0 + D * between(random, 0.3, 0.7);
         const hemName = `Hẻm ${60 + Math.floor(random() * 420)}`;
-        addStreet({ id: `hem-v-${Math.round(hemX)}-${Math.round(hemZ)}-${blocks.length}`, name: hemName, klass: "alley", widthM: hemW, points: [[hemX, block.z0 - g.sidewalk], [hemX, block.z1 + g.sidewalk]], insideBlock: id });
-        addStreet({ id: `hem-h-${Math.round(hemX)}-${Math.round(hemZ)}-${blocks.length}`, name: hemName, klass: "alley", widthM: hemW, points: [[block.x0 - g.sidewalk, hemZ], [block.x1 + g.sidewalk, hemZ]], insideBlock: id });
+        // Hai khối cạnh nhau có thể đặt hẻm cách nhau 0,2–2 m: hai lòng hẻm chồng nhau thành một
+        // cái hào, và vì lòng đường là vùng cấm xây nên cả dãy nhà hai bên bị loại. Hẻm nào quá sát
+        // một hẻm cùng phương đã có thì bỏ — khối đó dùng luôn hẻm của khối bên cạnh.
+        const tooClose = (axis: "v" | "h", at: number, from: number, to: number) =>
+          streets.some((other) => {
+            if (other.klass !== "alley") return false;
+            const [ox, oz] = other.points[0];
+            const [px, pz] = other.points[other.points.length - 1];
+            const otherV = Math.abs(ox - px) < 0.5;
+            if ((axis === "v") !== otherV) return false;
+            const otherAt = axis === "v" ? ox : oz;
+            if (Math.abs(otherAt - at) > Math.max(hemW, other.widthM) + 2.5) return false;
+            const [from2, to2] = axis === "v" ? [oz, pz] : [ox, px];
+            return Math.min(Math.max(from, to), Math.max(from2, to2)) - Math.max(Math.min(from, to), Math.min(from2, to2)) > 6;
+          });
+        const vOk = !tooClose("v", hemX, block.z0 - g.sidewalk, block.z1 + g.sidewalk);
+        const hOk = !tooClose("h", hemZ, block.x0 - g.sidewalk, block.x1 + g.sidewalk);
+        if (!vOk || !hOk) hemSkipped += 1;
+        if (!vOk && !hOk) continue;
+        if (vOk) addStreet({ id: `hem-v-${Math.round(hemX)}-${Math.round(hemZ)}-${blocks.length}`, name: hemName, klass: "alley", widthM: hemW, points: [[hemX, block.z0], [hemX, block.z1]], insideBlock: id });
+        if (hOk) addStreet({ id: `hem-h-${Math.round(hemX)}-${Math.round(hemZ)}-${blocks.length}`, name: hemName, klass: "alley", widthM: hemW, points: [[block.x0, hemZ], [block.x1, hemZ]], insideBlock: id });
         // Cửa hẻm: chỗ hẻm cắt qua dãy nhà mặt phố. Phải ăn sâu vào trong khối ít nhất bằng bề
         // dày dãy mặt phố (nếu chỉ chừa vỉa hè thì dãy nhà bịt đầu hẻm và cả khối thành ổ kín).
         const mouthDepth = g.ring[1] + 6;
@@ -890,9 +1010,21 @@ export function generateCity(seedOverride?: string): City {
           const kind = isShop ? pick(random, Object.keys(KIND_NAMES)) : pick(random, PLAIN_KINDS);
           const floors = Math.max(1, Math.round(between(random, g.floors[0], g.floors[1])));
           const make = (w: number) => {
+            // Lô chạm giao lộ: cắt ngắn cho tới khi ra khỏi lòng tuyến cắt ngang rồi vẫn xây.
+            // (Trước đây cả lô bị bỏ, nên mỗi ngã tư để lại một lỗ 5–8 m trên dãy mặt phố.)
+            let width = w;
+            for (let cut = 0; cut < 14; cut += 1) {
+              const test: CityRect = vertical
+                ? { ...rect, z0: Math.min(az + uz * t, az + uz * (t + width)), z1: Math.max(az + uz * t, az + uz * (t + width)) }
+                : { ...rect, x0: Math.min(ax + ux * t, ax + ux * (t + width)), x1: Math.max(ax + ux * t, ax + ux * (t + width)) };
+              if (!onRoad(test) && width >= 2.6) break;
+              width -= 0.6;
+            }
+            if (width < 2.6) return null;
+            const w2 = width;
             const r2 = vertical
-              ? { ...rect, z0: Math.min(az + uz * t, az + uz * (t + w)), z1: Math.max(az + uz * t, az + uz * (t + w)) }
-              : { ...rect, x0: Math.min(ax + ux * t, ax + ux * (t + w)), x1: Math.max(ax + ux * t, ax + ux * (t + w)) };
+              ? { ...rect, z0: Math.min(az + uz * t, az + uz * (t + w2)), z1: Math.max(az + uz * t, az + uz * (t + w2)) }
+              : { ...rect, x0: Math.min(ax + ux * t, ax + ux * (t + w2)), x1: Math.max(ax + ux * t, ax + ux * (t + w2)) };
             return addBuilding({
               district: klass,
               ...r2,
@@ -985,6 +1117,32 @@ export function generateCity(seedOverride?: string): City {
     }
   };
 
+  // Nhà của người chơi (phòng 6.07) không được nằm giữa lòng đường. Mốc "room" chiếu ra đúng gốc
+  // bản đồ, mà lưới đại lộ lại đi qua gốc — nên nhà phải trượt ra lô trống gần nhất, còn POI/điểm
+  // xuất phát theo nhà mới.
+  let roomCenter = { x: ROOM.x, z: ROOM.z };
+  const offRoad = (rect: CityRect): CityRect => {
+    const w = rect.x1 - rect.x0;
+    const d = rect.z1 - rect.z0;
+    const cx0 = (rect.x0 + rect.x1) / 2;
+    const cz0 = (rect.z0 + rect.z1) / 2;
+    const dirs: Array<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]];
+    for (let r = 1; r <= 96; r += 1) {
+      for (const [sx, sz] of dirs) {
+        const cand = { x0: cx0 + sx * r - w / 2, x1: cx0 + sx * r + w / 2, z0: cz0 + sz * r - d / 2, z1: cz0 + sz * r + d / 2 };
+        const grown = inflate(cand, 0.8);
+        if (grown.x0 < frame.x0 + 2 || grown.x1 > frame.x1 - 2 || grown.z0 < frame.z0 + 2 || grown.z1 > frame.z1 - 2) continue;
+        if (onRoad(grown)) continue;
+        if (water.some((wt) => overlaps(grown, wt))) continue;
+        // Nhà dân thì dọn được (nhà của mình mọc lên chỗ 2–3 căn cũ), nhưng không được đè lên
+        // mốc thật khác: Landmark, chợ, công viên là thứ không thể dời.
+        if (buildings.some((b) => overlaps(b, grown) && (b.anchor || b.on === "anchor"))) continue;
+        return cand;
+      }
+    }
+    return rect;
+  };
+
   for (const anchor of anchors) {
     const ward = anchor.ward;
     const half = anchor.footprintM / 2;
@@ -1012,8 +1170,15 @@ export function generateCity(seedOverride?: string): City {
       pois.push({ id: `poi-${poiSeq++}`, name: anchor.name, kind: "metro-site", x: anchor.x, z: site.z1 + 2, district: ward, tier: "venue", story: "rào tôn, lối tắt, hối lộ", anchor: anchor.id });
       continue;
     }
-    const footprint: CityRect = { x0: anchor.x - half, x1: anchor.x + half, z0: anchor.z - half, z1: anchor.z + half };
-    clearArea(inflate(footprint, 2.2));
+    let footprint: CityRect = { x0: anchor.x - half, x1: anchor.x + half, z0: anchor.z - half, z1: anchor.z + half };
+    if (anchor.kind === "home" || anchor.id === "room") {
+      clearArea(inflate(footprint, 2.2));
+      footprint = offRoad(footprint);
+      clearArea(inflate(footprint, 1.0));
+      roomCenter = { x: (footprint.x0 + footprint.x1) / 2, z: (footprint.z0 + footprint.z1) / 2 };
+    } else {
+      clearArea(inflate(footprint, 2.2));
+    }
     const floors = anchor.kind === "market" ? 3 : anchor.kind === "metro" ? 3 : Math.max(6, Math.round(anchor.heightM / 3.9));
     addBuilding({
       district: ward,
@@ -1089,6 +1254,20 @@ export function generateCity(seedOverride?: string): City {
     }
   }
 
+  // Mặt cầu: tuyến klass "bridge" là một mặt sàn đi được bắc qua nước.
+  const decks: CityRect[] = streets
+    .filter((st) => st.klass === "bridge")
+    .map((st) => {
+      const [ax, az] = st.points[0];
+      const [bx, bz] = st.points[st.points.length - 1];
+      const h = st.widthM / 2;
+      const minX = Math.min(ax, bx), maxX = Math.max(ax, bx);
+      const minZ = Math.min(az, bz), maxZ = Math.max(az, bz);
+      return maxX - minX < 0.01
+        ? { x0: ax - h, x1: ax + h, z0: minZ - h, z1: maxZ + h }
+        : { x0: minX - h, x1: maxX + h, z0: az - h, z1: az + h };
+    });
+
   // --- 5c. Vá ổ kín: đục hẻm cụt ngắn nhất ----------------------------------------------------
   // Sau khi rải nhà, vài chục mét vuông có thể bị bọc kín (thường là góc sân chung). Một ổ kín
   // không phải "hẻm cụt" — hẻm cụt vẫn vào được. Nên chỗ nào kín thì đục một lối 2,2 m tới chỗ
@@ -1096,7 +1275,7 @@ export function generateCity(seedOverride?: string): City {
   let connectionRepairs = 0;
 
   for (let pass = 0; pass < 4; pass += 1) {
-    const grid = rasterize({ frame, water, buildings });
+    const grid = rasterize({ frame, water, buildings, decks });
     const { nx: gx, nz: gz, cells: gc } = grid;
     const comp = new Int32Array(gx * gz).fill(-1);
     const queue = new Int32Array(gx * gz);
@@ -1243,6 +1422,46 @@ export function generateCity(seedOverride?: string): City {
   const freeAt = (x: number, z: number) =>
     x > frame.x0 + 1 && x < frame.x1 - 1 && z > frame.z0 + 1 && z < frame.z1 - 1 &&
     !waterIndex.some(x, z) && !solidIndex.some(x, z);
+  // Điểm xuất phát: tâm "phòng" nằm TRONG toà nhà nên không đứng được. Lấy điểm đi được gần nhất
+  // (ngưỡng cửa) và xuất ra thành `start` — nếu để engine tự đoán, người chơi spawn trong tường.
+  const start = (() => {
+    // Tìm điểm đứng được GẦN NHẤT nhưng ưu tiên phía mặt phố: nhà ống có cửa trước và lối sau,
+    // và người chơi phải bước ra từ cửa trước, không phải từ đuôi nhà.
+    let face = { x: roomCenter.x + 1, z: roomCenter.z, d: Infinity };
+    for (const st of streets) {
+      const [ax, az] = st.points[0];
+      const [bx, bz] = st.points[st.points.length - 1];
+      const vx = bx - ax;
+      const vz = bz - az;
+      const len2 = vx * vx + vz * vz || 1;
+      const t = Math.max(0, Math.min(1, ((roomCenter.x - ax) * vx + (roomCenter.z - az) * vz) / len2));
+      const px = ax + vx * t;
+      const pz = az + vz * t;
+      const d = Math.hypot(px - roomCenter.x, pz - roomCenter.z);
+      if (d < face.d) face = { x: px, z: pz, d };
+    }
+    const base = Math.atan2(face.z - roomCenter.z, face.x - roomCenter.x);
+    for (let r = 0.5; r <= 18; r += 0.5) {
+      for (let k = 0; k < 48; k += 1) {
+        const step = Math.ceil(k / 2) * (Math.PI * 2 / 48);
+        const a = base + (k % 2 === 1 ? step : -step);
+        const x = roomCenter.x + Math.cos(a) * r;
+        const z = roomCenter.z + Math.sin(a) * r;
+        // Đứng cách tường 0,6 m: điểm sát mép tường vẫn "đi được" trên giấy nhưng người chơi
+        // sẽ bị đẩy ra ngay khi bước vào, và camera ngưỡng cửa dán mặt vào gạch.
+        if (freeAt(x, z) && freeAt(x + Math.cos(a) * 0.6, z + Math.sin(a) * 0.6)) {
+          // Trả điểm đã bước ra 0,6 m: nếu trả đúng mặt tường thì hình học nói "đi được" còn lưới
+          // 0,5 m của engine nói "trong tường", và người chơi spawn kẹt ngay ô đầu.
+          return {
+            x: +(x + Math.cos(a) * 0.6).toFixed(2),
+            z: +(z + Math.sin(a) * 0.6).toFixed(2),
+            distanceFromRoomM: +(r + 0.6).toFixed(1),
+          };
+        }
+      }
+    }
+    return { x: roomCenter.x, z: roomCenter.z, distanceFromRoomM: 0 };
+  })();
   let relocated = 0;
   for (const poi of pois) {
     if (freeAt(poi.x, poi.z)) continue;
@@ -1316,17 +1535,21 @@ export function generateCity(seedOverride?: string): City {
   }
 
   // --- 7. Đo bằng raster -----------------------------------------------------------------------
-  const walk = rasterize({ frame, water, buildings });
-  const stats = measure(walk, { frame, districts, buildings, streets, pois, blocks, water, anchors }, ROOM);
+  const walk = rasterize({ frame, water, buildings, decks });
+  const stats = measure(walk, { frame, districts, buildings, streets, pois, blocks, water, anchors }, start);
   stats.rejectedOverlap = rejectedOverlap;
   stats.connectionRepairs = connectionRepairs;
   stats.rejectedStreetPhase = rejectedBeforeInterior;
   stats.streetPhase = streetPhase;
   stats.phaseById = phaseById;
+  stats.hemSkipped = hemSkipped;
+  stats.rejectedRoad = rejectedRoad;
+  stats.rejectedRoadSamples = rejectedRoadSamples;
   stats.relocatedPois = relocated;
 
   return {
     seed: PLAN.seed,
+    start,
     frame,
     compression,
     districts,
@@ -1338,6 +1561,7 @@ export function generateCity(seedOverride?: string): City {
     pois,
     props,
     walk,
+    decks,
     metrics: stats,
   };
 }
@@ -1347,7 +1571,7 @@ function intersectRect(a: CityRect, b: CityRect): CityRect {
 }
 
 /** Lưới 1 m: 0 = đi được, 1 = toà nhà, 2 = nước. */
-function rasterize(city: { frame: CityRect; water: Array<CityRect>; buildings: CityBuilding[] }, step = 0.5): CityWalkGrid {
+function rasterize(city: { frame: CityRect; water: Array<CityRect>; buildings: CityBuilding[]; decks?: Array<CityRect> }, step = 0.5): CityWalkGrid {
   const f = city.frame;
   const nx = Math.max(1, Math.ceil((f.x1 - f.x0) / step));
   const nz = Math.max(1, Math.ceil((f.z1 - f.z0) / step));
@@ -1363,6 +1587,8 @@ function rasterize(city: { frame: CityRect; water: Array<CityRect>; buildings: C
   };
   for (const w of city.water) paint(w, 2);
   for (const b of city.buildings) if (!b.walkable) paint(b, 1);
+  // Mặt cầu: đi được DÙ bên dưới là nước. Cầu không đi được là một lời nói dối trên bản đồ.
+  for (const d of city.decks ?? []) paint(d, 0);
   return { step, nx, nz, cells, start: { x: ROOM.x, z: ROOM.z } };
 }
 
@@ -1494,6 +1720,8 @@ function measure(
   interface StreetFront {
     units: number;
     shops: number;
+    /** Đơn vị theo từng bên (+1 / −1) — để đo nhịp trên đúng đoạn có tường phố. */
+    unitsBySide: Record<string, number>;
     built: number;
     intervals: Array<{ side: 1 | -1; t0: number; t1: number }>;
     length: number;
@@ -1512,6 +1740,7 @@ function measure(
     fronts.set(street.id, {
       units: 0,
       shops: 0,
+      unitsBySide: {},
       built: 0,
       intervals: [],
       length: len0,
@@ -1547,6 +1776,8 @@ function measure(
     if (!front) continue;
     front.units += 1;
     if (b.poi) front.shops += 1;
+    const sideKey = String(best.perp > 0 ? 1 : -1);
+    front.unitsBySide[sideKey] = (front.unitsBySide[sideKey] ?? 0) + 1;
     const t0 = Math.max(0, best.along - edgeLen / 2);
     const t1 = Math.min(front.length, best.along + edgeLen / 2);
     if (t1 > t0) {
@@ -1632,12 +1863,37 @@ function measure(
     if (!front || front.length < 40) continue;
     const mid: [number, number] = [street.points[0][0], street.points[0][1]];
     const wardOf = city.districts.find((d) => d.tiles.some((t) => mid[0] >= t.x0 && mid[0] <= t.x1 && mid[1] >= t.z0 && mid[1] <= t.z1));
-    const unitsPer100 = (front.units / (2 * front.length)) * 100;
+    // Nhịp mặt phố đo trên ĐOẠN CÓ TƯỜNG: hợp các khoảng có nhà (nới 6 mỗi phía) theo từng bên.
+    // Giao lộ, công viên, bờ sông là khoảng trống dài — không phải "mặt tiền thưa", và nếu đem
+    // chia cho cả chiều dài hình học thì mỗi ngã tư bị tính như một dãy nhà biến mất.
+    const dilate = 6;
+    const sideStats = ([1, -1] as const).map((side) => {
+      const spans = front.intervals
+        .filter((iv) => iv.side === side)
+        .map((iv) => [iv.t0 - dilate, iv.t1 + dilate] as [number, number])
+        .sort((p, q) => p[0] - q[0]);
+      let wall = 0;
+      let cur0 = NaN;
+      let cur1 = NaN;
+      for (const [a, b] of spans) {
+        if (!Number.isFinite(cur0)) { cur0 = a; cur1 = b; continue; }
+        if (a <= cur1) { cur1 = Math.max(cur1, b); continue; }
+        wall += Math.min(cur1, front.length) - Math.max(cur0, 0);
+        cur0 = a; cur1 = b;
+      }
+      if (Number.isFinite(cur0)) wall += Math.min(cur1, front.length) - Math.max(cur0, 0);
+      return { wall: Math.max(0, wall), units: front.unitsBySide[String(side)] ?? 0 };
+    }).filter((st) => st.wall > 30);
+    if (!sideStats.length) continue;
+    const wallM = sideStats.reduce((sum, st) => sum + st.wall, 0);
+    const unitsOnWall = sideStats.reduce((sum, st) => sum + st.units, 0);
+    const unitsPer100 = (unitsOnWall / wallM) * 100;
+    const fnPer100 = ((front.shops * unitsOnWall) / Math.max(1, front.units) / wallM) * 100;
     perStreet.push(unitsPer100);
-    perStreetFn.push((front.shops / (2 * front.length)) * 100);
+    perStreetFn.push(fnPer100);
     if (wardOf) {
       (perStreetByClass[wardOf.klass] ??= []).push(unitsPer100);
-      (perStreetFnByClass[wardOf.klass] ??= []).push((front.shops / (2 * front.length)) * 100);
+      (perStreetFnByClass[wardOf.klass] ??= []).push(fnPer100);
     }
   }
   const classMedians = Object.fromEntries(Object.entries(perStreetByClass).map(([k, v]) => [k, +median(v).toFixed(1)]));
@@ -1726,6 +1982,9 @@ function measure(
     rejectedStreetPhase: 0,
     streetPhase: {},
     phaseById: {},
+    hemSkipped: 0,
+    rejectedRoad: 0,
+    rejectedRoadSamples: [],
   };
 }
 
@@ -1764,7 +2023,7 @@ function buildRectIndex(rects: CityRect[], cell = 16): RectIndex {
   };
 }
 
-const indexCache = new WeakMap<City, { solid: RectIndex; water: RectIndex }>();
+const indexCache = new WeakMap<City, { solid: RectIndex; water: RectIndex; deck: RectIndex }>();
 
 /** Điểm có đi được không: trong khung, không phải nước, không nằm trong toà nhà (trừ công viên/sân). */
 export function isWalkable(city: City, x: number, z: number): boolean {
@@ -1772,9 +2031,14 @@ export function isWalkable(city: City, x: number, z: number): boolean {
   if (x < f.x0 || x > f.x1 || z < f.z0 || z > f.z1) return false;
   let cache = indexCache.get(city);
   if (!cache) {
-    cache = { solid: buildRectIndex(city.buildings.filter((b) => !b.walkable)), water: buildRectIndex(city.water) };
+    cache = {
+      solid: buildRectIndex(city.buildings.filter((b) => !b.walkable)),
+      water: buildRectIndex(city.water),
+      deck: buildRectIndex(city.decks ?? []),
+    };
     indexCache.set(city, cache);
   }
+  if (cache.deck.some(x, z)) return true;
   if (cache.water.some(x, z)) return false;
   return !cache.solid.some(x, z);
 }

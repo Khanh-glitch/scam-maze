@@ -22,3 +22,8 @@ apps/game/scripts/longq9/.build/
 # OSM extraction output (regenerable; keep only the plan PNG)
 docs/product/audit/osm-*.json
 docs/product/audit/osm-*.svg
+
+# SVG của renderer là bản trung gian (PNG mới là thứ để nhìn); hai ảnh phẳng/trục đo của audit vẫn commit.
+docs/product/audit/city-*.svg
+!docs/product/audit/city-plan.svg
+!docs/product/audit/city-iso.svg
