@@ -17,6 +17,8 @@ describe("the journey map page", () => {
       expect(screen.getByTestId(`journey-mission-${mission.id}`)).toBeTruthy();
     }
     expect(screen.getByTestId("journey-mission-m01.missing-access").textContent).toContain("THE MISSING ACCESS");
+    // The header repeats the chapter's own premise line for Alex.
+    expect(screen.getByTestId("journey-page").textContent).toContain("You are Alex");
     expect(screen.getByTestId("journey-mission-m02.the-ride").textContent).toContain("THE RIDE");
   });
 
