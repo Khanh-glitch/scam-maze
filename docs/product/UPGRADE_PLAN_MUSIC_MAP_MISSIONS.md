@@ -188,6 +188,9 @@ chủ đích ở cảnh căng thẳng cao nhất (dừng nhạc 2 s trước khi
 
 ## 5. W2 — Bản đồ rộng hơn (8–10 phiên)
 
+**Quy trình thi công (phi tuyến, đọc gì, dùng gì, nghiệm thu tầng nào):**
+[MAP_PROCESS_BRIEF.md](./MAP_PROCESS_BRIEF.md).
+
 ### 5.1 Nguyên tắc
 
 1. **Một bản đồ, nhiều route test.** `/khupho`, `/testbus`, `/roomv2` giữ lại làm trang kiểm thử
