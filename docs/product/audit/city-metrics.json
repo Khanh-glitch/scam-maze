@@ -1,0 +1,244 @@
+{
+  "generatedAt": "2026-11-27T12:18:28.641Z",
+  "seed": "scammaze-saigon-2026",
+  "generateMs": 3179,
+  "frame": {
+    "x0": -420,
+    "x1": 800,
+    "z0": -470,
+    "z1": 320,
+    "widthM": 1220,
+    "depthM": 790,
+    "km2": 0.964
+  },
+  "walkable": {
+    "m2": 383373.75,
+    "km2": 0.3834,
+    "pctOfLand": 43.3,
+    "components": 1,
+    "largestPct": 100,
+    "reachableFromRoomPct": 100,
+    "coverage45sPct": 97.6,
+    "worstMetres": 106
+  },
+  "built": {
+    "roofM2": 502826,
+    "roofPctOfLand": 56.7,
+    "buildings": 5241,
+    "blocks": 55,
+    "courts": 105,
+    "medianFloors": 4,
+    "maxHeightM": 461,
+    "grossFloorKm2": 4.529
+  },
+  "streets": {
+    "segments": 142,
+    "km": 27.9,
+    "hemKm": 12.4,
+    "kmPerKm2": 29,
+    "frontagePer100m": 10.6,
+    "functionsPer100m": 8.2,
+    "medianByClass": {
+      "construction": 12.8,
+      "residential": 15.5,
+      "tourist": 9,
+      "park": 7.6,
+      "corporate": 3.4,
+      "market": 12
+    },
+    "builtPct": 61.3,
+    "deadM": 195,
+    "deadPct": 37.8,
+    "deadStreet": "Võ Văn Kiệt"
+  },
+  "pois": {
+    "total": 2582,
+    "venues": 32,
+    "shops": 2550,
+    "perKm2": 6735,
+    "unreachable": [],
+    "medianMetresFromRoom": 450,
+    "withBeat": 12
+  },
+  "props": {
+    "total": 7063,
+    "per100m": 25.3
+  },
+  "districts": [
+    {
+      "id": "vuon-lai",
+      "ward": "Phường Vườn Lài",
+      "old": "Quận 10",
+      "klass": "residential",
+      "walkableM2": 55609,
+      "roofPct": 56.4,
+      "pois": 717,
+      "buildings": 1491,
+      "streets": 26,
+      "story": "nơi bị lừa",
+      "verb": "trốn / nợ / gọi vay"
+    },
+    {
+      "id": "hoa-hung",
+      "ward": "Phường Hòa Hưng",
+      "old": "Quận 10",
+      "klass": "construction",
+      "walkableM2": 81376,
+      "roofPct": 56.2,
+      "pois": 829,
+      "buildings": 1571,
+      "streets": 37,
+      "story": "tiền chảy qua công trình",
+      "verb": "chui rào / bán hàng rong / hối lộ"
+    },
+    {
+      "id": "cho-lon",
+      "ward": "Phường Chợ Lớn",
+      "old": "Quận 5",
+      "klass": "market",
+      "walkableM2": 27603,
+      "roofPct": 58.9,
+      "pois": 235,
+      "buildings": 427,
+      "streets": 14,
+      "story": "tiền mặt, vàng, cầm đồ",
+      "verb": "mặc cả / đổi tiền / cầm cố"
+    },
+    {
+      "id": "an-dong",
+      "ward": "Phường An Đông",
+      "old": "Quận 5",
+      "klass": "market",
+      "walkableM2": 18384,
+      "roofPct": 60.2,
+      "pois": 184,
+      "buildings": 319,
+      "streets": 10,
+      "story": "hàng hoá và tiền mặt",
+      "verb": "mua bán / đổi trả / cầm"
+    },
+    {
+      "id": "ben-thanh",
+      "ward": "Phường Bến Thành",
+      "old": "Quận 1",
+      "klass": "tourist",
+      "walkableM2": 74716,
+      "roofPct": 56.1,
+      "pois": 409,
+      "buildings": 832,
+      "streets": 23,
+      "story": "khách du lịch và tiền sạch",
+      "verb": "chụp ảnh / mua tour / đổi tiền"
+    },
+    {
+      "id": "sai-gon",
+      "ward": "Phường Sài Gòn",
+      "old": "Quận 1",
+      "klass": "corporate",
+      "walkableM2": 84782,
+      "roofPct": 56.4,
+      "pois": 106,
+      "buildings": 269,
+      "streets": 23,
+      "story": "tiền được hợp pháp hoá",
+      "verb": "ký hợp đồng / mở công ty / rửa tiền"
+    },
+    {
+      "id": "thanh-my-tay",
+      "ward": "Phường Thạnh Mỹ Tây",
+      "old": "Quận Bình Thạnh",
+      "klass": "park",
+      "walkableM2": 40906,
+      "roofPct": 56.9,
+      "pois": 102,
+      "buildings": 332,
+      "streets": 9,
+      "story": "đỉnh của thang tiền",
+      "verb": "gặp người giàu / bán dự án / bị tống tiền"
+    }
+  ],
+  "anchors": [
+    {
+      "id": "bitexco",
+      "name": "Bitexco Financial Tower",
+      "x": 443.4,
+      "z": -74.4,
+      "heightM": 262,
+      "ward": "sai-gon",
+      "year2026": "2 Hải Triều, Phường Sài Gòn"
+    },
+    {
+      "id": "landmark81",
+      "name": "Landmark 81",
+      "x": 680.8,
+      "z": -393.8,
+      "heightM": 461,
+      "ward": "thanh-my-tay",
+      "year2026": "720A Điện Biên Phủ, Phường Thạnh Mỹ Tây"
+    },
+    {
+      "id": "ben-thanh",
+      "name": "Chợ Bến Thành",
+      "x": 355.4,
+      "z": -82.9,
+      "heightM": 14,
+      "ward": "ben-thanh",
+      "year2026": "Phường Bến Thành"
+    },
+    {
+      "id": "binh-tay",
+      "name": "Chợ Bình Tây",
+      "x": -274.8,
+      "z": 232.1,
+      "heightM": 12,
+      "ward": "cho-lon",
+      "year2026": "Phường Chợ Lớn"
+    },
+    {
+      "id": "an-dong",
+      "name": "Chợ An Đông",
+      "x": -13.7,
+      "z": 135.4,
+      "heightM": 11,
+      "ward": "an-dong",
+      "year2026": "Phường An Đông"
+    },
+    {
+      "id": "tao-dan",
+      "name": "Công viên Tao Đàn",
+      "x": 259.7,
+      "z": -117.4,
+      "heightM": 0,
+      "ward": "ben-thanh",
+      "year2026": "Phường Bến Thành"
+    },
+    {
+      "id": "metro-ben-thanh",
+      "name": "Ga Metro Bến Thành",
+      "x": 354.1,
+      "z": -67.7,
+      "heightM": 8,
+      "ward": "ben-thanh",
+      "year2026": "Tuyến 1, ga ngầm"
+    },
+    {
+      "id": "metro-hoa-hung",
+      "name": "Ga Hòa Hưng (ST04)",
+      "x": -106.6,
+      "z": 45.6,
+      "heightM": 0,
+      "ward": "hoa-hung",
+      "year2026": "Tuyến 2 Bến Thành–Tham Lương, khởi công 15/1/2026"
+    },
+    {
+      "id": "room",
+      "name": "Phòng 6.07",
+      "x": 0,
+      "z": 0,
+      "heightM": 12,
+      "ward": "vuon-lai",
+      "year2026": "Hẻm 462/14 Lý Thái Tổ, Phường Vườn Lài"
+    }
+  ],
+  "mismatch": []
+}

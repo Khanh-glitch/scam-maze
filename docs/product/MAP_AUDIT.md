@@ -1,5 +1,9 @@
 # Kiểm toán bản đồ mở Sài Gòn — 27/11/2026
 
+> **Bản đồ thành phố 1:8 dùng trong game** (`cityGen.ts`) có bài kiểm toán riêng, độc lập với tài liệu
+> này: xem [`CITY_MAP.md`](CITY_MAP.md) — 21 cổng đo trên lưới 0,5 m, ảnh `audit/city-plan.png`, và
+> `node apps/game/scripts/city-audit.ts`.
+
 Tài liệu này tồn tại vì một yêu cầu cụ thể: **bản đồ phải được nhìn tận mắt, đo, rồi mới được nói là
 ổn** — "đẹp, thật, usable, không lỗi". Nó ghi lại cái đã nhìn thấy, số đo, và những lỗi đã sửa.
 
