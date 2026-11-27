@@ -133,32 +133,40 @@ Ngân sách hiệu năng áp cho **mọi** task W2/W3 (đo trên máy dev, Chrom
 
 Kết luận: **không thiếu hạ tầng âm thanh — thiếu một "nhạc trưởng".** Đây là lý do W1 rẻ.
 
-### 4.2 Quyết định kiến trúc (đề xuất, có thể đổi)
+### 4.2 Quyết định kiến trúc (owner chốt 27/11/2026)
 
-**D1 — Nhạc tổng hợp bằng Web Audio (procedural) là chính, thu thanh là phụ.**
+**D1 — Owner tự sáng tác/thu nhạc; game là "bộ phát" đọc file qua manifest.** Phương án tổng hợp
+procedural đã bị bỏ (chỉ còn là phương án dự phòng nếu sau này cần cue động).
 
-| Phương án | Ưu | Nhược | Chọn |
+| Phương án | Ưu | Nhược | Quyết định |
 |---|---|---|---|
-| A. Nhạc tổng hợp (oscillator + filter + reverb) | 0 KB asset, thích ứng được, không bản quyền, đổi lớp theo cảnh | "sang" khó bằng nhạc thu | **Chính** |
-| B. Loop CC0 tải về | Nghe "thật" hơn | Không có host ngoài github/npm/pypi; rủi ro licence; nặng | **Phụ**, chỉ khi có bộ CC0 rõ nguồn |
-| C. Nhạc AI sinh | — | Không có công cụ sinh nhạc trong môi trường này | Không |
+| A. Owner sáng tác, game phát file | Chất lượng thật, owner kiểm soát nghệ thuật | Cần thời gian sáng tác; phải chuẩn hoá file | **Chốt** |
+| B. Nhạc tổng hợp (procedural) | 0 KB, thích ứng | "sang" khó, không phải nhạc của owner | Dự phòng |
+| C. Loop CC0 tải về | Nhanh | Licence, không đồng bộ chất | Không |
 
-Thiết kế: **một nhạc trưởng, nhiều lớp**. Mỗi cue = bộ (bed, pulse, lead, texture) + tempo + scale.
-Căng thẳng = thêm lớp, lọc bớt, tăng nhịp; bình yên = bỏ lớp, hạ âm lượng. Không cắt cứng, luôn
-crossfade 1,5–3 s. Khi có voice → duck −6 dB trong 250 ms.
+Hệ quả kỹ thuật: **manifest là nguồn duy nhất** cho (cue → file, cảnh phát, BPM/ô nhịp, gain,
+ducking, ưu tiên). Đã có:
+`apps/game/src/game/audio/musicManifest.json` (dữ liệu),
+`musicManifest.ts` (kiểu + tiện ích),
+`musicCueSelection.ts` (chính sách chọn cue, thuần logic),
+`scripts/check-music.mjs` (`pnpm --filter @scammaze/game music:check`).
+Brief cho người sáng tác: [MUSIC_BRIEF.md](../gameplay/MUSIC_BRIEF.md).
+
+Thiết kế phát: mỗi cue là **một file loop hoặc one-shot**; chuyển cue bằng crossfade 1,5–4 s theo
+bảng trong manifest; có voice → duck −6 dB trong 250 ms.
 
 ### 4.3 Việc phải làm
 
 | ID | Việc | Phương pháp | Kết quả đầu ra | Nghiệm thu |
 |---|---|---|---|---|
-| **T10** | Chốt kiến trúc + bảng cue | Viết trước khi code; mỗi cue: khi nào, cảm xúc, tempo, scale, lớp | §4.2 + §4.4 tài liệu này | Bảng cue phủ hết 6 cảnh; không cue nào trùng chức năng |
-| **T11** | `MusicDirector` (máy trạng thái thuần) | Không đụng Web Audio trong lõi: nhận `setCue`, `setIntensity`, `duck`, trả về gain/layer theo thời gian | `apps/game/src/game/audio/musicDirector.ts` + `.test.ts` | Test: ưu tiên tense > quiet > calm; crossfade đúng thời lượng; mute = 0; dispose không rò; không phát trước khi có gesture |
-| **T12** | `musicScore` (dữ liệu nhạc) | Scale, hợp âm, pattern 4/8 ô nhịp, seed tất định; không random ngoài seed | `game/audio/musicScore.ts` + test | Test: chuỗi nốt tất định theo seed; nốt luôn trong scale; loop dài ≥ 8 nhịp; không nốt nào lệch pha |
-| **T13** | `musicSynth` (Web Audio) | Oscillator + envelope + lowpass + convolver reverb; voice pool ≤ 24; tất cả nối vào `musicGain` chung | `game/audio/musicSynth.ts` | Test headless: không throw khi thiếu AudioContext; tạo/ngắt đúng số node; không rò sau `dispose` |
-| **T14** | Nối vào chương | `useChapterMusic`: đọc `settings.musicVolume`, mood của chương, trạng thái cảnh (phòng/phố/buýt), `duckForVoice`; gắn vào `RoomChapterLayer` | `features/chapter1/room/useChapterMusic.ts` + test | Test: đổi mood → đổi cue; tắt sound → gain 0; volume 0 → im; voice → duck rồi hồi |
-| **T15** | 6 cue nội dung | Sáng tác bằng dữ liệu: `theme.alex`, `room.calm`, `room.tense`, `street`, `ride`, `ending` | `game/audio/cues/*.ts` (6 file dữ liệu) + test | Nghe tay: không click/pop; chuyển cảnh mượt; loop không "gãy"; mỗi cue ≤ 24 voice |
-| **T16** | "Radio Alex" trong phone (stretch) | 3 kênh dùng chung synth: lofi / đêm / tin tức (voice-only); app trong phone | `features/chapter1/phone/apps/RadioApp.tsx` | Mở app → chọn kênh → nhạc đổi; đóng phone → quay lại cue cảnh |
-| **T17** | Trộn + accessibility + ngân sách | Kiểm tra: mute, volume, mất focus tab, headphone, CPU; đo | `EVIDENCE_LOG.md` + số đo | CPU nhạc ≤ 2% main thread; 0 yêu cầu mạng; im lặng tuyệt đối khi mute; tiếng Việt/Anh không ảnh hưởng |
+| **T10** ✅ | Chốt kiến trúc + bảng cue + brief cho owner | Mỗi cue: cảnh phát, cảm xúc, BPM/tone, số ô, loop, chuẩn file | [MUSIC_BRIEF.md](../gameplay/MUSIC_BRIEF.md) + `musicManifest.json` | Bảng cue phủ hết 6 cảnh; test đối chiếu brief ↔ manifest xanh |
+| **T11** ✅ | Manifest + chính sách chọn cue | Dữ liệu JSON một nguồn; hàm thuần `selectMusicCue` / `isTense` / `crossfadeMs`; không Web Audio trong lõi | `game/audio/{musicManifest.json,musicManifest.ts,musicCueSelection.ts}` + 2 test | Test: ưu tiên ending > radio > intro > ride > street > room.tense > room.calm; ngưỡng tense; crossfade; tên file hợp lệ |
+| **T12** | Bộ kiểm tra file nhạc | Script đọc manifest: thiếu file = cảnh báo; sai tên/đuôi/dung lượng/độ dài = lỗi (dùng ffprobe nếu có) | `scripts/check-music.mjs` + script `music:check` | Chạy trên thư mục rỗng: 0 lỗi, 7 cảnh báo; thả file sai tên → exit 1 |
+| **T13** | `MusicPlayer` (Web Audio, file) | Fetch + decode từng cue, cache theo cue, loop bằng `AudioBufferSourceNode`, gain theo manifest, crossfade + duck, dispose sạch | `game/audio/musicPlayer.ts` + test (AudioContext giả) | Test: không throw khi thiếu AudioContext; mute = 0; volume 0..1; duck → hồi; dispose dừng hết source |
+| **T14** | Nối vào chương | `useChapterMusic`: đọc `settings.musicVolume`, `soundEnabled`, cảnh (phòng/phố/buýt/kết thúc), tín hiệu tense, `duckForVoice`; gắn vào `RoomChapterLayer` | `features/chapter1/room/useChapterMusic.ts` + test | Test: đổi mood → đổi cue; tắt sound → im; volume 0 → im; voice → duck rồi hồi; thiếu file → im, không lỗi |
+| **T15** | Nhận file từ owner | Owner sáng tác theo brief; chạy `music:check` đến khi 0 lỗi | 7 file trong `public/assets/audio/music/` | `music:check` 7/7, 0 lỗi; nghe tay 6 cảnh |
+| **T16** | "Radio Alex" trong phone (stretch) | 3 kênh: lofi / đêm / tin tức (voice-only); app trong phone; radio thắng cue cảnh | `features/chapter1/phone/apps/RadioApp.tsx` | Mở app → chọn kênh → nhạc đổi; đóng phone → quay lại cue cảnh |
+| **T17** | Trộn + accessibility + ngân sách | Kiểm tra: mute, volume, mất focus tab, headphone, CPU; đo | `EVIDENCE_LOG.md` + số đo | CPU nhạc ≤ 2% main thread; 0 yêu cầu mạng trước khi cần; im tuyệt đối khi mute |
 
 ### 4.4 Bảng cue (hợp đồng nội dung)
 
@@ -402,7 +410,7 @@ và luôn kèm test hồi quy.
 
 | # | Câu hỏi | Mặc định tôi chọn | Đổi được không |
 |---|---|---|---|
-| D1 | Nhạc: tổng hợp hay thu thanh? | **Tổng hợp (procedural)** trước; stem CC0 sau nếu đủ hay | Có, trước T15 |
+| D1 | Nhạc: ai làm, bằng cách nào? | **Owner sáng tác, game phát file qua manifest** (chốt 27/11/2026) | Đã chốt |
 | D2 | Quy mô map đích của Chương 1 | **0,35 km² / 7 quận / 5 nội thất** (không đua 9 km²) | Có, trước T21 |
 | D3 | Số nhiệm vụ lẻ | **8 side + 4 hoạt động lặp** | Có, trước T35 |
 | D4 | Có làm "Radio Alex" không | **Có, nhưng là stretch sau T15** | Có |

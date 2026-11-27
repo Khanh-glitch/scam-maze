@@ -59,7 +59,29 @@ ngưỡng. Hiện các số ở T00 được đo tay, nên **chưa được dùn
 
 ## M1 — Nhạc nền
 
-_(chưa có dòng; sẽ thêm khi T11–T17 xong: log test director, số đo CPU, biên bản nghe 6 cue)_
+### T10 · Kiến trúc + brief cho owner · 27/11/2026
+
+| Việc | Kết quả |
+|---|---|
+| Owner chốt | Owner tự sáng tác/thu; game là bộ phát file (phương án procedural bị bỏ) |
+| Brief | `docs/gameplay/MUSIC_BRIEF.md`: 7 cue, thể loại, BPM/tone, số ô, vị trí file, chuẩn kỹ thuật, nghiệm thu A1–A8 |
+| Manifest | `apps/game/src/game/audio/musicManifest.json`: 7 cue; loop length lần lượt 98,5 s / 62,6 s / 91,4 s / 87,3 s; one-shot 53–75 s, 60–90 s, 55–80 s; ngưỡng tense `security ≤ 60`, `≤ 360 phút`; duck −6 dB; crossfade 1,5 / 2,5 / 4 / 0,8 s |
+
+### T11 · Manifest + chọn cue · 27/11/2026
+
+| Việc | Lệnh | Kết quả |
+|---|---|---|
+| Test module nhạc | `vitest run src/game/audio` | **19 test** xanh (manifest 8, chọn cue/tense/crossfade 11) |
+| Đồng bộ brief ↔ manifest | test `keeps the composers' brief in sync with the manifest` | Brief chứa đủ 7 id + 7 tên file + thư mục + loudness |
+| Bất biến dữ liệu | test manifest | Không trùng file/priority; loop = đúng số ô; one-shot có cửa sổ độ dài; gain 0..1 |
+
+### T12 · Bộ kiểm tra file · 27/11/2026
+
+| Việc | Lệnh | Kết quả |
+|---|---|---|
+| Thư mục rỗng | `pnpm --filter @scammaze/game music:check` | `0/7 file có mặt · 0 lỗi · 7 cảnh báo`, exit 0 |
+| ffprobe | — | Không có trong môi trường → script tự ghi chú và bỏ qua kiểm độ dài/bitrate/kênh |
+| Cổng chung | `vitest run` · `tsc -b` · `vite build` | **282 file / 2.545 test** xanh · tsc sạch · build sạch |
 
 ## M2 — Bản đồ
 

@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "directory": "/assets/audio/music",
+  "format": {
+    "extensions": ["mp3", "ogg"],
+    "sampleRate": 44100,
+    "channels": 2,
+    "maxBytes": 3145728,
+    "minBytes": 51200
+  },
+  "loudness": {
+    "loopLufs": -18,
+    "oneShotLufs": -16,
+    "truePeakDb": -1.5
+  },
+  "tense": {
+    "securityAtMost": 60,
+    "minutesLeftAtMost": 360,
+    "releaseAfterMs": 8000
+  },
+  "voiceDuckDb": -6,
+  "crossfadeMs": {
+    "default": 1500,
+    "roomMood": 2500,
+    "ending": 4000,
+    "radio": 800
+  },
+  "cues": [
+    {
+      "id": "theme.alex",
+      "file": "theme_alex.mp3",
+      "scene": "intro",
+      "loop": false,
+      "bpm": 72,
+      "bars": 16,
+      "key": "A minor",
+      "genre": "minimal neo-classical / piano + warm pad",
+      "mood": "day dứt nhưng còn hy vọng",
+      "gain": 0.5,
+      "duckDb": -6,
+      "priority": 80,
+      "lengthRangeSeconds": [53, 75]
+    },
+    {
+      "id": "room.calm",
+      "file": "room_calm.mp3",
+      "scene": "room",
+      "loop": true,
+      "bpm": 78,
+      "bars": 32,
+      "key": "D Dorian",
+      "genre": "lofi hip-hop / study beats",
+      "mood": "tập trung, hơi buồn ngủ, an toàn",
+      "gain": 0.5,
+      "duckDb": -6,
+      "priority": 30
+    },
+    {
+      "id": "room.tense",
+      "file": "room_tense.mp3",
+      "scene": "room",
+      "loop": true,
+      "bpm": 92,
+      "bars": 24,
+      "key": "D Phrygian",
+      "genre": "ambient tension / drone + pulse + texture",
+      "mood": "có gì đó không ổn, thời gian đang trôi",
+      "gain": 0.45,
+      "duckDb": -6,
+      "priority": 40
+    },
+    {
+      "id": "street",
+      "file": "street.mp3",
+      "scene": "street",
+      "loop": true,
+      "bpm": 84,
+      "bars": 32,
+      "key": "G major / E minor",
+      "genre": "city-pop / funk-lite / indie rock instrumental",
+      "mood": "thành phố sống, hơi nóng, hơi mệt",
+      "gain": 0.28,
+      "duckDb": -6,
+      "priority": 50
+    },
+    {
+      "id": "ride",
+      "file": "ride.mp3",
+      "scene": "ride",
+      "loop": true,
+      "bpm": 88,
+      "bars": 32,
+      "key": "A minor",
+      "genre": "trip-hop / downtempo",
+      "mood": "lơ đễnh, suy nghĩ, chuyển động",
+      "gain": 0.35,
+      "duckDb": -6,
+      "priority": 60
+    },
+    {
+      "id": "ending.hope",
+      "file": "ending_hope.mp3",
+      "scene": "ending",
+      "loop": false,
+      "bpm": 72,
+      "bars": 20,
+      "key": "A major",
+      "genre": "piano + warm strings / ending score",
+      "mood": "khép lại, nhẹ nhõm có giá",
+      "gain": 0.6,
+      "duckDb": -6,
+      "priority": 100,
+      "lengthRangeSeconds": [60, 90]
+    },
+    {
+      "id": "ending.cost",
+      "file": "ending_cost.mp3",
+      "scene": "ending",
+      "loop": false,
+      "bpm": 66,
+      "bars": 16,
+      "key": "A minor",
+      "genre": "sparse piano / room tone / ending score",
+      "mood": "mất mát, không bi kịch hoá",
+      "gain": 0.6,
+      "duckDb": -6,
+      "priority": 95,
+      "lengthRangeSeconds": [55, 80]
+    }
+  ]
+}
