@@ -131,6 +131,8 @@ const addInstanced = (
   mesh.instanceMatrix.needsUpdate = true;
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   mesh.frustumCulled = false;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
   scene.add(mesh);
   return mesh;
 };
@@ -171,6 +173,10 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     renderer.setSize(W, H);
     renderer.setClearColor(SKY_BOTTOM);
+    // Bóng đổ: một nguồn nắng chiều thấp. Không có bóng thì mọi mặt đứng sáng đều nhau và cả
+    // thành phố đọc ra "các khối màu dán lên nền" — đúng thứ cần tránh.
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     el.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
@@ -198,6 +204,7 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.12;
+    ground.receiveShadow = true;
     scene.add(ground);
 
     const cube = new THREE.BoxGeometry(1, 1, 1);
@@ -213,18 +220,34 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     addInstanced(scene, cube, meshData.boxes, [facade, facade, roofMat, roofMat, facade, facade]);
     addInstanced(scene, prism, meshData.prisms);
     addInstanced(scene, gableGeometry(), meshData.gables);
+    // Chi tiết mặt tiền (cửa cuốn, biển hiệu, mái hiên, ban công) không vân, màu phẳng.
+    addInstanced(scene, cube, meshData.details, new THREE.MeshLambertMaterial());
     const trunkGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 6);
     trunkGeo.translate(0, 0.5, 0);
     addInstanced(scene, trunkGeo, meshData.trunks);
     const canopyGeo = new THREE.ConeGeometry(0.5, 1, 7);
     canopyGeo.translate(0, 0.5, 0);
     addInstanced(scene, canopyGeo, meshData.canopies);
+    const drumGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 10);
+    drumGeo.translate(0, 0.5, 0);
+    addInstanced(scene, drumGeo, meshData.drums, new THREE.MeshLambertMaterial({ color: "#c9cdd2" }));
 
     // Nắng chiều thấp: một nguồn chính + trời tán xạ. Bóng đổ thật (shadow map) cho 20.000 khối
     // thì vượt ngân sách khung hình của máy yếu, nên dùng sáng hai chiều + sương làm độ sâu.
     const sun = new THREE.DirectionalLight("#ffe0b8", 2.1);
     sun.position.set(-600, 700, 900);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -700;
+    sun.shadow.camera.right = 700;
+    sun.shadow.camera.top = 700;
+    sun.shadow.camera.bottom = -700;
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 3000;
+    sun.shadow.bias = -0.0008;
+    sun.shadow.normalBias = 0.6;
     scene.add(sun);
+    scene.add(sun.target);
     scene.add(new THREE.HemisphereLight("#8fa6c4", "#4a4438", 1.35));
 
     const camera = new THREE.PerspectiveCamera(48, W / H, 1, 6000);
@@ -325,6 +348,9 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
       if (keys.has("q")) target.y -= step * 0.6;
       if (keys.has("e")) target.y += step * 0.6;
       if (keys.size) applyCamera();
+      // nguồn nắng đi theo điểm nhìn để bản đồ bóng luôn phủ vùng đang xem
+      sun.position.set(target.x - 700, 850, target.z + 900);
+      sun.target.position.set(target.x, 0, target.z);
       sky.position.set(camera.position.x, 0, camera.position.z);
       horizon.position.set(camera.position.x, 520, camera.position.z);
       renderer.render(scene, camera);

@@ -210,8 +210,43 @@ Lỗi đã gặp và **không được lặp lại** (chi tiết trong lịch s�
 - Biến cục bộ không dùng làm `tsc -b` dừng trước khi audit chạy — luôn đọc đúng số dòng trình biên
   dịch chỉ ra.
 
+## 4b. Xem trong game: `/saigon`
+
+Thành phố sinh tự động **chạy được trong game**, không chỉ trong bài đo:
+
+- Vào menu chính → **SÀI GÒN 2026**, hoặc mở thẳng `/saigon` (`#saigon`). Trang là `three.js`, lazy-load,
+  dựng **chính** `buildCityMesh(generateCity())` mà `city-render.ts` dùng — một nguồn hình học duy nhất,
+  nên sửa mesh là sửa cả ảnh audit lẫn game.
+- Nhóm instanced: `boxes` (thân + mặt đường + vỉa hè + parapet), `details` (cửa cuốn, mái hiên, biển hiệu,
+  ban công, cửa trời chợ), `prisms`, `gables` (mái dốc/mái tôn), `trunks`/`canopies`, `drums` (bồn nước).
+- Vật liệu: tường dùng canvas texture mặt tiền (theo `kind`), mái/mặt đường dùng màu phẳng; bóng đổ
+  PCFSoft 2048, nắng chiếu theo tâm camera.
+- Điều khiển: chuột trái xoay (pitch −1,45…−0,02 rad), chuột phải/Shift+kéo để pan, lăn chuột 40–3000 m,
+  WASD/phím mũi tên + Q/E, Shift chạy ×4.
+- Nhãn: các POI trong `cityPlan.ts` (Landmark 81, chợ Bến Thành, Dinh Độc Lập…) là sprite chữ nổi trên mái.
+
+## 4c. Xem trước offline: `city-mesh-preview.ts`
+
+`/saigon` cần WebGL; trong CI/không có trình duyệt thì dùng trình xem phần mềm đọc **cùng** mesh:
+
+```bash
+cd apps/game
+node scripts/city-mesh-preview.ts                                  # toàn cảnh trên không
+node scripts/city-mesh-preview.ts --street                         # đứng ở 1,65 m trên đại lộ dài nhất
+node scripts/city-mesh-preview.ts --x=180 --y=95 --z=210 --tx=-60 --ty=20 --tz=-90 --out=mid
+```
+
+Cờ: `--street`, `--x/--y/--z`, `--tx/--ty/--tz`, `--fov`, `--out`, `--nogable` (tắt mái dốc để cô lập lỗi),
+`--nodetail` (tắt chi tiết mặt tiền), `--mark` (đánh dấu điểm rơi ngoài khung). Ảnh ghi vào
+`docs/product/audit/_<out>.png`. Đây là **cùng hình học, khác bộ dựng**: nó không có texture mặt tiền,
+bóng đổ nhiều nguồn hay sương mù, nên dùng để bắt lỗi hình học (đường lệch góc, mái lật, chi tiết nằm sai
+phía) chứ không phải để duyệt "đẹp".
+
 ## 5. Giới hạn — cái bài đo này **không** nói được
 
+- Cả `city-render.ts` lẫn `city-mesh-preview.ts` đều là **renderer phần mềm trong repo**, không chụp
+  được khung hình WebGL của `/saigon`: bố cục hình học đã nhìn, còn **texture mặt tiền, bóng đổ, sương và
+  FPS trên trang `/saigon` thì chưa ai nhìn bằng mắt** — cần một lần mở trình duyệt thật.
 - Ảnh 3D là **renderer phần mềm trong repo**, không phải engine của game. Nó đúng về hình học, tỉ lệ,
   va chạm và ánh sáng một nguồn; nó **không** nói gì về shader, vật liệu, hay khung hình/giây trên máy
   owner.

@@ -34,6 +34,10 @@ export interface CityMesh {
   /** Thân cây (trụ), tán cây (nón). */
   trunks: Part[];
   canopies: Part[];
+  /** Chi tiết dán lên mặt tiền: cửa cuốn, biển hiệu, mái hiên, ban công. Không vân, màu phẳng. */
+  details: Part[];
+  /** Bồn nước inox trên mái — hình trụ. */
+  drums: Part[];
   anchors: Array<{ id: string; name: string; x: number; y: number; z: number }>;
   stats: {
     buildings: number;
@@ -55,8 +59,25 @@ const WALL: Record<string, string[]> = {
   construction: ["#8f8a80", "#a49c8e", "#7c766c"],
   park: ["#9aa88f", "#b3b49a"],
 };
-const TILE = ["#8a5b45", "#9c6b4f", "#7a5a4a", "#a5794f"];
+const TILE = ["#9c6b4f", "#8a5b45", "#7a6a5c", "#6f7a6a", "#a5794f", "#7d5b4a", "#8d7a63"];
+const SHEET = ["#8d8b84", "#9aa0a2", "#7f8a86", "#94897c"];
+
+/** Trộn hai màu hex (dùng cho tấm biển sáng hơn màu quán). */
+const mixHex = (a: string, b: string, t: number): string => {
+  const pa = Number.parseInt(a.slice(1), 16);
+  const pb = Number.parseInt(b.slice(1), 16);
+  const ch = (shift: number) => Math.round(((pa >> shift) & 255) + (((pb >> shift) & 255) - ((pa >> shift) & 255)) * t);
+  return `#${[ch(16), ch(8), ch(0)].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+};
 const CROWN = "#5f636c";
+
+const SHOP_COLOR: Record<string, string> = {
+  cafe: "#d9a05b", food: "#c8603f", shop: "#3f6f7a", net: "#4b6f9c", gaming: "#7a4b9c",
+  money: "#d4b23f", gold: "#e0c04a", bank: "#2f5a7a", pawn: "#8a3f4a", hotel: "#5f7fa8",
+  repair: "#6a6a6a", laundry: "#5f8fa0", phone: "#3f7a6a", herb: "#6a8a4a", kho: "#7a6a52",
+  boarding: "#7a5f52", room: "#8a6a52", market: "#b7743f", office: "#4a5a6a",
+};
+const AWNING = ["#b8452f", "#2f6b7a", "#c2762f", "#3f7a55", "#a8443f"];
 
 const hash01 = (n: number): number => {
   const s = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
@@ -80,6 +101,8 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
   const gables: Part[] = [];
   const trunks: Part[] = [];
   const canopies: Part[] = [];
+  const details: Part[] = [];
+  const drums: Part[] = [];
   const byDistrict = new Map(city.districts.map((d) => [d.id, d]));
   let towers = 0;
   let gabledRoofs = 0;
@@ -100,18 +123,43 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
   let roads = 0;
   for (const s of city.streets) {
     const w = s.widthM;
-    const walk = s.klass === "alley" ? 1.2 : s.klass === "avenue" ? 6.4 : 3.4;
+    const walk = s.klass === "alley" ? 0.45 : s.klass === "avenue" ? 2.8 : 1.6;
     for (let i = 0; i < s.points.length - 1; i += 1) {
       const [ax, az] = s.points[i];
       const [bx, bz] = s.points[i + 1];
       const len = Math.hypot(bx - ax, bz - az);
       if (len < 1) continue;
-      const ry = Math.atan2(bz - az, bx - ax);
+      // Ba.js (và mọi phép quay quanh trục Y) biến trục cục bộ +x thành (cos ry, −sin ry). Để
+      // trục dài của tấm đường trùng hướng tuyến thì ry phải là −θ. Trước đây dùng +θ nên mọi
+      // đoạn đường chéo bị xoay lệch — nhìn ảnh là thấy, đếm mặt thì không.
+      const theta = Math.atan2(bz - az, bx - ax);
+      const ry = -theta;
       const cx = (ax + bx) / 2;
       const cz = (az + bz) / 2;
       // vỉa hè (sáng, thấp) rồi lòng đường (tối) chồng lên
-      box({ x: cx, y: 0.02, z: cz, sx: len + walk * 2, sy: 0.09, sz: w + walk * 2, ry, color: "#8e8b95" });
-      box({ x: cx, y: 0.06, z: cz, sx: len + 0.4, sy: 0.06, sz: w, ry, color: s.klass === "alley" ? "#43414c" : "#3a3944" });
+      // Vỉa hè cao 0,17 m, lòng đường 0,08 m ⇒ có bó vỉa. Trước đây đường cao hơn hè 1 cm nên
+      // mép đường biến mất, cả mặt phố thành một tấm xám.
+      // Vỉa hè là HAI DẢI hai bên, không phải một tấm phủ cả mặt đường: tấm phủ rộng hơn và cao
+      // hơn lòng đường nên nó che mất đường, cả phố ra một dải xám.
+      const off = w / 2 + walk / 2;
+      for (const sgn of [-1, 1]) {
+        // dịch theo trục ngang của tấm đường: cục bộ +z → (sin ry, cos ry)
+        box({
+          x: cx + Math.sin(ry) * off * sgn,
+          y: 0.05,
+          z: cz + Math.cos(ry) * off * sgn,
+          sx: len + 0.4, sy: 0.12, sz: walk, ry, color: "#9a97a1",
+        });
+      }
+      box({ x: cx, y: 0.02, z: cz, sx: len + 0.4, sy: 0.06, sz: w, ry, color: s.klass === "alley" ? "#3a3842" : "#2e2d37" });
+      // vạch tim đường cho đại lộ / phố: gạch 2 m cách nhau 6 m
+      if (s.klass === "avenue" || s.klass === "street") {
+        const dash = Math.max(1, Math.floor(len / 7));
+        for (let k = 0; k < dash; k += 1) {
+          const t = (k + 0.5) / dash;
+          box({ x: ax + (bx - ax) * t, y: 0.085, z: az + (bz - az) * t, sx: 2.2, sy: 0.02, sz: 0.18, ry, color: "#c9c08a" });
+        }
+      }
       roads += 1;
     }
   }
@@ -136,7 +184,57 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
     const cx = (b.x0 + b.x1) / 2;
     const cz = (b.z0 + b.z1) / 2;
     const tileC = TILE[Math.floor(hash01(b.x1 + b.z1) * TILE.length) % TILE.length];
-    const roofC = b.kind === "market" ? "#8b6a52" : b.floors <= 2 ? tileC : CROWN;
+
+    // --- chi tiết mặt tiền ---------------------------------------------------------------------
+    // Một dãy phố không có cửa cuốn, mái hiên, biển hiệu thì đọc ra "các khối hộp sơn màu".
+    // Tháp cũng cần: bệ tháp ngoài đời là dãy cửa hàng.
+    const streetFront = (facadeH: number) => {
+      if (b.anchor || klass === "park" || b.on === "court") return;
+      const side = b.facing;
+      const alongX = side === "n" || side === "s";
+      const faceLen = Math.max(2, (alongX ? w : d) - 0.5);
+      const wallPlane = side === "n" ? b.z0 : side === "s" ? b.z1 : side === "w" ? b.x0 : b.x1;
+      const outDir = side === "n" || side === "w" ? -1 : 1;
+      const shopC = SHOP_COLOR[b.kind] ?? "#6a6472";
+      const decal = (y: number, hh: number, deep: number, out: number, szAlong: number, color: string) => {
+        const off = wallPlane + outDir * (out + deep / 2);
+        push(details, alongX
+          ? { x: cx, y, z: off, sx: szAlong, sy: hh, sz: deep, color }
+          : { x: off, y, z: cz, sx: deep, sy: hh, sz: szAlong, color });
+      };
+      if (facadeH > 3.2) {
+        decal(0.16, Math.min(2.75, facadeH * 0.6), 0.12, 0.02, faceLen, shopC);
+        decal(Math.min(2.9, facadeH * 0.6), Math.min(0.85, facadeH * 0.2), 0.14, 0.02, faceLen, mixHex(shopC, "#ffffff", 0.18));
+      }
+      // Mái hiên bạt: TỪNG TẤM 3–4 m có khe, không phải một tấm dài bằng cả dãy nhà.
+      if ((klass === "residential" || klass === "market") && facadeH > 4.6 && facadeH < 26) {
+        const aw = AWNING[Math.floor(hash01(b.x0 + b.z1) * AWNING.length) % AWNING.length];
+        const pieces = Math.max(1, Math.round(faceLen / 4.2));
+        for (let k = 0; k < pieces; k += 1) {
+          const segLen = (faceLen / pieces) * 0.82;
+          const centreT = (k + 0.5) / pieces;
+          const off = wallPlane + outDir * 0.34;
+          push(details, alongX
+            ? { x: b.x0 + 0.25 + faceLen * centreT, y: 3.55, z: off, sx: segLen, sy: 0.1, sz: 0.72, color: aw }
+            : { x: off, y: 3.55, z: b.z0 + 0.25 + faceLen * centreT, sx: 0.72, sy: 0.1, sz: segLen, color: aw });
+        }
+      }
+      // biển hiệu nhô vuông góc
+      if (facadeH > 5 && hash01(b.z0 + b.x1) > 0.55) {
+        const off = wallPlane + outDir * 0.42;
+        push(details, alongX
+          ? { x: b.x0 + w * 0.35, y: 3.6, z: off, sx: 0.16, sy: 1.25, sz: 0.85, color: shopC }
+          : { x: off, y: 3.6, z: b.z0 + d * 0.35, sx: 0.85, sy: 1.25, sz: 0.16, color: shopC });
+      }
+      // ban công nhà ở (2–4 tầng)
+      if ((klass === "residential" || klass === "market") && b.floors >= 2 && b.floors <= 4 && faceLen > 3.4) {
+        for (let f = 1; f < b.floors; f += 1) {
+          decal(f * 3.2 + 0.1, 0.14, 0.45, 0.0, faceLen * 0.9, mixHex(base, "#ffffff", 0.16));
+        }
+      }
+    };
+
+
 
     if (b.anchor === "landmark81") {
       // Đế rộng + thân liền vát góc + đỉnh giật hai bậc. Đế 84 m (không phải 44) để tỉ lệ thật.
@@ -158,6 +256,7 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
       const wide = minSide >= 14;
       const podH = Math.min(18, Math.max(9, h * 0.16));
       box({ x: cx, y: 0, z: cz, sx: w, sy: podH, sz: d, color: base });
+      streetFront(podH);
       const shaftTop = podH + (h - podH) * (wide ? 0.62 : 0.8);
       const s1 = inset(b, wide ? 0.05 : 0.025);
       push(prisms, {
@@ -188,20 +287,68 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
 
     // Nhà ống / chợ / ga: thân một khối, mái ngói dốc hay mái bằng.
     box({ x: cx, y: 0, z: cz, sx: w, sy: h, sz: d, color: base });
-    const wantGable = (b.kind === "market" || ((klass === "residential" || klass === "market") && b.floors <= 4 && w > 3 && d > 3));
+    streetFront(h);
+
+    const roofPick = hash01(b.x0 * 5.3 + b.z1 * 3.7);
+    const wantGable = b.kind === "market"
+      || ((klass === "residential" || klass === "market") && b.floors <= 3 && w > 3 && d > 3 && w < 26 && roofPick < 0.55);
+    const sheetRoof = !wantGable && (klass === "residential" || klass === "market") && b.floors <= 3 && roofPick > 0.85;
     if (wantGable) {
-      const rise = b.kind === "market" ? Math.min(9, Math.min(w, d) * 0.24) : Math.min(2.6, Math.min(w, d) * 0.22);
+      const rise = b.kind === "market" ? Math.min(5.5, Math.min(w, d) * 0.14) : Math.min(2.4, Math.min(w, d) * 0.2);
       const alongX = w >= d;
       push(gables, {
         x: cx, y: h, z: cz,
         sx: alongX ? w : d, sy: rise, sz: alongX ? d : w,
         ry: alongX ? 0 : Math.PI / 2,
-        color: b.kind === "market" ? "#8b6a52" : tileC,
+        color: b.kind === "market" ? mixHex(tileC, "#ffffff", 0.16) : tileC,
+      });
+      // Chợ thật không phải một cái lều: mái có **dãy cửa trời** chạy dọc sống mái, và tường hồi
+      // lộ ra dưới mái. Thiếu chi tiết này, chợ đọc ra "kim tự tháp bìa cứng".
+      if (b.kind === "market") {
+        const rl = (alongX ? w : d) * 0.78;
+        const rc = mixHex("#d9d3c4", tileC, 0.25);
+        push(details, alongX
+          ? { x: cx, y: h + rise * 0.72, z: cz, sx: rl, sy: 1.5, sz: 3.0, color: rc }
+          : { x: cx, y: h + rise * 0.72, z: cz, sx: 3.0, sy: 1.5, sz: rl, color: rc });
+        for (let k = 1; k <= 3; k += 1) {
+          const t = k / 4;
+          push(details, alongX
+            ? { x: b.x0 + w * t, y: h + 0.4, z: cz, sx: 0.5, sy: 0.8, sz: d * 0.98, color: mixHex(rc, "#000000", 0.25) }
+            : { x: cx, y: h + 0.4, z: b.z0 + d * t, sx: w * 0.98, sy: 0.8, sz: 0.5, color: mixHex(rc, "#000000", 0.25) });
+        }
+      }
+      gabledRoofs += 1;
+    } else if (sheetRoof) {
+      // mái tôn: một tấm dốc nhẹ, màu xám bạc
+      push(gables, {
+        x: cx, y: h, z: cz,
+        sx: w, sy: Math.min(1.4, Math.min(w, d) * 0.12), sz: d,
+        color: SHEET[Math.floor(hash01(b.x1 * 2.9 + b.z0) * SHEET.length) % SHEET.length],
       });
       gabledRoofs += 1;
-    } else if (h > 4) {
-      // gờ mái / parapet: một vành mỏng tối hơn, đọc ra mép mái
-      box({ x: cx, y: h, z: cz, sx: w * 0.96, sy: 0.35, sz: d * 0.96, color: roofC });
+    } else {
+      // Mái bằng: MẶT MÁI luôn có, tối hơn tường — thiếu nó thì nhà 1–2 tầng có nóc màu vôi, và cả
+      // khu phố đọc ra "các hộp bìa cứng". Gờ parapet chỉ thêm khi nhà đủ cao.
+      const t = 0.32;
+      // Mái bê tông/tôn sáng màu: mái tối om đọc ra "toà nhà không có mái, chỉ có lòng chảo".
+      // Mỗi lô một sắc độ: cả quận mà cùng một màu mái thì nhìn từ trên xuống thành "tấm thảm".
+      const jit = hash01(b.x0 * 1.7 + b.z1 * 9.1);
+      const plateC = mixHex(mixHex("#a39684", tileC, 0.4), jit > 0.5 ? "#6f685e" : "#f2ece1", 0.1 + jit * 0.24);
+      box({ x: cx, y: h, z: cz, sx: Math.max(0.5, w - t), sy: 0.12, sz: Math.max(0.5, d - t), color: plateC });
+      if (h > 4.5) {
+        const c = mixHex(base, "#ffffff", 0.06);
+        box({ x: cx, y: h, z: b.z0 + t / 2, sx: w, sy: 0.34, sz: t, color: c });
+        box({ x: cx, y: h, z: b.z1 - t / 2, sx: w, sy: 0.34, sz: t, color: c });
+        box({ x: b.x0 + t / 2, y: h, z: cz, sx: t, sy: 0.34, sz: Math.max(0.2, d - t * 2), color: mixHex(c, "#000000", 0.1) });
+        box({ x: b.x1 - t / 2, y: h, z: cz, sx: t, sy: 0.34, sz: Math.max(0.2, d - t * 2), color: mixHex(c, "#000000", 0.1) });
+      }
+    }
+    // bồn nước inox trên mái — chi tiết nhỏ nhưng là "chữ ký" của nhà ống Sài Gòn
+    if (!b.anchor && b.floors >= 2 && b.floors <= 6 && w > 3 && d > 3 && !wantGable && hash01(b.x0 * 1.7 + b.z1 * 2.3) > 0.45) {
+      push(drums, {
+        x: b.x0 + w * 0.3, y: h, z: b.z0 + d * 0.66,
+        sx: 0.55, sy: 1.4, sz: 0.55, color: "#c9cdd2",
+      });
     }
   }
 
@@ -209,9 +356,10 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
   let props = 0;
   for (const p of city.props) {
     if (p.kind === "tree") {
-      const hh = 3.6 + hash01(p.x + p.z) * 1.6;
-      push(trunks, { x: p.x, y: 0, z: p.z, sx: 0.26, sy: hh * 0.55, sz: 0.26, color: "#584330" });
-      push(canopies, { x: p.x, y: hh * 0.5, z: p.z, sx: 1.5, sy: hh * 0.55, sz: 1.5, color: "#557a4a" });
+      const hh = 3.8 + hash01(p.x + p.z) * 1.4;
+      const trunkH = hh * 0.42;
+      push(trunks, { x: p.x, y: 0, z: p.z, sx: 0.22, sy: trunkH, sz: 0.22, color: "#584330" });
+      push(canopies, { x: p.x, y: trunkH - 0.4, z: p.z, sx: 1.9, sy: hh - trunkH + 0.6, sz: 1.9, color: "#4f7046" });
       props += 1;
     } else if (p.kind === "lamp") {
       box({ x: p.x, y: 0, z: p.z, sx: 0.16, sy: 4.6, sz: 0.16, color: "#8a8f96" });
@@ -242,7 +390,7 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
     .filter((a): a is { id: string; name: string; x: number; y: number; z: number } => a !== null);
 
   return {
-    boxes, prisms, gables, trunks, canopies, anchors,
+    boxes, prisms, gables, trunks, canopies, details, drums, anchors,
     stats: {
       buildings: city.buildings.filter((b) => !b.walkable).length,
       towers, gabledRoofs, parts, roads, props,
