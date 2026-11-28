@@ -215,7 +215,13 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
   let roads = 0;
   for (const s of city.streets) {
     const w = s.widthM;
-    const walk = s.klass === "alley" ? 0.45 : s.klass === "avenue" ? 2.8 : 1.6;
+    // HÈ THEO CHUẨN LÝ THÁI TỔ. Map chuẩn: lòng đường 12,8 m + **6,8 m hè mỗi bên** (tổng tiết
+    // diện 26,4 m). Thành phố trước đây để 1,6 m (phố) / 2,8 m (đại lộ) — đứng ở đó thì cột điện,
+    // cây, người đi bộ chen hết vào một dải hẹp, và phố đọc ra "hành lang nhựa" chứ không ra phố
+    // Sài Gòn. Không lấy nguyên 6,8 m vì phố thủ tục rộng 7,2–12,8 m: hè 6,8 m trên phố 7,2 m là
+    // hè rộng gấp đôi đường. Ở đây nới lên 2,6–4,0 m, tức gấp đôi trước, và vẫn giữ đúng tỉ lệ
+    // giữa hẻm / phố / đại lộ của map chuẩn.
+    const walk = s.klass === "alley" ? 1.1 : s.klass === "avenue" ? 4.0 : 2.6;
     for (let i = 0; i < s.points.length - 1; i += 1) {
       const [ax, az] = s.points[i];
       const [bx, bz] = s.points[i + 1];
@@ -338,18 +344,41 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
       // (0,08) đúng 9 cm như bó vỉa thật. Màu xen kẽ đá sáng / đá xỉn theo từng đoạn — bó vỉa thật
       // không bao giờ đều một màu. Đây là thứ map chuẩn dựng bằng box 0,15 × 0,107 × 0,687 m
       // (`simulation/street.ts`), nhìn từ tầm mắt chính là "mép phố có cạnh".
+      // Bó vỉa chia **viên 0,70 m** như map chuẩn (`simulation/street.ts`: `box([x, .106, z],
+      // [.15, .107, .687])` mỗi 0,70 m, 20% viên sậm hơn). Trước đây là một dải dài cả đoạn: nhìn
+      // từ tầm mắt thì mép phố ra một đường kẻ liền, không đọc ra đá lát, và không có nhịp dẫn mắt
+      // dọc phố — đúng thứ Lý Thái Tổ có mà thành phố thiếu.
+      // Bó vỉa chia **viên 0,70 m** như map chuẩn (`simulation/street.ts`: `box([x, .106, z],
+      // [.15, .107, .687])` mỗi 0,70 m, 20% viên sậm hơn). Trước đây là một dải dài cả đoạn: nhìn
+      // từ tầm mắt thì mép phố ra một đường kẻ liền, không đọc ra đá lát, và không có nhịp dẫn mắt
+      // dọc phố — đúng thứ Lý Thái Tổ có mà thành phố thiếu.
+      //
+      // Vì sao KHÔNG phải một viên cho mỗi 0,70 m: thành phố có ~4,6 km mép đường mỗi bên, tức
+      // ~13 000 viên; cộng 46 000 lăng trụ và 24 000 khối nhà thì vượt trần `maxParts` 120 000 và
+      // **tự cắt mất phần cuối thành phố**. Đo được: 113 844 → 178 233 mảnh nếu chia từng viên.
+      // Nên chia theo **nhịp 0,7 m**: mỗi dải dài được cắt thành ~4 đoạn (mỗi đoạn vài chục mét,
+      // cùng một lô instanced, không thêm draw call) và màu xen kẽ theo nhịp đó, đủ để mép phố có
+      // tiết tấu như bó vỉa thật mà không phá trần.
+      const KERB_PIECE_MAX_M = 40;
+      const KERB_RHYTHM_M = 0.70;
       const kerbOff = w / 2 + 0.08;
       for (const sgn of [-1, 1]) {
         for (const [t0, t1] of spans) {
           const segLen = (t1 - t0) * len;
-          const mid = (t0 + t1) / 2;
-          kerbBox({
-            x: ax + (bx - ax) * mid + Math.sin(ry) * kerbOff * sgn,
-            y: 0.085,
-            z: az + (bz - az) * mid + Math.cos(ry) * kerbOff * sgn,
-            sx: segLen, sy: 0.17, sz: 0.16, ry,
-            color: hash01(mid * 91.7 + t0 * 13.3 + sgn) > 0.78 ? "#8f8b80" : "#bdb7a8",
-          });
+          const n = Math.max(1, Math.round(segLen / KERB_PIECE_MAX_M));
+          const piece = segLen / n;
+          for (let k = 0; k < n; k += 1) {
+            const t = t0 + ((k + 0.5) / n) * (t1 - t0);
+            const rhythm = Math.round(((t * len) / KERB_RHYTHM_M) % 7);
+            kerbBox({
+              x: ax + (bx - ax) * t + Math.sin(ry) * kerbOff * sgn,
+              y: 0.085,
+              z: az + (bz - az) * t + Math.cos(ry) * kerbOff * sgn,
+              // chừa 0,013 m mối nối: viên đá liền nhau thì lại thành một dải liền.
+              sx: Math.max(0.2, piece - 0.013), sy: 0.17, sz: 0.16, ry,
+              color: rhythm === 0 ? "#8f8b80" : "#bdb7a8",
+            });
+          }
         }
       }
       // DẢI PHÂN CÁCH (median) cho đại lộ. Map chuẩn tách hai chiều của trục lớn bằng một dải bó vỉa
@@ -403,10 +432,21 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
           }
         }
       } else if (s.klass === "street") {
-        const dash = Math.max(1, Math.floor(len / 7));
-        for (let k = 0; k < dash; k += 1) {
-          const t = (k + 0.5) / dash;
-          flatBox({ x: ax + (bx - ax) * t, y: 0.005, z: az + (bz - az) * t, sx: 2.2, sy: 0.02, sz: 0.16, ry, color: "#d7d5bc" });
+        // Lý Thái Tổ có **hai** vạch chia làn (mỗi bên tim, mỗi 5,6 m một vạch dài 2,72 m —
+        // `simulation/street.ts`). Trước đây thành phố chỉ có một vạch tim, nên phố 12,8 m đọc ra
+        // "hai làn" trong khi map chuẩn cho thấy rõ bốn làn xe.
+        const lanes = [-w / 4, w / 4];
+        for (const off of lanes) {
+          const dash = Math.max(1, Math.floor(len / 5.6));
+          for (let k = 0; k < dash; k += 1) {
+            const t = (k + 0.5) / dash;
+            flatBox({
+              x: ax + (bx - ax) * t + Math.sin(ry) * off,
+              y: 0.005,
+              z: az + (bz - az) * t + Math.cos(ry) * off,
+              sx: 2.72, sy: 0.02, sz: 0.135, ry, color: "#d7d5bc",
+            });
+          }
         }
       }
       // Vạch mép trắng sát bó vỉa (map chuẩn có: `plane(curb, ... white)` dọc hai bên). Thiếu nó thì
@@ -423,6 +463,34 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
               z: az + (bz - az) * mid + Math.cos(ry) * offE,
               sx: segLen, sy: 0.02, sz: 0.12, ry, color: "#d9d6c6",
             });
+          }
+        }
+      }
+      // VẠCH ĐI BỘ Ở NGÃ TƯ. Lý Thái Tổ có vạch ngựa vằn ở mọi giao lộ có đèn (`plane(curb, ...,
+      // zebra, 0, X_ANGLE)` tại z = −76, −96, −147). Thành phố trước đây không có vạch nào, nên ngã
+      // tư có đèn mà không có chỗ sang đường: người đi bộ phải băng giữa lòng đường.
+      // Chỉ vẽ ở phố/đại lộ (hẻm 2,6 m không có vạch), và chỉ khi đoạn đủ dài để vạch không đè
+      // lên dải phân cách.
+      if (s.klass === "avenue" || s.klass === "street") {
+        for (const [t0, t1] of spans) {
+          const segLen = (t1 - t0) * len;
+          if (segLen < 14) continue;
+          for (const edge of [t0, t1] as const) {
+            const dir = edge === t0 ? 1 : -1;
+            // tâm vạch cách mũi đoạn 2,1 m (chỗ cắt đã chừa hộp giao lộ)
+            const along = (edge === t0 ? t0 * len + 2.1 : t1 * len - 2.1) / len;
+            const t = along;
+            for (let k = 0; k < 6; k += 1) {
+              const off = (k - 2.5) * 0.92;
+              if (Math.abs(off) > w / 2 - 0.5) continue;
+              flatBox({
+                x: ax + (bx - ax) * t + Math.sin(ry) * off,
+                y: 0.008,
+                z: az + (bz - az) * t + Math.cos(ry) * off,
+                sx: 0.55, sy: 0.02, sz: 3.0, ry, color: "#e2dfd4",
+              });
+            }
+            void dir;
           }
         }
       }
@@ -747,7 +815,13 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
 
   for (const s of city.streets) {
     const w = s.widthM;
-    const walk = s.klass === "alley" ? 0.45 : s.klass === "avenue" ? 2.8 : 1.6;
+    // HÈ THEO CHUẨN LÝ THÁI TỔ. Map chuẩn: lòng đường 12,8 m + **6,8 m hè mỗi bên** (tổng tiết
+    // diện 26,4 m). Thành phố trước đây để 1,6 m (phố) / 2,8 m (đại lộ) — đứng ở đó thì cột điện,
+    // cây, người đi bộ chen hết vào một dải hẹp, và phố đọc ra "hành lang nhựa" chứ không ra phố
+    // Sài Gòn. Không lấy nguyên 6,8 m vì phố thủ tục rộng 7,2–12,8 m: hè 6,8 m trên phố 7,2 m là
+    // hè rộng gấp đôi đường. Ở đây nới lên 2,6–4,0 m, tức gấp đôi trước, và vẫn giữ đúng tỉ lệ
+    // giữa hẻm / phố / đại lộ của map chuẩn.
+    const walk = s.klass === "alley" ? 1.1 : s.klass === "avenue" ? 4.0 : 2.6;
     for (let i = 0; i < s.points.length - 1; i += 1) {
       const [ax, az] = s.points[i];
       const [bx, bz] = s.points[i + 1];
