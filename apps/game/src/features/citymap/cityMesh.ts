@@ -312,8 +312,10 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
           // dịch theo trục ngang của tấm đường: cục bộ +z → (sin ry, cos ry)
           flatBox({
             x: ax + (bx - ax) * mid + Math.sin(ry) * off * sgn,
-            // Đỉnh hè = 0,17 m: đúng cao độ `CURB_HEIGHT` mà bàn chân nhân vật đứng trên map
-            // chuẩn. Lệch cao độ ở chỗ nối là bậc thang nhìn thấy được.
+            // Đỉnh hè = 0,24 m (đáy 0,10 + dày 0,14) trên lòng đường đỉnh 0,03 m ⇒ bó vỉa cao 21 cm,
+            // đúng dải cao độ của map chuẩn (`CURB_HEIGHT` = 0,16 cộng tấm lát). `pushTiled` **dùng
+            // chung object** cho mọi ô nhỏ nên đây phải là một object mới mỗi lần, không được tái sử
+            // dụng — nếu tái sử dụng thì `x` ghi đè lẫn nhau và cả vỉa hè dồn về một chỗ.
             y: 0.10,
             z: az + (bz - az) * mid + Math.cos(ry) * off * sgn,
             sx: segLen, sy: 0.14, sz: walk, ry, color: "#8e8b86",
@@ -401,8 +403,68 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
     flatBox({ x: (d.x0 + d.x1) / 2, y: 0.1, z: (d.z0 + d.z1) / 2, sx: d.x1 - d.x0, sy: 0.2, sz: d.z1 - d.z0, color: "#6c6a63" });
   }
 
+  // --- ĐAI CHUYỂN TIẾP quanh map chuẩn ---------------------------------------------------------
+  // Dải đất 18 m ngoài 9 vùng đi được trước đây là vành trống: `cityGen` nhường cả lề nhà 18 m cho
+  // dãy nhà map chuẩn, mà map chuẩn thì chỉ dựng tới 10–18 m ngoài mép vùng đi được. Hệ quả là
+  // đứng trong hẻm 462/14 nhìn ra thấy thành phố bắt đầu sau một khoảng đất trống.
+  //
+  // Ở đây dựng đúng lớp chuyển tiếp: hè 3 m + bó vỉa ở cao độ `CURB_HEIGHT`, và dãy nhà 3–4 tầng
+  // (cao ≤ 12 m, sâu 8–12 m) mặt tiền quay vào map cũ. Mọi mảnh vẫn đi qua `push`, nên
+  // `partHitsRealMap` kiểm lại lần cuối — đai không bao giờ đè lên công trình của map chuẩn.
+  //
+  // Dữ liệu ở `city.belt` (`transitionBelt.ts`) chứ không sinh trong vòng lặp này: cùng một nguồn
+  // cho hình học và cho test.
+  for (const p of city.belt.walk) {
+    flatBox({
+      x: p.x,
+      y: 0.10,
+      z: p.z,
+      sx: p.lengthM,
+      sy: 0.14,
+      sz: p.widthM,
+      ry: p.ry,
+      color: "#8e8b86",
+    });
+  }
+  for (const p of city.belt.kerbs) {
+    kerbBox({
+      x: p.x,
+      y: 0.085,
+      z: p.z,
+      sx: p.lengthM,
+      sy: 0.17,
+      sz: p.widthM,
+      ry: p.ry,
+      color: hash01(p.x * 3.7 + p.z * 1.3) > 0.7 ? "#8f8b80" : "#bdb7a8",
+    });
+  }
+  for (const p of city.belt.props) {
+    if (p.kind === "tree") {
+      const hh = 4.2 + hash01(p.x + p.z) * 1.6;
+      const trunkH = hh * 0.42;
+      // Thân và tán đứng trên vỉa hè của map chuẩn (0,17 m), không phải mặt đất 0 m.
+      push(trunks, { x: p.x, y: 0.17, z: p.z, sx: 0.24, sy: trunkH, sz: 0.24, color: "#584330" });
+      push(canopies, { x: p.x, y: 0.17 + trunkH - 0.4, z: p.z, sx: 2.1, sy: hh - trunkH + 0.6, sz: 2.1, color: "#4f7046" });
+    } else if (p.kind === "lamp") {
+      push(poles, { x: p.x, y: 0.17, z: p.z, sx: 0.19, sy: 7.6, sz: 0.19, color: "#5a6066" });
+      push(details, { x: p.x, y: 0.17, z: p.z, sx: 0.34, sy: 0.7, sz: 0.34, color: "#2a3034" });
+      const dir = hash01(p.x * 3.1 + p.z * 1.7) > 0.5 ? 1 : -1;
+      const alongX = hash01(p.z * 2.7 + p.x * 0.9) > 0.5;
+      push(details, alongX
+        ? { x: p.x + dir, y: 7.67, z: p.z, sx: 2.0, sy: 0.09, sz: 0.09, color: "#5a6066" }
+        : { x: p.x, y: 7.67, z: p.z + dir, sx: 0.09, sy: 0.09, sz: 2.0, color: "#5a6066" });
+      const hx = alongX ? p.x + dir * 2.1 : p.x;
+      const hz = alongX ? p.z : p.z + dir * 2.1;
+      push(details, { x: hx, y: 7.95, z: hz, sx: 0.64, sy: 0.14, sz: 0.34, color: "#2a3034" });
+      push(details, { x: hx, y: 7.85, z: hz, sx: 0.52, sy: 0.06, sz: 0.24, color: "#ffdca4" });
+    }
+  }
+
   // --- toà nhà --------------------------------------------------------------------------------
-  for (const b of city.buildings) {
+  // Nhà của đai chuyển tiếp đi **qua đúng đường** của nhà thành phố: cùng vân mặt đứng, cùng dầm
+  // sàn, cùng ban công — chỉ khác là thấp (≤ 12 m) và quay mặt vào map cũ. Dựng riêng một bộ hình
+  // khác ở đây là hai chất lượng mặt phố trong cùng một khung hình.
+  for (const b of [...city.buildings, ...city.belt.buildings]) {
     if (b.walkable) continue; // mặt công viên / sân: đã có ở lớp nền
     const klass = byDistrict.get(b.district)?.klass ?? "residential";
     const palette = WALL[klass] ?? WALL.residential;
@@ -868,7 +930,7 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
   return {
     boxes, flat, kerbs, prisms, gables, trunks, canopies, details, drums, poles, anchors,
     stats: {
-      buildings: city.buildings.filter((b) => !b.walkable).length,
+      buildings: city.buildings.filter((b) => !b.walkable).length + city.belt.buildings.length,
       towers, gabledRoofs, parts, roads, props,
       minY: Number.isFinite(minY) ? minY : 0,
       // Toà cao nhất trong scene có thể là toà của **map thật** (Landmark 81, 461 m) — nó không phải

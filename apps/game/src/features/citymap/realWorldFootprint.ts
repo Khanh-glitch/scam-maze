@@ -57,6 +57,27 @@ export const REAL_WORLD_BUILD_MARGIN_M = 18;
 const hit = (r: RealWorldRect, x: number, z: number, margin: number) =>
   x >= r.x0 - margin && x <= r.x1 + margin && z >= r.z0 - margin && z <= r.z1 + margin;
 
+/**
+ * Hộp bao chung của 9 vùng đi được — ranh ngoài của map chuẩn.
+ *
+ * Dùng cho đai chuyển tiếp (`transitionBelt.ts`): đai chạy dọc **mép ngoài** của map, nên cần biết
+ * mép đó ở đâu chứ không phải từng vùng một. Không dùng cho việc kiểm chồng lấn (việc đó phải so
+ * từng hình chữ nhật, vì map chuẩn không phải một khối đặc).
+ */
+export function realWorldFootprintUnion(): { x0: number; x1: number; z0: number; z1: number } {
+  let x0 = Infinity;
+  let x1 = -Infinity;
+  let z0 = Infinity;
+  let z1 = -Infinity;
+  for (const r of REAL_WORLD_RECTS) {
+    x0 = Math.min(x0, r.x0);
+    x1 = Math.max(x1, r.x1);
+    z0 = Math.min(z0, r.z0);
+    z1 = Math.max(z1, r.z1);
+  }
+  return { x0, x1, z0, z1 };
+}
+
 /** Điểm (x, z) có nằm trong (hoặc sát) vùng của map thật không. */
 export function inRealWorld(x: number, z: number, margin = 0): boolean {
   return REAL_WORLD_RECTS.some((r) => hit(r, x, z, margin));

@@ -23,6 +23,7 @@ import {
   isRealWorldTower,
   rectHitsRealWorld,
 } from "./realWorldFootprint.ts";
+import { buildTransitionBelt } from "./transitionBelt.ts";
 
 export type CityClass = "residential" | "market" | "tourist" | "corporate" | "construction" | "park";
 
@@ -228,6 +229,19 @@ export interface City {
   streets: CityStreet[];
   pois: CityPoi[];
   props: CityProp[];
+  /**
+   * ĐAI CHUYỂN TIẾP quanh map chuẩn (`transitionBelt.ts`): hè 3 m + bó vỉa dọc mép vùng đi được,
+   * và dãy nhà 3–4 tầng mặt tiền quay vào map cũ. Đây là dữ liệu **riêng**, không nằm trong
+   * `buildings`/`props`, vì nó không phải thành phố sinh tự động mà là lớp chuyển tiếp giữa hai
+   * thế giới; `cityMesh` dựng nó (nhà dùng đúng vân mặt đứng của thành phố), còn test kiểm được nó
+   * mà không phải dựng hình.
+   */
+  belt: {
+    buildings: CityBuilding[];
+    props: CityProp[];
+    walk: Array<{ x: number; z: number; widthM: number; lengthM: number; ry: number }>;
+    kerbs: Array<{ x: number; z: number; widthM: number; lengthM: number; ry: number }>;
+  };
   /**
    * KHU PHỐ GỐC — bản đồ đang chơi được của game (`features/khupho`), đặt nguyên vào thành phố.
    * `x`/`z` là gốc toạ độ (tim phố, chính giữa); hình chữ nhật là vùng đã dành riêng cho nó.
@@ -1929,6 +1943,12 @@ export function generateCity(seedOverride?: string, options: CityGenOptions = {}
     // cột điện, xe dựng của phố Lý Thái Tổ. 540 món đang nằm chồng lên chúng (đếm được) trước khi
     // lọc ở đây — cùng lý do với `partHitsRealMap` bên `cityMesh`.
     props: props.filter((p) => !inRealWorld(p.x, p.z, REAL_WORLD_BUILD_MARGIN_M)),
+    // ĐAI CHUYỂN TIẾP: vành đất 18 m quanh map chuẩn mà thành phố phải nhường. Cây/cột đèn ở đây
+    // đứng trên hè của đai (0,17 m) nên `cityMesh` đặt chúng ở lớp hè, không phải mặt đất.
+    belt: (() => {
+      const b = buildTransitionBelt(seedOverride ?? PLAN.seed);
+      return { buildings: b.buildings, props: b.props, walk: b.walk, kerbs: b.kerbs };
+    })(),
     core,
     walk,
     decks,
