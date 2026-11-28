@@ -27,7 +27,7 @@ dòng nào: ba mục đó là hợp đồng kiến trúc, không phải gợi ý
 | Test + ngân sách | xong — [G] 59 test `features/citymap`, 171 test `features/testbus` |
 | Kiểm bằng mắt trên máy thật | **chờ 4 ảnh pose của người dùng** (sandbox crash GPU, xem §6) |
 
-Commit cuối: `a959375`.
+Commit cuối: `bcac2b3`.
 
 ---
 
@@ -162,11 +162,11 @@ Pose kiểm tra sẵn có (nhận `?t=x,z&ty=&yaw=&pitch=`):
 | **C** nền 9 km có vân | `cityGround.ts` | `groundTexturePixels()` là hàm thuần số (jsdom không có canvas 2D), tông `#55544a` khớp đất engine |
 | **D** đèn ngã tư | `cityNetwork.ts` + `citySignals.ts` | lưới đường chia tại mọi giao điểm, nối bằng `addCityLink` của engine; ngã tư bật `signalized` + `signals.registerIntersection(spec)` + `bindSignalVisual` |
 | **E** dải phân cách đại lộ | `cityMesh.ts` | bó vỉa `CURB_HEIGHT` 0,16 m + mặt cỏ/bê tông, chỉ đoạn > 40 m |
-| **F** Bus 06 vòng thành phố | `cityBus.ts` | **một** `BusCircuit` thứ hai từ `LTT_S_SB` qua lưới rồi về, lái bằng `BusRouteController` qua hook `engine.afterTrafficStep` (mặc định `null` ⇒ `/testbus` y nguyên) |
+| **F** Bus 06 vòng thành phố | `cityBus.ts` | **một** `BusCircuit` thứ hai từ `LTT_S_SB` qua lưới rồi về; luật lái là `planBus06` của engine (nay nhận `circuit` của từng xe), hình học tích phân bằng `stepCityBusMotion` thuần số; hook `engine.afterTrafficStep` mặc định `null` ⇒ `/testbus` y nguyên |
 | **G** test + ngân sách | `cityNetwork/citySignals/cityMedian/cityBus/cityBudget.test.ts` | 59 test `features/citymap`, 171 test `features/testbus` |
 
 Con số đo trên sandbox (không GPU): `build 2,1 s` · `10 tuyến / 44 làn / 29 giao lộ` ·
-`perStepMs 0,063` · `draw calls ≈ 134` · `113 844 mảnh`.
+`perStepMs 0,058` · `draw calls ≈ 134` · `113 844 mảnh` · **231 test pass** (`features/citymap` 59, `features/testbus` 172).
 
 ### 7.1 Còn lại: kiểm bằng mắt
 Chỉ còn nghiệm thu ảnh (xem §6): mở `/saigon` trên máy có GPU và gửi bốn pose. Mọi tinh chỉnh sau đó
