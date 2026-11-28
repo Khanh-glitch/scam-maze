@@ -49,12 +49,36 @@ function parkingSpot(h: House, south: boolean, bin: boolean, jitter: number): nu
   return spots.length ? spots[Math.min(spots.length - 1, Math.floor(jitter * spots.length))] : null;
 }
 
-export function buildNeighborhood(ctx: Ctx) {
+export interface GroundRect {
+  x0: number; x1: number; z0: number; z1: number;
+  /** Cao độ mặt nền (mặc định 0,02 — nằm trên nền của thành phố, dưới vỉa hè 0,15). */
+  y?: number;
+}
+
+export interface NeighborhoodOptions {
+  /**
+   * Nền đất dưới phố. `true` (mặc định) = tấm 440 × 440 m của màn đứng riêng. Khi khu phố được đặt
+   * vào thành phố, truyền danh sách hình chữ nhật để chỉ lát đúng dải của khu phố, đúng cao độ —
+   * nếu tắt hẳn thì quanh nhà lộ nền xám của thành phố thành một bãi đất trống.
+   */
+  ground?: boolean | readonly GroundRect[];
+  /** Dãy nhà xa 140–220 m bao quanh phố. Tắt khi đã có thành phố thật bao quanh. */
+  skyline?: boolean;
+}
+
+export function buildNeighborhood(ctx: Ctx, opts: NeighborhoodOptions = {}) {
+  const { ground = true, skyline = true } = opts;
   F.resetBikeMix();
   const NB = new Builder();
   const r = mulberry32(2024);
   // ---------------- ground, street, sidewalks ----------------
-  NB.box(-220, -0.6, -220, 440, 0.55, 440, 'conc:#7d7a70', { ny: null });
+  if (ground === true) NB.box(-220, -0.6, -220, 440, 0.55, 440, 'conc:#7d7a70', { ny: null });
+  else if (Array.isArray(ground)) {
+    for (const g of ground) {
+      const y = g.y ?? 0.02;
+      NB.box(g.x0, y - 0.55, g.z0, g.x1 - g.x0, 0.55, g.z1 - g.z0, 'conc:#7d7a70', { ny: null });
+    }
+  }
   NB.box(-70, -0.3, -3.6, 140, 0.3, 7.2, 'asph');
   NB.surf(-70, -3.6, 70, 3.6, 0, 'concrete');
   const walk = (x0: number, x1: number, z0: number, z1: number) => {
@@ -254,6 +278,7 @@ export function buildNeighborhood(ctx: Ctx) {
   for (const c of NB.cols) ctx.phys.addCol(c);
   for (const s of NB.surfs) ctx.phys.addSurf(s);
   // distant skyline
+  if (skyline) {
   const sky = new Builder();
   for (let i = 0; i < 46; i++) {
     const a = (i / 46) * Math.PI * 2, d = 140 + r() * 80, w = 14 + r() * 20, hgt = 25 + r() * 70;
@@ -261,5 +286,6 @@ export function buildNeighborhood(ctx: Ctx) {
     for (let k = 0; k < Math.floor(hgt / 6); k++) sky.box(Math.cos(a) * d * 1.3 + 1, 5 + k * 6, Math.sin(a) * d * 0.9 - 0.05, w - 2, 2.2, 0.1, 'emit:#ffd79a');
   }
   sky.build(ctx.root, { shadows: false });
+  }
   return placed;
 }

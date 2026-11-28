@@ -15,7 +15,6 @@
 //     từ chính hình học này — không cộng đại số các hình chữ nhật (lần đầu cộng ra 72% mái trên
 //     khung 47% đi được, vô nghĩa).
 import { cityPlan, type CityPlan } from "./cityPlan.ts";
-import { coreLots, STREET } from "../khupho/world/streetPlan.ts";
 
 export type CityClass = "residential" | "market" | "tourist" | "corporate" | "construction" | "park";
 
@@ -678,21 +677,13 @@ export function generateCity(seedOverride?: string): City {
   // chung. Nó không tự mọc thành thành phố 1,2 km, nhưng thành phố thì mọc QUANH nó được: chọn một
   // tuyến phố ngang đủ dài, dành riêng đúng hình chữ nhật của khu phố, rồi để lưới sinh tự động
   // tiếp tục hai đầu. Mọi con số về căn nào/mấy tầng/màu gì đọc từ `streetPlan.ts`.
-  const coreFoot = (() => {
-    const lots = coreLots();
-    let fx0 = Infinity;
-    let fx1 = -Infinity;
-    let fz0: number = -STREET.walkOuter;
-    let fz1: number = STREET.walkOuter;
-    for (const l of lots) {
-      fx0 = Math.min(fx0, l.x0);
-      fx1 = Math.max(fx1, l.x1);
-      fz0 = Math.min(fz0, l.z0);
-      fz1 = Math.max(fz1, l.z1);
-    }
-    fz1 = Math.max(fz1, STREET.court.z1, STREET.alley.z1);
-    return { fx0, fx1, fz0, fz1 };
-  })();
+  // Vùng dành riêng = đúng khuôn của thế giới thật: phố chạy x −70…70, hẻm và sân chung tới z 53,
+  // vật lý của khu phố tới ±58, cộng 2 m lề để lô sinh tự động không chạm vào.
+  // Số đo lấy từ chính khu phố: phố dựng từ x −70 tới 70; nhà hai bên tới z ±21; hẻm và sân chung
+  // ăn tới z 53 trong khoảng x −4,6…23,6. Dành riêng đúng hai dải đó (hình L), phần còn lại để lưới
+  // sinh tự động lấp — nếu dành cả hình chữ nhật 144 × 116 thì hai bên thành bãi đất trống.
+  const coreFoot = { fx0: -70, fx1: 70, fz0: -26, fz1: 26 };
+  const coreBack = { bx0: -12, bx1: 30, bz0: 26, bz1: 58 };
   const clearOfAnchors = (z: number) => anchors.every((a) => Math.abs(a.z - z) > 45 || Math.abs(a.x) > 90);
   const coreStreet = streets
     .filter((st) => {
@@ -763,6 +754,7 @@ export function generateCity(seedOverride?: string): City {
     }
   };
   occupy({ x0: core.x0 - 1, x1: core.x1 + 1, z0: core.z0 - 1, z1: core.z1 + 1 });
+  occupy({ x0: core.x + coreBack.bx0 - 1, x1: core.x + coreBack.bx1 + 1, z0: core.z + coreBack.bz0, z1: core.z + coreBack.bz1 + 1 });
   let rejectedOverlap = 0;
   let rejectedWater = 0;
   let hemSkipped = 0;
@@ -1645,7 +1637,13 @@ export function generateCity(seedOverride?: string): City {
   // --- 6. Vật thể vỉa hè + sân chung -----------------------------------------------------------
   const props: CityProp[] = [];
   const buildingGrid = buildRectIndex(buildings, 24);
-  const freeSpot = (x: number, z: number) => !inWater(x, z) && !buildingGrid.some(x, z) && x > frame.x0 && x < frame.x1 && z > frame.z0 && z < frame.z1;
+  // Vật thể vỉa hè KHÔNG được rơi vào khu phố gốc: chỗ đó đã có đồ thật của map gốc (cây, ghế,
+  // bồn rác chim cánh cụt, xe dựng, giỏ hàng). Trước khi chặn, thùng/cọc của thành phố đứng giữa
+  // lòng đường khu phố thành mấy khối xám lơ lửng.
+  const inCore = (x: number, z: number) =>
+    (Math.abs(x - core.x) < 72 && Math.abs(z - core.z) < 28) ||
+    (x > core.x + coreBack.bx0 && x < core.x + coreBack.bx1 && z > core.z + coreBack.bz0 && z < core.z + coreBack.bz1);
+  const freeSpot = (x: number, z: number) => !inWater(x, z) && !buildingGrid.some(x, z) && !inCore(x, z) && x > frame.x0 && x < frame.x1 && z > frame.z0 && z < frame.z1;
 
   for (const street of streets) {
     const [ax, az] = street.points[0];

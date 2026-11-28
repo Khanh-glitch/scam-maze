@@ -4,7 +4,7 @@
 // một sân chung. Trước đây toàn bộ bố cục đó nằm lẫn trong hàm dựng hình, nên không chỗ nào khác
 // (thành phố lớn ở `/saigon`) đọc được. Tách ra đây thành *dữ liệu*: cùng một nguồn cho
 //  (a) `neighborhood.ts` — dựng khu phố chơi được,
-//  (b) `citymap/coreStreet.ts` — đặt đúng khu phố đó vào giữa thành phố sinh tự động.
+//  (b) `citymap/coreWorld.ts` — cắm nguyên thế giới này vào giữa thành phố sinh tự động.
 // Sửa một căn nhà ở đây thì cả hai nơi đổi theo. Đây là "kế thừa bản đồ", không phải vẽ lại.
 
 export type LotStyle = "modern" | "french" | "cap4";

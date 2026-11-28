@@ -9,7 +9,6 @@
 // bằng vát góc) + hộp kỹ thuật. Nhà ống = thân + mái ngói dốc + tum. Chợ = nhà lớn + mái dốc.
 // Độ thụt co theo bề rộng lô, để tháp 9 m không thành cây kim.
 import type { City, CityBuilding } from "./cityGen";
-import { buildCoreStreet } from "./coreStreet.ts";
 
 /** Một khối đặc: hộp (hoặc lăng trụ vát góc / lăng trụ tam giác tuỳ danh sách chứa nó). */
 export interface Part {
@@ -561,12 +560,8 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
 
   // --- KHU PHỐ GỐC: bản đồ đang chơi được, đặt nguyên vào giữa thành phố --------------------------
 
-  const core = buildCoreStreet(city.core.x, city.core.z);
-  for (const p of core.flat) push(flat, p);
-  for (const p of core.boxes) push(boxes, p);
-  for (const p of core.details) push(details, p);
-  for (const p of core.gables) push(gables, p);
-  for (const p of core.drums) push(drums, p);
+  // Khu phố gốc KHÔNG vẽ lại ở đây: CityPage cắm nguyên thế giới thật của `features/khupho`
+  // (coreWorld.ts) vào đúng chỗ đã cắt. Cắt lòng đường ở trên chỉ để nó không bị đè.
 
   // --- cây, cột đèn, vật thể vỉa hè -----------------------------------------------------------
   let props = 0;

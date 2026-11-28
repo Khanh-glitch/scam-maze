@@ -337,12 +337,22 @@ vì hình học lẫn dữ liệu đều đọc từ cùng một nguồn `featur
 - `cityGen` chọn một tuyến phố **ngang, dài > 175 m, rộng 6–9,5 m, không vướng mốc**, dành riêng
   đúng hình chữ nhật của khu phố (≈ 92 × 74 m) rồi để lưới sinh tiếp tục hai đầu — không có khoảng
   trống. Hiện tại: `{x: 260, z: −133,35, streetName: "Lê Thánh Tôn"}`, `core.id = st-z--133`.
-- `cityMesh` cắt lòng đường/vỉa hè của tuyến phố đó theo `spans` (vỉa hè dừng ở khu phố và ở ngã tư),
-  rồi ghép `buildCoreStreet()` vào cùng danh sách khối.
-- `coreStreet.ts` vẽ mặt đường, rãnh, vỉa hè chia đôi ở hẻm, vạch tim đường, sân hẻm/sân chung và
-  từng căn nhà ống: hiên, băng hiệu, chuồng cu, bồn nước, mái ngói / mặt tiền giả.
-- `/saigon` mở màn **ngay trên khu phố gốc**, có nhãn "Khu phố gốc · Lê Thánh Tôn".
-- Bất biến mới: sau khi lưới đi lại chốt, mọi POI bị đè được nắn sang ô đứng được gần nhất
+- `cityMesh` cắt lòng đường/vỉa hè của tuyến phố đó theo `spans` (vỉa hè dừng ở khu phố và ở ngã tư)
+  và **không vẽ lại** khu phố.
+- `citymap/coreWorld.ts` cắm **nguyên thế giới đang chơi được** của `features/khupho` vào đúng chỗ đã
+  cắt: cùng `buildNeighborhood` (44 nhà ống, mặt đường, vỉa hè, hẻm, sân chung, dây điện, cây, xe dựng),
+  cùng `buildLife` (người đi đường, chủ quán, xe máy chạy theo luật của map gốc), cùng
+  `loadStreetProps` + `loadStreetFurniture` (đồ GLB đã đặt tay). Chỉ tắt hai thứ thuộc màn đứng riêng:
+  tấm nền 440 m và dãy nhà xa giả — thành phố thật đã ở đó.
+- Vùng dành riêng là **hình L**, không phải hình chữ nhật: dải phố x ±70 × z ±26, cộng khối hẻm/sân
+  chung x −12…30 × z 26…58. Phần còn lại của hình chữ nhật cũ (hai bên hông) để lưới sinh lấp — dành
+  cả hình chữ nhật thì thành bãi đất trống.
+- Dựng khu phố ở gốc toạ độ rồi mới dời tới `(core.x, core.z)`: `buildShadowProxies` nướng ma trận
+  thế giới vào hình học, dời trước sẽ bị cộng đôi vị trí.
+- `/saigon` mở màn **ngay trên khu phố gốc**, có nhãn "Khu phố gốc · Lê Thánh Tôn" và thanh tải riêng
+  ("Đang cắm khu phố gốc"). Người mẫu GLB (~50 MB) mặc định tắt để trang mở nhanh — người đi đường
+  vẫn là người của khu phố, dựng thủ tục; bật bằng `?humans=1`, xe báo thủ bằng `?baothu=1`.
+- Bất biến POI: sau khi lưới đi lại chốt, mọi POI bị đè được nắn sang ô đứng được gần nhất
   (≤ 18 m, 32 hướng) — kiểm bằng **cả** hình học chính xác và lưới 0,5 m.
 
-Ảnh: `docs/product/audit/_core.png` (mặt phố trong khu phố gốc), `_g-core.jpg` (màn mở đầu `/saigon`).
+Ảnh: `_g-realcore2.jpg` (khu phố thật cắm trong thành phố, nhìn từ trên), `_g-core.jpg` (màn mở đầu `/saigon`).

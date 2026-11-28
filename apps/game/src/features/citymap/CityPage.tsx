@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import * as THREE from "three";
 import { generateCity, type City } from "./cityGen";
 import { buildCityMesh, type Part } from "./cityMesh";
+import { buildCoreWorld, type CoreWorld } from "./coreWorld";
 
 /**
  * `/saigon` — bản đồ Sài Gòn 2026 SINH TỰ ĐỘNG (`cityGen`) dựng bằng three.js.
@@ -183,11 +184,13 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
   const meshData = useMemo(() => (city ? buildCityMesh(city) : null), [city]);
 
   const labelRef = useRef<Array<{ id: string; name: string; pos: THREE.Vector3 }>>([]);
+  const [coreLoad, setCoreLoad] = useState<{ step: string; fraction: number } | null>(null);
   const showLabelsRef = useRef(showLabels);
   showLabelsRef.current = showLabels;
 
   const mount = useCallback(() => {
     if (!mountRef.current || !meshData || !city) return undefined;
+    let cancelled = false;
     const el = mountRef.current;
     const W = el.clientWidth || window.innerWidth;
     const H = el.clientHeight || window.innerHeight;
@@ -296,6 +299,40 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     const drumGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 10);
     drumGeo.translate(0, 0.5, 0);
     addInstanced(scene, drumGeo, meshData.drums, new THREE.MeshLambertMaterial({ color: "#c9cdd2" }));
+
+    // KHU PHỐ GỐC: cắm nguyên thế giới đang chơi được của game vào đây — nhà ống, mặt đường, vỉa hè,
+    // hẻm, sân chung, dây điện, cây, đồ vỉa hè, người và xe máy chạy theo đúng luật của map gốc.
+    // Không vẽ lại: cùng builder, cùng dữ liệu, chỉ khác vị trí và không có nền/nhà xa giả.
+    let coreWorld: CoreWorld | null = null;
+    if (city.core.streetId) {
+      void buildCoreWorld(city.core.x, city.core.z, {
+        onStep: (step, fraction) => setCoreLoad({ step, fraction }),
+        humans: qs.get("humans") === "1",
+        baothu: qs.get("baothu") === "1",
+      })
+        .then((world) => {
+          if (cancelled) {
+            world.dispose();
+            return;
+          }
+          coreWorld = world;
+          scene.add(world.root);
+          setCoreLoad(null);
+          {
+            const box = new THREE.Box3().setFromObject(world.root);
+            (window as unknown as { __cityCore?: unknown }).__cityCore = {
+              houses: world.houses.length,
+              children: world.root.children.length,
+              props: world.loaded.props,
+              bounds: { x0: box.min.x, x1: box.max.x, z0: box.min.z, z1: box.max.z },
+            };
+          }
+        })
+        .catch((err) => {
+          console.error("[citymap] khu phố gốc không dựng được", err);
+          setCoreLoad(null);
+        });
+    }
 
     // Nắng chiều thấp: một nguồn chính + trời tán xạ. Bóng đổ thật (shadow map) cho 20.000 khối
     // thì vượt ngân sách khung hình của máy yếu, nên dùng sáng hai chiều + sương làm độ sâu.
@@ -417,6 +454,8 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     const tmp = new THREE.Vector3();
     const loop = () => {
       const dt = Math.min(0.05, clock.getDelta());
+      const now = clock.elapsedTime;
+      coreWorld?.update(dt, now);
       const boost = keys.has("shift") ? 4 : 1;
       const step = 60 * boost * dt;
       const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
@@ -463,6 +502,9 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     raf = requestAnimationFrame(loop);
 
     return () => {
+      cancelled = true;
+      coreWorld?.dispose();
+      coreWorld = null;
       cancelAnimationFrame(raf);
       dom.removeEventListener("pointerdown", onDown);
       dom.removeEventListener("pointerup", onUp);
@@ -554,6 +596,12 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
           </button>
         )}
       </div>
+
+      {coreLoad && (
+        <div className="pointer-events-none absolute bottom-10 left-4 rounded-md border border-white/15 bg-black/55 px-3 py-1.5 text-[11px] text-white/80 backdrop-blur">
+          Đang cắm khu phố gốc ({coreLoad.step} {Math.round(coreLoad.fraction * 100)}%)
+        </div>
+      )}
 
       <div className="pointer-events-none absolute bottom-3 left-4 text-[11px] text-white/55">
         kéo trái: xoay · kéo phải / shift: dịch · lăn: thu phóng · WASD: bay · Q/E: lên xuống
