@@ -1520,6 +1520,11 @@ export function generateCity(seedOverride?: string, options: CityGenOptions = {}
     // không bỏ. Sáu trong chín mốc (Bitexco, Bến Thành, Bình Tây, An Đông, hai ga metro) từng
     // không có toà nào trên bản đồ mà không cổng nào bắt được.
     let placedRect = offRoad(footprint);
+    // `offRoad` có thể TRƯỢT cả hình chữ nhật sang lô khác (ga metro 40 × 40 m cạnh chợ Bến Thành bị
+    // đẩy 40 m về nam). Bản trước chỉ dọn ở vị trí **trước khi trượt**, nên sau khi trượt toà đè
+    // lên dãy nhà mặt phố vừa sinh — đúng lỗi "công trình dính chùm": 5 cặp, 81 m², tất cả đều là
+    // `bd-5147` (ga metro) đè `bd-2019…2023` ở `x 294…330, z −10`.
+    if (placedRect.x0 !== footprint.x0 || placedRect.z0 !== footprint.z0) clearArea(inflate(placedRect, 1.2));
     let towerOk = false;
     for (let shrink = 0; shrink < 5 && !towerOk; shrink += 1) {
       const cxr = (placedRect.x0 + placedRect.x1) / 2;

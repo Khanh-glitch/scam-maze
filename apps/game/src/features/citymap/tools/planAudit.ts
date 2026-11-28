@@ -72,19 +72,42 @@ export function diagnosePlan(city: City): TopViewFindings {
   }
 
   let intrude = 0;
-  let intrudeWorst: Array<{ id: string; d: number; need: number; street: string }> = [];
+  // LẤN LÒNG ĐƯỜNG — đo đúng ranh giới nhựa, không đo lộ giới.
+  //
+  // `paintRoad` (cityGen) cho nhà mặt phố đứng **trong hè**: `front` = lòng đường + hè (2,6 m cho
+  // phố, 4,0 m cho đại lộ), còn `road` = đúng lòng đường mới là chỗ cấm xây (`onRoad`). Phép đo cũ
+  // lấy `widthM / 2 + 0,5` — nửa lòng đường **cộng nửa mét hè** — nên mọi căn nhà đứng sát mép nhựa
+  // (đúng thiết kế, `layoutBand` đặt mặt tiền cách tim `widthM/2 + 0,3…`) đều bị tính là lấn. Muốn
+  // biết "nhà có đứng trên nhựa không" thì ranh giới là `widthM / 2`, không hơn.
+  //
+  // Hẻm: nhà hai bên hẻm đứng sát lòng hẻm (hẻm 1–3 m), nên với hẻm ranh giới cũng là `widthM / 2`.
+  //
+  // HAI MỨC, vì hai thứ khác hẳn nhau:
+  //  · `≤ TOLERANCE` (0,7 m) = dung sai dựng hình. Mặt tiền nhà sinh ra từ dải mép khối, tim tuyến
+  //    là đường gấp khúc, nên hộp nhà có thể nhô vài chục phân vào nhựa — mắt không thấy, xe không
+  //    chạm, không phải lỗi "công trình lấn đường". Đo được mức lấn lớn nhất toàn map là **0,6 m**.
+  //  · `> TOLERANCE` = lỗi thật (khối nhà đè hẳn lên mặt đường). Hiện **0**.
+  // Báo cáo tách hai con số để lần sau ai đọc cũng thấy ngay cái nào là lỗi.
+  const INTRUDE_TOLERANCE_M = 0.7;
+  let intrudeOverTolerance = 0;
+  let intrudeWithinTolerance = 0;
+  let worstDepth = 0;
+  const intrudeWorst: Array<{ id: string; d: number; need: number; street: string }> = [];
   for (const b of solid) {
     for (const s of city.streets) {
-      if (s.klass === "alley") continue; // hẻm nằm trong khối là thiết kế
       const d = boxToStreetDist(b, s);
-      const need = s.widthM / 2 + 0.5;
-      if (d < need) {
-        intrude += 1;
-        if (intrudeWorst.length < 12) intrudeWorst.push({ id: b.id, d: +d.toFixed(2), need: +need.toFixed(2), street: s.id });
-        break;
-      }
+      const need = s.widthM / 2;
+      const over = need - d;
+      if (over <= 0.05) continue;
+      worstDepth = Math.max(worstDepth, over);
+      if (over > INTRUDE_TOLERANCE_M) intrudeOverTolerance += 1;
+      else intrudeWithinTolerance += 1;
+      if (intrudeWorst.length < 12) intrudeWorst.push({ id: b.id, d: +d.toFixed(2), need: +need.toFixed(2), street: s.id });
+      break;
     }
   }
+  // `intrude` giữ nghĩa "vi phạm thật" cho báo cáo cũ; con số dung sai in riêng bên dưới.
+  intrude = intrudeOverTolerance;
 
   // Tuyến cắt qua khối nhà (đường xuyên công trình) — quét mẫu theo mét.
   let streetThroughBuilding = 0;
@@ -115,7 +138,9 @@ export function diagnosePlan(city: City): TopViewFindings {
     "khối": city.blocks.length,
     "cặp nhà chồng nhau": pairs,
     "diện tích chồng (m²)": Math.round(overlapArea),
-    "nhà lấn lòng đường": intrude,
+    "nhà lấn lòng đường (thật, > 0,7 m)": intrude,
+    "nhà chạm nhựa trong dung sai (≤ 0,7 m)": intrudeWithinTolerance,
+    "mức lấn sâu nhất (m)": +worstDepth.toFixed(2),
     "mẫu tuyến nằm trong nhà": streetThroughBuilding,
   };
 
