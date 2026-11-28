@@ -307,8 +307,15 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     if (city.core.streetId) {
       void buildCoreWorld(city.core.x, city.core.z, {
         onStep: (step, fraction) => setCoreLoad({ step, fraction }),
+        // Phố hiện ngay khi nhà + mặt đường dựng xong; người và đồ GLB chảy vào sau, không chặn.
+        onWorldReady: (root) => {
+          if (cancelled) return;
+          scene.add(root);
+          (window as unknown as { __cityCoreWorldAt?: number }).__cityCoreWorldAt = performance.now();
+        },
         humans: qs.get("humans") === "1",
         baothu: qs.get("baothu") === "1",
+        nolife: qs.get("nolife") === "1",
       })
         .then((world) => {
           if (cancelled) {
@@ -316,10 +323,11 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
             return;
           }
           coreWorld = world;
-          scene.add(world.root);
+          if (!world.root.parent) scene.add(world.root);
           setCoreLoad(null);
           {
             const box = new THREE.Box3().setFromObject(world.root);
+            (window as unknown as { __cityCoreAt?: number }).__cityCoreAt = performance.now();
             (window as unknown as { __cityCore?: unknown }).__cityCore = {
               houses: world.houses.length,
               children: world.root.children.length,

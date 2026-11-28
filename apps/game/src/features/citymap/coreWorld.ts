@@ -51,6 +51,11 @@ export interface CoreWorldOptions {
   /** Gọi sau mỗi bước nặng để thanh tải của trang kịp vẽ. */
   onStep?: (step: 'world' | 'life' | 'props', fraction: number) => void;
   /**
+   * Gọi ngay khi phần **nhà + đường + vỉa hè** đã dựng xong, trước khi có người và đồ GLB: chủ
+   * trang gắn `root` vào scene lúc này để phố hiện ra sớm, phần còn lại chảy vào sau.
+   */
+  onWorldReady?: (root: THREE.Group) => void;
+  /**
    * Người mẫu GLB của khu phố (thư viện nhân vật ~50 MB). Mặc định tắt: trong thành phố, người đi
    * đường dựng bằng hình thủ tục của chính khu phố — vẫn là người thật của map gốc, chỉ không phải
    * model quét. Bật bằng `?humans=1` khi cần đúng model.
@@ -58,6 +63,11 @@ export interface CoreWorldOptions {
   humans?: boolean;
   /** Xe "báo thủ" chạy ẩu. Mặc định tắt cho nhẹ; `?baothu=1` để bật. */
   baothu?: boolean;
+  /**
+   * Chỉ dựng nhà + đường + vỉa hè, bỏ người/xe/đồ GLB (`?nolife=1`). Dùng khi máy yếu hoặc khi chỉ
+   * cần xem bố cục.
+   */
+  nolife?: boolean;
 }
 
 const yieldFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
@@ -110,12 +120,13 @@ export async function buildCoreWorld(x: number, z: number, opts: CoreWorldOption
   // trên nền thành phố để không bị nền xám của thành phố nuốt mất.
   const houses = buildNeighborhood(ctx, {
     ground: [
-      { x0: -74, x1: 74, z0: -30, z1: -6 },
-      { x0: -74, x1: 74, z0: 6, z1: 58 },
+      { x0: -74, x1: 74, z0: -30, z1: -6, color: "#55544a" },
+      { x0: -74, x1: 74, z0: 6, z1: 58, color: "#55544a" },
     ],
     skyline: false,
   });
   ctx.houses = houses;
+  opts.onWorldReady?.(root);
   opts.onStep?.('world', 1);
 
   // Gộp hình khối tĩnh như màn gốc: cùng số hình, ít lệnh vẽ hơn nhiều.
@@ -127,18 +138,22 @@ export async function buildCoreWorld(x: number, z: number, opts: CoreWorldOption
   opts.onStep?.('life', 0.2);
   await yieldFrame();
   const vehicles: { pos: THREE.Vector3; speed: number }[] = [];
-  const life = buildLife(ctx, houses, vehicles, silentAudio, await bikeRider, await humans, await baothu);
-  ctx.walkers.push(life);
+  const life = opts.nolife
+    ? null
+    : buildLife(ctx, houses, vehicles, silentAudio, await bikeRider, await humans, await baothu);
+  if (life) ctx.walkers.push(life);
   opts.onStep?.('life', 1);
 
   placeStreetFurniture(root);
   opts.onStep?.('props', 0.2);
   await yieldFrame();
   let placedProps = 0;
-  try {
-    placedProps = (await loadStreetProps(ctx)).length;
-  } catch (err) {
-    console.warn('[citymap] street props failed to load', err);
+  if (!opts.nolife) {
+    try {
+      placedProps = (await loadStreetProps(ctx)).length;
+    } catch (err) {
+      console.warn('[citymap] street props failed to load', err);
+    }
   }
   opts.onStep?.('props', 1);
 
@@ -149,7 +164,7 @@ export async function buildCoreWorld(x: number, z: number, opts: CoreWorldOption
 
   const tick = (dt: number, t: number) => {
     windUniform.value = t;
-    life.update(dt, t);
+    life?.update(dt, t);
   };
 
   return {

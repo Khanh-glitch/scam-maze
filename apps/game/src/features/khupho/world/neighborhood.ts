@@ -53,6 +53,8 @@ export interface GroundRect {
   x0: number; x1: number; z0: number; z1: number;
   /** Cao độ mặt nền (mặc định 0,02 — nằm trên nền của thành phố, dưới vỉa hè 0,15). */
   y?: number;
+  /** Màu nền; truyền màu nền của thành phố để mép dải không lộ vệt sáng. */
+  color?: string;
 }
 
 export interface NeighborhoodOptions {
@@ -76,7 +78,7 @@ export function buildNeighborhood(ctx: Ctx, opts: NeighborhoodOptions = {}) {
   else if (Array.isArray(ground)) {
     for (const g of ground) {
       const y = g.y ?? 0.02;
-      NB.box(g.x0, y - 0.55, g.z0, g.x1 - g.x0, 0.55, g.z1 - g.z0, 'conc:#7d7a70', { ny: null });
+      NB.box(g.x0, y - 0.55, g.z0, g.x1 - g.x0, 0.55, g.z1 - g.z0, `conc:${g.color ?? '#7d7a70'}`, { ny: null });
     }
   }
   NB.box(-70, -0.3, -3.6, 140, 0.3, 7.2, 'asph');
