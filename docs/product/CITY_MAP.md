@@ -334,7 +334,11 @@ vì hình học lẫn dữ liệu đều đọc từ cùng một nguồn `featur
 
 - `streetPlan.ts` tách khỏi `neighborhood.ts`: `STREET`, `MOD`, `appearance()`, `coreLots()`,
   `coreFootprint()`. Không có three.js → dùng được cả trong sinh thành phố.
-- `cityGen` chọn một tuyến phố **ngang, dài > 175 m, rộng 6–9,5 m, không vướng mốc**, dành riêng
+- `cityGen` chọn tuyến phố theo **điểm khu**: khu ở/chợ/du khách cao, hành chính thấp, **công trường
+  và công viên bị trừ nặng** (lần chọn đầu rơi vào công viên Tao Đàn, lần hai vào công trường metro).
+  Dãy nhà 91 m được đặt vào **khoảng trống dài nhất giữa hai phố cắt ngang**, đo theo mép đường —
+  lưới phố Sài Gòn dày ~90 m nên không tuyến 220 m nào sạch suốt. Hiện tại: **Nguyễn Du**, rộng 6,5 m
+  (phố gốc 7,2 m), khu dân cư, 72 toà trong vành 60–90 m. Dành riêng
   đúng hình chữ nhật của khu phố (≈ 92 × 74 m) rồi để lưới sinh tiếp tục hai đầu — không có khoảng
   trống. Hiện tại: `{x: 260, z: −133,35, streetName: "Lê Thánh Tôn"}`, `core.id = st-z--133`.
 - `cityMesh` cắt lòng đường/vỉa hè của tuyến phố đó theo `spans` (vỉa hè dừng ở khu phố và ở ngã tư)
@@ -355,7 +359,8 @@ vì hình học lẫn dữ liệu đều đọc từ cùng một nguồn `featur
 - Bất biến POI: sau khi lưới đi lại chốt, mọi POI bị đè được nắn sang ô đứng được gần nhất
   (≤ 18 m, 32 hướng) — kiểm bằng **cả** hình học chính xác và lưới 0,5 m.
 
-Ảnh (chụp từ `/saigon` thật, bằng Chromium): `_g-core-air2.jpg` / `_g-final.jpg` (khu phố thật trong công
+Ảnh (chụp từ `/saigon` thật, bằng Chromium): `_g-ndu.jpg` (khu phố trên Nguyễn Du, giữa khu dân cư,
+kênh ở phía bắc), `_g-core-air2.jpg` / `_g-final.jpg` (khu phố thật trong công
 viên, thành phố bao quanh), `_g-realcore-street.jpg` và `_g-core-east.jpg` (đứng trong lòng phố: vỉa hè,
 cây, dây điện, biển hiệu, xe máy, người đi đường), `_plan2.png` (mặt bằng: công viên có cỏ/lối đi/cây).
 
