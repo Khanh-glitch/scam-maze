@@ -22,6 +22,7 @@ import { WorldStreamer } from '../testbus/openworld/world/WorldStreamer';
 import { buildSaigonDistricts, type SaigonDistricts } from '../testbus/openworld/world/saigonDistricts';
 import { buildBoardingHouse, type BoardingHouse } from '../testbus/openworld/world/boardingHouse';
 import { buildStreet } from '../testbus/openworld/simulation/street';
+import { SaigonTrafficManager } from '../testbus/openworld/traffic';
 
 type StreetWorld = ReturnType<typeof buildStreet>;
 
@@ -114,9 +115,18 @@ export async function buildRealWorld(opts: RealWorldOptions = {}): Promise<RealW
   await yieldFrame();
   const house: BoardingHouse = buildBoardingHouse(sink, noAssetCallback);
 
+  /**
+   * GIAO THÔNG — đúng bộ mô phỏng của map chuẩn (`traffic/TrafficManager.ts`): đèn QCVN 41:2024,
+   * ACC/IDM+, sublane Sài Gòn, va chạm OBB, người qua đường, còi. Trước đây `realWorld.ts` truyền
+   * `undefined` nên đường Lý Thái Tổ trong thành phố chỉ có xe **dựng im** — thiếu hẳn phần sống nhất
+   * của map chuẩn. Truyền manager vào `buildStreet` và `buildSaigonDistricts` thì chính 9 xe của phố
+   * và đoàn xe trên Đại lộ 3/2 / Hải Triều / Đại lộ Đông vào chung một hàng đợi và chạy theo luật.
+   */
+  const traffic = new SaigonTrafficManager();
+
   opts.onStep?.('street', 0.15);
   await yieldFrame();
-  const street: StreetWorld = buildStreet(sink, software, undefined, noAssetCallback);
+  const street: StreetWorld = buildStreet(sink, software, undefined, noAssetCallback, traffic);
 
   opts.onStep?.('districts', 0.4);
   await yieldFrame();
@@ -124,7 +134,7 @@ export async function buildRealWorld(opts: RealWorldOptions = {}): Promise<RealW
   // `horizon: false` — vòng chân trời giả của map thật (11 cụm tháp đen + tấm nền 880 m) chỉ dùng khi
   // nó đứng một mình ở `/testbus`. Trong thành phố, chân trời thật đã có; để nguyên thì mười một khối
   // đen mọc giữa phố (đã thấy trong ảnh kiểm tra đầu tiên).
-  const districts: SaigonDistricts = buildSaigonDistricts(sink, streamer, software, noAssetCallback, undefined, undefined, {
+  const districts: SaigonDistricts = buildSaigonDistricts(sink, streamer, software, noAssetCallback, traffic, undefined, {
     horizon: false,
   });
 
@@ -161,6 +171,7 @@ export async function buildRealWorld(opts: RealWorldOptions = {}): Promise<RealW
 
   const player = { x: 0, y: 0, z: 0 };
   let time = 0;
+  let frames = 0;
   let disposed = false;
 
   // Đặt sau khi dựng xong: `mergeStaticMeshesByMaterial` / `freezeStaticMatrices` của map thật nướng
@@ -198,11 +209,32 @@ export async function buildRealWorld(opts: RealWorldOptions = {}): Promise<RealW
       player.z = camera.position.z;
       // Chunk/LOD của map thật theo camera thành phố — đúng cơ chế của game, không phải "hiện hết".
       streamer.update(player.x, player.y, player.z, software);
+      // Camera thành phố đóng vai "người chơi" của bộ mô phỏng: LOD 3 tầng, vùng cách âm, còi, và
+      // người qua đường đều tính quanh nó.
+      traffic.step({
+        dt,
+        playerX: player.x,
+        playerY: player.y,
+        playerZ: player.z,
+        playerYaw: 0,
+        wetness: 0.12,
+      });
       districts.update(dt, time, player.x, player.z);
       // `skipBlockCull = true`: camera thành phố bay ở 45 m, cắt ô theo "người chơi" 1,7 m sẽ làm cả
       // con phố biến mất khi nhìn từ trên cao.
       street.update(dt, player, time, true);
       house.update(time);
+      // Số liệu giao thông cho kiểm toán: bao nhiêu xe đang chạy (không phải xe dựng im).
+      if (frames % 20 === 0) {
+        let moving = 0;
+        for (const v of traffic.vehicles) if (Math.abs(v.speed ?? 0) > 0.4) moving += 1;
+        (window as unknown as { __cityRealTraffic?: unknown }).__cityRealTraffic = {
+          vehicles: traffic.vehicles.length,
+          moving,
+          simTime: Number(time.toFixed(1)),
+        };
+      }
+      frames += 1;
     },
     dispose() {
       disposed = true;

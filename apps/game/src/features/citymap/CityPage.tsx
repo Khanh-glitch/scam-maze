@@ -352,7 +352,70 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     // Đường, hè, nước, sân, vật thể: màu phẳng. Dán vân cửa sổ lên mặt đường là biến phố thành
     // một tấm lưới đen (lỗi nhìn thấy ngay ở khung ngang tầm mắt).
     // Mặt đường/sân/nước chỉ nhận bóng: cho 30 000 tấm phẳng ném bóng là tiền mất tật mang.
-    addChunked(scene, cube, meshData.flat, { materials: new THREE.MeshLambertMaterial(), castShadow: false });
+    // MẶT ĐƯỜNG LẤY TỪ MAP CHUẨN. `survey/map.webp` (+ normal, + rough) là bộ quét nhựa đường thật
+    // mà phố Lý Thái Tổ của `/testbus` dùng. Trước đây mặt đường thành phố chỉ là màu phẳng
+    // `#5a5964`; giờ nó là cùng một vật liệu với map chuẩn, nên chỗ giáp ranh không còn "đổi chất".
+    // Máy chạy renderer phần mềm (SwiftShader/llvmpipe) thì giữ màu phẳng: nhựa đường có normal map
+    // phủ toàn màn hình làm khung hình trong sandbox rớt tới mức không chụp nổi ảnh (đã đo: quá 150 s
+    // cho một khung). Trên GPU thật thì bật — cùng cách map chuẩn tự hạ chi tiết khi gặp software.
+    const SOFT_GL = (() => {
+      try {
+        const gl = renderer.getContext();
+        const ext = gl.getExtension("WEBGL_debug_renderer_info");
+        const info = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : "";
+        return /swiftshader|llvmpipe|software|mesa offscreen/i.test(info);
+      } catch {
+        return false;
+      }
+    })();
+    const ROAD_COLORS = new Set(["#5a5964", "#605e6b"]);
+    const roadParts = meshData.flat
+      .filter((p) => p.color && ROAD_COLORS.has(p.color))
+      // Màu của instance nhân vào map: phải để trắng, nếu không nhựa đường bị nhân thêm màu xám đậm.
+      .map((p) => ({ ...p, color: "#ffffff" }));
+    const otherFlat = meshData.flat.filter((p) => !(p.color && ROAD_COLORS.has(p.color)));
+    // `MeshLambertMaterial`: cùng một tấm ảnh nhựa đường, nhưng không có per-pixel normal/rough nên
+    // rẻ hơn nhiều lần — cái giá phải trả của `MeshStandardMaterial` phủ toàn màn hình đã đo được là
+    // khung hình vượt 150 s trong sandbox. Màu phẳng trước đây giữ làm nền khi ảnh chưa tải xong.
+    // `#d4d8dc` là đúng màu nhân mà `street.ts` của map chuẩn dùng cho cùng tấm ảnh này
+    // (`asphalt.color.set(0xd4d8dc)`); để trắng thì nhựa đường ra gần đen.
+    const roadMat = new THREE.MeshLambertMaterial({ color: "#d4d8dc" });
+    /**
+     * Ảnh quét nhựa đường của map chuẩn, **hạ xuống 256²** qua canvas.
+     *
+     * Lần đầu tôi gán thẳng file 1024² và mặt đường ra đen tuyền trong sandbox (texture báo
+     * `complete: true`, 1024×1024, UV có, mà vẫn đen) — nghi bản WebP 1024² không lên được GPU ảo.
+     * Vẽ lại qua canvas 256² vừa nhẹ cho SwiftShader, vừa không phụ thuộc định dạng file.
+     */
+    const surveyTex = (file: string) => {
+      const t = new THREE.Texture();
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = 256;
+        c.height = 256;
+        const g = c.getContext("2d");
+        if (!g) return;
+        g.drawImage(img, 0, 0, 256, 256);
+        const ct = new THREE.CanvasTexture(c);
+        ct.colorSpace = THREE.SRGBColorSpace;
+        ct.wrapS = ct.wrapT = THREE.RepeatWrapping;
+        ct.anisotropy = 4;
+        ct.needsUpdate = true;
+        roadMat.map = ct;
+        roadMat.needsUpdate = true;
+      };
+      img.onerror = () => console.warn("[citymap] không tải được", file);
+      img.src = `/assets/testbus/ow/images/survey/${file}`;
+      return t;
+    };
+    // `surveyTex` tự gán `roadMat.map` khi ảnh giải mã xong (bất đồng bộ), nên không cần đặt ở đây.
+    surveyTex("map.webp");
+    if (!SOFT_GL) surveyTex("normal.webp");
+    // Luôn dùng `roadParts` (màu instance = trắng): màu instance nhân vào map, để nguyên `#5a5964`
+    // thì nhựa đường bị nhân hai lần và ra đen tuyền — đúng cái đã thấy ở ảnh kiểm tra thứ nhất.
+    addChunked(scene, cube, roadParts, { materials: roadMat, castShadow: false });
+    addChunked(scene, cube, otherFlat, { materials: new THREE.MeshLambertMaterial(), castShadow: false });
     addChunked(scene, prism, meshData.prisms);
     addChunked(scene, gableGeometry(), meshData.gables);
     // Chi tiết mặt tiền (cửa cuốn, biển hiệu, mái hiên, ban công) không vân, màu phẳng.
