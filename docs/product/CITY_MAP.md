@@ -355,4 +355,10 @@ vì hình học lẫn dữ liệu đều đọc từ cùng một nguồn `featur
 - Bất biến POI: sau khi lưới đi lại chốt, mọi POI bị đè được nắn sang ô đứng được gần nhất
   (≤ 18 m, 32 hướng) — kiểm bằng **cả** hình học chính xác và lưới 0,5 m.
 
-Ảnh: `_g-realcore2.jpg` (khu phố thật cắm trong thành phố, nhìn từ trên), `_g-core.jpg` (màn mở đầu `/saigon`).
+Ảnh (chụp từ `/saigon` thật, bằng Chromium): `_g-core-air2.jpg` / `_g-final.jpg` (khu phố thật trong công
+viên, thành phố bao quanh), `_g-realcore-street.jpg` và `_g-core-east.jpg` (đứng trong lòng phố: vỉa hè,
+cây, dây điện, biển hiệu, xe máy, người đi đường), `_plan2.png` (mặt bằng: công viên có cỏ/lối đi/cây).
+
+Đo được: khu phố dựng xong sau ~90–120 s trên Chromium phần mềm (SwiftShader) — trên GPU thật nhanh
+hơn nhiều; trong lúc chờ, thành phố đã hiện và có badge "Đang cắm khu phố gốc". 44 nhà, 1 493 nhóm vật
+thể, 3 đồ GLB đặt tay, khung bao 186…334 × −163…−75 (đúng dải 148 × 88 m).
