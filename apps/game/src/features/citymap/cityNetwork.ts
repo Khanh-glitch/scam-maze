@@ -204,7 +204,15 @@ export function buildCityNetwork(
       });
     }
   }
-  const horizontal = (l: Line) => Math.abs(l.bz - l.az) >= Math.abs(l.bx - l.ax);
+  // TRỤC CỦA TUYẾN — đây là chỗ đã gán sai nhãn và làm lỗi L5.
+  //
+  // `alongZ` nghĩa là tuyến chạy theo trục z (bắc–nam), nên `axis` phải là `"ns"`. Bản trước đặt
+  // `axis = alongZ ? "ew" : "ns"` — nhãn ngược. Hậu quả không nhìn thấy bằng mắt nhưng rất thật:
+  // `TurnArc.axis = from.axis`, và `TrafficManager` đọc đèn theo `turn.axis` khi vào ngã tư. Xe chạy
+  // dọc phố bắc–nam lại xin đèn của trục đông–tây, nên hoặc vượt đèn đỏ, hoặc dừng giữa lúc trục
+  // của mình đang xanh — đúng "xe dừng đèn đỏ không hợp lí". Đo được: một xe chạy trên `CTY_1_0_A`
+  // (phố bắc–nam) dừng lại ở `z = 70` vì đèn EW đỏ trong khi pha NS đang xanh.
+  const alongZ = (l: Line) => Math.abs(l.bz - l.az) >= Math.abs(l.bx - l.ax);
   const lineOf = new Map(lines.map((l) => [l.i, l]));
 
   // 2. Chỗ cắt: hai đầu tuyến (quay đầu) + giao điểm với tuyến vuông góc.
@@ -220,7 +228,7 @@ export function buildCityNetwork(
       const a = lines[p];
       const b = lines[q];
       // Chỉ cặp vuông góc: hai tuyến song song sát nhau là hai chiều của cùng một con phố.
-      if (horizontal(a) === horizontal(b)) continue;
+      if (alongZ(a) === alongZ(b)) continue;
       const den = a.tx * b.tz - a.tz * b.tx;
       if (Math.abs(den) < 1e-6) continue;
       const ox = b.ax - a.ax;
@@ -261,7 +269,7 @@ export function buildCityNetwork(
     // Bề rộng cả mặt đường (hai chiều chung), và nửa-bề-rộng của **một chiều** để đặt làn.
     const carriage = Math.max(3.2, l.st.widthM); // = 12,8 cho phố, 21,2 cho đại lộ
     const speed = l.st.klass === "avenue" ? 13.9 : 11.1;
-    const axis = horizontal(l) ? "ew" : "ns";
+    const axis = alongZ(l) ? "ns" : "ew";
 
     for (let k = 0; k < ordered.length - 1; k += 1) {
       const a = ordered[k];

@@ -22,8 +22,21 @@ import { deriveSignalApproaches, signalBasePosition, signalYaw } from "../testbu
 import { rect, type Solid } from "../testbus/openworld/simulation/boarding";
 
 export interface CitySignalOptions {
-  /** Trần số ngã tư được bật đèn — mỗi ngã tư 2–4 cột đèn GLB. */
+  /**
+   * Trần số ngã tư **được dựng cột đèn** — mỗi ngã tư 2–4 cột GLB. Đây là chi phí draw call.
+   *
+   * Tách khỏi `maxPhases` theo đúng lý do của lỗi L5: ngã tư **không có pha** thì mọi hướng đều
+   * "xanh 99" (`TrafficSignalController.update` trả `green 99` cho `signalized === false`), nên xe
+   * hai trục cắt thẳng vào nhau — đo được hai xe cách nhau 2,3 m ở ngã tư `CTYJ_1_8` mà cả hai vẫn
+   * chạy 8–11 m/s. Pha là **số học** trong `signalController` (67 ngã tư × một phép mod mỗi khung,
+   * không đáng kể), còn cột đèn mới là hình học. Vậy bật pha cho tất cả, dựng cột cho N gần nhất.
+   */
   maxIntersections?: number;
+  /**
+   * Trần số ngã tư được bật **pha đèn** (mặc định: tất cả). Đặt bằng 0 để chỉ dựng cột mà không có
+   * pha — chỉ dùng cho test so sánh.
+   */
+  maxPhases?: number;
   /** Cha của các cột đèn (thường là `engine.exteriorGroup`). */
   parent: THREE.Object3D;
   /** Hộp cản của cột đèn được đẩy vào đây, để nhân vật không đi xuyên cột. */
@@ -58,6 +71,7 @@ export function signalizeCityIntersections(
   options: CitySignalOptions,
 ): CitySignals {
   const maxIntersections = options.maxIntersections ?? 3;
+  const maxPhases = options.maxPhases ?? Number.POSITIVE_INFINITY;
   const root = new THREE.Group();
   root.name = "city-traffic-signals";
   const signalized: string[] = [];
@@ -70,12 +84,15 @@ export function signalizeCityIntersections(
     .map((j) => ({ id: j.id, x: j.x, z: j.z }));
   // Gần gốc toạ độ (map chuẩn nằm quanh đó) trước — đó là chỗ người chơi thật sự đi qua.
   candidates.sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z));
+  // PHA: mọi ngã tư thật (trần `maxPhases`, mặc định không trần).
+  const withPhase = candidates.slice(0, maxPhases);
+  // CỘT ĐÈN: chỉ N gần nhất — đây mới là chỗ tốn hình.
   const picked = candidates.slice(0, maxIntersections);
-  if (!picked.length) return { signalized, root, poles: 0 };
+  if (!withPhase.length) return { signalized, root, poles: 0 };
 
   // 2. `IntersectionSpec` là object sống trong đồ thị: bật cờ là bộ điều khiển của engine nhận
   //    ngay ở khung sau (`signals.update` duyệt lại `specs` mỗi lần gọi).
-  for (const p of picked) {
+  for (const p of withPhase) {
     const spec = graph.intersections.get(p.id);
     if (!spec) continue;
     spec.signalized = true;
@@ -91,7 +108,7 @@ export function signalizeCityIntersections(
 
   // 3. Cột đèn cho đúng những ngã tư vừa bật. `deriveSignalApproaches` trả về mọi nhánh vào của mọi
   //    ngã tư có đèn (cả của map chuẩn), nên lọc lại theo danh sách vừa chọn.
-  const wanted = new Set(signalized);
+  const wanted = new Set(picked.map((p) => p.id));
   const approaches = deriveSignalApproaches(graph).filter((a) => wanted.has(a.intersectionId));
   const groupOf = new Map<string, THREE.Group>();
   let poles = 0;

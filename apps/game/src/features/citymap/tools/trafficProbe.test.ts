@@ -4,6 +4,8 @@ import sharp from "sharp";
 import { generateCity } from "../cityGen";
 import { extendTrafficGraph } from "../cityTraffic";
 import { SaigonTrafficManager } from "../../testbus/openworld/traffic";
+import { signalizeCityIntersections } from "../citySignals";
+import * as THREE from "three";
 import { renderCityTopView } from "./topView";
 import { buildCityMesh } from "../cityMesh";
 
@@ -25,25 +27,42 @@ describe("vệt xe chạy", () => {
     const traffic = new SaigonTrafficManager();
     const ext = extendTrafficGraph(traffic.graph, city, { near: { x: 0, z: -60 }, radiusM: 900, maxCorridors: 24 });
 
+    // Bật đèn **như game thật** (`SaigonEnginePage` gọi y hệt): không có pha thì mọi hướng đều
+    // "xanh 99" và hình vẽ sẽ không phản ánh cái người chơi thấy. `maxIntersections: 0` để test
+    // không phải dựng cột GLB (jsdom không có canvas 2D cho bảng đếm giây).
+    signalizeCityIntersections(traffic.graph, traffic, {
+      parent: new THREE.Group(),
+      junctions: ext.junctions,
+      maxIntersections: 0,
+    });
+
+    // Rải 36 xe trên **toàn** lưới, không dồn vào các cạnh đầu danh sách: bản trước chỉ tô nửa trái
+    // bản đồ và trông như nửa thành phố không có xe.
+    const total = ext.edgeIds.length;
+    const stride = Math.max(1, Math.floor(total / 36));
+    const picked: string[] = [];
+    for (let i = 0; i < total && picked.length < 36; i += stride) picked.push(ext.edgeIds[i]);
+    // Nếu lưới ít hơn 36 cạnh thì lấp thêm.
+    for (let i = 0; picked.length < 36 && i < total; i += 1) picked.push(ext.edgeIds[i]);
+
     // Đặt 36 xe bằng tay: `spawnCityVehicles` cần GLTF (jsdom không nạp được GLB nhị phân).
-    let n = 0;
-    for (const edgeId of ext.edgeIds) {
-      for (let k = 0; k < 2 && n < 36; k += 1) {
-        traffic.spawnVehicle({
-          id: `P_${n}`,
-          category: n % 3 === 0 ? "moto" : "car",
-          edgeId,
-          s: 20 + k * 40,
-          halfWidth: 0.92,
-          halfLength: 2.2,
-        });
-        n += 1;
-      }
-      if (n >= 36) break;
-    }
+    picked.slice(0, 36).forEach((edgeId, n) => {
+      const edge = traffic.graph.edges.get(edgeId)!;
+      traffic.spawnVehicle({
+        id: `P_${n}`,
+        category: n % 3 === 0 ? "moto" : "car",
+        edgeId,
+        s: Math.min(edge.length * 0.5, 20 + (n % 2) * 40),
+        halfWidth: 0.92,
+        halfLength: 2.2,
+      });
+    });
 
     const step = { dt: 1 / 60, playerX: 0, playerY: 1.7, playerZ: -60, playerYaw: 0, wetness: 0.1 };
-    for (let i = 0; i < 60; i += 1) traffic.step(step); // hâm nóng
+    for (let i = 0; i < 60; i += 1) {
+      traffic.step(step);
+      traffic.signals.update(i / 60);
+    } // hâm nóng
 
     type Pt = { x: number; z: number };
     const trails = new Map<string, Pt[]>();
@@ -51,6 +70,7 @@ describe("vệt xe chạy", () => {
     let reversals = 0;
     for (let i = 0; i < 60 * 40; i += 1) {
       traffic.step(step);
+      traffic.signals.update(1 + i / 60);
       if (i % 12 !== 0) continue; // 5 mẫu/giây
       for (const v of traffic.vehicles) {
         const arr = trails.get(v.id) ?? [];

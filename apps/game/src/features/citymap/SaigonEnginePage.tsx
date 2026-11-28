@@ -135,6 +135,10 @@ export function SaigonEnginePage({ onBackToMenu }: { onBackToMenu?: () => void }
                 // rộng lưới; đặt đèn ở 12 ngã tư gần map chuẩn nhất — đủ để mọi hướng đi ra khỏi
                 // 6.07 đều gặp đèn thật, mà không phải dựng 29 cột (mỗi cột là một cụm mesh + một
                 // chương trình shader của `TrafficSignalController`).
+                // Chỉ trần CỘT ĐÈN. Pha thì bật cho **mọi** ngã tư thật (`maxPhases` mặc định
+                // không trần) — ngã tư không có pha trả "xanh 99" cho cả hai trục, và xe hai phố cắt
+                // thẳng vào nhau (đo được 2,3 m ở `CTYJ_1_8`). Pha là số học trong
+                // `TrafficSignalController`; cột đèn mới là draw call.
                 maxIntersections: Number(qs.get("lights") ?? 12) || 12,
                 solids: engine.citySolids,
               });
