@@ -247,7 +247,13 @@ export class OpenWorldEngine {
   private readonly playOut = { position: new T.Vector3(), inRoom: false, moved: 0 };
   public renderer: T.WebGLRenderer;
   public scene: T.Scene;
-  private exteriorGroup = new T.Group();
+  /**
+   * Nhóm chứa **toàn bộ** thế giới ngoài trời của engine (phố, quận, bus, NPC). Engine ẩn cả nhóm
+   * khi người chơi còn trong phòng 6.07, nên thứ gì cấy thêm vào thế giới ngoài trời (thành phố thủ
+   * tục, khu phố gốc) cũng phải nằm trong nhóm này — nếu gắn thẳng vào `scene` thì nó vẽ xuyên qua
+   * tường phòng ngủ và làm hỏng pha warmup.
+   */
+  public exteriorGroup = new T.Group();
   private streetGroup = new T.Group();
   private busCastGroup = new T.Group();
   private roomLightsGroup = new T.Group();

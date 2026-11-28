@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { generateCity } from "./cityGen";
 import { addCityLayer } from "./cityLayer";
 import { extendTrafficGraph, spawnCityVehicles } from "./cityTraffic";
+import { buildCoreWorld, type CoreWorld } from "./coreWorld";
 import { OpenWorldEngine } from "../testbus/openworld/world/OpenWorldEngine";
 import { loadStreetFurniture } from "../khupho/world/streetFurniture";
 
@@ -18,17 +19,23 @@ import { loadStreetFurniture } from "../khupho/world/streetFurniture";
  * bằng `addCityLayer` — cùng một hàm `/saigon` bản cũ dùng, nên hình học thành phố không thể lệch
  * giữa hai nơi. Nó chỉ thêm hình, không thay đèn, không thay trời, không thay vật liệu của engine.
  *
+ * KHU PHỐ GỐC: `city.core` là chỗ `cityMesh` đã cắt đất; ở đây `buildCoreWorld` dựng **nguyên thế
+ * giới đang chơi được** của game (`features/khupho`: nhà ống, hẻm, sân chung, dây điện, người, xe)
+ * vào đúng chỗ đó — cùng builder với màn chơi, không vẽ lại.
+ *
  * Người chơi bắt đầu trong phòng 6.07 như thường lệ và bước ra là đứng giữa thành phố.
  */
 export function SaigonEnginePage({ onBackToMenu }: { onBackToMenu?: () => void }) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState("Đang dựng Sài Gòn…");
+  const [load, setLoad] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const el = mountRef.current;
     if (!el) return;
     let engine: OpenWorldEngine | null = null;
+    let coreWorld: CoreWorld | null = null;
     let cancelled = false;
     const qs = new URLSearchParams(window.location.search);
 
@@ -125,6 +132,49 @@ export function SaigonEnginePage({ onBackToMenu }: { onBackToMenu?: () => void }
           };
           requestAnimationFrame(tick);
         }
+
+        // KHU PHỐ GỐC: cắm nguyên thế giới đang chơi được của game vào đúng chỗ `cityMesh` đã cắt
+        // đất cho nó. Cùng `buildCoreWorld` mà `/saigon?engine=0` dùng — không có bản dựng thứ hai.
+        if (city.core.streetId && qs.get("city") !== "0" && qs.get("core") !== "0") {
+          setLoad("Đang dựng khu phố gốc…");
+          // Phiên bản engine đang chạy (không phải bản sao) — cần giữ tham chiếu trong closure.
+          const liveEngine = engine;
+          void buildCoreWorld(city.core.x, city.core.z, {
+            onWorldReady: (root) => {
+              if (cancelled) return;
+              // Gắn vào `exteriorGroup` chứ không phải thẳng scene: engine ẩn cả nhóm này khi người
+              // chơi còn ở trong phòng 6.07 (`sealExterior`), nên khu phố không bị vẽ sau tấm kính
+              // phòng ngủ và cũng không bị engine bỏ quên trong các pha warmup.
+              liveEngine.exteriorGroup.add(root);
+              liveEngine.renderer.shadowMap.needsUpdate = true;
+            },
+            humans: qs.get("humans") === "1",
+            baothu: qs.get("baothu") === "1",
+            nolife: qs.get("nolife") === "1",
+          })
+            .then((world) => {
+              if (cancelled) {
+                world.dispose();
+                return;
+              }
+              coreWorld = world;
+              if (!world.root.parent) engine?.exteriorGroup.add(world.root);
+              if (engine) engine.renderer.shadowMap.needsUpdate = true;
+              setLoad(null);
+              console.info(
+                "[saigon] khu phố gốc cấy vào engine ·",
+                world.houses.length,
+                "nhà ·",
+                world.loaded.props,
+                "đồ vỉa hè",
+              );
+            })
+            .catch((err) => {
+              console.error("[saigon] khu phố gốc không dựng được", err);
+              setLoad(null);
+            });
+        }
+
         if (qs.get("t")) {
           const [x, z] = qs.get("t")!.split(",").map(Number);
           if (Number.isFinite(x) && Number.isFinite(z)) engine.feet.set(x, Number(qs.get("ty") ?? 0) || 0, z);
@@ -139,6 +189,8 @@ export function SaigonEnginePage({ onBackToMenu }: { onBackToMenu?: () => void }
 
     return () => {
       cancelled = true;
+      coreWorld?.dispose();
+      coreWorld = null;
       engine?.dispose();
     };
   }, []);
@@ -149,6 +201,11 @@ export function SaigonEnginePage({ onBackToMenu }: { onBackToMenu?: () => void }
       {status && (
         <div className="pointer-events-none absolute inset-x-0 top-6 flex justify-center">
           <div className="rounded-full bg-black/70 px-4 py-2 text-sm text-white/90">{status}</div>
+        </div>
+      )}
+      {load && !status && (
+        <div className="pointer-events-none absolute inset-x-0 top-6 flex justify-center">
+          <div className="rounded-full bg-black/70 px-4 py-2 text-sm text-white/90">{load}</div>
         </div>
       )}
       {error && (
