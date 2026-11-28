@@ -304,6 +304,58 @@ dây/bánh) — kiểm bằng ảnh chụp thật.
 
 Số khối: 44 175 → **97 331** (vẫn dưới ngưỡng `maxParts` 120 000).
 
+### 4h. Bản đồ thật nằm trong `/saigon` (Lý Thái Tổ, Bitexco, Landmark 81, nhà trọ 59)
+
+`/saigon` không chỉ có thành phố sinh tự động. Trong đó giờ có **chính** Sài Gòn dựng tay của game
+(`features/testbus/openworld`) — thế giới của `/testbus`:
+
+| Thứ | Trong code |
+|---|---|
+| Hẻm **462/14 Lý Thái Tổ** (Quận 10), 364 m | `openWorldBounds.json → ly-thai-to` |
+| **Nhà trọ 59** + **phòng 6.07** của nhân vật chính | `boardingHouse.ts`, `ROOM_ANCHOR = (22.0, 3.2, −16.8)` |
+| Phố **Lý Thái Tổ** chia ô 21 m, vỉa hè, xe dựng | `simulation/street.ts → buildStreet` |
+| **Đại lộ 3/2**, **Điện Biên Phủ**, **Hải Triều**, **Đại lộ Đông**, **bến sông Bình Thạnh**, **quảng trường Landmark 81** | `saigonDistricts.ts` (các chunk) |
+| **Bitexco** (94, −186) và **Landmark 81** (26, −356) | `BITEXCO_POS`, `LANDMARK81_POS` |
+
+Cách làm — `features/citymap/realWorld.ts`: gọi đúng ba hàm dựng của map thật theo đúng thứ tự
+`OpenWorldEngine` gọi (`buildBoardingHouse` → `buildStreet` → `buildSaigonDistricts`), gắn chúng vào
+một nhóm của thành phố (`scene.add` được thay bằng một "scene" là nhóm đó), và cập nhật
+`WorldStreamer` bằng camera thành phố. Không vẽ lại gì.
+
+Bốn chỗ phải sửa để nó sống được trong thành phố (mỗi chỗ đều do ảnh kiểm tra bắt được):
+
+1. **Vòng chân trời giả** (11 cụm tháp đen + tấm nền 880 m) — `buildSaigonDistricts` nhận thêm
+   `options.horizon` (mặc định `true` cho `/testbus`), `realWorld.ts` truyền `false`. Để nguyên thì
+   mười một khối đen mọc giữa phố.
+2. **LOD tối giản** — `WorldStreamer.forceNear()`: camera thành phố nhìn từ 200 m, bản LOD hiện ra
+   thành tháp đen; hình học đầy đủ chỉ 268 000 tam giác.
+3. **Môi trường phản chiếu** — `scene.environment` của `/testbus` do `AtmosphereSystem` gán; trong
+   thành phố không ai gán nên kính/kim loại ra đen. `realWorld.ts` dựng một equirect gradient trời
+   chiều → PMREM và chỉ gán cho vật liệu của map thật (không đụng vật liệu thành phố).
+4. **Giờ trong ngày** — vật liệu của map thật dựng ở chế độ đêm (`uNight: 0.9`) và chờ engine gọi
+   `setEnvironment` mỗi khung. `realWorld.ts` gọi một lần: `setEnvironment(0, 0.12, 0.35, 0, sunDir,
+   #c8a68c, 0.0006)` + `house.setEnvironment` + `street.wet(false, 0.12)`.
+
+Phía thành phố (`cityGen.ts`) chừa đất để hai thế giới không đè nhau: `realWorldFootprint.ts` đọc
+thẳng `openWorldBounds.json`, nên 9 vùng đi được của map thật không có một lô thủ tục nào
+(`metrics.rejectedRealWorld`, đo được **2 102** lô bị từ chối → 3 960 toà thay vì 4 285), và **Bitexco
++ Landmark 81 do map thật dựng** — thành phố không dựng bản sao thứ hai
+(`metrics.anchorsServedByRealWorld = ["bitexco","landmark81"]`). Khu phố Nguyễn Du vì thế dời khỏi
+Nguyễn Du (57, −330) sang **Nguyễn Trãi (−352, −332)**, vẫn còn trong thành phố.
+
+Mặc định **bật**. Tắt bằng `?real=0` (thành phố vẫn chừa đất nhưng mảng đó trống). `?core=0` để tắt
+khu phố Nguyễn Du khi chỉ muốn xem map thật.
+
+Đo trong sandbox (SwiftShader, 2 core): dựng map thật **21–35 s**; `saigon-real-world` có **1 797
+mesh / 268 360 tam giác**, nhà trọ `DayTro_462_14` 39 con, `SaigonOpenWorldDistricts` 12 nhóm,
+`WorldStreamer` 11 ô. Ảnh: `docs/product/audit/_g-real7.jpg` (phố Lý Thái Tổ tầm mắt),
+`_g-real9.jpg` (mặt phố), `_g-real10.jpg` (từ trên cao).
+
+**Chưa đạt / còn phải sửa:** các tháp kính của map thật (Bitexco, Landmark 81, khu Đại lộ Đông) vẫn
+**tối hơn** phần còn lại của thành phố khi nhìn từ trên cao — chưa tìm ra nguyên nhân cuối (nghi
+`createInteriorMappingTowerMaterial`). Ảnh chụp trong sandbox phải hạ xuống 900×560 và chờ ~90–110 s
+mới lấy được một khung; ở 1152×720 CDP báo `Unable to capture screenshot`.
+
 ### 4g. Không thấy khu phố gốc trong `/saigon`?
 
 `/saigon` dựng thành phố ngay (khoảng 5 s) rồi mới cắm khu phố gốc. Trong sandbox 2 core

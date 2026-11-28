@@ -8,6 +8,7 @@
 // Nguyên tắc hình khối: một toà nhà KHÔNG phải một cái hộp. Tháp = bệ + thân thụt hai cấp (mặt
 // bằng vát góc) + hộp kỹ thuật. Nhà ống = thân + mái ngói dốc + tum. Chợ = nhà lớn + mái dốc.
 // Độ thụt co theo bề rộng lô, để tháp 9 m không thành cây kim.
+import { REAL_WORLD_TOWERS } from "./realWorldFootprint";
 import type { City, CityBuilding } from "./cityGen";
 
 /** Một khối đặc: hộp (hoặc lăng trụ vát góc / lăng trụ tam giác tuỳ danh sách chứa nó). */
@@ -632,10 +633,18 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
     const top = { x: (b.x0 + b.x1) / 2, y: b.heightM + 4, z: (b.z0 + b.z1) / 2 };
     if (!prev || top.y > prev.y) anchorTops.set(b.anchor, top);
   }
+  const servedByRealWorld = new Set(city.metrics.anchorsServedByRealWorld);
   const anchors = city.anchors
     .map((a) => {
       const t = anchorTops.get(a.id);
-      return t ? { id: a.id, name: a.name, ...t } : null;
+      if (t) return { id: a.id, name: a.name, ...t };
+      // Bitexco / Landmark 81 do map thật dựng sẵn (`realWorld.ts`) — thành phố không có toà nào mang
+      // id đó, nhưng nhãn vẫn phải nằm trên đúng toà thật, đúng độ cao thật.
+      const real = REAL_WORLD_TOWERS[a.id];
+      if (real && servedByRealWorld.has(a.id)) {
+        return { id: a.id, name: a.name, x: real.x, y: (a.heightM || 12) + 4, z: real.z };
+      }
+      return null;
     })
     .filter((a): a is { id: string; name: string; x: number; y: number; z: number } => a !== null);
 
@@ -655,7 +664,11 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
       buildings: city.buildings.filter((b) => !b.walkable).length,
       towers, gabledRoofs, parts, roads, props,
       minY: Number.isFinite(minY) ? minY : 0,
-      maxY: Number.isFinite(maxY) ? maxY : 0,
+      // Toà cao nhất trong scene có thể là toà của **map thật** (Landmark 81, 461 m) — nó không phải
+      // khối nào của `cityMesh` nên phải cộng tay, nếu không con số "cao nhất" của thành phố còn 117 m.
+      maxY: Math.max(Number.isFinite(maxY) ? maxY : 0, ...(city.metrics.anchorsServedByRealWorld
+        .map((id) => city.anchors.find((a) => a.id === id)?.heightM ?? 0)
+        .concat(0))),
     },
   };
 };

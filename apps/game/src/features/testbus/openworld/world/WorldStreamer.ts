@@ -85,6 +85,23 @@ export class WorldStreamer {
     return { zone: tr("zone.lyThaiTo"), district: tr("district.d10Hcmc") };
   }
 
+  /**
+   * Bỏ hẳn chế độ LOD: mọi ô luôn ở trạng thái `near`, mọi nhóm LOD bị ẩn.
+   *
+   * Dùng khi thế giới này được đặt **bên trong** một cảnh khác, nơi camera là camera bay của thành
+   * phố (nhìn từ 100–300 m chứ không phải từ mặt đất 1,7 m). Ở khoảng cách đó bản LOD — vốn chỉ là
+   * khối tối giản — hiện ra thành tháp đen giữa phố. Hình học đầy đủ của map thật chỉ 268 000 tam
+   * giác nên bật hết vẫn rẻ hơn cái giá phải nhìn tháp đen.
+   */
+  forceNear(): void {
+    for (const c of this.chunks) {
+      c.alwaysVisible = true;
+      c.state = "near";
+      c.near.visible = true;
+      if (c.lod) c.lod.visible = false;
+    }
+  }
+
   update(px: number, py: number, pz: number, software: boolean): StreamingStats {
     let activeNear = 0;
     let activeLod = 0;

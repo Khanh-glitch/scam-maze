@@ -15,6 +15,11 @@
 //     từ chính hình học này — không cộng đại số các hình chữ nhật (lần đầu cộng ra 72% mái trên
 //     khung 47% đi được, vô nghĩa).
 import { cityPlan, type CityPlan } from "./cityPlan.ts";
+import {
+  REAL_WORLD_TOWERS,
+  isRealWorldTower,
+  rectHitsRealWorld,
+} from "./realWorldFootprint.ts";
 
 export type CityClass = "residential" | "market" | "tourist" | "corporate" | "construction" | "park";
 
@@ -186,6 +191,10 @@ export interface CityMetrics {
   rejectedRoad: number;
   /** Vài ví dụ bị loại vì lòng đường (để điều tra). */
   rejectedRoadSamples: string[];
+  /** Số lô bị bỏ vì nằm trong đất của map thật (9 vùng `openWorldBounds.json`). */
+  rejectedRealWorld: number;
+  /** Mốc nào do map thật dựng sẵn thay vì thành phố (hiện là Bitexco và Landmark 81). */
+  anchorsServedByRealWorld: string[];
   /** Cùng bộ đếm nhưng theo id tuyến — để soi một con phố cụ thể. */
   phaseById: Record<string, { tried: number; placed: number; mouth: number; water: number; occ: number }>;
 }
@@ -367,7 +376,17 @@ const PLAN: CityPlan = cityPlan;
 /** Toạ độ phòng 6.07 (gốc bản đồ này) — điểm xuất phát của BFS. */
 const ROOM = { x: 0, z: 0 };
 
-export function generateCity(seedOverride?: string): City {
+export interface CityGenOptions {
+  /**
+   * Map thật (`features/testbus/openworld`) có được dựng trong thành phố hay không. Mặc định **có**:
+   * thành phố chừa đất cho 9 vùng của nó và không dựng bản sao Bitexco / Landmark 81. Đặt `false`
+   * khi cần thành phố thuần thủ tục (đo đạc, hoặc `?real=0` lúc chạy).
+   */
+  realWorld?: boolean;
+}
+
+export function generateCity(seedOverride?: string, options: CityGenOptions = {}): City {
+  const realWorldOn = options.realWorld !== false;
   const random = rng(seedOverride ?? PLAN.seed);
   const frame: CityRect = PLAN.frame;
   const compression = PLAN.compression;
@@ -754,6 +773,16 @@ export function generateCity(seedOverride?: string): City {
     }
     return best;
   };
+  /**
+   * Khu phố Nguyễn Du (map gốc của bản dựng cũ) và map thật Lý Thái Tổ không được chồng lên nhau:
+   * hai thế giới dựng sẵn đè nhau thì cả hai đều hỏng. Street nào có dãy nhà chạm đất map thật bị
+   * loại khỏi danh sách ứng viên — khu phố vẫn còn trong thành phố, chỉ là ở chỗ khác.
+   */
+  const coreClearsRealWorld = (st: (typeof streets)[number], x: number): boolean => {
+    const z = st.points[0][1];
+    const half = st.widthM / 2 + 6;
+    return !rectHitsRealWorld({ x0: x + coreFoot.fx0, x1: x + coreFoot.fx1, z0: z + coreFoot.fz0 - half, z1: z + coreFoot.fz1 + half }, 8);
+  };
   const coreCandidates = streets.filter((st) => {
     const [ax, az] = st.points[0];
     const [bx, bz] = st.points[st.points.length - 1];
@@ -772,8 +801,10 @@ export function generateCity(seedOverride?: string): City {
       score: coreScoreAt(x, st.points[0][1]) + (gap.len >= CONTENT_W ? 6 : 0) + Math.min(4, gap.len / 60),
     };
   });
-  const coreOptionsOk = coreOptions.filter((o) => o.gap.len >= CONTENT_W);
-  const coreChoice = (coreOptionsOk.length ? coreOptionsOk : coreOptions).sort((a, b) => b.score - a.score)[0];
+  const coreOptionsOnLand = coreOptions.filter((o) => !realWorldOn || coreClearsRealWorld(o.st, o.x));
+  const coreOptionsOk = coreOptionsOnLand.filter((o) => o.gap.len >= CONTENT_W);
+  const corePool = coreOptionsOk.length ? coreOptionsOk : coreOptionsOnLand.length ? coreOptionsOnLand : coreOptions;
+  const coreChoice = corePool.sort((a, b) => b.score - a.score)[0];
   const coreStreet = coreChoice?.st;
   const core = {
     x: coreChoice ? coreChoice.x : 0,
@@ -840,7 +871,16 @@ export function generateCity(seedOverride?: string): City {
   let hemSkipped = 0;
   let rejectedRoad = 0;
   const rejectedRoadSamples: string[] = [];
+  /** Số lô bị bỏ vì rơi vào đất của map thật (đất đó đã có phố thật dựng sẵn). */
+  let rejectedRealWorld = 0;
   const addBuilding = (b: Omit<CityBuilding, "id">): CityBuilding | null => {
+    // Đất của map thật: hẻm 462/14 Lý Thái Tổ, nhà trọ 59, Đại lộ 3/2, Hải Triều, bến sông, quảng
+    // trường Landmark 81… Nhà thủ tục ở đây sẽ đâm xuyên phố thật, nên chừa nguyên. Cầu thì đi qua
+    // sông được phép (mặt cầu là hình học riêng, không phải toà).
+    if (realWorldOn && b.kind !== "bridge" && rectHitsRealWorld(b)) {
+      rejectedRealWorld += 1;
+      return null;
+    }
     if (!fits(b)) {
       rejectedOverlap += 1;
       return null;
@@ -1297,9 +1337,29 @@ export function generateCity(seedOverride?: string): City {
     return rect;
   };
 
+  const anchorsServedByRealWorld: string[] = [];
   for (const anchor of anchors) {
     const ward = anchor.ward;
     const half = anchor.footprintM / 2;
+    // Bitexco và Landmark 81 của thành phố sẽ là **bản sao thứ hai**: map thật đã dựng hai toà đó
+    // bằng hình học riêng (BITEXCO_POS, LANDMARK81_POS). Người dùng đã chốt: giữ toà của map thật.
+    // Ở đây chỉ ghi POI trỏ về đúng toà thật, không dựng khối hộp nào.
+    if (realWorldOn && isRealWorldTower(anchor.id)) {
+      const at = REAL_WORLD_TOWERS[anchor.id];
+      anchorsServedByRealWorld.push(anchor.id);
+      pois.push({
+        id: `poi-${poiSeq++}`,
+        name: anchor.name,
+        kind: anchor.kind,
+        x: at.x,
+        z: at.z,
+        district: ward,
+        tier: "venue",
+        story: "toà thật của map gốc (features/testbus/openworld)",
+        anchor: anchor.id,
+      });
+      continue;
+    }
     if (anchor.kind === "park") {
       const r = half;
       const parkRect: CityRect = { x0: anchor.x - r, x1: anchor.x + r, z0: anchor.z - r * 0.72, z1: anchor.z + r * 0.72 };
@@ -1818,6 +1878,14 @@ export function generateCity(seedOverride?: string): City {
   stats.hemSkipped = hemSkipped;
   stats.anchorsPlaced = anchorsPlaced;
   stats.anchorsMissing = anchorsMissing;
+  stats.anchorsServedByRealWorld = anchorsServedByRealWorld;
+  // Toà cao nhất của thành phố giờ là Landmark 81 **của map thật** (461 m, dựng trong `realWorld.ts`).
+  // Không cộng nó vào thì con số "cao nhất" chỉ còn 117 m và mô tả thành phố thành sai.
+  if (realWorldOn) {
+    const realTallest = Math.max(0, ...anchors.filter((a) => isRealWorldTower(a.id)).map((a) => a.heightM ?? 0));
+    if (realTallest > stats.maxHeightM) stats.maxHeightM = realTallest;
+  }
+  stats.rejectedRealWorld = rejectedRealWorld;
   stats.rejectedRoad = rejectedRoad;
   stats.rejectedRoadSamples = rejectedRoadSamples;
   stats.relocatedPois = relocated;
@@ -2263,6 +2331,8 @@ function measure(
     anchorsMissing: [],
     rejectedRoad: 0,
     rejectedRoadSamples: [],
+    rejectedRealWorld: 0,
+    anchorsServedByRealWorld: [],
   };
 }
 

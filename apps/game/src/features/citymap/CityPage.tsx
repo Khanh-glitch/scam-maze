@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { generateCity, type City } from "./cityGen";
 import { buildCityMesh, type Part } from "./cityMesh";
 import { buildCoreWorld, type CoreWorld } from "./coreWorld";
+import { buildRealWorld, type RealWorldHandle } from "./realWorld";
 
 /**
  * `/saigon` — bản đồ Sài Gòn 2026 SINH TỰ ĐỘNG (`cityGen`) dựng bằng three.js.
@@ -219,7 +220,11 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
   useEffect(() => {
     const id = window.setTimeout(() => {
       try {
-        setCity(generateCity());
+        // Map thật (`features/testbus/openworld`) mặc định được dựng trong thành phố; `?real=0` để
+        // xem thành phố thuần thủ tục (đo đạc). Thành phố phải biết trước để chừa đất và không dựng
+        // bản sao Bitexco / Landmark 81.
+        const realOn = new URLSearchParams(window.location.search).get("real") !== "0";
+        setCity(generateCity(undefined, { realWorld: realOn }));
       } catch (err) {
         setError(err instanceof Error ? err.message : "không sinh được thành phố");
       }
@@ -236,6 +241,12 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
   const [coreError, setCoreError] = useState<string>("");
   /** Camera bay tới khu phố gốc khi bấm nút. */
   const flyToCoreRef = useRef<(() => void) | null>(null);
+  /** Map thật Sài Gòn (Lý Thái Tổ, Bitexco, Landmark 81, nhà trọ 59) — trạng thái để chip nói ra. */
+  const [realState, setRealState] = useState<"off" | "pending" | "ready" | "error">("off");
+  const [realLoad, setRealLoad] = useState<{ step: string; fraction: number } | null>(null);
+  const [realError, setRealError] = useState<string>("");
+  const [realStats, setRealStats] = useState<{ chunks: number; ms: number } | null>(null);
+  const flyToRealRef = useRef<(() => void) | null>(null);
   const showLabelsRef = useRef(showLabels);
   showLabelsRef.current = showLabels;
 
@@ -359,8 +370,9 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     // KHU PHỐ GỐC: cắm nguyên thế giới đang chơi được của game vào đây — nhà ống, mặt đường, vỉa hè,
     // hẻm, sân chung, dây điện, cây, đồ vỉa hè, người và xe máy chạy theo đúng luật của map gốc.
     // Không vẽ lại: cùng builder, cùng dữ liệu, chỉ khác vị trí và không có nền/nhà xa giả.
+    // `?core=0` tắt khu phố Nguyễn Du — dùng khi chỉ muốn xem/đo map thật cho nhanh.
     let coreWorld: CoreWorld | null = null;
-    if (city.core.streetId) {
+    if (city.core.streetId && qs.get("core") !== "0") {
       void buildCoreWorld(city.core.x, city.core.z, {
         onStep: (step, fraction) => setCoreLoad({ step, fraction }),
         // Phố hiện ngay khi nhà + mặt đường dựng xong; người và đồ GLB chảy vào sau, không chặn.
@@ -402,6 +414,46 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
           setCoreLoad(null);
           setCoreState("error");
           setCoreError(err instanceof Error ? err.message : String(err));
+        });
+    }
+
+    // BẢN ĐỒ THẬT: dựng thẳng Sài Gòn dựng tay của game (`features/testbus/openworld`) vào thành
+    // phố — hẻm 462/14 Lý Thái Tổ, nhà trọ 59 với phòng 6.07 của nhân vật chính, Đại lộ 3/2, Hải
+    // Triều, Đại lộ Đông, bến sông Bình Thạnh, quảng trường Landmark 81, Bitexco và Landmark 81.
+    // Cùng ba hàm dựng của engine gốc; ở đây chỉ khác cái scene và việc cập nhật streamer bằng
+    // camera thành phố. `?real=0` để tắt (khi đó thành phố vẫn chừa đất nhưng mảng đó trống).
+    let realWorld: RealWorldHandle | null = null;
+    if (qs.get("real") !== "0") {
+      setRealState("pending");
+      const realT0 = performance.now();
+      void buildRealWorld({
+        renderer,
+        onStep: (step, fraction) => setRealLoad({ step, fraction }),
+      })
+        .then((world) => {
+          if (cancelled) {
+            world.dispose();
+            return;
+          }
+          realWorld = world;
+          scene.add(world.root);
+          renderer.shadowMap.needsUpdate = true;
+          setRealState("ready");
+          setRealLoad(null);
+          const ms = Math.round(performance.now() - realT0);
+          setRealStats({ chunks: world.stats.chunks, ms });
+          const box = new THREE.Box3().setFromObject(world.root);
+          (window as unknown as { __cityReal?: unknown }).__cityReal = {
+            chunks: world.stats.chunks,
+            buildMs: ms,
+            bounds: { x0: box.min.x, x1: box.max.x, z0: box.min.z, z1: box.max.z },
+          };
+        })
+        .catch((err) => {
+          console.error("[citymap] map thật không dựng được", err);
+          setRealLoad(null);
+          setRealState("error");
+          setRealError(err instanceof Error ? err.message : String(err));
         });
     }
 
@@ -529,6 +581,23 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
       applyCamera();
     };
 
+    flyToRealRef.current = () => {
+      // Đứng giữa hẻm 462/14 nhìn lên dãy trọ 59 — chỗ nhân vật chính ở trong map thật.
+      target.set(6, 2.2, -34);
+      yaw = Math.PI;
+      pitch = -0.12;
+      radius = 26;
+      applyCamera();
+    };
+
+    // Móc kiểm tra: đọc được scene/camera/renderer từ ngoài (probe, kiểm toán) mà không phải đoán.
+    {
+      const dbg = window as unknown as { __cityScene?: THREE.Scene; __cityCamera?: THREE.Camera; __cityRenderer?: THREE.WebGLRenderer };
+      dbg.__cityScene = scene;
+      dbg.__cityCamera = camera;
+      dbg.__cityRenderer = renderer;
+    }
+
     labelRef.current = meshData.anchors.map((a) => ({ id: a.id, name: a.name, pos: new THREE.Vector3(a.x, a.y, a.z) }));
 
     let raf = 0;
@@ -539,6 +608,7 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
       const dt = Math.min(0.05, clock.getDelta());
       const now = clock.elapsedTime;
       coreWorld?.update(dt, now);
+      realWorld?.update(dt, now, camera);
       const boost = keys.has("shift") ? 4 : 1;
       const step = 60 * boost * dt;
       const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
@@ -589,6 +659,8 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
       cancelled = true;
       coreWorld?.dispose();
       coreWorld = null;
+      realWorld?.dispose();
+      realWorld = null;
       cancelAnimationFrame(raf);
       dom.removeEventListener("pointerdown", onDown);
       dom.removeEventListener("pointerup", onUp);
@@ -703,6 +775,33 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
           >
             Bay tới khu phố gốc
           </button>
+          {/* MAP THẬT — Lý Thái Tổ, nhà trọ 59, Bitexco, Landmark 81. Trạng thái hiện ngay trên
+              màn hình: trước đây không có gì báo nên rất dễ tưởng map thật không nằm trong thành phố. */}
+          <div className="mt-2 border-t border-white/15 pt-1.5">
+            <div className="font-medium">
+              {realState === "off"
+                ? "Map thật: tắt (?real=0)"
+                : realState === "ready"
+                  ? "Map thật Sài Gòn ✓"
+                  : realState === "error"
+                    ? "Map thật: dựng thất bại"
+                    : `Đang dựng map thật${realLoad ? ` (${realLoad.step} ${Math.round(realLoad.fraction * 100)}%)` : ""}`}
+            </div>
+            {realState === "error" && <div className="max-w-[280px] text-red-300">{realError.slice(0, 160)}</div>}
+            {realState === "ready" && (
+              <div className="text-white/55">
+                Lý Thái Tổ · nhà trọ 59 · phòng 6.07 · Bitexco · Landmark 81
+                {realStats ? ` · ${realStats.chunks} ô · ${(realStats.ms / 1000).toFixed(0)} s` : ""}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => flyToRealRef.current?.()}
+              className="mt-1 cursor-pointer rounded border border-white/20 px-2 py-0.5 text-[11px] hover:bg-white/15"
+            >
+              Bay tới hẻm 462/14 (Lý Thái Tổ)
+            </button>
+          </div>
         </div>
       )}
 

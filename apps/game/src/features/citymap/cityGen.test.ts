@@ -6,6 +6,7 @@
 // `node apps/game/scripts/city-audit.ts`, rồi cập nhật `docs/product/CITY_MAP.md`.
 import { describe, expect, it } from "vitest";
 import { cellAt, generateCity, isWalkable, type City } from "./cityGen";
+import { rectHitsRealWorld } from "./realWorldFootprint";
 
 const city: City = generateCity();
 
@@ -127,9 +128,28 @@ describe("generateCity", () => {
   it("mỗi mốc thật đều có toà trên bản đồ", () => {
     // Sáu trong chín mốc từng KHÔNG có toà nào: hình chữ nhật của mốc đè lên lòng đường nên
     // `addBuilding` từ chối, và mốc biến mất im lặng. Chợ Bến Thành còn bị ga metro đặt sau xoá sạch.
-    const missing = city.anchors.filter((a) => !city.buildings.some((b) => b.anchor === a.id));
+    // Ngoại lệ duy nhất, có chủ ý: Bitexco và Landmark 81 do **map thật** dựng sẵn — thành phố không
+    // dựng bản sao thứ hai, chỉ ghi lại là mốc đó đã có toà thật.
+    const served = new Set(city.metrics.anchorsServedByRealWorld);
+    const missing = city.anchors.filter((a) => !city.buildings.some((b) => b.anchor === a.id) && !served.has(a.id));
     expect(missing.map((a) => a.id)).toEqual([]);
     expect(city.metrics.anchorsMissing).toEqual([]);
+    expect([...served].sort()).toEqual(["bitexco", "landmark81"]);
+  });
+
+  it("không toà thủ tục nào mọc trong đất của map thật", () => {
+    // 9 vùng của `openWorldBounds.json` (hẻm 462/14 Lý Thái Tổ, nhà trọ 59, Đại lộ 3/2, Hải Triều,
+    // bến sông, quảng trường Landmark 81…) đã có phố thật dựng sẵn. Nhà sinh tự động trong đó là nhà
+    // đâm xuyên phố thật.
+    const intruders = city.buildings.filter((b) => b.kind !== "bridge" && rectHitsRealWorld(b, 0));
+    expect(intruders.map((b) => `${b.kind}@${b.x0.toFixed(0)},${b.z0.toFixed(0)}`)).toEqual([]);
+    expect(city.metrics.rejectedRealWorld).toBeGreaterThan(0);
+  });
+
+  it("khu phố Nguyễn Du không nằm chồng lên map thật", () => {
+    if (!city.core.streetId) return;
+    const coreRect = { x0: city.core.x0, x1: city.core.x1, z0: city.core.z0, z1: city.core.z1 };
+    expect(rectHitsRealWorld(coreRect, 0)).toBe(false);
   });
 
   it("có đủ mốc thật để người chơi nhận ra Sài Gòn", () => {

@@ -177,6 +177,17 @@ function imageSignMat(file: string, aspect: number, fill: string, glow: string) 
   return mat;
 }
 
+export interface SaigonDistrictsOptions {
+  /**
+   * Vòng chân trời giả (11 cụm tháp tối màu + tấm nền 880 m) đặt quanh thế giới. Chỉ đúng khi map
+   * thật đứng **một mình** trong scene của `/testbus`: nó thay cho thành phố ở phía xa.
+   *
+   * Trong `/saigon` thì Sài Gòn thật đã ở đó rồi — vòng chân trời giả thành 11 khối đen lơ lửng
+   * giữa phố, nên `realWorld.ts` tắt nó đi. Mặc định `true` để `/testbus` giữ nguyên như cũ.
+   */
+  horizon?: boolean;
+}
+
 export function buildSaigonDistricts(
   scene: T.Scene,
   streamer: WorldStreamer,
@@ -184,6 +195,7 @@ export function buildSaigonDistricts(
   onAssetLoaded?: (obj: T.Object3D) => void,
   trafficMgr?: SaigonTrafficManager,
   humanPresence?: HumanPresenceSystem,
+  options: SaigonDistrictsOptions = {},
 ): SaigonDistricts {
   const presenceCleanups: (() => void)[] = [];
   const root = new T.Group();
@@ -1361,7 +1373,7 @@ export function buildSaigonDistricts(
   // Strictly placed far outside all playable districts & roadways
   // =========================================================================
   const chunkHorizon = new T.Group();
-  root.add(chunkHorizon);
+  if (options.horizon !== false) root.add(chunkHorizon);
   plane(chunkHorizon, [35, -0.08, -140], [880, 880], material(0x282d30, 0.96), 0, -Math.PI / 2);
 
   const skylineRing: [number, number, number, number, number][] = [
@@ -1386,7 +1398,7 @@ export function buildSaigonDistricts(
     box(chunkHorizon, [x, h + 1.4, z], [w * 0.45, 2.8, d * 0.45], louverDark, false);
   });
 
-  streamer.register({
+  if (options.horizon !== false) streamer.register({
     id: "hcmc-skyline-horizon",
     name: "Đường Chân Trời TP.HCM",
     district: "TP. Hồ Chí Minh",
