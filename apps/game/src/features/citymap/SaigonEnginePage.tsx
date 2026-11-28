@@ -95,11 +95,26 @@ export function SaigonEnginePage({ onBackToMenu }: { onBackToMenu?: () => void }
 
         // Giao thông thành phố đi vào **cùng** bộ mô phỏng của engine: cùng đèn, cùng luật, cùng
         // hàng đợi ACC/IDM+ — không phải một vòng lặp xe thứ hai.
-        const extension = extendTrafficGraph(engine.traffic.graph, city, { maxCorridors: 10, radiusM: 520 });
+        //
+        // Quy mô lấy theo đúng mật độ của Lý Thái Tổ, không theo "đủ để thấy có xe": map chuẩn có 3
+        // ngã tư có đèn trên 236 m phố, và xe chạy liền nhau trên cả bốn làn. Trước đây thành phố chỉ
+        // đưa **10 tuyến trong bán kính 520 m** vào đồ thị với **10 xe** — tức phần lớn bản đồ không
+        // có giao thông nào, và lưới phía xa là "phố chết".
+        //
+        // Nay: 24 tuyến trong bán kính 900 m (phủ gần trọn khung 1,1 km của `city.frame`), 2 xe/làn.
+        // Số xe là chi phí CPU thật (mỗi bước duyệt mọi xe cho ACC/IDM+, OBB, sublane), nên trần
+        // giữ ở 36 và `cityBudget.test.ts` đo `perStepMs` với đúng con số này.
+        const CITY_CORRIDORS = Number(qs.get("corridors") ?? 24) || 24;
+        const CITY_VEHICLES = Number(qs.get("vehicles") ?? 36) || 36;
+        const extension = extendTrafficGraph(engine.traffic.graph, city, {
+          maxCorridors: CITY_CORRIDORS,
+          radiusM: 900,
+        });
         if (qs.get("veh") !== "0")
-          void spawnCityVehicles(engine.traffic, extension, engine.scene, { perEdge: 1, maxVehicles: 10 }).catch(
-          (err) => console.error("[saigon] xe thành phố lỗi", err),
-        );
+          void spawnCityVehicles(engine.traffic, extension, engine.scene, {
+            perEdge: 2,
+            maxVehicles: CITY_VEHICLES,
+          }).catch((err) => console.error("[saigon] xe thành phố lỗi", err));
 
         // ĐÈN Ở NGÃ TƯ CỦA PHỐ THỦ TỤC: bật `signalized` cho ngã tư thật (không bật đầu cụt — ở đó
         // chỉ có vòng quay đầu), rồi dựng cột đèn bằng đúng `createMastArmSignal` +
@@ -110,7 +125,11 @@ export function SaigonEnginePage({ onBackToMenu }: { onBackToMenu?: () => void }
             : signalizeCityIntersections(engine.traffic.graph, engine.traffic, {
                 parent: engine.exteriorGroup,
                 junctions: extension.junctions,
-                maxIntersections: 4,
+                // Lý Thái Tổ: 3 ngã tư có đèn trên 236 m. Phố thủ tục có 29 giao lộ sau khi mở
+                // rộng lưới; đặt đèn ở 12 ngã tư gần map chuẩn nhất — đủ để mọi hướng đi ra khỏi
+                // 6.07 đều gặp đèn thật, mà không phải dựng 29 cột (mỗi cột là một cụm mesh + một
+                // chương trình shader của `TrafficSignalController`).
+                maxIntersections: Number(qs.get("lights") ?? 12) || 12,
                 solids: engine.citySolids,
               });
 

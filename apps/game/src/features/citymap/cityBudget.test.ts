@@ -19,7 +19,7 @@ describe("ngân sách `/saigon`", () => {
     const city = generateCity(undefined, { realWorld: true });
     const mesh = buildCityMesh(city);
     const traffic = new SaigonTrafficManager();
-    const ext = extendTrafficGraph(traffic.graph, city, { near: { x: 0, z: -60 }, radiusM: 520, maxCorridors: 10 });
+    const ext = extendTrafficGraph(traffic.graph, city, { near: { x: 0, z: -60 }, radiusM: 900, maxCorridors: 24 });
     const buildMs = performance.now() - t0;
 
     console.log(
@@ -32,20 +32,33 @@ describe("ngân sách `/saigon`", () => {
     expect(mesh.stats.towers).toBeGreaterThan(300);
   });
 
-  it("một bước mô phỏng dưới 0,5 ms với 10 xe thành phố trên đồ thị đã mở rộng", () => {
+  it("một bước mô phỏng dưới 0,5 ms với số tuyến/xe mà `/saigon` thật sự dùng", () => {
     const city = generateCity(undefined, { realWorld: true });
     const traffic = new SaigonTrafficManager();
-    const ext = extendTrafficGraph(traffic.graph, city, { near: { x: 0, z: -60 }, radiusM: 520, maxCorridors: 10 });
+    // ĐÚNG tham số của `SaigonEnginePage`: 24 tuyến / 900 m / 36 xe. Đo bằng 10 xe thì con số đẹp
+    // nhưng không nói gì về trang thật.
+    const ext = extendTrafficGraph(traffic.graph, city, { near: { x: 0, z: -60 }, radiusM: 900, maxCorridors: 24 });
     // `spawnCityVehicles` tải GLB nên không gọi được ở đây (jsdom không có fetch nhị phân); đặt xe
     // bằng tay trên đúng những làn mà nó sẽ dùng — cùng số lượng, cùng loại.
+    // 2 xe mỗi làn, trần 36 — đúng `perEdge`/`maxVehicles` của trang.
     let n = 0;
     for (const edgeId of ext.edgeIds) {
-      if (n >= 10) break;
-      traffic.spawnVehicle({ id: `B_${n}`, category: n % 3 === 0 ? "moto" : "car", edgeId, s: 30, halfWidth: 0.92, halfLength: 2.2 });
-      n += 1;
+      for (let k = 0; k < 2; k += 1) {
+        if (n >= 36) break;
+        traffic.spawnVehicle({
+          id: `B_${n}`,
+          category: n % 3 === 0 ? "moto" : "car",
+          edgeId,
+          s: 20 + k * 26,
+          halfWidth: 0.92,
+          halfLength: 2.2,
+        });
+        n += 1;
+      }
+      if (n >= 36) break;
     }
     expect(spawnCityVehicles).toBeTypeOf("function");
-    expect(traffic.vehicles.length).toBe(10);
+    expect(traffic.vehicles.length).toBe(36);
 
     const step = { dt: 1 / 60, playerX: 0, playerY: 1.7, playerZ: -60, playerYaw: 0, wetness: 0.1 };
     for (let i = 0; i < 120; i += 1) traffic.step(step); // hâm nóng JIT
@@ -54,7 +67,8 @@ describe("ngân sách `/saigon`", () => {
     const perStepMs = (performance.now() - t0) / 600;
 
     console.log(
-      `[saigon] perStepMs ${perStepMs.toFixed(3)} · ${traffic.graph.edges.size} cạnh · ${traffic.graph.turns.size} cung · ${traffic.vehicles.length} xe`,
+      `[saigon] perStepMs ${perStepMs.toFixed(3)} · ${traffic.graph.edges.size} cạnh · ${traffic.graph.turns.size} cung · ` +
+        `${traffic.vehicles.length} xe · ${ext.corridors} tuyến · ${ext.junctions.length} giao lộ`,
     );
     // Ngân sách của bản bàn giao là 0,5 ms/bước trên máy có GPU; sandbox không GPU nên nới ra 1,5 ms
     // — nhưng vẫn phải cùng bậc độ lớn, nếu không là hồi quy thật.
