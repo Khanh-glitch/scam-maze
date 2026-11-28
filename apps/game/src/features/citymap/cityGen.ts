@@ -685,18 +685,98 @@ export function generateCity(seedOverride?: string): City {
   const coreFoot = { fx0: -70, fx1: 70, fz0: -26, fz1: 26 };
   const coreBack = { bx0: -12, bx1: 30, bz0: 26, bz1: 58 };
   const clearOfAnchors = (z: number) => anchors.every((a) => Math.abs(a.z - z) > 45 || Math.abs(a.x) > 90);
-  const coreStreet = streets
-    .filter((st) => {
-      const [ax, az] = st.points[0];
-      const [bx, bz] = st.points[st.points.length - 1];
-      const horizontal = Math.abs(bz - az) < 1.5;
-      const span = Math.abs(bx - ax);
-      return horizontal && span > 175 && st.widthM >= 6 && st.widthM <= 9.5 && clearOfAnchors(az);
-    })
-    .sort((a, b) => Math.abs(a.points[0][1]) - Math.abs(b.points[0][1]))[0];
-  const coreSpanX = coreStreet ? coreStreet.points.map((q) => q[0]) : [0, 0];
+
+  // Ở ĐÂU: khu phố phải nằm trong phố ở. Lần chọn đầu (phố ngang dài gần tâm) rơi vào công viên
+  // Tao Đàn; lần hai (lưới phố dày) rơi vào công trường metro. Giờ chấm điểm theo KHU và đặt khu phố
+  // vào khoảng trống dài nhất giữa hai phố cắt ngang, đo theo MÉP đường.
+  // Chỉ dãy nhà cần sạch: nhà chạy x −37…54 (91 m); hai đầu phố trống thì hẻm chữ T cắt vào cũng
+  // chấp nhận được, giống phố thật.
+  const CONTENT_X0 = -37;
+  const CONTENT_X1 = 54;
+  const CONTENT_W = CONTENT_X1 - CONTENT_X0 + 5;
+  const CONTENT_MID = (CONTENT_X0 + CONTENT_X1) / 2;
+  const districtClassAt = (x: number, z: number): CityClass | null => {
+    for (const d of districts) {
+      for (const t of d.tiles) if (x > t.x0 && x < t.x1 && z > t.z0 && z < t.z1) return d.klass;
+    }
+    return null;
+  };
+  const classScore: Record<CityClass, number> = {
+    residential: 6, market: 7, tourist: 5, corporate: 1, construction: -6, park: -8,
+  };
+  /** Điểm của một vị trí: hạng khu quanh nó + số phố chạy qua (lưới dày = khối đông). */
+  const coreScoreAt = (x: number, z: number): number => {
+    let score = 0;
+    for (let i = -2; i <= 2; i += 1) {
+      const klass = districtClassAt(x + i * 22, z);
+      score += klass ? classScore[klass] : 0;
+      const px = x + i * 22;
+      const crosses = streets.filter((o) => {
+        const ox0 = Math.min(...o.points.map((q) => q[0]));
+        const ox1 = Math.max(...o.points.map((q) => q[0]));
+        const oz0 = Math.min(...o.points.map((q) => q[1]));
+        const oz1 = Math.max(...o.points.map((q) => q[1]));
+        return px > ox0 && px < ox1 && z > oz0 && z < oz1;
+      }).length;
+      score += Math.min(3, crosses) * 0.8;
+    }
+    return score;
+  };
+  /** Các phố dọc cắt ngang tuyến này (vị trí + bề rộng). */
+  const crossingsOn = (st: (typeof streets)[number]): Array<{ at: number; width: number }> => {
+    const cz = st.points[0][1];
+    const sx0 = Math.min(...st.points.map((q) => q[0]));
+    const sx1 = Math.max(...st.points.map((q) => q[0]));
+    const out: Array<{ at: number; width: number }> = [];
+    for (const o of streets) {
+      if (o === st) continue;
+      const ox0 = Math.min(...o.points.map((q) => q[0]));
+      const ox1 = Math.max(...o.points.map((q) => q[0]));
+      const oz0 = Math.min(...o.points.map((q) => q[1]));
+      const oz1 = Math.max(...o.points.map((q) => q[1]));
+      if (ox1 - ox0 < 1.5 && ox0 > sx0 + 4 && ox0 < sx1 - 4 && oz0 <= cz && oz1 >= cz) {
+        out.push({ at: ox0, width: o.widthM });
+      }
+    }
+    return out.sort((a, b) => a.at - b.at);
+  };
+  /** Khoảng trống dài nhất giữa hai phố cắt ngang, tính theo mép đường. */
+  const longestGap = (st: (typeof streets)[number]): { mid: number; len: number } => {
+    const sx0 = Math.min(...st.points.map((q) => q[0]));
+    const sx1 = Math.max(...st.points.map((q) => q[0]));
+    const cuts = crossingsOn(st).map((c) => ({ a: c.at - c.width / 2, b: c.at + c.width / 2 }));
+    let best = { mid: (sx0 + sx1) / 2, len: -1 };
+    let from = sx0;
+    for (const c of [...cuts, { a: sx1, b: sx1 }]) {
+      const len = c.a - from;
+      if (len > best.len) best = { mid: (from + c.a) / 2, len };
+      from = Math.max(from, c.b);
+    }
+    return best;
+  };
+  const coreCandidates = streets.filter((st) => {
+    const [ax, az] = st.points[0];
+    const [bx, bz] = st.points[st.points.length - 1];
+    const horizontal = Math.abs(bz - az) < 1.5;
+    const span = Math.abs(bx - ax);
+    return horizontal && span > CONTENT_W + 40 && st.widthM >= 6 && st.widthM <= 9.5 && clearOfAnchors(az);
+  });
+  const coreOptions = coreCandidates.map((st) => {
+    const gap = longestGap(st);
+    // tim phố đặt sao cho giữa dãy nhà rơi vào giữa khoảng trống
+    const x = gap.mid - CONTENT_MID;
+    return {
+      st,
+      gap,
+      x,
+      score: coreScoreAt(x, st.points[0][1]) + (gap.len >= CONTENT_W ? 6 : 0) + Math.min(4, gap.len / 60),
+    };
+  });
+  const coreOptionsOk = coreOptions.filter((o) => o.gap.len >= CONTENT_W);
+  const coreChoice = (coreOptionsOk.length ? coreOptionsOk : coreOptions).sort((a, b) => b.score - a.score)[0];
+  const coreStreet = coreChoice?.st;
   const core = {
-    x: (Math.min(...coreSpanX) + Math.max(...coreSpanX)) / 2,
+    x: coreChoice ? coreChoice.x : 0,
     z: coreStreet ? coreStreet.points[0][1] : 0,
     x0: 0,
     x1: 0,
