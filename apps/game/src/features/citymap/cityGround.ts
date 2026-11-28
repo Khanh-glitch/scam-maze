@@ -140,5 +140,13 @@ export function createCityGroundMaterial(sizeM: number, software = false): THREE
   const repeat = Math.max(1, Math.round(sizeM / GROUND_TILE_M));
   tex.repeat.set(repeat, repeat);
   tex.needsUpdate = true;
-  return new THREE.MeshLambertMaterial({ map: tex, color: "#ffffff" });
+  /**
+   * Nền đất là bề mặt **phủ kín màn hình** khi nhìn xuống, nên nó là chỗ thiếu IBL lộ rõ nhất: đất
+   * Lambert chỉ có `color × hemi`, đọc ra tấm xám đều. Trên GPU dùng `MeshStandardMaterial` để nhận
+   * `scene.environment` của `AtmosphereSystem` (ba chế độ ngày/hoàng hôn/đêm); trên renderer phần
+   * mềm vẫn là Lambert, đúng cách map chuẩn tự hạ chi tiết. Đất khô, nhám — không dùng lại độ bóng
+   * của nhựa đường.
+   */
+  if (software) return new THREE.MeshLambertMaterial({ map: tex, color: "#ffffff" });
+  return new THREE.MeshStandardMaterial({ map: tex, color: "#ffffff", roughness: 0.97, metalness: 0.0, envMapIntensity: 0.55 });
 }

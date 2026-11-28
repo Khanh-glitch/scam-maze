@@ -25,9 +25,10 @@ dòng nào: ba mục đó là hợp đồng kiến trúc, không phải gợi ý
 | Bus 06 chạy tuyến thành phố | xong — `cityBus.ts` (một `BusCircuit` thứ hai, cùng `BusRouteController`) |
 | Dải phân cách đại lộ thủ tục | xong — [E] `cityMesh.ts`, `CURB_HEIGHT`, đoạn > 40 m |
 | Test + ngân sách | xong — [G] 59 test `features/citymap`, 171 test `features/testbus` |
-| Kiểm bằng mắt trên máy thật | **chờ 4 ảnh pose của người dùng** (sandbox crash GPU, xem §6) |
+| Kiểm bằng mắt trên máy thật | **chờ ảnh pose của người dùng** (sandbox crash GPU, xem §6) |
+| **Sửa lỗi "mất vân nhà/đường"** | xong — 4 file vân mặt đứng chết + vật liệu nhận IBL (`0419fb8`, mục 8) |
 
-Commit cuối: `bcac2b3`.
+Commit cuối: `0419fb8` + commit B (vật liệu IBL).
 
 ---
 
@@ -166,7 +167,7 @@ Pose kiểm tra sẵn có (nhận `?t=x,z&ty=&yaw=&pitch=`):
 | **G** test + ngân sách | `cityNetwork/citySignals/cityMedian/cityBus/cityBudget.test.ts` | 59 test `features/citymap`, 171 test `features/testbus` |
 
 Con số đo trên sandbox (không GPU): `build 2,1 s` · `10 tuyến / 44 làn / 29 giao lộ` ·
-`perStepMs 0,058` · `draw calls ≈ 134` · `113 844 mảnh` · **231 test pass** (`features/citymap` 59, `features/testbus` 172).
+`perStepMs 0,066` · `draw calls ≈ 134` · `113 844 mảnh` · **240 test pass** (`features/citymap` 65, `features/testbus` 175).
 
 ### 7.1 Còn lại: kiểm bằng mắt
 Chỉ còn nghiệm thu ảnh (xem §6): mở `/saigon` trên máy có GPU và gửi bốn pose. Mọi tinh chỉnh sau đó
@@ -185,3 +186,42 @@ Người chơi sống ở phòng 6.07, nhà trọ 59, hẻm 462/14 Lý Thái T�
 Đại lộ 3/2, Hải Triều, Đại lộ Đông, Bến Bình Thạnh, Landmark 81 — do map dựng tay; phần còn lại do
 thành phố sinh, cùng khổ đường, cùng cao độ, cùng vật liệu, cùng luật giao thông. Không có chỗ nào
 là hai thế giới chồng lên nhau, và không có chỗ nào là đất trống.
+
+---
+
+## 8. Vì sao "mất vân nhà, mất vân đường" — và hai việc đã sửa
+
+Triệu chứng người dùng báo: cả thành phố mất vân, chỉ còn biển hiệu emissive sáng, tường và
+mặt đường ra khối phẳng tối.
+
+**Nguyên nhân 1 — dữ liệu ảnh (việc A, `0419fb8`).** Đo độ lệch chuẩn độ xám (64×64, thang 0–255)
+của các file mà `createWorldFacadePBR` nạp:
+
+| file | trước | sau |
+| --- | --- | --- |
+| `q1/beige_wall_001-map.webp` | **0,20** (một màu tuyệt đối, 3,8 KB / 1024²) | 17,2 |
+| `q1/clay_plaster-map.webp` | **1,75** (gần phẳng) | 9,9 |
+| `q1/painted_plaster_wall-map.webp` | 2,93 (ảnh thật, bẹt tương phản) | 8,0 |
+| `q1/concrete_wall_007-map.webp` | 3,44 (ảnh thật, bẹt tương phản) | 9,1 |
+
+`beige_wall_001` là `travertine` của **14 toà nhà** (`addCommercialTower`) và `stuccoColors[0]` cho
+mọi khối infill; `clay_plaster` là `warmLimestone` + 2 vật liệu Chợ Lớn. Nên "toà mất vân" không
+phải lỗi renderer: hai file đó là ảnh một màu nằm sẵn trong `public/`. Hai file sau là ảnh thật nên
+**chỉ kéo giãn tương phản từng kênh** quanh trung bình — tông không đổi một đơn vị nào.
+
+Chặn hồi quy: `facadeAssets.test.ts` đo phương sai điểm ảnh, **không** đoán qua kích thước file
+(`clay_plaster` tối màu nên nén còn 9,6 KB mà vẫn có vân thật — đây là bẫy của lần sửa đầu).
+
+**Nguyên nhân 2 — vật liệu không nhận IBL (việc B).** `WebGLRenderer` chỉ gắn
+`scene.environment` cho `MeshStandardMaterial` (`WebGLRenderer.js` ~1658, `WebGLPrograms.js` ~53).
+Toàn bộ lớp thành phố là `MeshLambertMaterial`, nên PMREM ba chế độ của `AtmosphereSystem` **không
+chiếu vào một bề mặt nào**: ban đêm tường chỉ còn hemisphere 0,62 + trăng 0,62 ⇒ xám bết. Chú thích
+cũ ở `cityLayer.ts` hứa "khối PMREM bên dưới" nhưng khối đó chưa bao giờ tồn tại.
+
+Đã sửa: nền đất, mặt đứng, mái, hè/sân, ốp chân tường, bó vỉa, lăng trụ, đầu hồi, cột đèn, thùng
+chuyển sang `MeshStandardMaterial` **trên GPU**; trên renderer phần mềm vẫn là Lambert đúng cách map
+chuẩn tự hạ chi tiết. Đo lại: **0 lô Lambert** trong lớp thành phố trên nhánh GPU
+(`cityLayerMaterial.test.ts`), `draw calls ≈ 134` **không đổi** (B không thêm lô nào), chi phí là
+shader: Lambert 57 uniform → physical 106 (`materialBudget.test.ts` in ra con số này).
+
+Tuyệt đối **không** thêm khối PMREM vào `cityLayer`: trời/IBL là của engine (Single Engine).

@@ -276,7 +276,7 @@ const addChunked = (
      * Sửa UV theo kích thước THẬT của từng instance: hộp 60 m cao mà dán 4 cửa sổ thì đọc ra "tường
      * trơn có 4 ô đen". Một ô vân = 4 cửa sổ ≈ 13,5 m ngang, 14,5 m đứng.
      */
-    const facadeUvPatch = (m: THREE.MeshLambertMaterial) => {
+    const facadeUvPatch = <M extends THREE.MeshLambertMaterial | THREE.MeshStandardMaterial>(m: M): M => {
       m.onBeforeCompile = (shader) => {
         shader.vertexShader = shader.vertexShader
           .replace(
@@ -296,15 +296,54 @@ const addChunked = (
           #endif`,
           );
       };
+      // Không có khoá này thì `Material.customProgramCacheKey` lấy `onBeforeCompile.toString()`, và
+      // ba bộ vân mặt đứng chia nhau **một** chương trình — chương trình dựng cho material đầu tiên
+      // sẽ được dùng cho hai material còn lại (cùng shader nên chạy được, nhưng mọi thay đổi sau đó
+      // của một biến thể sẽ âm thầm áp cho cả ba). `tiledSurface` dưới đây đã có khoá riêng vì lý do
+      // này; mặt đứng thì chưa.
+      m.customProgramCacheKey = () => `city-facade-uv-${m.type}`;
       return m;
     };
-    const roofMat = new THREE.MeshLambertMaterial({ map: roofTexture() });
+    /**
+     * MẶT ĐỨNG + MÁI: `MeshStandardMaterial` trên GPU, `MeshLambertMaterial` trên renderer phần mềm.
+     *
+     * Vì sao: `WebGLRenderer` chỉ gắn `scene.environment` (PMREM ba chế độ của `AtmosphereSystem`)
+     * cho `MeshStandardMaterial` — đọc thẳng `WebGLRenderer.js` ~1658. Vật liệu Lambert **không**
+     * nhận IBL, nên ban đêm tường chỉ còn hemisphere 0,62 + trăng 0,62 và ra xám bết, đúng cái nhìn
+     * thấy trong ảnh người dùng gửi (biển emissive sáng, tường phẳng tối). Đây là nửa còn lại của
+     * lỗi "mất vân": việc A sửa dữ liệu ảnh, việc B cho vật liệu nhận được ánh sáng môi trường.
+     *
+     * Giữ Lambert trên máy phần mềm đúng như `simulation/street.ts` của map chuẩn tự hạ chi tiết
+     * (`software ? null : bumpMap`): PBR phủ toàn màn hình từng làm khung hình vượt 150 s ở §4i.
+     */
+    const facadeMaterial = (map: THREE.Texture) =>
+      SOFT_GL
+        ? new THREE.MeshLambertMaterial({ map })
+        : new THREE.MeshStandardMaterial({ map, roughness: 0.9, metalness: 0.02, envMapIntensity: 0.85 });
+    const roofMat: THREE.Material = SOFT_GL
+      ? new THREE.MeshLambertMaterial({ map: roofTexture() })
+      : new THREE.MeshStandardMaterial({
+          map: roofTexture(),
+          // Mái tôn/bê tông ẩm: bóng hơn tường, bắt được vệt trời.
+          roughness: 0.72,
+          metalness: 0.06,
+          envMapIntensity: 0.9,
+        });
+    /**
+     * Vật liệu cho các lô **không có map** (màu nằm ở từng instance): bó vỉa, lăng trụ, đầu hồi,
+     * cột đèn, thùng. Để trắng và cho nhận IBL giống mặt đứng — một lô trắng phẳng mà Lambert thì
+     * chỉ có `color × hemi`, đúng thứ đọc ra "khối nhựa" dưới nắng Sài Gòn.
+     */
+    const surfaceMaterial = () =>
+      SOFT_GL
+        ? new THREE.MeshLambertMaterial({ color: "#ffffff" })
+        : new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.8, metalness: 0.04, envMapIntensity: 0.8 });
     // BoxGeometry có 6 nhóm mặt: +x, -x, +y, -y, +z, -z
     // MẶT ĐỨNG: ba bộ vân, mỗi bộ là **ảnh quét thạch cao của map chuẩn** phủ dưới lưới cửa sổ
     // (`q1/beige_wall_001`, `q1/grey_plaster_02`, `q1/clay_plaster`). Toà được chia theo hash nên dãy
     // phố không còn "một bức tường vẽ một lần rồi dán khắp thành phố", mà vẫn chỉ tốn 3 lệnh vẽ.
     const facadeVariants = ["beige_wall_001", "grey_plaster_02", "clay_plaster"];
-    const facadeMats = facadeVariants.map((id) => facadeUvPatch(new THREE.MeshLambertMaterial({ map: facadeTexture(id) })));
+    const facadeMats = facadeVariants.map((id) => facadeUvPatch(facadeMaterial(facadeTexture(id))));
     const buckets: Part[][] = facadeVariants.map(() => []);
     const hF = (n: number) => {
       const v = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
@@ -409,16 +448,23 @@ const addChunked = (
     slabTex.wrapS = THREE.RepeatWrapping;
     slabTex.wrapT = THREE.RepeatWrapping;
     slabTex.anisotropy = 4;
-    const slabMat = tiledSurface(new THREE.MeshLambertMaterial({ map: slabTex, color: "#cfcdc4" }), 1.2);
+    // Cùng lý do với mặt đứng: đá lát chỉ "ướt" khi vật liệu nhận được `scene.environment`, mà
+    // điều đó chỉ xảy ra với `MeshStandardMaterial`. Trên renderer phần mềm vẫn là Lambert.
+    const slabMat = tiledSurface(
+      SOFT_GL
+        ? new THREE.MeshLambertMaterial({ map: slabTex, color: "#cfcdc4" })
+        : new THREE.MeshStandardMaterial({ map: slabTex, color: "#cfcdc4", roughness: 0.86, metalness: 0.02, envMapIntensity: 0.7 }),
+      1.2,
+    );
     addChunked(scene, cube, otherFlat, { materials: slabMat, castShadow: false });
     // Bó vỉa: đá granite hai màu, dựng từ cùng bộ hình khối nhưng **không** dùng chung vật liệu với
     // hè — nếu dùng chung thì mép đường lại lẫn vào mặt hè và mất cạnh.
-    addChunked(scene, cube, meshData.kerbs, {
-      materials: new THREE.MeshLambertMaterial({ color: "#ffffff" }),
-      castShadow: false,
-    });
-    addChunked(scene, prism, meshData.prisms);
-    addChunked(scene, gableGeometry(), meshData.gables);
+    // Ba lô này để **trắng**: màu nằm ở từng instance. Không có `map`, nên đây là chỗ IBL trả lại
+    // nhiều nhất — một màu trắng phẳng dưới ánh sáng Lambert chỉ ra đúng `color × hemi`, không có
+    // gì lấy từ bầu trời. `prisms` là lô lớn nhất của cả thành phố (≈46 000 mảnh).
+    addChunked(scene, cube, meshData.kerbs, { materials: surfaceMaterial(), castShadow: false });
+    addChunked(scene, prism, meshData.prisms, { materials: surfaceMaterial() });
+    addChunked(scene, gableGeometry(), meshData.gables, { materials: surfaceMaterial() });
     // Chi tiết mặt tiền (cửa cuốn, biển hiệu, mái hiên, ban công): trước đây là **màu phẳng**, nên
     // cả dãy cửa cuốn đọc ra những khối xanh đen không rõ là gì. Nay dán tấm tôn cuốn của map chuẩn
     // (`drive-look/tin-map.webp`, cùng tấm mà map chuẩn dùng cho vách tôn) — màu của từng ô vẫn do
@@ -428,7 +474,9 @@ const addChunked = (
     tin.wrapT = THREE.RepeatWrapping;
     tin.repeat.set(2, 2);
     addChunked(scene, cube, meshData.details, {
-      materials: new THREE.MeshLambertMaterial({ map: tin }),
+      materials: SOFT_GL
+        ? new THREE.MeshLambertMaterial({ map: tin })
+        : new THREE.MeshStandardMaterial({ map: tin, roughness: 0.62, metalness: 0.28, envMapIntensity: 0.9 }),
       castShadow: false,
     });
     // CÂY: dùng **đúng bộ cây của map chuẩn** — `SaigonBotanicalBatch` (thân phân nhánh + 20 thẻ lá
@@ -456,10 +504,12 @@ const addChunked = (
     if (!treeWind) {
       const trunkGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 6);
       trunkGeo.translate(0, 0.5, 0);
-      addChunked(scene, trunkGeo, meshData.trunks);
+      // Đường lui này chỉ dùng khi không có cây thật (máy phần mềm), nhưng vẫn đi qua
+      // `surfaceMaterial()` để nó không lệch sang một họ vật liệu khác.
+      addChunked(scene, trunkGeo, meshData.trunks, { materials: surfaceMaterial() });
       const canopyGeo = new THREE.ConeGeometry(0.5, 1, 7);
       canopyGeo.translate(0, 0.5, 0);
-      addChunked(scene, canopyGeo, meshData.canopies);
+      addChunked(scene, canopyGeo, meshData.canopies, { materials: surfaceMaterial() });
     }
     // ĐỒ VỈA HÈ THẬT của map chuẩn: xe bánh mì, tủ đổi pin, thùng rác inox — **chính file GLB** mà
     // phố Lý Thái Tổ dùng (`simulation/streetPropsGlb.ts`, các node `Prop_BanhMi` / `Prop_BatterySwap`
@@ -483,13 +533,13 @@ const addChunked = (
     // Cột đèn: trụ tròn mảnh, cùng một lưới instanced cho cả 937 cột.
     const poleGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 8);
     poleGeo.translate(0, 0.5, 0);
-    addChunked(scene, poleGeo, meshData.poles, { materials: new THREE.MeshLambertMaterial({ color: "#ffffff" }), castShadow: false });
+    addChunked(scene, poleGeo, meshData.poles, { materials: surfaceMaterial(), castShadow: false });
     const drumGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 10);
     drumGeo.translate(0, 0.5, 0);
     // Vật liệu để **trắng**: màu nằm ở từng instance (bồn inox `#c9cdd2`, thùng rác `#2c4236`,
     // cọc tiêu `#b8542f`, bánh xe). Trước đây vật liệu mang màu inox nên mọi thứ khác trong cùng
     // lưới bị nhân màu thép và mất màu riêng.
-    addChunked(scene, drumGeo, meshData.drums, { materials: new THREE.MeshLambertMaterial({ color: "#ffffff" }), castShadow: false });
+    addChunked(scene, drumGeo, meshData.drums, { materials: surfaceMaterial(), castShadow: false });
 
   return { anchors: meshData.anchors, trees: meshData.trunks.length, wind: treeWind };
 };
