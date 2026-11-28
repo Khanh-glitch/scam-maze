@@ -2,10 +2,10 @@ import * as THREE from "three";
 import { buildCityMesh, type CityMesh, type Part } from "./cityMesh";
 import type { City } from "./cityGen";
 import { SaigonBotanicalBatch } from "../testbus/openworld/world/foliageAndProps";
-import { placeStreetProps } from "../testbus/openworld/simulation/streetPropsGlb";
 import { createRealTreeBarkPBR } from "../testbus/openworld/world/pbrTextures";
 import { inRealWorld } from "./realWorldFootprint";
 import { createCityGroundMaterial } from "./cityGround";
+import { planStreetPropAssets, placeStreetPropAssets } from "./cityStreetProps";
 
 /**
  * CẤY THÀNH PHỐ SAIGON VÀO MỘT SCENE CÓ SẴN.
@@ -513,23 +513,22 @@ const addChunked = (
       canopyGeo.translate(0, 0.5, 0);
       addChunked(scene, canopyGeo, meshData.canopies, { materials: surfaceMaterial() });
     }
-    // ĐỒ VỈA HÈ THẬT của map chuẩn: xe bánh mì, tủ đổi pin, thùng rác inox — **chính file GLB** mà
-    // phố Lý Thái Tổ dùng (`simulation/streetPropsGlb.ts`, các node `Prop_BanhMi` / `Prop_BatterySwap`
-    // / `Prop_TrashBin`). Đặt thưa (24 chỗ trên 408 sạp) để không thành rừng bản sao và không phá
-    // ngân sách khung hình; mỗi chỗ là một bản sao trên mặt hè (y = 0,17 m).
+    // ĐỒ VỈA HÈ THẬT — thay cho 24 chỗ cũ.
+    //
+    // Trước đây chỉ 24/9 012 đồ vỉa hè được thay bằng GLB (`i % 17 === 0` của loại `stall`), còn
+    // lại là khối nguyên thuỷ: 1 428 xe máy dựng = hộp, 1 485 thùng rác và 1 027 bồn inox = trụ
+    // tròn, 823 cột đèn = trụ tròn. Đó là "NPC không tận dụng asset thật, dùng đồ giả".
+    //
+    // Nay mỗi loại đồ có asset thật dùng asset thật (xe máy ba đời, thùng rác, sạp bánh mì/tủ đổi
+    // pin, bàn ghế nhựa, biển hiệu), chia đều khắp bản đồ, trần 96 bản sao cho ngân sách draw call.
+    // Đồ **không có** asset thật (cột đèn, cọc tiêu, dây phơi, rào tôn) vẫn là hình khối — đó là
+    // hình học đúng của nó, không phải đồ giả.
     {
-      const spots = city.props
-        .filter((p) => p.kind === "stall")
-        // Không đặt đồ vỉa hè vào vùng của map chuẩn: ở đó đã có đồ thật của phố Lý Thái Tổ.
-        .filter((p) => !inRealWorld(p.x, p.z, 2))
-        .filter((_, i) => i % 17 === 0)
-        .slice(0, 24);
-      const nodes = ["Prop_BanhMi", "Prop_BatterySwap", "Prop_TrashBin"] as const;
-      if (spots.length) {
-        void placeStreetProps(
-          scene,
-          spots.map((p, i) => ({ node: nodes[i % nodes.length], x: p.x, y: 0.17, z: p.z, yaw: (i * 1.7) % (Math.PI * 2) })),
-        ).catch((err) => console.warn("[citymap] không đặt được đồ vỉa hè GLB", err));
+      const plan = planStreetPropAssets(city.props, { inRealWorld });
+      if (plan.length) {
+        void placeStreetPropAssets(scene, plan).catch((err) =>
+          console.warn("[citymap] không đặt được đồ vỉa hè GLB", err),
+        );
       }
     }
     // Cột đèn: trụ tròn mảnh, cùng một lưới instanced cho cả 937 cột.

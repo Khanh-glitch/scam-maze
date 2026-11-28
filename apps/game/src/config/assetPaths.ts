@@ -53,6 +53,17 @@ export const CHAPTER1_VOICE_BASE = "/audio/chapter01";
  */
 export const STREET_PROPS_GLB = "/assets/3d/optimized/street-props.optimized.glb";
 /**
+ * Đồ vỉa hè lẻ của map dựng tay — bàn ghế nhựa, biển hiệu, xe máy dựng sẵn. Dùng cho vỉa hè của
+ * phố thủ tục để NPC/đồ đạc không còn là khối trụ nguyên thuỷ (L7).
+ */
+export const STOOL_LOW_GLB = "/assets/3d/optimized/props/stool-low.optimized.glb";
+export const STOOL_HIGH_GLB = "/assets/3d/optimized/props/stool-high.optimized.glb";
+export const TABLE_SET_GLB = "/assets/3d/optimized/props/table-set.optimized.glb";
+export const BIENHIEU_GLB = "/assets/3d/optimized/props/bienhieu1.optimized.glb";
+export const BIKE_PCX_GLB = "/assets/3d/optimized/props/bike-pcx.optimized.glb";
+export const BIKE_SUPERCUB_GLB = "/assets/3d/optimized/props/bike-supercub.optimized.glb";
+export const BIKE_CG125_GLB = "/assets/3d/optimized/props/bike-cg125.optimized.glb";
+/**
  * Scooter with rider for the neighborhood traffic: 3 levels of detail, rigid parts, no skin
  * (Meshopt, produced by scripts/optimize-bike-rider.cjs).
  */
