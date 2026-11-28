@@ -60,3 +60,17 @@ describe("buildCityMesh", () => {
     expect(walkTop).toBeGreaterThan(roadTop);
   });
 });
+
+describe("van maxParts không được cắt cụt thành phố", () => {
+  it("không mảnh nào bị bỏ, và cây đường phố phủ cả hai hè", () => {
+    const city = generateCity(undefined, { realWorld: true });
+    const mesh = buildCityMesh(city);
+    // Đây là bẫy đã xảy ra hai lần: thêm hè rộng rồi thêm cây làm số mảnh vượt trần, `push` im
+    // lặng bỏ phần còn lại, và triệu chứng duy nhất là "một vùng trống" không ai giải thích được.
+    expect(mesh.stats.droppedParts).toBe(0);
+    // Cây đường phố: mỗi tuyến phố/đại lộ có cây, không chỉ công viên. Đo bằng tương quan: số thân
+    // cây phải lớn hơn hẳn số cây công viên + prop rời trước đây (1 592).
+    expect(mesh.trunks.length).toBeGreaterThan(2_400);
+    expect(mesh.stats.droppedParts).toBe(0);
+  });
+});

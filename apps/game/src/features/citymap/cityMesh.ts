@@ -62,6 +62,8 @@ export interface CityMesh {
     towers: number;
     gabledRoofs: number;
     parts: number;
+    /** Số mảnh bị van `maxParts` bỏ. Khác 0 nghĩa là thành phố đang bị cắt cụt. */
+    droppedParts: number;
     roads: number;
     props: number;
     minY: number;
@@ -114,10 +116,18 @@ const inset = (r: CityBuilding, k: number) => {
 
 /**
  * Dựng toàn bộ hình học của thành phố.
- * `maxParts` chặn trần để trang web không bao giờ dựng quá nặng (mặc định đủ cho ~4.400 toà).
+ *
+ * `maxParts` là **van an toàn**, không phải ngân sách: hình học đi vào `InstancedMesh` nên chi phí
+ * khung hình tính theo số **lô** (`< 14`), không theo số mảnh. Nhưng khi chạm trần, `push` im lặng
+ * bỏ phần còn lại — tức thành phố bị **cắt cụt từ chỗ nào đó tuỳ thứ tự sinh**, và triệu chứng duy
+ * nhất là "một vùng trống" không ai giải thích được. Chuyện này đã xảy ra khi thêm hè rộng và cây
+ * đường phố (113 844 → 178 233 → 120 052 mảnh, luôn đúng bằng trần).
+ *
+ * Nên trần được đặt lại theo **số đo thật + lề 25%**, và khi vượt thì `stats.droppedParts` nói ra
+ * con số, để lần sau không ai phải đoán vì sao map thiếu nhà.
  */
 export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): CityMesh => {
-  const maxParts = opts.maxParts ?? 120_000;
+  const maxParts = opts.maxParts ?? 165_000;
   const boxes: Part[] = [];
   const prisms: Part[] = [];
   const gables: Part[] = [];
@@ -136,6 +146,7 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
   let minY = Number.POSITIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
   let parts = 0;
+  let droppedParts = 0;
 
   /**
    * MẢNH NÀY CÓ RƠI VÀO MAP CHUẨN KHÔNG.
@@ -200,7 +211,10 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
   };
 
   const push = (list: Part[], p: Part) => {
-    if (parts >= maxParts) return;
+    if (parts >= maxParts) {
+      droppedParts += 1;
+      return;
+    }
     if (partHitsRealMap(p)) return;
     parts += 1;
     list.push(p);
@@ -937,7 +951,47 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
   }
 
   // --- cây, cột đèn, vật thể vỉa hè -----------------------------------------------------------
-  let props = 0;
+  // CÂY ĐƯỜNG PHỐ: Lý Thái Tổ trồng một cây mỗi ~15 m dọc **cả hai** hè, cây cao 7–11 m với tán
+  // rộng phủ qua lòng đường (`simulation/street.ts`: `tree(block, tx + side*.42, ..., .92 / 1.21)`).
+  // Thành phố trước đây chỉ có cây trong công viên và một ít prop rời — phố chính không có cây,
+  // nên tiết diện đọc ra "đường nhựa + hộp nhà" chứ không ra phố Sài Gòn có bóng mát.
+  // Đặt mỗi 16 m, hai bên hè, lệch nhau nửa nhịp; bỏ qua chỗ có cửa hàng sạp (prop) và chỗ cắt
+  // ngã tư (đoạn phẳng đã bị cắt khỏi `spans` nên chỉ cần né bó vỉa).
+  let streetTrees = 0;
+  for (const s of city.streets) {
+    if (s.klass === "alley" || s.klass === "bridge") continue;
+    const walk = s.klass === "avenue" ? 4.0 : 2.6;
+    const treeOff = s.widthM / 2 + Math.max(0.9, walk * 0.55);
+    for (let i = 0; i < s.points.length - 1; i += 1) {
+      const [ax, az] = s.points[i];
+      const [bx, bz] = s.points[i + 1];
+      const len = Math.hypot(bx - ax, bz - az);
+      if (len < 24) continue;
+      const ry = -Math.atan2(bz - az, bx - ax);
+      const n = Math.floor(len / 8);
+      for (let k = 0; k < n; k += 1) {
+        const t = (k + 0.5) / n;
+        // Hai bên lệch nhau nửa nhịp để phố không thành hai hàng cây đối xứng máy móc.
+        const sgn = k % 2 === 0 ? 1 : -1;
+        const px = ax + (bx - ax) * t + Math.sin(ry) * treeOff * sgn;
+        const pz = az + (bz - az) * t + Math.cos(ry) * treeOff * sgn;
+        // Bỏ chỗ đã có sạp hàng, cột đèn hoặc công trình (tránh cây mọc xuyên mái hiên).
+        if (city.props.some((q) => Math.abs(q.x - px) < 1.6 && Math.abs(q.z - pz) < 1.6)) continue;
+        const h1 = hash01(px * 2.3 + pz * 5.7);
+        // Cây đường phố thật: 7–11 m. Tán rộng 3,4–4,6 m, vươn qua mép đường.
+        const hh = 7.0 + h1 * 4.0;
+        const trunkH = hh * 0.46;
+        push(trunks, { x: px, y: 0.17, z: pz, sx: 0.30, sy: trunkH, sz: 0.30, color: "#584330" });
+        push(canopies, {
+          x: px, y: 0.17 + trunkH - 0.5, z: pz,
+          sx: 3.4 + h1 * 1.2, sy: hh - trunkH + 0.9, sz: 3.4 + h1 * 1.2,
+          color: h1 > 0.5 ? "#4a6a41" : "#557a4b",
+        });
+        streetTrees += 1;
+      }
+    }
+  }
+  let props = streetTrees;
   for (const p of city.props) {
     if (p.kind === "tree") {
       const hh = 3.8 + hash01(p.x + p.z) * 1.4;
@@ -1039,7 +1093,7 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
     boxes, flat, kerbs, prisms, gables, trunks, canopies, details, drums, poles, anchors,
     stats: {
       buildings: city.buildings.filter((b) => !b.walkable).length + city.belt.buildings.length,
-      towers, gabledRoofs, parts, roads, props,
+      towers, gabledRoofs, parts, droppedParts, roads, props,
       minY: Number.isFinite(minY) ? minY : 0,
       // Toà cao nhất trong scene có thể là toà của **map thật** (Landmark 81, 461 m) — nó không phải
       // khối nào của `cityMesh` nên phải cộng tay, nếu không con số "cao nhất" của thành phố còn 117 m.
