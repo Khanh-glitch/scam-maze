@@ -24,6 +24,7 @@ import { buildShadowProxies } from '../khupho/world/shadowProxy';
 import type { Ctx } from '../khupho/world/types';
 import type { AudioSys } from '../khupho/world/audio';
 import type { House } from '../khupho/world/house';
+import { GROUND_BASE_HEX } from './cityGround';
 
 /** Thứ âm thanh: thành phố chưa có mixer của khu phố, câm nhưng vẫn đủ hàm để logic chạy. */
 const silentAudio = {
@@ -120,8 +121,10 @@ export async function buildCoreWorld(x: number, z: number, opts: CoreWorldOption
   // trên nền thành phố để không bị nền xám của thành phố nuốt mất.
   const houses = buildNeighborhood(ctx, {
     ground: [
-      { x0: -74, x1: 74, z0: -30, z1: -6, color: "#55544a" },
-      { x0: -74, x1: 74, z0: 6, z1: 58, color: "#55544a" },
+      // Cùng một hằng tông đất với nền 9 km của thành phố (`cityGround.ts`): hai tấm nền lệch màu
+      // là một vệt sáng hình chữ nhật giữa thành phố.
+      { x0: -74, x1: 74, z0: -30, z1: -6, color: GROUND_BASE_HEX },
+      { x0: -74, x1: 74, z0: 6, z1: 58, color: GROUND_BASE_HEX },
     ],
     skyline: false,
   });

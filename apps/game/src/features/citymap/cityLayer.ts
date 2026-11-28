@@ -5,6 +5,7 @@ import { SaigonBotanicalBatch } from "../testbus/openworld/world/foliageAndProps
 import { placeStreetProps } from "../testbus/openworld/simulation/streetPropsGlb";
 import { createRealTreeBarkPBR } from "../testbus/openworld/world/pbrTextures";
 import { inRealWorld } from "./realWorldFootprint";
+import { createCityGroundMaterial } from "./cityGround";
 
 /**
  * CẤY THÀNH PHỐ SAIGON VÀO MỘT SCENE CÓ SẴN.
@@ -47,9 +48,13 @@ export const addCityLayer = (scene: THREE.Scene, city: City, opts: CityLayerOpti
    * che chỗ đó; khi thành phố được cấy vào thì tấm đó bị bỏ (nó nằm dưới cả thành phố), nên nền
    * phải do lớp thành phố tự mang theo — như bản `/saigon` cũ vẫn làm.
    */
+  // Tông đất + vân: `createCityGroundMaterial` (`cityGround.ts`) sinh tấm vân đất theo đúng tông
+  // nền của engine và lặp theo mét. Trước đây đây là một `MeshLambertMaterial("#55544a")` phẳng —
+  // nhìn từ trên cao là một tấm xám tuyệt đối, và ở mép map chuẩn tông lệch hẳn nền của
+  // `saigonDistricts`.
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(9000, 9000),
-    new THREE.MeshLambertMaterial({ color: "#55544a" }),
+    createCityGroundMaterial(9000, SOFT_GL),
   );
   ground.name = "city-ground";
   ground.rotation.x = -Math.PI / 2;
