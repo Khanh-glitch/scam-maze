@@ -258,8 +258,8 @@ export function buildCityNetwork(
     const ordered = [...cuts.get(l.i)!].sort((p, q) => p.s - q.s);
     const rx = -l.tz;
     const rz = l.tx;
-    const lane = Math.max(1.2, l.st.widthM / 4);
-    const carriage = Math.max(2.6, l.st.widthM / 2 - 0.6);
+    // Bề rộng cả mặt đường (hai chiều chung), và nửa-bề-rộng của **một chiều** để đặt làn.
+    const carriage = Math.max(3.2, l.st.widthM); // = 12,8 cho phố, 21,2 cho đại lộ
     const speed = l.st.klass === "avenue" ? 13.9 : 11.1;
     const axis = horizontal(l) ? "ew" : "ns";
 
@@ -271,8 +271,18 @@ export function buildCityNetwork(
       if (s1 - s0 < 12) continue;
       for (const dir of ["A", "B"] as const) {
         const sign = dir === "A" ? 1 : -1;
-        const near0 = { x: l.ax + l.tx * s0 + rx * lane * sign, z: l.az + l.tz * s0 + rz * lane * sign };
-        const near1 = { x: l.ax + l.tx * s1 + rx * lane * sign, z: l.az + l.tz * s1 + rz * lane * sign };
+        // TÂM ĐƯỜNG = TIM TUYẾN, KHÔNG PHẢI TIM *NỬA* ĐƯỜNG.
+        //
+        // Bản trước đặt hai cạnh cách tim tuyến `widthM / 4` (≈3,2 m cho phố 12,8 m), tức hai làn
+        // cách nhau 6,4 m và mang bề rộng `carriage = widthM / 2 - 0,6` — biến cả con phố 12,8 m
+        // thành **hai con phố 5,8 m** nằm cạnh nhau, giữa là 6,4 m đất trống. Đó là "tuyến đường
+        // ngổn ngang, thiếu nguyên tắc" và cũng là lý do nhìn từ trên xuống thấy xe chạy hai bên
+        // hè khác nhau.
+        //
+        // Giờ: mỗi cạnh là **một chiều** của cùng mặt đường, tâm cạnh = tim tuyến, bề rộng = cả
+        // `carriage`; làn xe lệch ±`carriage / 4` quanh tim, đúng khổ 12,8 m của `roadSpec`.
+        const near0 = { x: l.ax + l.tx * s0, z: l.az + l.tz * s0 };
+        const near1 = { x: l.ax + l.tx * s1, z: l.az + l.tz * s1 };
         const id = `CTY_${l.i}_${k}_${dir}`;
         graph.addCityEdge({
           id,
@@ -286,9 +296,39 @@ export function buildCityNetwork(
           end: dir === "A" ? near1 : near0,
           width: carriage,
           speedLimit: speed,
-          carLaneOffsets: [-carriage * 0.22, carriage * 0.22],
-          motoLatRange: [-carriage * 0.42, carriage * 0.42],
+          // Làn gán ngay sau `addCityEdge` (cần `r` đã dựng xong) — xem khối ngay dưới.
+          carLaneOffsets: [0, 0],
+          motoLatRange: [0, 0],
         });
+        // LÀN XE: MỘT CHIỀU = MỘT NỬA ĐƯỜNG, PHÍA BÊN PHẢI HƯỚNG ĐI.
+        //
+        // `addCityEdge` tự tính `r = normalize(−t.z, t.x)` từ `start/end`. Với cạnh dọc tuyến z,
+        // `_A` có `r = (−1, 0)` còn `_B` có `r = (+1, 0)` — nên "cùng một công thức dấu" không thể
+        // đúng cho cả hai. Điều cần là: làn nằm ở nửa đường bên phải hướng đi, tức **phía `+r` của
+        // chính cạnh đó**. Vì `_A` và `_B` có `r` trái dấu, hai dòng xe tự động ra hai nửa đường
+        // ngược nhau — đối xứng qua tim tuyến, đúng quy ước đi bên phải.
+        //
+        // Lệch lớn nhất là 0,46 × bề rộng xe chạy (≈5,9 m cho phố 12,8 m) < nửa bề rộng (6,4 m),
+        // nên không làn nào tràn sang hè.
+        // LÀN XE: MỘT CHIỀU = MỘT NỬA ĐƯỜNG — và dấu phải **GIỐNG NHAU** cho cả hai chiều.
+        //
+        // Đo bằng xe thật chạy (test `laneSide`, đọc `latOffset` sau khi spawn): hai cạnh `_A` và `_B`
+        // của cùng một tuyến có pháp tuyến `r` **ngược dấu nhau** (A: `r = (−1,0)`, B: `r = (+1,0)` với
+        // phố chạy theo z), vì `addCityEdge` tự suy `r` từ `start → end` của từng cạnh. Nên cùng một
+        // giá trị `lat` dương đặt A và B ở **hai nửa đường khác nhau**.
+        //
+        // Lịch sử: tôi đã hai lần thêm `× sign` (theo `dir`, rồi theo `r`) và cả hai lần đều đẩy hai
+        // dòng xe về **một bên** vỉa — A ở −6,78 m, B ở −7,67 m, hai dòng xe chồng lên nhau. Đó
+        // đúng là "xe đi ngược chiều" nhìn thấy trên ảnh. Bản đúng là KHÔNG nhân dấu gì cả.
+        //
+        // Lệch lớn nhất 0,46 × bề rộng xe chạy ≤ 5,9 m cho phố 12,8 m (< nửa bề rộng 6,4 m), nên
+        // không làn nào tràn sang hè.
+        const built = graph.edges.get(id);
+        if (built) {
+          built.carLaneOffsets = [carriage * 0.16, carriage * 0.32];
+          // Xe máy đi sát bó vỉa phía phải hơn ô tô — thói quen Sài Gòn.
+          built.motoLatRange = [carriage * 0.26, carriage * 0.46];
+        }
         const from = dir === "A" ? a.junction : b.junction;
         const to = dir === "A" ? b.junction : a.junction;
         segments.push({ edgeId: id, corridor: l.i, lane: dir, from, to });
