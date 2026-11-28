@@ -353,13 +353,18 @@ vì hình học lẫn dữ liệu đều đọc từ cùng một nguồn `featur
   cả hình chữ nhật thì thành bãi đất trống.
 - Dựng khu phố ở gốc toạ độ rồi mới dời tới `(core.x, core.z)`: `buildShadowProxies` nướng ma trận
   thế giới vào hình học, dời trước sẽ bị cộng đôi vị trí.
+- Thời gian: `onWorldReady` gắn nhà + mặt phố vào scene **ngay khi dựng xong**, trước phần người và
+  đồ GLB (đo trong sandbox: mặt phố hiện trước ~4 s). `?nolife=1` chỉ dựng nhà/đường/vỉa hè cho máy
+  yếu; `?humans=1` / `?baothu=1` bật model nặng.
+- Nền khu phố dùng đúng màu nền thành phố (`#55544a`) nên mép dải không còn vệt sáng.
 - `/saigon` mở màn **ngay trên khu phố gốc**, có nhãn "Khu phố gốc · Lê Thánh Tôn" và thanh tải riêng
   ("Đang cắm khu phố gốc"). Người mẫu GLB (~50 MB) mặc định tắt để trang mở nhanh — người đi đường
   vẫn là người của khu phố, dựng thủ tục; bật bằng `?humans=1`, xe báo thủ bằng `?baothu=1`.
 - Bất biến POI: sau khi lưới đi lại chốt, mọi POI bị đè được nắn sang ô đứng được gần nhất
   (≤ 18 m, 32 hướng) — kiểm bằng **cả** hình học chính xác và lưới 0,5 m.
 
-Ảnh (chụp từ `/saigon` thật, bằng Chromium): `_g-ndu.jpg` (khu phố trên Nguyễn Du, giữa khu dân cư,
+Ảnh (chụp từ `/saigon` thật, bằng Chromium): `_g-ndu-seam.jpg` (nền đã khớp màu thành phố, khu phố nằm
+giữa dãy nhà ống cùng tông), `_g-ndu.jpg` (khu phố trên Nguyễn Du, giữa khu dân cư,
 kênh ở phía bắc), `_g-core-air2.jpg` / `_g-final.jpg` (khu phố thật trong công
 viên, thành phố bao quanh), `_g-realcore-street.jpg` và `_g-core-east.jpg` (đứng trong lòng phố: vỉa hè,
 cây, dây điện, biển hiệu, xe máy, người đi đường), `_plan2.png` (mặt bằng: công viên có cỏ/lối đi/cây).
