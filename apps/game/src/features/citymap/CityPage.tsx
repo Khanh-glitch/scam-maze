@@ -231,6 +231,11 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
 
   const labelRef = useRef<Array<{ id: string; name: string; pos: THREE.Vector3 }>>([]);
   const [coreLoad, setCoreLoad] = useState<{ step: string; fraction: number } | null>(null);
+  /** Trạng thái khu phố gốc để người xem biết nó đang dựng, đã xong hay lỗi — không phải đoán. */
+  const [coreState, setCoreState] = useState<"pending" | "ready" | "error">("pending");
+  const [coreError, setCoreError] = useState<string>("");
+  /** Camera bay tới khu phố gốc khi bấm nút. */
+  const flyToCoreRef = useRef<(() => void) | null>(null);
   const showLabelsRef = useRef(showLabels);
   showLabelsRef.current = showLabels;
 
@@ -376,6 +381,7 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
             world.dispose();
             return;
           }
+          setCoreState("ready");
           coreWorld = world;
           if (!world.root.parent) scene.add(world.root);
           renderer.shadowMap.needsUpdate = true;
@@ -394,6 +400,8 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
         .catch((err) => {
           console.error("[citymap] khu phố gốc không dựng được", err);
           setCoreLoad(null);
+          setCoreState("error");
+          setCoreError(err instanceof Error ? err.message : String(err));
         });
     }
 
@@ -511,6 +519,15 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
       camera.updateProjectionMatrix();
     };
     window.addEventListener("resize", onResize);
+
+    flyToCoreRef.current = () => {
+      if (!city.core.streetId) return;
+      target.set(city.core.x, 3, city.core.z - 6);
+      radius = 140;
+      yaw = -1.35;
+      pitch = -0.32;
+      applyCamera();
+    };
 
     labelRef.current = meshData.anchors.map((a) => ({ id: a.id, name: a.name, pos: new THREE.Vector3(a.x, a.y, a.z) }));
 
@@ -664,9 +681,28 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
         )}
       </div>
 
-      {coreLoad && (
-        <div className="pointer-events-none absolute bottom-10 left-4 rounded-md border border-white/15 bg-black/55 px-3 py-1.5 text-[11px] text-white/80 backdrop-blur">
-          Đang cắm khu phố gốc ({coreLoad.step} {Math.round(coreLoad.fraction * 100)}%)
+      {/*
+        Trước đây không có gì trên màn hình nói khu phố gốc đang dựng hay đã hỏng, nên người xem chỉ
+        thấy thành phố khối và tưởng map gốc không có trong /saigon. Chip này nói thẳng trạng thái.
+      */}
+      {city?.core.streetId && (
+        <div className="pointer-events-auto absolute left-4 top-24 rounded-md border border-white/15 bg-black/55 px-3 py-2 text-[11px] leading-relaxed text-white/85 backdrop-blur">
+          <div className="font-medium">
+            {coreState === "ready"
+              ? `Khu phố gốc · ${city.core.streetName} ✓`
+              : coreState === "error"
+                ? "Khu phố gốc: dựng thất bại"
+                : `Đang dựng khu phố gốc${coreLoad ? ` (${coreLoad.step} ${Math.round(coreLoad.fraction * 100)}%)` : ""}`}
+          </div>
+          {coreState === "error" && <div className="max-w-[280px] text-red-300">{coreError.slice(0, 160)}</div>}
+          {coreState === "ready" && <div className="text-white/55">44 nhà ống · hẻm cụt · sân chung · người &amp; xe của map gốc</div>}
+          <button
+            type="button"
+            onClick={() => flyToCoreRef.current?.()}
+            className="mt-1 cursor-pointer rounded border border-white/20 px-2 py-0.5 text-[11px] hover:bg-white/15"
+          >
+            Bay tới khu phố gốc
+          </button>
         </div>
       )}
 
