@@ -15,8 +15,10 @@
 //     từ chính hình học này — không cộng đại số các hình chữ nhật (lần đầu cộng ra 72% mái trên
 //     khung 47% đi được, vô nghĩa).
 import { cityPlan, type CityPlan } from "./cityPlan.ts";
+import { CITY_AVENUE_WIDTH, CITY_MINOR_WIDTH, CITY_RING_WIDTH, CITY_STREET_WIDTH } from "./roadSpec.ts";
 import {
   REAL_WORLD_TOWERS,
+  inRealWorld,
   isRealWorldTower,
   rectHitsRealWorld,
 } from "./realWorldFootprint.ts";
@@ -358,12 +360,12 @@ interface ClassGrid {
  * khối 90–170 m, tầng 2–5 ở khu ở và 7–26 ở khu văn phòng.
  */
 const GRID: Record<CityClass, ClassGrid> = {
-  residential: { cell: [124, 158], street: 12, minor: 6.5, hem: [2.6, 3.4], sidewalk: 1.5, ring: [12, 16], lot: [3.6, 5.0], floors: [2, 5], floorHeight: 3.25, commercial: 0.5, streets: STREET_NAMES },
-  market: { cell: [112, 142], street: 10, minor: 5.5, hem: [2.4, 3.2], sidewalk: 1.2, ring: [10, 13], lot: [3.2, 4.4], floors: [2, 3], floorHeight: 3.3, commercial: 0.58, streets: MARKET_STREETS },
-  tourist: { cell: [140, 178], street: 16, minor: 8, hem: [3, 4], sidewalk: 2.4, ring: [16, 22], lot: [6, 11], floors: [5, 14], lowRise: 0.38, floorHeight: 3.4, commercial: 0.55, streets: TOURIST_STREETS },
-  corporate: { cell: [152, 195], street: 20, minor: 10, hem: [3.6, 5], sidewalk: 3, ring: [22, 30], lot: [11, 23], floors: [8, 30], lowRise: 0.34, floorHeight: 3.9, commercial: 0.42, streets: CORPORATE_STREETS },
-  construction: { cell: [124, 160], street: 13, minor: 6.5, hem: [2.8, 3.6], sidewalk: 1.8, ring: [12, 16], lot: [3.8, 5.6], floors: [3, 8], floorHeight: 3.35, commercial: 0.55, streets: STREET_NAMES },
-  park: { cell: [165, 210], street: 16, minor: 8, hem: [3, 4], sidewalk: 2.6, ring: [18, 24], lot: [8, 14], floors: [4, 12], lowRise: 0.3, floorHeight: 3.35, commercial: 0.3, streets: PARK_STREETS },
+  residential: { cell: [124, 158], street: CITY_STREET_WIDTH, minor: CITY_MINOR_WIDTH, hem: [2.6, 3.4], sidewalk: 1.5, ring: [CITY_RING_WIDTH, CITY_RING_WIDTH], lot: [3.6, 5.0], floors: [2, 5], floorHeight: 3.25, commercial: 0.5, streets: STREET_NAMES },
+  market: { cell: [112, 142], street: CITY_STREET_WIDTH, minor: CITY_MINOR_WIDTH, hem: [2.4, 3.2], sidewalk: 1.2, ring: [CITY_RING_WIDTH, CITY_RING_WIDTH], lot: [3.2, 4.4], floors: [2, 3], floorHeight: 3.3, commercial: 0.58, streets: MARKET_STREETS },
+  tourist: { cell: [140, 178], street: CITY_STREET_WIDTH, minor: CITY_MINOR_WIDTH, hem: [3, 4], sidewalk: 2.4, ring: [CITY_RING_WIDTH, CITY_RING_WIDTH], lot: [6, 11], floors: [5, 14], lowRise: 0.38, floorHeight: 3.4, commercial: 0.55, streets: TOURIST_STREETS },
+  corporate: { cell: [152, 195], street: CITY_AVENUE_WIDTH, minor: CITY_MINOR_WIDTH, hem: [3.6, 5], sidewalk: 3, ring: [CITY_RING_WIDTH, CITY_RING_WIDTH], lot: [11, 23], floors: [8, 30], lowRise: 0.34, floorHeight: 3.9, commercial: 0.42, streets: CORPORATE_STREETS },
+  construction: { cell: [124, 160], street: CITY_STREET_WIDTH, minor: CITY_MINOR_WIDTH, hem: [2.8, 3.6], sidewalk: 1.8, ring: [CITY_RING_WIDTH, CITY_RING_WIDTH], lot: [3.8, 5.6], floors: [3, 8], floorHeight: 3.35, commercial: 0.55, streets: STREET_NAMES },
+  park: { cell: [165, 210], street: CITY_STREET_WIDTH, minor: CITY_MINOR_WIDTH, hem: [3, 4], sidewalk: 2.6, ring: [CITY_RING_WIDTH, CITY_RING_WIDTH], lot: [8, 14], floors: [4, 12], lowRise: 0.3, floorHeight: 3.35, commercial: 0.3, streets: PARK_STREETS },
 };
 
 const asClass = (density: string): CityClass =>
@@ -422,7 +424,9 @@ export function generateCity(seedOverride?: string, options: CityGenOptions = {}
   const avenues: Array<{ id: string; name: string; widthM: number; klass?: "bridge"; points: Array<[number, number]> }> = PLAN.avenues.map((a) => ({
     id: a.id,
     name: a.name,
-    widthM: a.widthM,
+    // Mọi đại lộ của thành phố dùng đúng khổ hành lang của Đại lộ 3/2 bên map chuẩn: cùng bề rộng
+    // thì chỗ nối hai bên mới không có bậc thang ở mép nhựa.
+    widthM: a.class === "bridge" ? a.widthM : CITY_AVENUE_WIDTH,
     klass: a.class === "bridge" ? ("bridge" as const) : undefined,
     points: a.points.map(([x, z]) => [x, z] as [number, number]),
   }));
@@ -1902,7 +1906,10 @@ export function generateCity(seedOverride?: string, options: CityGenOptions = {}
     buildings,
     streets,
     pois,
-    props,
+    // Đồ vỉa hè của thành phố KHÔNG được rơi vào vùng của map chuẩn: ở đó đã có sạp, thùng rác,
+    // cột điện, xe dựng của phố Lý Thái Tổ. 540 món đang nằm chồng lên chúng (đếm được) trước khi
+    // lọc ở đây — cùng lý do với `partHitsRealMap` bên `cityMesh`.
+    props: props.filter((p) => !inRealWorld(p.x, p.z, 1)),
     core,
     walk,
     decks,

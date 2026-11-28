@@ -287,6 +287,18 @@ export class OpenWorldEngine {
   public traffic: SaigonTrafficManager;
   public streamer: WorldStreamer;
   public atmosphere: AtmosphereSystem;
+  /**
+   * THÀNH PHỐ THỦ TỤC quanh map chuẩn — do `/saigon` (xem `citymap/SaigonEnginePage.tsx`) giao vào
+   * sau khi cấy `cityGen`/`cityMesh` vào scene này.
+   *
+   * Map chuẩn dựng tay chỉ có 9 vùng đi được (`openWorldBounds.json`) và `isWithinOpenWorld` chặn
+   * cứng ở mép: bước ra khỏi hẻm 462/14 là bị đẩy lại. Có `cityBounds` thì vùng đi được mở rộng ra
+   * cả thành phố, và `citySolids` (hộp bao từng khối nhà, cùng kiểu `Solid` của `boarding.ts`) giữ
+   * cho nhân vật không xuyên tường. Không có thành phố thì hai thứ này là `null`/rỗng và `/testbus`
+   * chạy y như cũ.
+   */
+  public cityBounds: { x0: number; x1: number; z0: number; z1: number } | null = null;
+  public citySolids: Solid[] = [];
   private audio: AudioEngine;
   private bumpVx = 0;
   private bumpVz = 0;
@@ -1262,6 +1274,12 @@ export class OpenWorldEngine {
     const col = resolveSolids(x, z, r, this.solidsGround);
     x = col.x;
     z = col.z;
+    // Khối nhà của thành phố thủ tục: cùng phép đẩy hình tròn–chữ nhật với map chuẩn.
+    if (this.citySolids.length) {
+      const cityCol = resolveSolids(x, z, r, this.citySolids);
+      x = cityCol.x;
+      z = cityCol.z;
+    }
 
     if (!this.onBus) {
       const busHull = rect(this.route.x, this.route.z, 2.55, 11.1);
@@ -1299,7 +1317,14 @@ export class OpenWorldEngine {
       }
     }
 
-    if (!this.districts.isWithinOpenWorld(x, z)) {
+    // Mép thế giới: 9 vùng của map chuẩn, cộng vùng thành phố nếu có thành phố được cấy vào.
+    const inCity =
+      !!this.cityBounds &&
+      x >= this.cityBounds.x0 &&
+      x <= this.cityBounds.x1 &&
+      z >= this.cityBounds.z0 &&
+      z <= this.cityBounds.z1;
+    if (!inCity && !this.districts.isWithinOpenWorld(x, z)) {
       return { x: this.feet.x, z: this.feet.z };
     }
 

@@ -70,7 +70,16 @@ export function SaigonEnginePage({ onBackToMenu }: { onBackToMenu?: () => void }
         // Vòng chân trời giả của map chuẩn (11 cụm tháp tối + tấm nền 880 m) thay cho thành phố ở
         // phía xa khi map đứng một mình ở `/testbus`. Ở đây thành phố thật đã có, để nguyên thì mười
         // một khối đen mọc giữa phố (đúng lỗi đã thấy trong ảnh kiểm tra của `/saigon` bản cũ).
-        if (qs.get("city") !== "0") engine.scene.getObjectByName("hcmc-skyline-horizon")?.removeFromParent();
+        if (qs.get("city") !== "0") {
+          engine.scene.getObjectByName("hcmc-skyline-horizon")?.removeFromParent();
+          // MỞ KHOÁ BIÊN GIỚI: map chuẩn chỉ cho đi trong 9 vùng dựng tay, bước ra là bị đẩy lại.
+          // Giao vùng thành phố cho engine và dựng hộp bao từng khối nhà làm vật cản — nếu chỉ mở
+          // biên giới mà không có vật cản thì nhân vật xuyên thẳng qua tường nhà.
+          engine.cityBounds = { x0: city.frame.x0, x1: city.frame.x1, z0: city.frame.z0, z1: city.frame.z1 };
+          engine.citySolids = city.buildings
+            .filter((b) => !b.walkable)
+            .map((b) => ({ x0: b.x0, x1: b.x1, z0: b.z0, z1: b.z1 }));
+        }
         engine.renderer.shadowMap.needsUpdate = true;
         const buildMs = Math.round(performance.now() - t0);
 
@@ -87,12 +96,24 @@ export function SaigonEnginePage({ onBackToMenu }: { onBackToMenu?: () => void }
           software,
           trees: layer.trees,
           corridors: extension.corridors,
+          citySolids: engine.citySolids.length,
           vehicles: extension.edgeIds.length,
           scene: engine.scene,
           engine,
         };
         setStatus("");
-        console.info("[saigon] thành phố cấy vào engine trong", buildMs, "ms ·", extension.corridors, "tuyến");
+        console.info(
+          "[saigon] thành phố cấy vào engine trong",
+          buildMs,
+          "ms ·",
+          extension.corridors,
+          "tuyến ·",
+          engine.citySolids.length,
+          "khối cản · biên",
+          JSON.stringify(engine.cityBounds),
+          "· cờ phần mềm",
+          software,
+        );
         // Giữ tham chiếu để shader gió của cây chạy theo thời gian của engine (engine đã tự vẽ
         // scene; uniform này chỉ cần một giá trị thời gian, đặt ở đây để không đụng vòng lặp).
         const wind = layer.wind;

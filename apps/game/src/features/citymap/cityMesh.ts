@@ -8,7 +8,7 @@
 // Nguyên tắc hình khối: một toà nhà KHÔNG phải một cái hộp. Tháp = bệ + thân thụt hai cấp (mặt
 // bằng vát góc) + hộp kỹ thuật. Nhà ống = thân + mái ngói dốc + tum. Chợ = nhà lớn + mái dốc.
 // Độ thụt co theo bề rộng lô, để tháp 9 m không thành cây kim.
-import { REAL_WORLD_TOWERS } from "./realWorldFootprint";
+import { REAL_WORLD_MARGIN_M, REAL_WORLD_RECTS, REAL_WORLD_TOWERS } from "./realWorldFootprint";
 import type { City, CityBuilding } from "./cityGen";
 
 /** Một khối đặc: hộp (hoặc lăng trụ vát góc / lăng trụ tam giác tuỳ danh sách chứa nó). */
@@ -130,8 +130,39 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
   let maxY = Number.NEGATIVE_INFINITY;
   let parts = 0;
 
+  /**
+   * MẢNH NÀY CÓ RƠI VÀO MAP CHUẨN KHÔNG.
+   *
+   * `/saigon` chạy trên chính runtime của `/testbus`: hẻm 462/14, Đại lộ 3/2, Hải Triều, Đại lộ
+   * Đông, bến sông và quảng trường Landmark 81 **đã có hình học riêng** trong scene đó. Thành phố
+   * sinh tự động chỉ được dựng phần còn lại — nếu không thì hai tấm nhựa, hai dãy bó vỉa, hai bộ
+   * cột đèn nằm chồng lên nhau, lệch nhau vài phân và lệch cả bề rộng.
+   *
+   * Hộp bao của mảnh (đã tính cả góc xoay) được so với 9 vùng của map chuẩn; chạm là bỏ, không
+   * phải "cắt bớt cho gần đúng".
+   */
+  const partHitsRealMap = (p: Part): boolean => {
+    const ry = p.ry ?? 0;
+    const c = Math.abs(Math.cos(ry));
+    const sn = Math.abs(Math.sin(ry));
+    const hx = (c * p.sx + sn * p.sz) / 2;
+    const hz = (sn * p.sx + c * p.sz) / 2;
+    for (const r of REAL_WORLD_RECTS) {
+      if (
+        p.x + hx > r.x0 - REAL_WORLD_MARGIN_M &&
+        p.x - hx < r.x1 + REAL_WORLD_MARGIN_M &&
+        p.z + hz > r.z0 - REAL_WORLD_MARGIN_M &&
+        p.z - hz < r.z1 + REAL_WORLD_MARGIN_M
+      ) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   const push = (list: Part[], p: Part) => {
     if (parts >= maxParts) return;
+    if (partHitsRealMap(p)) return;
     parts += 1;
     list.push(p);
     minY = Math.min(minY, p.y);
@@ -181,6 +212,38 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
           cuts.push({ t, half: (o.widthM / 2 + 1.2) / len });
         }
       }
+      // Cắt theo 9 vùng của map chuẩn: tuyến dừng đúng mép vùng (cộng lề 2 m), không chạy vào
+      // trong rồi bị bộ lọc `partHitsRealMap` xoá cả đoạn dài.
+      for (const r of REAL_WORLD_RECTS) {
+        const dx0 = bx - ax;
+        const dz0 = bz - az;
+        let rt0 = 0;
+        let rt1 = 1;
+        let keep = true;
+        const axes: Array<[number, number, number, number]> = [
+          [ax, dx0, r.x0 - REAL_WORLD_MARGIN_M, r.x1 + REAL_WORLD_MARGIN_M],
+          [az, dz0, r.z0 - REAL_WORLD_MARGIN_M, r.z1 + REAL_WORLD_MARGIN_M],
+        ];
+        for (const [p0, d0, lo, hi] of axes) {
+          if (Math.abs(d0) < 1e-6) {
+            if (p0 < lo || p0 > hi) {
+              keep = false;
+              break;
+            }
+            continue;
+          }
+          const ta = (lo - p0) / d0;
+          const tb = (hi - p0) / d0;
+          rt0 = Math.max(rt0, Math.min(ta, tb));
+          rt1 = Math.min(rt1, Math.max(ta, tb));
+          if (rt0 >= rt1) {
+            keep = false;
+            break;
+          }
+        }
+        if (!keep || rt1 <= 0 || rt0 >= 1) continue;
+        cuts.push({ t: (rt0 + rt1) / 2, half: (rt1 - rt0) / 2 });
+      }
       // Khu phố gốc tự vẽ lòng đường + hè của nó: cắt bỏ đoạn tuyến sinh tự động nằm trong vùng đó,
       // nếu không hai tấm nhựa chồng nhau và mép đường hiện một bậc.
       if (city.core.streetId === s.id && Math.abs(bz - az) < 1.5) {
@@ -211,9 +274,11 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
           // dịch theo trục ngang của tấm đường: cục bộ +z → (sin ry, cos ry)
           flatBox({
             x: ax + (bx - ax) * mid + Math.sin(ry) * off * sgn,
-            y: 0.05,
+            // Đỉnh hè = 0,17 m: đúng cao độ `CURB_HEIGHT` mà bàn chân nhân vật đứng trên map
+            // chuẩn. Lệch cao độ ở chỗ nối là bậc thang nhìn thấy được.
+            y: 0.10,
             z: az + (bz - az) * mid + Math.cos(ry) * off * sgn,
-            sx: segLen, sy: 0.12, sz: walk, ry, color: "#8e8b86",
+            sx: segLen, sy: 0.14, sz: walk, ry, color: "#8e8b86",
           });
         }
       }
@@ -221,7 +286,9 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
         const segLen = (t1 - t0) * len;
         const mid = (t0 + t1) / 2;
         flatBox({
-          x: ax + (bx - ax) * mid, y: 0.02, z: az + (bz - az) * mid,
+          // Mặt nhựa đỉnh 0,0 m — trùng mặt đường của map chuẩn (`simulation/street.ts` đặt tấm
+          // nhựa ở y = 0). Trước đây thành phố cao 0,08 m nên mép nối nhô lên 8 cm.
+          x: ax + (bx - ax) * mid, y: -0.03, z: az + (bz - az) * mid,
           sx: segLen + 0.3, sy: 0.06, sz: w, ry,
           color: s.klass === "alley" ? "#605e6b" : "#5a5964",
         });
@@ -237,9 +304,9 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
           const mid = (t0 + t1) / 2;
           kerbBox({
             x: ax + (bx - ax) * mid + Math.sin(ry) * kerbOff * sgn,
-            y: 0.08,
+            y: 0.085,
             z: az + (bz - az) * mid + Math.cos(ry) * kerbOff * sgn,
-            sx: segLen, sy: 0.095, sz: 0.16, ry,
+            sx: segLen, sy: 0.17, sz: 0.16, ry,
             color: hash01(mid * 91.7 + t0 * 13.3 + sgn) > 0.78 ? "#8f8b80" : "#bdb7a8",
           });
         }
@@ -255,7 +322,7 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
             const offY = 0.22 * sgn;
             flatBox({
               x: ax + (bx - ax) * mid + Math.sin(ry) * offY,
-              y: 0.086,
+              y: 0.006,
               z: az + (bz - az) * mid + Math.cos(ry) * offY,
               sx: segLen, sy: 0.02, sz: 0.13, ry, color: "#c8b264",
             });
@@ -265,7 +332,7 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
         const dash = Math.max(1, Math.floor(len / 7));
         for (let k = 0; k < dash; k += 1) {
           const t = (k + 0.5) / dash;
-          flatBox({ x: ax + (bx - ax) * t, y: 0.085, z: az + (bz - az) * t, sx: 2.2, sy: 0.02, sz: 0.16, ry, color: "#d7d5bc" });
+          flatBox({ x: ax + (bx - ax) * t, y: 0.005, z: az + (bz - az) * t, sx: 2.2, sy: 0.02, sz: 0.16, ry, color: "#d7d5bc" });
         }
       }
       // Vạch mép trắng sát bó vỉa (map chuẩn có: `plane(curb, ... white)` dọc hai bên). Thiếu nó thì
@@ -278,7 +345,7 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
             const offE = (w / 2 - 0.35) * sgn;
             flatBox({
               x: ax + (bx - ax) * mid + Math.sin(ry) * offE,
-              y: 0.087,
+              y: 0.007,
               z: az + (bz - az) * mid + Math.cos(ry) * offE,
               sx: segLen, sy: 0.02, sz: 0.12, ry, color: "#d9d6c6",
             });

@@ -4,6 +4,7 @@ import type { City } from "./cityGen";
 import { SaigonBotanicalBatch } from "../testbus/openworld/world/foliageAndProps";
 import { placeStreetProps } from "../testbus/openworld/simulation/streetPropsGlb";
 import { createRealTreeBarkPBR } from "../testbus/openworld/world/pbrTextures";
+import { inRealWorld } from "./realWorldFootprint";
 
 /**
  * CẤY THÀNH PHỐ SAIGON VÀO MỘT SCENE CÓ SẴN.
@@ -439,7 +440,12 @@ const addChunked = (
     // / `Prop_TrashBin`). Đặt thưa (24 chỗ trên 408 sạp) để không thành rừng bản sao và không phá
     // ngân sách khung hình; mỗi chỗ là một bản sao trên mặt hè (y = 0,17 m).
     {
-      const spots = city.props.filter((p) => p.kind === "stall").filter((_, i) => i % 17 === 0).slice(0, 24);
+      const spots = city.props
+        .filter((p) => p.kind === "stall")
+        // Không đặt đồ vỉa hè vào vùng của map chuẩn: ở đó đã có đồ thật của phố Lý Thái Tổ.
+        .filter((p) => !inRealWorld(p.x, p.z, 2))
+        .filter((_, i) => i % 17 === 0)
+        .slice(0, 24);
       const nodes = ["Prop_BanhMi", "Prop_BatterySwap", "Prop_TrashBin"] as const;
       if (spots.length) {
         void placeStreetProps(
