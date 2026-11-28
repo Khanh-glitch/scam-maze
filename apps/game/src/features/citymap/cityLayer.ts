@@ -347,7 +347,12 @@ const addChunked = (
     //   MeshStandardMaterial({ map, roughnessMap, normalMap, normalScale .45, roughness .94 })
     // Khác biệt lớn nhất giữa hai ảnh người dùng gửi không phải màu mà là **độ bóng ướt**: mặt đường
     // map chuẩn có envMap nên phản chiếu trời, còn mặt đường /saigon trước đây là Lambert nên bết.
-    // Nay /saigon dùng đúng vật liệu đó + `scene.environment` (xem khối PMREM bên dưới).
+    // Nay /saigon dùng đúng vật liệu đó, và nó nhận `scene.environment` của `AtmosphereSystem` —
+    // **nhưng chỉ vì đây là `MeshStandardMaterial`**. Ba lần đọc sai đã xảy ra ở đúng dòng này nên
+    // ghi rõ: `WebGLRenderer` chỉ lấy `scene.environment` khi `material.isMeshStandardMaterial`
+    // (`WebGLRenderer.js` ~1658, `WebGLPrograms.js` ~53); mọi `MeshLambertMaterial` trong file này
+    // (mặt đứng, mái, hè, bó vỉa, cột đèn) **không** nhận IBL từ PMREM ba chế độ của engine. Không
+    // có khối PMREM nào ở đây và cũng không được thêm: trời/IBL là của engine (Single Engine).
     const roadMat: THREE.Material = tiledSurface(
       new THREE.MeshStandardMaterial({ color: "#d4d8dc", roughness: 0.94, metalness: 0.02, envMapIntensity: 0.9 }),
       12.8,
