@@ -563,6 +563,45 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
   // Khu phố gốc KHÔNG vẽ lại ở đây: CityPage cắm nguyên thế giới thật của `features/khupho`
   // (coreWorld.ts) vào đúng chỗ đã cắt. Cắt lòng đường ở trên chỉ để nó không bị đè.
 
+  // --- công viên -----------------------------------------------------------------------------
+  // Trước đây "park" chỉ là một tấm nền phẳng: nhìn từ trên cao ra bãi đất trống, và khu phố gốc
+  // nằm giữa một vùng xám. Ở đây mỗi ô công viên có cỏ, lối đi cắt chéo và cây trồng theo lưới lệch.
+  for (const b of city.buildings) {
+    if (b.kind !== "park") continue;
+    const w = b.x1 - b.x0;
+    const d = b.z1 - b.z0;
+    if (w < 8 || d < 8) continue;
+    const cx = (b.x0 + b.x1) / 2;
+    const cz = (b.z0 + b.z1) / 2;
+    push(flat, { x: cx, y: 0.015, z: cz, sx: w, sy: 0.03, sz: d, color: "#6f8259" });
+    // lối đi: một trục chính theo chiều dài, một nhánh ngang
+    const along = w >= d ? "x" : "z";
+    const pathW = 3.2;
+    if (along === "x") {
+      push(flat, { x: cx, y: 0.045, z: cz, sx: w, sy: 0.03, sz: pathW, color: "#b6ab97" });
+      push(flat, { x: cx, y: 0.045, z: cz, sx: pathW, sy: 0.03, sz: d, color: "#b6ab97" });
+    } else {
+      push(flat, { x: cx, y: 0.045, z: cz, sx: pathW, sy: 0.03, sz: d, color: "#b6ab97" });
+      push(flat, { x: cx, y: 0.045, z: cz, sx: w, sy: 0.03, sz: pathW, color: "#b6ab97" });
+    }
+    // cây: lưới 10 m lệch, chừa lối đi và mép
+    let trees = 0;
+    for (let x = b.x0 + 5; x < b.x1 - 4 && trees < 160; x += 10) {
+      for (let z = b.z0 + 5; z < b.z1 - 4 && trees < 160; z += 10) {
+        const h1 = hash01(x * 1.7 + z * 3.1);
+        const h2 = hash01(x * 4.3 + z * 0.9);
+        const px = x + (h1 - 0.5) * 4.5;
+        const pz = z + (h2 - 0.5) * 4.5;
+        if ((along === "x" && Math.abs(pz - cz) < 3.4) || (along === "z" && Math.abs(px - cx) < 3.4)) continue;
+        const hh = 4.2 + h1 * 2.6;
+        const trunkH = hh * 0.4;
+        push(trunks, { x: px, y: 0, z: pz, sx: 0.26, sy: trunkH, sz: 0.26, color: "#584330" });
+        push(canopies, { x: px, y: trunkH - 0.45, z: pz, sx: 2.6 + h2 * 1.2, sy: hh - trunkH + 0.8, sz: 2.6 + h2 * 1.2, color: h2 > 0.55 ? "#4a6a41" : "#557a4b" });
+        trees += 1;
+      }
+    }
+  }
+
   // --- cây, cột đèn, vật thể vỉa hè -----------------------------------------------------------
   let props = 0;
   for (const p of city.props) {
