@@ -215,6 +215,31 @@ export async function buildRealWorld(opts: RealWorldOptions = {}): Promise<RealW
         patched += 1;
       }
     });
+    // MẶT ĐƯỜNG ƯỚT NHƯ TRONG MAP CHUẨN: `simulation/street.ts` chỉnh chính vật liệu này theo
+    // thời tiết (`asphalt.roughness = 0.89 - wetness*0.57; metalness = 0.02 + wetness*0.36`). Khi
+    // map thật được cấy vào /saigon, không có `AtmosphereSystem` bơm wetness, nên vật liệu giữ độ
+    // nhám 0,94 khô và mất hẳn vệt phản chiếu — đây chính là khác biệt "mặt đường bết" trong ảnh so
+    // sánh. Đặt mức ướt nhẹ (0,45) đúng bằng trạng thái "sau cơn mưa" của bản gốc.
+    let wet = 0;
+    const WETNESS = 0.45;
+    root.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const m of mats) {
+        const std = m as THREE.MeshStandardMaterial;
+        const tex = std?.map as (THREE.Texture & { userData?: { src?: string } }) | undefined;
+        const src = tex?.userData?.src ?? tex?.image?.currentSrc ?? "";
+        if (typeof src === "string" && src.includes("survey/map")) {
+          std.roughness = 0.89 - WETNESS * 0.57;
+          std.metalness = 0.02 + WETNESS * 0.36;
+          std.envMapIntensity = 1.25;
+          std.needsUpdate = true;
+          wet += 1;
+        }
+      }
+    });
+    (window as unknown as { __cityRealWet?: number }).__cityRealWet = wet;
     (window as unknown as { __cityRealEnv?: number }).__cityRealEnv = patched;
   }
 

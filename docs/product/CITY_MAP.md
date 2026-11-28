@@ -433,6 +433,38 @@ tự nhận diện renderer phần mềm vẫn hạ chi tiết.
 đèn vẫn là hộp 0,16 × 4,6 (chưa lấy cột đèn + halo của `saigonDistricts.ts`); ngã tư phố thủ tục vẫn
 chưa có đèn; bus 06 chưa nối.
 
+### 4l. Mặt đường: dùng đúng vật liệu + ánh sáng của map chuẩn (không phải bản gần giống)
+
+So sánh ảnh người dùng gửi (Lý Thái Tổ trong game gốc vs trong `/saigon`) cho thấy khác biệt **không
+phải màu nhựa đường** mà là **ba thứ đi kèm vật liệu**:
+
+1. **UV theo mét.** Mọi tấm phẳng của thành phố là khối hộp instanced dùng chung `BoxGeometry`, nên
+   UV mỗi mặt luôn 0…1: dán ảnh quét lên đại lộ 30 m thì cả tấm ảnh bị kéo thành mảng nhoè. Nay
+   `tiledSurface()` nhân `vMapUv` với kích thước thật của từng instance, ô vân **12,8 m** — đúng
+   `ROAD_WIDTH` của Lý Thái Tổ (`simulation/street.ts` đặt `repeat(1, L/W)` trên tấm W × L).
+2. **Env map.** `simulation/street.ts` dựa vào `scene.environment` (PMREM của `AtmosphereSystem`)
+   để nhựa đường có phản chiếu trời. `/saigon` trước đây **không có gì** trong `scene.environment`,
+   nên mọi vật liệu PBR ra bết. Nay `/saigon` nướng PMREM 64×32 từ đúng gradient trời/đất đang dùng
+   và đặt `scene.environmentIntensity = 0,85`.
+3. **Wetness.** `street.ts` chỉnh vật liệu theo thời tiết: `roughness = 0.89 − wet·0,57`,
+   `metalness = 0.02 + wet·0,36`. Khi map thật được cấy vào `/saigon` không có `AtmosphereSystem`
+   bơm wetness, nên nhựa đường giữ độ nhám khô 0,94 và mất hẳn vệt phản chiếu. Nay `realWorld.ts`
+   đặt mức ướt 0,45 (đúng trạng thái "sau cơn mưa" của bản gốc) cho **chính vật liệu** nhận ra qua
+   `map.userData.src` chứa `survey/map` — không đụng vật liệu nào khác.
+
+Thêm: vạch mép trắng sát bó vỉa, vỉa hè dán `drive-look/slab-map.webp` (UV 1,2 m), cột đèn dựng
+đúng hình cột đèn của `saigonDistricts.ts` (bệ 0,7 m + cột 7,6 m + tay đòn 2 m + đầu đèn 0,64 m +
+tấm phát sáng `0xffdca4`) thay cho thanh vuông 0,16 × 4,6 m.
+
+**Lỗi đã sửa:** shader UV mặt đường làm `MeshStandardMaterial` báo "Vertex shader is not compiled"
+khi compile lần đầu (ảnh quét chưa tải xong ⇒ chưa có `USE_MAP` ⇒ `vMapUv` không tồn tại). Nay toàn
+bộ phép nhân UV nằm trong `#if defined(USE_INSTANCING) && defined(USE_MAP)`.
+
+**Chưa làm (theo hướng "testbus là gốc"):** `/saigon` vẫn dùng nắng/sương mù tự dựng của nó thay vì
+`AtmosphereSystem` của map chuẩn (sky shader, giờ trong ngày, wet reflector, mưa, bloom). Đó là phần
+lớn nhất còn lại của khoảng cách chất lượng — bước tiếp theo là cấy `AtmosphereSystem` vào `/saigon`
+chứ không chỉnh tay từng vật liệu.
+
 ### 4g. Không thấy khu phố gốc trong `/saigon`?
 
 `/saigon` dựng thành phố ngay (khoảng 5 s) rồi mới cắm khu phố gốc. Trong sandbox 2 core

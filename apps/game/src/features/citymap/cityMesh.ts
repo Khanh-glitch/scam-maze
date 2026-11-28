@@ -47,6 +47,8 @@ export interface CityMesh {
   details: Part[];
   /** Bồn nước inox trên mái — hình trụ. */
   drums: Part[];
+  /** Cột đèn đường — hình trụ mảnh, dùng chung một lưới instanced. */
+  poles: Part[];
   anchors: Array<{ id: string; name: string; x: number; y: number; z: number }>;
   stats: {
     buildings: number;
@@ -120,6 +122,7 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
   const flat: Part[] = [];
   const kerbs: Part[] = [];
   const drums: Part[] = [];
+  const poles: Part[] = [];
   const byDistrict = new Map(city.districts.map((d) => [d.id, d]));
   let towers = 0;
   let gabledRoofs = 0;
@@ -263,6 +266,23 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
         for (let k = 0; k < dash; k += 1) {
           const t = (k + 0.5) / dash;
           flatBox({ x: ax + (bx - ax) * t, y: 0.085, z: az + (bz - az) * t, sx: 2.2, sy: 0.02, sz: 0.16, ry, color: "#d7d5bc" });
+        }
+      }
+      // Vạch mép trắng sát bó vỉa (map chuẩn có: `plane(curb, ... white)` dọc hai bên). Thiếu nó thì
+      // mép đường không có đường dẫn mắt, cả mặt phố thành một tấm xám liền.
+      if (s.klass === "avenue" || s.klass === "street") {
+        for (const sgn of [-1, 1]) {
+          for (const [t0, t1] of spans) {
+            const segLen = (t1 - t0) * len;
+            const mid = (t0 + t1) / 2;
+            const offE = (w / 2 - 0.35) * sgn;
+            flatBox({
+              x: ax + (bx - ax) * mid + Math.sin(ry) * offE,
+              y: 0.087,
+              z: az + (bz - az) * mid + Math.cos(ry) * offE,
+              sx: segLen, sy: 0.02, sz: 0.12, ry, color: "#d9d6c6",
+            });
+          }
         }
       }
       roads += 1;
@@ -651,7 +671,21 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
       push(canopies, { x: p.x, y: trunkH - 0.4, z: p.z, sx: 1.9, sy: hh - trunkH + 0.6, sz: 1.9, color: "#4f7046" });
       props += 1;
     } else if (p.kind === "lamp") {
-      flatBox({ x: p.x, y: 0, z: p.z, sx: 0.16, sy: 4.6, sz: 0.16, color: "#8a8f96" });
+      // CỘT ĐÈN KIỂU MAP CHUẨN (`saigonDistricts.ts` → `addLampPost`): bệ bê tông 0,7 m, cột thép
+      // 7,6 m, tay đòn vươn 2 m ra lòng đường, đầu đèn hộp 0,64 m + tấm phát sáng vàng ấm
+      // (0xffdca4 — đúng màu `lamp(0xffdca4, 2.2)` của map chuẩn). Trước đây chỉ là **một thanh
+      // vuông 0,16 × 4,6 m**, nên ban đêm phố không có đèn mà ban ngày cũng không ra cột đèn.
+      push(poles, { x: p.x, y: 0, z: p.z, sx: 0.19, sy: 7.6, sz: 0.19, color: "#5a6066" });
+      push(details, { x: p.x, y: 0, z: p.z, sx: 0.34, sy: 0.7, sz: 0.34, color: "#2a3034" });
+      const dir = hash01(p.x * 3.1 + p.z * 1.7) > 0.5 ? 1 : -1;
+      const alongX = hash01(p.z * 2.7 + p.x * 0.9) > 0.5;
+      push(details, alongX
+        ? { x: p.x + dir, y: 7.5, z: p.z, sx: 2.0, sy: 0.09, sz: 0.09, color: "#5a6066" }
+        : { x: p.x, y: 7.5, z: p.z + dir, sx: 0.09, sy: 0.09, sz: 2.0, color: "#5a6066" });
+      const hx = alongX ? p.x + dir * 2.1 : p.x;
+      const hz = alongX ? p.z : p.z + dir * 2.1;
+      push(details, { x: hx, y: 7.78, z: hz, sx: 0.64, sy: 0.14, sz: 0.34, color: "#2a3034" });
+      push(details, { x: hx, y: 7.68, z: hz, sx: 0.52, sy: 0.06, sz: 0.24, color: "#ffdca4" });
       props += 1;
     } else if (p.kind === "stall") {
       flatBox({ x: p.x, y: 0, z: p.z, sx: 1.5, sy: 2.1, sz: 1.5, color: "#b06a4a" });
@@ -722,7 +756,7 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
   }
 
   return {
-    boxes, flat, kerbs, prisms, gables, trunks, canopies, details, drums, anchors,
+    boxes, flat, kerbs, prisms, gables, trunks, canopies, details, drums, poles, anchors,
     stats: {
       buildings: city.buildings.filter((b) => !b.walkable).length,
       towers, gabledRoofs, parts, roads, props,

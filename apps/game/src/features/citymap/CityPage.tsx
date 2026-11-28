@@ -197,6 +197,33 @@ let CHUNK = 0;
  * nên khi nhìn dọc một con phố máy chỉ vẽ những ô trong khung hình thay vì **toàn bộ 97 000 khối**.
  * Bản cũ đặt `frustumCulled = false` cho tất cả: đứng ở đâu cũng vẽ cả thành phố 1,3 km.
  */
+/**
+ * UV mặt đường theo **mét thật**.
+ *
+ * Mọi tấm phẳng của thành phố là một khối hộp instanced dùng chung `BoxGeometry`, nên UV của mỗi
+ * mặt luôn chạy 0…1 — dán ảnh quét nhựa đường lên một đại lộ 30 m thì cả tấm ảnh bị kéo thành một
+ * mảng nhoè, đúng như ảnh kiểm tra: "mặt đường vẫn sai". Ở đây nhân UV với kích thước thật của
+ * từng instance chia cho cỡ ô (3,2 m — cùng cỡ `survey` mà map chuẩn dùng), nên hạt nhựa, vết vá,
+ * vệt bánh đọc ra đúng tỉ lệ ở mọi bề rộng đường.
+ */
+const tiledSurface = (m: THREE.Material, tileMeters = 3.2): THREE.Material => {
+  m.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader.replace(
+      "#include <uv_vertex>",
+      `#include <uv_vertex>
+      #if defined(USE_INSTANCING) && defined(USE_MAP)
+        float sX = length(instanceMatrix[0].xyz);
+        float sY = length(instanceMatrix[1].xyz);
+        float sZ = length(instanceMatrix[2].xyz);
+        vec2 dims = abs(normal.y) > 0.5 ? vec2(sZ, sX) : (abs(normal.x) > 0.5 ? vec2(sZ, sY) : vec2(sX, sY));
+        vMapUv *= max(vec2(1.0), dims / ${tileMeters.toFixed(2)});
+      #endif`,
+    );
+  };
+  m.customProgramCacheKey = () => `city-tiled-${tileMeters.toFixed(2)}`;
+  return m;
+};
+
 const addChunked = (
   scene: THREE.Scene,
   geometry: THREE.BufferGeometry,
@@ -328,6 +355,39 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     );
     scene.add(sky);
 
+    // ENV MAP: map chuẩn có `AtmosphereSystem` nạp PMREM từ chính vòm trời, nên mặt đường/nhựa/kính
+    // đều có phản chiếu mềm và "ướt". /saigon trước đây không có gì trong `scene.environment`, nên
+    // mọi vật liệu PBR ra bết — đây là nửa còn lại của khác biệt về mặt đường. Ở đây nướng một PMREM
+    // 128 từ đúng gradient trời/đất đang dùng (một lần, rất rẻ) thay vì kéo cả hệ thống khí quyển.
+    try {
+      const envCanvas = document.createElement("canvas");
+      envCanvas.width = 64;
+      envCanvas.height = 32;
+      const eg = envCanvas.getContext("2d");
+      if (eg) {
+        const grad = eg.createLinearGradient(0, 0, 0, 32);
+        grad.addColorStop(0, "#2b4a86");
+        grad.addColorStop(0.45, "#9dbbdd");
+        grad.addColorStop(0.55, "#cfd8dc");
+        grad.addColorStop(0.75, "#6f6a5e");
+        grad.addColorStop(1, "#46443c");
+        eg.fillStyle = grad;
+        eg.fillRect(0, 0, 64, 32);
+      }
+      const envTex = new THREE.CanvasTexture(envCanvas);
+      envTex.mapping = THREE.EquirectangularReflectionMapping;
+      envTex.colorSpace = THREE.SRGBColorSpace;
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      pmrem.compileEquirectangularShader();
+      const rt = pmrem.fromEquirectangular(envTex);
+      scene.environment = rt.texture;
+      scene.environmentIntensity = 0.85;
+      envTex.dispose();
+      pmrem.dispose();
+    } catch (err) {
+      console.warn("[citymap] không nướng được env map", err);
+    }
+
     // Đất ngoài đô thị: một tấm lớn, cùng tông với nền xám lục của ảnh kiểm toán.
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(9000, 9000),
@@ -430,9 +490,15 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     // Trên GPU thật: `MeshStandardMaterial` để dùng được ảnh normal + độ nhám của bản quét (mặt
     // nhựa có hạt, có vệt bánh). Trên renderer phần mềm: Lambert, vì normal map phủ toàn màn hình
     // từng làm khung hình quá 150 s (xem §4i).
-    const roadMat: THREE.Material = SOFT_GL
-      ? new THREE.MeshLambertMaterial({ color: "#d4d8dc" })
-      : new THREE.MeshStandardMaterial({ color: "#d4d8dc", roughness: 0.94, metalness: 0.02 });
+    // ĐÚNG CÔNG THỨC CỦA MAP CHUẨN (`simulation/street.ts:227`):
+    //   MeshStandardMaterial({ map, roughnessMap, normalMap, normalScale .45, roughness .94 })
+    // Khác biệt lớn nhất giữa hai ảnh người dùng gửi không phải màu mà là **độ bóng ướt**: mặt đường
+    // map chuẩn có envMap nên phản chiếu trời, còn mặt đường /saigon trước đây là Lambert nên bết.
+    // Nay /saigon dùng đúng vật liệu đó + `scene.environment` (xem khối PMREM bên dưới).
+    const roadMat: THREE.Material = tiledSurface(
+      new THREE.MeshStandardMaterial({ color: "#d4d8dc", roughness: 0.94, metalness: 0.02, envMapIntensity: 0.9 }),
+      12.8,
+    );
     /**
      * Ảnh quét nhựa đường của map chuẩn, **hạ xuống 256²** qua canvas.
      *
@@ -479,7 +545,14 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     // Luôn dùng `roadParts` (màu instance = trắng): màu instance nhân vào map, để nguyên `#5a5964`
     // thì nhựa đường bị nhân hai lần và ra đen tuyền — đúng cái đã thấy ở ảnh kiểm tra thứ nhất.
     addChunked(scene, cube, roadParts, { materials: roadMat, castShadow: false });
-    addChunked(scene, cube, otherFlat, { materials: new THREE.MeshLambertMaterial(), castShadow: false });
+    // HÈ / SÂN: tấm lát `drive-look/slab-map.webp` của map chuẩn (cùng tấm mà vỉa hè Lý Thái Tổ
+    // dùng), UV theo mét để viên lát đúng cỡ 1,2 m chứ không phải ảnh bị kéo.
+    const slabTex = new THREE.TextureLoader().load("/assets/testbus/ow/images/drive-look/slab-map.webp");
+    slabTex.wrapS = THREE.RepeatWrapping;
+    slabTex.wrapT = THREE.RepeatWrapping;
+    slabTex.anisotropy = 4;
+    const slabMat = tiledSurface(new THREE.MeshLambertMaterial({ map: slabTex, color: "#cfcdc4" }), 1.2);
+    addChunked(scene, cube, otherFlat, { materials: slabMat, castShadow: false });
     // Bó vỉa: đá granite hai màu, dựng từ cùng bộ hình khối nhưng **không** dùng chung vật liệu với
     // hè — nếu dùng chung thì mép đường lại lẫn vào mặt hè và mất cạnh.
     addChunked(scene, cube, meshData.kerbs, {
@@ -544,6 +617,10 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
         ).catch((err) => console.warn("[citymap] không đặt được đồ vỉa hè GLB", err));
       }
     }
+    // Cột đèn: trụ tròn mảnh, cùng một lưới instanced cho cả 937 cột.
+    const poleGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 8);
+    poleGeo.translate(0, 0.5, 0);
+    addChunked(scene, poleGeo, meshData.poles, { materials: new THREE.MeshLambertMaterial({ color: "#ffffff" }), castShadow: false });
     const drumGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 10);
     drumGeo.translate(0, 0.5, 0);
     // Vật liệu để **trắng**: màu nằm ở từng instance (bồn inox `#c9cdd2`, thùng rác `#2c4236`,
