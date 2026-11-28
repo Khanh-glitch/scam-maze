@@ -4,6 +4,8 @@ import { addCityLayer } from "./cityLayer";
 import { extendTrafficGraph, spawnCityVehicles } from "./cityTraffic";
 import { signalizeCityIntersections } from "./citySignals";
 import { buildCityBusCircuit, spawnCityBus, type CityBus } from "./cityBus";
+import { citySidewalkLanes, matchCityZebras, spawnCityPedestrians, type CityPedestrians } from "./cityPedestrians";
+import type { CityZebra } from "./cityMesh";
 import { buildCoreWorld, type CoreWorld } from "./coreWorld";
 import { OpenWorldEngine } from "../testbus/openworld/world/OpenWorldEngine";
 import { loadStreetFurniture } from "../khupho/world/streetFurniture";
@@ -39,6 +41,10 @@ export function SaigonEnginePage({ onBackToMenu }: { onBackToMenu?: () => void }
     let engine: OpenWorldEngine | null = null;
     let coreWorld: CoreWorld | null = null;
     let cityBus: CityBus | null = null;
+    let cityPeds: CityPedestrians | null = null;
+    // Con số cho `window.__saigonEngine`: gán trong `.then` (TypeScript không thấy được), nên đếm
+    // bằng một ô sống thay vì đọc `cityPeds` tại chỗ — chỗ đó luôn bị thu hẹp về `null`.
+    const pedInfo = { spawned: 0, lanes: 0 };
     let cancelled = false;
     const qs = new URLSearchParams(window.location.search);
 
@@ -75,7 +81,7 @@ export function SaigonEnginePage({ onBackToMenu }: { onBackToMenu?: () => void }
         const city = generateCity(undefined, { realWorld: true });
         const layer =
           qs.get("city") === "0"
-            ? { anchors: {}, trees: 0, wind: null }
+            ? { anchors: {}, zebras: [] as CityZebra[], trees: 0, wind: null }
             : addCityLayer(engine.scene, city, { software, chunkMeters: Number(qs.get("chunk") ?? 0) || 0 });
         // Vòng chân trời giả của map chuẩn (11 cụm tháp tối + tấm nền 880 m) thay cho thành phố ở
         // phía xa khi map đứng một mình ở `/testbus`. Ở đây thành phố thật đã có, để nguyên thì mười
@@ -133,6 +139,55 @@ export function SaigonEnginePage({ onBackToMenu }: { onBackToMenu?: () => void }
                 solids: engine.citySolids,
               });
 
+        // VẠCH ĐI BỘ CỦA PHỐ THỦ TỤC VÀO **CÙNG** BẢNG `crosswalks` CỦA ENGINE.
+        // Hạng mục H đã vẽ vạch ngựa vằn ở mọi ngã tư của phố/đại lộ, nhưng vạch chỉ là hình: não
+        // người đi bộ (`PedestrianBrain`) sang đường theo `graph.crosswalks`, và `TrafficManager` chỉ
+        // bắt xe nhường khi cung rẽ có `turn.crosswalks`. Nên vạch phải được đăng ký thật.
+        // Chỉ nhận vạch nằm cạnh một ngã tư **đã có đèn**: vạch giữa đoạn không có pha đèn thì
+        // `getAxisState` trả "green 99" và người đi bộ bước xuống đường bất kể xe đang tới.
+        const signalSet = new Set(signals.signalized);
+        const matchedZebras = matchCityZebras(layer.zebras, extension.junctions, signalSet);
+        for (const z of matchedZebras) {
+          engine.traffic.graph.addCityCrosswalk({
+            id: z.id,
+            intersectionId: z.intersectionId,
+            pedAxis: z.pedAxis,
+            // Người đi bộ đi cùng pha với trục xe mà vạch chạy song song (QCVN 41:2024: đèn đi bộ
+            // xanh khi trục song song với hướng đi được xanh).
+            parallelVehicleAxis: z.pedAxis,
+            a: z.a,
+            b: z.b,
+            halfWidth: z.halfWidthM,
+          });
+        }
+
+        // NGƯỜI ĐI BỘ TRÊN HÈ PHỐ THỦ TỤC. Lý Thái Tổ có 15 người trên 236 m phố; ở đây là 1 người
+        // mỗi làn hè (tối đa 44) trên 24 tuyến — cùng bộ não social-force, cùng clip đi bộ retarget,
+        // cùng `HumanPresenceSystem` của engine. `canCross` chỉ bật khi tuyến đó **có vạch thật**,
+        // nếu không họ sẽ băng nhựa đường giữa chừng.
+        if (qs.get("peds") !== "0") {
+          const lanes = citySidewalkLanes(city, { maxLanes: Number(qs.get("lanes") ?? 44) || 44 });
+          void spawnCityPedestrians(engine.traffic, engine.exteriorGroup, lanes, {
+            perLane: 1,
+            maxPedestrians: Number(qs.get("pedsMax") ?? 40) || 40,
+            humanPresence: engine.humanPresence,
+            // NPC mới về phải ẩn cho tới khung đầu: `spawnCityPedestrians` đặt vị trí theo bộ não
+            // trong `update()`, nên trước đó họ nằm ở gốc toạ độ của nhóm.
+            onAssetLoaded: (obj) => {
+              obj.visible = false;
+            },
+          }).then((peds) => {
+            if (cancelled) {
+              peds.dispose();
+              return;
+            }
+            cityPeds = peds;
+            pedInfo.spawned = peds.spawned;
+            pedInfo.lanes = lanes.length;
+            console.info("[saigon] người đi bộ thành phố ·", peds.spawned, "người ·", lanes.length, "làn hè ·", matchedZebras.length, "vạch đi bộ");
+          }).catch((err) => console.error("[saigon] người đi bộ thành phố lỗi", err));
+        }
+
         // BUS 06 CHẠY THÊM MỘT VÒNG QUA ĐẠI LỘ CỦA THÀNH PHỐ. Không phải vòng lặp xe buýt thứ hai:
         // cùng `BusCircuit` + `BusRouteController` + `TrafficManager` của engine, chỉ thêm một vòng
         // đường nối tiếp tuyến 06 của map chuẩn ở cổng `END_LTT_S`.
@@ -160,6 +215,9 @@ export function SaigonEnginePage({ onBackToMenu }: { onBackToMenu?: () => void }
           junctions: extension.junctions.length,
           portals: extension.portals,
           signalized: signals.signalized,
+          zebras: matchedZebras.length,
+          peds: pedInfo.spawned,
+          pedestrianLanes: pedInfo.lanes || citySidewalkLanes(city, { maxLanes: 44 }).length,
           signalPoles: signals.poles,
           citySolids: engine.citySolids.length,
           vehicles: extension.edgeIds.length,
@@ -185,7 +243,13 @@ export function SaigonEnginePage({ onBackToMenu }: { onBackToMenu?: () => void }
         // engine — cùng `dt`, cùng thứ tự với Bus 06 của map chuẩn. Không mở vòng lặp thứ hai và
         // cũng không bọc `traffic.step` (hook `afterTrafficStep` chỉ là một ô trống mặc định `null`,
         // `/testbus` không bị ảnh hưởng).
-        engine.afterTrafficStep = (dt) => cityBus?.update(dt);
+        // Người đi bộ đọc toạ độ **sau** bước mô phỏng của engine (bộ não đã tính xong vị trí), và
+        // cùng hook với xe buýt thành phố — không có vòng cập nhật thứ hai, không bọc `traffic.step`.
+        const liveCam = engine.camera;
+        engine.afterTrafficStep = (dt) => {
+          cityBus?.update(dt);
+          cityPeds?.update(dt, liveCam.position);
+        };
 
         const wind = layer.wind;
         if (wind) {
@@ -256,6 +320,8 @@ export function SaigonEnginePage({ onBackToMenu }: { onBackToMenu?: () => void }
       if (engine) engine.afterTrafficStep = null;
       cityBus?.dispose();
       cityBus = null;
+      cityPeds?.dispose();
+      cityPeds = null;
       coreWorld?.dispose();
       coreWorld = null;
       engine?.dispose();

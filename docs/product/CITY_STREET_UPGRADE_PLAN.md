@@ -32,14 +32,31 @@ triển hơn nữa ra toàn map."*
 
 ## Các bước, theo thứ tự thực hiện
 
-- [ ] **H — Đường phố theo đúng tiết diện Lý Thái Tổ**: nới hè, chia bó vỉa 0,70 m, hai vạch làn,
+- [x] **H — Đường phố theo đúng tiết diện Lý Thái Tổ**: nới hè, chia bó vỉa 0,70 m, hai vạch làn,
       vạch đi bộ ở ngã tư có đèn. Sửa trong `cityMesh.ts` (dữ liệu `Part`) — không đụng hình học của
       map chuẩn.
-- [ ] **J — Cây thật toàn map**: bỏ điều kiện chỉ-trồng-ngoài-map-chuẩn trong `cityLayer.ts` khi
+- [x] **J — Cây thật toàn map**: bỏ điều kiện chỉ-trồng-ngoài-map-chuẩn trong `cityLayer.ts` khi
       chọn `SaigonBotanicalBatch`, để cây đường phố của thành phố dùng đúng bộ cây của Lý Thái Tổ.
-- [ ] **I — Mở rộng giao thông**: tăng tuyến/bán kính trong `cityNetwork`, tuyến phụ (`minor`) vào
+- [x] **I — Mở rộng giao thông**: tăng tuyến/bán kính trong `cityNetwork`, tuyến phụ (`minor`) vào
       đồ thị khi đủ dài, đèn ở mọi ngã tư có 4 nhánh, thêm xe.
-- [ ] **K — NPC và hoạt động**: đăng ký người đi bộ bằng `PedestrianBrain.registerSidewalkWalker`
+- [x] **K — NPC và hoạt động**: đăng ký người đi bộ bằng `PedestrianBrain.registerSidewalkWalker`
       trên hè của thành phố (dùng đúng hệ social-force + vạch đi bộ của engine).
-- [ ] Đo lại: `build ms`, `perStepMs`, draw calls, số tuyến/ngã tư/xe/người.
-- [ ] Cập nhật `CITY_MAP_HANDOFF.md` mục 9 với bảng trước/sau và commit riêng từng mục.
+- [x] Đo lại: `build ms`, `perStepMs`, draw calls, số tuyến/ngã tư/xe/người.
+- [x] Cập nhật `CITY_MAP_HANDOFF.md` mục 9 với bảng trước/sau và commit riêng từng mục.
+
+## Kết quả thực đo (2026-11-28)
+
+| | baseline | sau H–K |
+| --- | --- | --- |
+| mảnh | 113 844 | 120 052 (`droppedParts` 0, trần 165 000) |
+| thân cây | 1 592 | 2 830 |
+| tuyến / làn / giao lộ | 10 / 44 / 29 | **24 / 112 / 67** |
+| xe / ngã tư có đèn | 10 / 4 | **36 / 12** |
+| vạch đi bộ trong `roadGraph` | 11 | **21** |
+| người đi bộ | 15 (chỉ LTT) | **55** |
+| `perStepMs` | 0,058–0,066 | **0,322** |
+| draw calls | ≈ 134 | ≈ 134 |
+
+Ba việc **không** làm được / không nên làm, ghi lại để không thử lại:
+bó vỉa từng viên 0,70 m (178 233 mảnh, vượt trần), nâng tuyến/xe quá 24/36 (CPU thật, phải LOD),
+và gờ xúc giác/nắp hố ga (chi tiết nhỏ, còn treo).

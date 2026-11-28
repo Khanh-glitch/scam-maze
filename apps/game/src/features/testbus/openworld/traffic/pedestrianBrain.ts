@@ -17,6 +17,13 @@ export interface SmartPedestrianAgent {
   phase: PedPhase;
   /** Patrol waypoints on sidewalk when not crossing */
   homeX: number;
+  /**
+   * Optional: patrol axis, default "z" (Lý Thái Tổ sidewalk). "x" makes the walker patrol along x at a fixed
+   * `homeX`-equivalent z — needed because procedural city streets run in both directions. Absent = old behaviour.
+   */
+  patrolAxis?: "x" | "z";
+  /** Patrol lane offset while `patrolAxis === "x"` (the fixed z of the lane). */
+  patrolZ?: number;
   patrolZMin: number;
   patrolZMax: number;
   patrolDir: 1 | -1;
@@ -59,6 +66,10 @@ export class PedestrianBrain {
     baseSpeed: number;
     canCross?: boolean;
     seed?: number;
+    /** Optional patrol axis; "x" lets the walker patrol along x. Omitted = "z", the original LTT behaviour. */
+    patrolAxis?: "x" | "z";
+    /** Fixed z of the lane when `patrolAxis === "x"`. */
+    patrolZ?: number;
   }): SmartPedestrianAgent {
     const seed = spec.seed ?? this.agents.length + 1;
     const agent: SmartPedestrianAgent = {
@@ -73,6 +84,8 @@ export class PedestrianBrain {
       radius: 0.34,
       phase: "sidewalk",
       homeX: spec.x,
+      patrolAxis: spec.patrolAxis,
+      patrolZ: spec.patrolZ,
       patrolZMin: spec.patrolZMin,
       patrolZMax: spec.patrolZMax,
       patrolDir: seed % 2 === 0 ? 1 : -1,
@@ -105,10 +118,19 @@ export class PedestrianBrain {
 
       // 1. State Machine: Sidewalk Patrol <-> Curb Wait <-> Zebra Crossing
       if (a.phase === "sidewalk") {
-        if (a.z >= a.patrolZMax) a.patrolDir = -1;
-        else if (a.z <= a.patrolZMin) a.patrolDir = 1;
-        goalX = a.homeX;
-        goalZ = a.z + a.patrolDir * 3.5;
+        // Along-x lanes reuse `patrolZMin/Max` as an x-range and `patrolZ` as the fixed lane coordinate, so the
+        // walker patrols a straight line in either direction without a second code path for the state machine.
+        const alongX = a.patrolAxis === "x";
+        const along = alongX ? a.x : a.z;
+        if (along >= a.patrolZMax) a.patrolDir = -1;
+        else if (along <= a.patrolZMin) a.patrolDir = 1;
+        if (alongX) {
+          goalX = a.x + a.patrolDir * 3.5;
+          goalZ = a.patrolZ ?? a.z;
+        } else {
+          goalX = a.homeX;
+          goalZ = a.z + a.patrolDir * 3.5;
+        }
 
         // Check if walking near a crosswalk endpoint & ready to cross
         if (a.nextCrossCooldown <= 0) {

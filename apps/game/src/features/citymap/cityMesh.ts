@@ -36,6 +36,18 @@ export interface Part {
   color: string;
 }
 
+/** Một dải vạch đi bộ: hai đầu trên hai mép nhựa đường, cùng toạ độ ngã tư gần nhất. */
+export interface CityZebra {
+  id: string;
+  /** Id ngã tư trong đồ thị giao thông (bộ bắt đầu bằng `CTYJ_`), hoặc null nếu chưa khớp được. */
+  intersectionId: string | null;
+  /** Đi bộ theo trục nào: "ns" là vạch bắc qua đường chạy bắc–nam. */
+  pedAxis: "ns" | "ew";
+  a: { x: number; z: number };
+  b: { x: number; z: number };
+  halfWidthM: number;
+}
+
 export interface CityMesh {
   /** Hộp: nhà, bệ, đỉnh kỹ thuật. Được dán vân mặt đứng + vân mái. */
   boxes: Part[];
@@ -56,6 +68,13 @@ export interface CityMesh {
   drums: Part[];
   /** Cột đèn đường — hình trụ mảnh, dùng chung một lưới instanced. */
   poles: Part[];
+  /**
+   * Vạch đi bộ đã vẽ, ở dạng dữ liệu. Mỗi mục là **một** dải ngựa vằn bắc qua một tuyến (hai đầu
+   * là hai mép nhựa đường), kèm id ngã tư gần nhất. Đây là thứ `cityCrosswalks()` cần để đăng ký
+   * `CrosswalkSpec` thật vào đồ thị giao thông: `PedestrianBrain` sang đường theo `roadGraph.crosswalks`,
+   * nên vạch chỉ có hình mà không có trong đồ thị thì người đi bộ không bao giờ dùng tới.
+   */
+  zebras: CityZebra[];
   anchors: Array<{ id: string; name: string; x: number; y: number; z: number }>;
   stats: {
     buildings: number;
@@ -140,6 +159,7 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
   const kerbs: Part[] = [];
   const drums: Part[] = [];
   const poles: Part[] = [];
+  const zebras: CityZebra[] = [];
   const byDistrict = new Map(city.districts.map((d) => [d.id, d]));
   let towers = 0;
   let gabledRoofs = 0;
@@ -486,25 +506,43 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
       // Chỉ vẽ ở phố/đại lộ (hẻm 2,6 m không có vạch), và chỉ khi đoạn đủ dài để vạch không đè
       // lên dải phân cách.
       if (s.klass === "avenue" || s.klass === "street") {
-        for (const [t0, t1] of spans) {
+        for (let si = 0; si < spans.length; si += 1) {
+          const [t0, t1] = spans[si];
           const segLen = (t1 - t0) * len;
           if (segLen < 14) continue;
           for (const edge of [t0, t1] as const) {
-            const dir = edge === t0 ? 1 : -1;
             // tâm vạch cách mũi đoạn 2,1 m (chỗ cắt đã chừa hộp giao lộ)
-            const along = (edge === t0 ? t0 * len + 2.1 : t1 * len - 2.1) / len;
-            const t = along;
-            for (let k = 0; k < 6; k += 1) {
-              const off = (k - 2.5) * 0.92;
-              if (Math.abs(off) > w / 2 - 0.5) continue;
+            const t = (edge === t0 ? t0 * len + 2.1 : t1 * len - 2.1) / len;
+            const cxp = ax + (bx - ax) * t;
+            const czp = az + (bz - az) * t;
+            if (partHitsRealMap({ x: cxp, y: 0.008, z: czp, sx: 3.0, sy: 0.02, sz: 3.0, ry, color: "#e2dfd4" })) continue;
+            // Dải ngựa vằn: **bắc hết bề rộng lòng đường**, sâu 3,0 m theo chiều xe chạy, mỗi vạch
+            // 0,55 m và cách nhau 0,92 m — đúng tỉ lệ dải `crossing-map` của Lý Thái Tổ
+            // (`street.ts:328`, `[WIDTH - 0.6, 2.78]`). Bản H đầu tiên chỉ vẽ 6 vạch quanh tim
+            // đường, tức 5,5 m giữa lòng đường 12,8 m: người đi bộ bước hết vạch vẫn còn nửa làn
+            // nhựa trống. `sx` là chiều sâu theo chiều xe chạy, `sz` là bề rộng từng vạch.
+            const stripes = Math.max(2, Math.floor((w - 1.0) / 0.92));
+            for (let k = 0; k < stripes; k += 1) {
+              const off = (k - (stripes - 1) / 2) * 0.92;
               flatBox({
-                x: ax + (bx - ax) * t + Math.sin(ry) * off,
+                x: cxp + Math.sin(ry) * off,
                 y: 0.008,
-                z: az + (bz - az) * t + Math.cos(ry) * off,
-                sx: 0.55, sy: 0.02, sz: 3.0, ry, color: "#e2dfd4",
+                z: czp + Math.cos(ry) * off,
+                sx: 3.0, sy: 0.02, sz: 0.55, ry, color: "#e2dfd4",
               });
             }
-            void dir;
+            // Dải ngựa vằn chạy **dọc** tuyến này (dài 3,0 m theo `ry`) và bắc **ngang** nó, tức hai
+            // đầu nằm ở hai mép nhựa và hướng đi bộ là pháp tuyến của tuyến. Đây cũng là dữ liệu mà
+            // `PedestrianBrain` cần: nó sang đường theo `a → b`, không theo hình vẽ.
+            zebras.push({
+              id: `CTY_CW_${s.id}_${i}_${si}_${edge === t0 ? "M" : "P"}`,
+              intersectionId: null,
+              // Hướng ĐI BỘ là pháp tuyến của tuyến này. Nó chỉ về trục z khi |cos ry| lớn.
+              pedAxis: Math.abs(Math.cos(ry)) > 0.7071 ? "ns" : "ew",
+              a: { x: cxp + Math.sin(ry) * (w / 2 - 0.3), z: czp + Math.cos(ry) * (w / 2 - 0.3) },
+              b: { x: cxp - Math.sin(ry) * (w / 2 - 0.3), z: czp - Math.cos(ry) * (w / 2 - 0.3) },
+              halfWidthM: 1.5,
+            });
           }
         }
       }
@@ -1090,7 +1128,7 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
   }
 
   return {
-    boxes, flat, kerbs, prisms, gables, trunks, canopies, details, drums, poles, anchors,
+    boxes, flat, kerbs, prisms, gables, trunks, canopies, details, drums, poles, anchors, zebras,
     stats: {
       buildings: city.buildings.filter((b) => !b.walkable).length + city.belt.buildings.length,
       towers, gabledRoofs, parts, droppedParts, roads, props,

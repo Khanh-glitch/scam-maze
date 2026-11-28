@@ -229,6 +229,26 @@ export class SaigonRoadGraph {
     return true;
   }
 
+  /**
+   * Đăng ký một vạch đi bộ của thành phố vào **cùng** bảng `crosswalks` của map chuẩn.
+   *
+   * `buildNetwork()` tính sẵn `turn.crosswalks` (cung nào cắt vạch nào) để `TrafficManager` bắt xe
+   * nhường người. Vạch thêm sau thời điểm đó phải tự tính lại cho các cung của ngã tư của nó, nếu
+   * không thì người đi bộ bước xuống đường mà xe vẫn lao qua — vạch chỉ là hình vẽ.
+   */
+  addCityCrosswalk(spec: Omit<CrosswalkSpec, "length">): void {
+    if (this.crosswalks.has(spec.id)) return;
+    this.addCrosswalk(spec);
+    const inter = this.intersections.get(spec.intersectionId);
+    const cw = this.crosswalks.get(spec.id);
+    if (!inter || !cw) return;
+    for (const turnId of inter.turnIds) {
+      const turn = this.turns.get(turnId);
+      if (!turn) continue;
+      if (turnCrossesCrosswalk(turn, cw) && !turn.crosswalks.includes(cw.id)) turn.crosswalks.push(cw.id);
+    }
+  }
+
   /** Nối hai đầu tuyến bằng một cung (đường của thành phố chỉ cần `uturn` ở hai đầu cụt). */
   addCityTurn(
     intersectionId: string,

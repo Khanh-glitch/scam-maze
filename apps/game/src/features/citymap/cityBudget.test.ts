@@ -10,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 import { generateCity } from "./cityGen";
 import { extendTrafficGraph, spawnCityVehicles } from "./cityTraffic";
+import { citySidewalkLanes } from "./cityPedestrians";
 import { buildCityMesh } from "./cityMesh";
 import { SaigonTrafficManager } from "../testbus/openworld/traffic";
 
@@ -60,6 +61,30 @@ describe("ngân sách `/saigon`", () => {
     expect(spawnCityVehicles).toBeTypeOf("function");
     expect(traffic.vehicles.length).toBe(36);
 
+    // NGƯỜI ĐI BỘ (mục K): đăng ký đúng số người mà trang thật đăng ký — 1 người/làn hè, tối đa
+    // 40. `PedestrianBrain` là O(n²) nên đây là chi phí **phải đo**, không phải chi phí giả định:
+    // 40 người = 1 600 cặp mỗi bước, mỗi cặp có hai `Math.hypot`.
+    const lanes = citySidewalkLanes(city, { maxLanes: 44 });
+    let peds = 0;
+    for (const lane of lanes) {
+      if (peds >= 40) break;
+      const along = lane.along;
+      traffic.pedestrians.registerSidewalkWalker({
+        id: `BENCH_PED_${peds}`,
+        x: lane.x + Math.sin(along) * 4,
+        z: lane.z + Math.cos(along) * 4,
+        patrolZMin: (lane.axis === "z" ? lane.z : lane.x) - lane.halfLenM,
+        patrolZMax: (lane.axis === "z" ? lane.z : lane.x) + lane.halfLenM,
+        baseSpeed: 0.8,
+        canCross: true,
+        seed: peds + 1,
+        patrolAxis: lane.axis,
+        patrolZ: lane.axis === "x" ? lane.z : undefined,
+      });
+      peds += 1;
+    }
+    expect(peds).toBe(40);
+
     const step = { dt: 1 / 60, playerX: 0, playerY: 1.7, playerZ: -60, playerYaw: 0, wetness: 0.1 };
     for (let i = 0; i < 120; i += 1) traffic.step(step); // hâm nóng JIT
     const t0 = performance.now();
@@ -68,7 +93,8 @@ describe("ngân sách `/saigon`", () => {
 
     console.log(
       `[saigon] perStepMs ${perStepMs.toFixed(3)} · ${traffic.graph.edges.size} cạnh · ${traffic.graph.turns.size} cung · ` +
-        `${traffic.vehicles.length} xe · ${ext.corridors} tuyến · ${ext.junctions.length} giao lộ`,
+        `${traffic.vehicles.length} xe · ${ext.corridors} tuyến · ${ext.junctions.length} giao lộ · ` +
+        `${traffic.pedestrians.agents.length} người đi bộ`,
     );
     // Ngân sách của bản bàn giao là 0,5 ms/bước trên máy có GPU; sandbox không GPU nên nới ra 1,5 ms
     // — nhưng vẫn phải cùng bậc độ lớn, nếu không là hồi quy thật.

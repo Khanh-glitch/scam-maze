@@ -225,3 +225,69 @@ chuẩn tự hạ chi tiết. Đo lại: **0 lô Lambert** trong lớp thành ph
 shader: Lambert 57 uniform → physical 106 (`materialBudget.test.ts` in ra con số này).
 
 Tuyệt đối **không** thêm khối PMREM vào `cityLayer`: trời/IBL là của engine (Single Engine).
+
+---
+
+## 9. Hạng mục H → K: chuẩn hoá đường/nhà/giao thông/đèn/xe/NPC theo Lý Thái Tổ
+
+Bốn commit trên nhánh `arena/3d9c58b4-scam-maze`: **H** `eaae20b` (đường), **J** `6356748` (cây),
+**I** `dd9f06e` (giao thông + đèn), **K** (người đi bộ + vạch đi bộ). Kế hoạch và checklist:
+`CITY_STREET_UPGRADE_PLAN.md`.
+
+### 9.1 Số đo trước → sau (`cityBudget.test.ts`, sandbox không GPU)
+
+| số đo | baseline | sau H–K |
+| --- | --- | --- |
+| mảnh dựng hình | 113 844 | **120 052** (trần 165 000, `droppedParts` 0) |
+| thân cây phố | 1 592 (chỉ 4 vị trí) | **2 830** |
+| tuyến vào đồ thị | 10 (bán kính 520 m) | **24** (900 m) |
+| làn / giao lộ / cổng nối | 44 / 29 / 1 | **112 / 67 / 2** |
+| xe thành phố | 10 | **36** (2 xe/làn) |
+| ngã tư có đèn | 4 | **12** |
+| vạch đi bộ trong `roadGraph` | 11 (chỉ của LTT) | **21** (+10 của thành phố) |
+| người đi bộ do brain điều khiển | 15 (chỉ LTT) | **15 + 40** |
+| `perStepMs` | 0,058–0,066 | **0,322** (ngưỡng 0,5) |
+| draw calls | ≈ 134 | ≈ 134 (K thêm NPC — xem 9.4) |
+
+### 9.2 Bảng chuẩn Lý Thái Tổ → thành phố
+
+| hạng mục | LTT | thành phố nay | ghi chú |
+| --- | --- | --- | --- |
+| hè mỗi bên | 6,8 m | 2,6 phố / 4,0 đại lộ / 1,1 hẻm | phố thủ tục rộng 7,2–12,8 m; hè 6,8 m trên đường 7,2 m là hè rộng gấp đôi đường. Giữ **tỉ lệ**, không giữ số tuyệt đối. |
+| bó vỉa | viên 0,70 m, xen 20 % sậm | đoạn ≤ 40 m, màu xen nhịp 0,7 m | chia từng viên đẩy lên 178 233 mảnh — vượt trần, đã bỏ (xem 9.5) |
+| vạch làn phố | 2 vạch, mỗi 5,6 m, dài 2,72 m | 2 vạch `±w/4`, đúng nhịp | chỉ `street`; đại lộ dùng tim kép vàng như LTT |
+| vạch đi bộ | dải `crossing-map` phủ **hết** bề rộng đường | dải 0,55 m cách 0,92 m, phủ hết `w − 1,0` | H đầu tiên chỉ vẽ 6 vạch quanh tim (5,5 m giữa đường 12,8 m) — đã sửa cùng K |
+| xe | mật độ liền nhau trên 4 làn | 2 xe/làn, 36 xe | trần CPU thật, xem 9.5 |
+| đèn | 3 ngã tư / 236 m | 12 ngã tư trên 24 tuyến | cùng `TrafficSignalController` QCVN 41:2024 |
+| người đi bộ | 15 người / 236 m | 40 người / 24 tuyến hè | cùng `PedestrianBrain` + `HumanRealismRig` + `HumanPresenceSystem` |
+| gờ xúc giác, nắp hố ga | có | **chưa** | chi tiết nhỏ, để sau |
+
+### 9.3 Mục K — hai thứ phải nối, không phải viết lại
+
+1. **Chỗ đứng.** Hè LTT là dải cố định theo trục z; phố thủ tục chạy cả hai trục. `citySidewalkLanes()`
+   sinh làn từ hình học tuyến (thuần số, test được), `PedestrianBrain` được mở thêm tham số **tuỳ
+   chọn** `patrolAxis: "x"` (mặc định `"z"` = y nguyên hành vi cũ của LTT) nên không phải bẻ lái
+   hành vi sau khi brain đã tính.
+2. **Vạch đi bộ.** `PedestrianBrain` sang đường theo `graph.crosswalks` và `TrafficManager` chỉ bắt xe
+   nhường khi cung rẽ có `turn.crosswalks`. Hạng mục H vẽ vạch nhưng **không** đăng ký vào đồ thị ⇒
+   người đi bộ không bao giờ dùng tới. Nay `cityMesh` phát `CityMesh.zebras` (dữ liệu, không phải
+   hình), `matchCityZebras()` khớp vạch với ngã tư **đã có đèn** (bỏ `CTYEND_*` — đầu cụt không có
+   làn cắt ngang), `SaigonRoadGraph.addCityCrosswalk()` đăng ký và tính lại `turn.crosswalks`.
+
+Không có bộ điều khiển người đi bộ thứ hai, không có `update` vòng lặp riêng: `cityPeds.update()`
+chạy trong hook `engine.afterTrafficStep` cùng chỗ với xe buýt thành phố.
+
+### 9.4 Đo trên trình duyệt
+
+Sandbox không có GPU nên không chạy headless được. `apps/game/docs/product/peds-probe.js` dán vào
+console của `/saigon` sẽ in ra: số NPC, số đang đứng đúng cao độ hè (y ≈ 0,24), số đã rời gốc toạ
+độ, và sau 2 s thì quãng đường/tốc độ trung bình — tức bằng chứng "đi bộ thật" chứ không phải tượng
+đứng. Kỳ vọng: ≥ 50 % số NPC `moved > 0,15 m` sau 2 s.
+
+### 9.5 Hai trần đã chạm, đừng thử lại
+
+- **Bó vỉa chia từng viên 0,70 m**: ~13 000 viên + 46 000 lăng trụ + 24 000 khối ⇒ **178 233 mảnh**,
+  `push` cắt cụt map âm thầm. Chốt: đoạn ≤ 40 m, màu xen theo nhịp 0,7 m.
+- **Mở rộng lưới/ xe bừa**: `TrafficManager` duyệt mọi cung × mọi xe mỗi bước. 24 tuyến / 36 xe cho
+  `perStepMs 0,322` (đã tính 40 người O(n²)). Muốn hơn thì phải LOD/chia vùng theo khoảng cách
+  người chơi, không phải nâng hằng số.

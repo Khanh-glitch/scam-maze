@@ -32,6 +32,8 @@ export interface CityLayerOptions {
 
 export interface CityLayer {
   anchors: CityMesh["anchors"];
+  /** Vạch đi bộ đã vẽ, để trang đăng ký `CrosswalkSpec` thật vào đồ thị giao thông (mục K). */
+  zebras: CityMesh["zebras"];
   trees: number;
   /** Uniform gió của bộ cây, cập nhật mỗi khung bằng `uTime.value = t`. */
   wind: { uTime: { value: number }; uWind: { value: number } } | null;
@@ -541,5 +543,5 @@ const addChunked = (
     // lưới bị nhân màu thép và mất màu riêng.
     addChunked(scene, drumGeo, meshData.drums, { materials: surfaceMaterial(), castShadow: false });
 
-  return { anchors: meshData.anchors, trees: meshData.trunks.length, wind: treeWind };
+  return { anchors: meshData.anchors, zebras: meshData.zebras, trees: meshData.trunks.length, wind: treeWind };
 };
