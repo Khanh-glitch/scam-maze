@@ -43,6 +43,11 @@ export interface CityNetwork {
   junctions: Array<{ id: string; x: number; z: number }>;
   /** Cổng của map chuẩn đã nối được vào lưới (để log và test). */
   portals: string[];
+  /**
+   * Độ trễ đồng bộ đèn giữa các ngã tư liền kề, tính bằng giây (đã chuẩn hoá về [0, 1) chu kỳ).
+   * Xem `signalPhaseOffsets` — đây là "làn sóng xanh" của lưới phố.
+   */
+  phaseOffsets: Array<{ id: string; offset: number }>;
   /** Tổng chiều dài lòng đường đưa vào đồ thị (m). */
   lengthM: number;
 }
@@ -427,7 +432,74 @@ export function buildCityNetwork(
     junctions.push({ id: node, x: centre.x, z: centre.z });
   }
 
-  // 6. NỐI CỔNG CỦA MAP CHUẨN VÀO LƯỚI.
+  // 6. PHA LỆCH THEO KHOẢNG CÁCH — LÀN SÓNG XANH.
+  //
+  //    Các ngã tư hiện đều chạy pha 0 với cùng chu kỳ (16 + 3 + 1,8 + 14 + 3 + 1,8 = 39,6 s), tức cả
+  //    lưới đổi đèn **cùng một lúc**. Đó không phải cách một trục phố lớn chạy: trên Lý Thái Tổ (và
+  //    mọi trục có điều khiển từ xa ở Sài Gòn), ngã tư sau lệch pha để đoàn xe đi được liên tục ở
+  //    tốc độ thiết kế.
+  //
+  //    Công thức là công thức làn sóng xanh chuẩn: `offset = (khoảng cách dọc trục) / v`, với `v`
+  //    là tốc độ thiết kế của trục (11,1 m/s phố, 13,9 m/s đại lộ — đúng `speedLimit` của cạnh).
+  //    Chỉ nối các ngã tư **liền kề trên cùng một tuyến** (qua `segments` của `buildCityNetwork`),
+  //    nên pha lan dọc phố chứ không nhảy lung tung giữa hai trục.
+  //
+  //    Không có gì mới được bịa ra: vẫn là một `phaseOffset` mà `TrafficSignalController` đã dùng
+  //    từ đầu (`spec.phaseOffset`), chỉ là trước đây luôn bằng 0.
+  const cycleSec = 16 + 3 + 1.8 + 14 + 3 + 1.8;
+  const phaseOffsets: Array<{ id: string; offset: number }> = [];
+  {
+    // Đồ thị ngã tư kề nhau theo tuyến: node → node, kèm chiều dài đoạn và tốc độ thiết kế.
+    // Đồ thị **vô hướng**: pha đèn lan theo khoảng cách dọc tuyến, không theo hướng đi của làn.
+    // Dùng cạnh có hướng (chỉ `from → to`) thì BFS chỉ tới được 12/36 ngã tư — đúng nửa lưới theo
+    // một chiều, và nửa còn lại vẫn đổi đèn cùng lúc.
+    const links = new Map<string, Array<{ to: string; len: number; speed: number }>>();
+    const addLink = (a: string, b: string, len: number, speed: number) => {
+      const list = links.get(a) ?? [];
+      list.push({ to: b, len, speed });
+      links.set(a, list);
+    };
+    for (const seg of segments) {
+      const edge = graph.edges.get(seg.edgeId);
+      if (!edge) continue;
+      addLink(seg.from, seg.to, edge.length, edge.speedLimit);
+      addLink(seg.to, seg.from, edge.length, edge.speedLimit);
+    }
+    // BFS từ mỗi ngã tư gần gốc toạ độ nhất: pha lan ra theo khoảng cách dọc tuyến, ngã tư đã có
+    // pha thì không ghi đè (lấy đường ngắn nhất tới nguồn).
+    const pos = new Map(junctions.map((j) => [j.id, j]));
+    const source = [...junctions].sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z))[0];
+    const arrived = new Map<string, number>();
+    if (source) {
+      const queue: string[] = [source.id];
+      arrived.set(source.id, 0);
+      while (queue.length) {
+        const at = queue.shift()!;
+        const t = arrived.get(at)!;
+        for (const link of links.get(at) ?? []) {
+          if (arrived.has(link.to) || !pos.has(link.to)) continue;
+          arrived.set(link.to, t + link.len / Math.max(4, link.speed));
+          queue.push(link.to);
+        }
+      }
+    }
+    for (const j of junctions) {
+      // Ngã tư nằm trong một cụm không nối được với nguồn (lưới bị cắt bởi đất map thật) vẫn phải
+      // có mục trong báo cáo — với pha 0. Bỏ nó đi thì `phaseOffsets.length < junctions.length` và
+      // người đọc log tưởng lưới có ngã tư "không có pha", trong khi thật ra nó có pha 0.
+      const travelSec = arrived.get(j.id) ?? 0;
+      // Chuẩn hoá về [0, 1) chu kỳ đèn; làm tròn 0,1 s cho dễ đọc trong log/test. Lấy modulo **sau
+      // khi** làm tròn: 39,56 s mà làm tròn trước thì thành 39,6 s = đúng một chu kỳ, tức pha 1,0 —
+      // trùng pha với nguồn và làm mất tính "khác pha" của ngã tư đó.
+      const round = (v: number) => Math.round(v * 10) / 10;
+      const offset = round((travelSec % cycleSec) / cycleSec) % 1;
+      phaseOffsets.push({ id: j.id, offset });
+      const spec = graph.intersections.get(j.id);
+      if (spec) spec.phaseOffset = offset * cycleSec;
+    }
+  }
+
+  // 7. NỐI CỔNG CỦA MAP CHUẨN VÀO LƯỚI.
   //
   //    Đồ thị gốc cụt ở năm `END_*` — đó chính là chỗ phố thủ tục tiếp quản đường. Tuyến thành phố gần
   //    cổng nhất, cùng trục và cùng chiều, nhận cung nối vào; làn ngược lại nhận cung quay về. Khoảng
@@ -478,5 +550,5 @@ export function buildCityNetwork(
     if (graph.edges.has(twin)) graph.addCityLink(link.node, link.back, twin, "straight");
   }
 
-  return { corridors: candidates.length, edgeIds, junctions, portals, lengthM: totalLen };
+  return { corridors: candidates.length, edgeIds, junctions, portals, phaseOffsets, lengthM: totalLen };
 }

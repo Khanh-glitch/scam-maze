@@ -612,7 +612,7 @@ export function generateCity(seedOverride?: string, options: CityGenOptions = {}
   const xAcc = new Map<string, LineAcc>();
   const zAcc = new Map<string, LineAcc>();
   const keyOf = (at: number) => (Math.round(at * 10) / 10).toFixed(1);
-  const reserve = (acc: Map<string, LineAcc>, at: number, width: number, from: number, to: number, name: string, klass?: "bridge") => {
+  const reserve = (acc: Map<string, LineAcc>, at: number, width: number, from: number, to: number, name: string, klass?: CityStreet["klass"]) => {
     const key = keyOf(at);
     const cur = acc.get(key);
     if (!cur) {
@@ -738,6 +738,14 @@ export function generateCity(seedOverride?: string, options: CityGenOptions = {}
     }
     return keep.sort((p, q) => p.at - q.at);
   };
+  // BA KHỔ CỦA `roadSpec` — 21,2 đại lộ · 12,8 phố · 7,2 phố nhỏ — là bất biến (§3 của
+  // `CITY_REALITY_PLAN.md`), và mọi tuyến dài của lưới phải rơi đúng vào một trong ba khổ đó.
+  //
+  // `g.minor = 7,2` là **phố nhỏ**, không phải hẻm: đó là khổ thứ hai trong `roadSpec`
+  // (`CITY_MINOR_WIDTH`), và trong Sài Gòn đúng là có những phố chỉ rộng 7 m (Nguyễn Du, Lão Tử).
+  // Hẻm thật (`hem-*`) do bước đục hẻm sinh ra và rộng 2,4–4,6 m — hẹp hơn hẳn. Giữ nguyên cách
+  // phân cấp theo bề rộng, chỉ ghi rõ ở đây để lần sau không ai "sửa" 7,2 thành hẻm rồi làm mất
+  // 14 tuyến khỏi đồ thị giao thông (đã thử: số làn tụt 112 → 48, ngã tư thật 15 → 4).
   for (const acc of pruneTooClose(xAcc)) {
     addStreet({ id: `st-x-${Math.round(acc.at)}`, name: acc.name, klass: acc.klass ?? (acc.width >= 14 ? "avenue" : "street"), widthM: acc.width, points: [[acc.at, acc.from], [acc.at, acc.to]] });
   }
