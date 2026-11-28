@@ -1,6 +1,6 @@
 # SÀI GÒN 2026 — BÀN GIAO PHẦN BẢN ĐỒ CUỐI
 
-Cập nhật: 2026-11-28 · nhánh `arena/f56eaa67-scam-maze` · commit cuối ghi ở mục 1.
+Cập nhật: 2026-11-28 · nhánh `arena/3d9c58b4-scam-maze` · commit cuối ghi ở mục 1.
 
 Tài liệu này để **một người/agent khác tiếp tục mà không cần hỏi lại**. Đọc hết mục 2–4 trước khi sửa
 dòng nào: ba mục đó là hợp đồng kiến trúc, không phải gợi ý.
@@ -17,14 +17,17 @@ dòng nào: ba mục đó là hợp đồng kiến trúc, không phải gợi ý
 | Khổ đường thành phố = khổ đường map chuẩn | xong (`roadSpec.ts`: 12,8 / 7,2 / 21,2 m) |
 | Mở biên giới đi ra khỏi map cũ + vật cản nhà thành phố | xong (`engine.cityBounds` + `engine.citySolids`) |
 | Nền đất (hết "mất nền") | xong (tấm nền 9 km trong `addCityLayer`) |
-| **Đai chuyển tiếp quanh map cũ** | **chưa** — vành 18 m đang là đất trống |
-| **Khu phố gốc (khupho) trong trang engine** | **chưa cắm** — `city.core` để trống |
-| Đèn ngã tư cho phố thủ tục | **chưa** |
-| Bus 06 chạy tuyến thành phố | **chưa** |
-| Dải phân cách đại lộ thủ tục | **chưa** |
-| Kiểm bằng mắt trên máy thật | **chưa** (sandbox crash GPU, xem §6) |
+| **Đai chuyển tiếp quanh map cũ** | xong — [B] `transitionBelt.ts` (`f78f772`→`39ed4d2`) |
+| **Nền đất 9 km có vân, khớp tông đất engine** | xong — [C] `cityGround.ts` (`7eed456`) |
+| **Khu phố gốc (khupho) trong trang engine** | xong — [A] `buildCoreWorld` cấy vào `exteriorGroup` (`f78f772`) |
+| **Mạng đường thành phố có ngã tư thật + nối vào cổng map chuẩn** | xong — `cityNetwork.ts` ([D]) |
+| Đèn ngã tư cho phố thủ tục | xong — `citySignals.ts`, cùng `TrafficSignalController` của engine |
+| Bus 06 chạy tuyến thành phố | xong — `cityBus.ts` (một `BusCircuit` thứ hai, cùng `BusRouteController`) |
+| Dải phân cách đại lộ thủ tục | xong — [E] `cityMesh.ts`, `CURB_HEIGHT`, đoạn > 40 m |
+| Test + ngân sách | xong — [G] 59 test `features/citymap`, 171 test `features/testbus` |
+| Kiểm bằng mắt trên máy thật | **chờ 4 ảnh pose của người dùng** (sandbox crash GPU, xem §6) |
 
-Commit cuối: `7cafd0c`.
+Commit cuối: `a959375`.
 
 ---
 
@@ -150,42 +153,29 @@ Pose kiểm tra sẵn có (nhận `?t=x,z&ty=&yaw=&pitch=`):
 
 ---
 
-## 7. Việc còn lại, theo thứ tự làm
+## 7. Đã làm xong A–G (2026-11-28) và việc còn lại
 
-### 7.1 Cắm khu phố gốc (khupho) vào trang engine — **làm trước tiên**
-`cityMesh` đã cắt đất cho `city.core` nhưng `SaigonEnginePage` **chưa** gọi `buildCoreWorld`
-(`citymap/coreWorld.ts`, mẫu ở `CityPage.tsx:185-215`). Hiện tại chỗ đó là đất trống giữa thành phố.
-Làm: `buildCoreWorld(city.core.x, city.core.z, {...})`, `engine.scene.add(world.root)`, gọi
-`world.update` trong vòng lặp của trang (hoặc `world.update(dt, t)` từ một `rAF`), dispose khi unmount.
+| Mục | Nơi làm | Ghi chú kiến trúc |
+| --- | --- | --- |
+| **A** khu phố gốc trong trang engine | `SaigonEnginePage.tsx` | `buildCoreWorld(city.core.x, city.core.z)` cấy vào `engine.exteriorGroup`, dispose khi unmount |
+| **B** đai chuyển tiếp 18 m | `transitionBelt.ts` | hè 3 m + bó vỉa, nhà 3–5 tầng ≤ 12 m quay mặt vào map cũ, cây 9 m, đèn 22 m; đo từ **mép ngoài dãy nhà** (`realWorldFootprintUnion() ± 18`) |
+| **C** nền 9 km có vân | `cityGround.ts` | `groundTexturePixels()` là hàm thuần số (jsdom không có canvas 2D), tông `#55544a` khớp đất engine |
+| **D** đèn ngã tư | `cityNetwork.ts` + `citySignals.ts` | lưới đường chia tại mọi giao điểm, nối bằng `addCityLink` của engine; ngã tư bật `signalized` + `signals.registerIntersection(spec)` + `bindSignalVisual` |
+| **E** dải phân cách đại lộ | `cityMesh.ts` | bó vỉa `CURB_HEIGHT` 0,16 m + mặt cỏ/bê tông, chỉ đoạn > 40 m |
+| **F** Bus 06 vòng thành phố | `cityBus.ts` | **một** `BusCircuit` thứ hai từ `LTT_S_SB` qua lưới rồi về, lái bằng `BusRouteController` qua hook `engine.afterTrafficStep` (mặc định `null` ⇒ `/testbus` y nguyên) |
+| **G** test + ngân sách | `cityNetwork/citySignals/cityMedian/cityBus/cityBudget.test.ts` | 59 test `features/citymap`, 171 test `features/testbus` |
 
-### 7.2 Đai chuyển tiếp quanh map chuẩn (đang là vành trống 18 m)
-Quy tắc đề xuất: dải rộng 18 m sát mép vùng map chuẩn, **quay mặt ra map cũ**:
-- hè 3 m + bó vỉa (dùng đúng vật liệu của `cityLayer`), cao độ 0,17 m;
-- dãy nhà thấp 3–5 tầng, cao ≤ 12 m, sâu 8–12 m, mặt đứng dùng `facadeTexture` như nhà thành phố;
-- cây thật (`SaigonBotanicalBatch`) thưa 8–10 m, cột đèn mỗi 22 m;
-- **không** đặt gì chồng lên đường của map chuẩn (vẫn lọc bằng `partHitsRealMap`).
-Mục tiêu: đứng trong map cũ nhìn ra không thấy vành đất trống, và mép thành phố có mặt tiền.
+Con số đo trên sandbox (không GPU): `build 2,1 s` · `10 tuyến / 44 làn / 29 giao lộ` ·
+`perStepMs 0,063` · `draw calls ≈ 134` · `113 844 mảnh`.
 
-### 7.3 Nền 9 km khớp tông
-Hiện là `MeshLambertMaterial("#55544a")` phẳng. Lấy mẫu màu đất của engine (ground của
-`saigonDistricts`) hoặc thêm 2–3 lớp vân rất nhẹ để không thành tấm xám tuyệt đối.
+### 7.1 Còn lại: kiểm bằng mắt
+Chỉ còn nghiệm thu ảnh (xem §6): mở `/saigon` trên máy có GPU và gửi bốn pose. Mọi tinh chỉnh sau đó
+là **thẩm mỹ**, không phải kiến trúc — nhưng vẫn phải giữ 6 bất biến ở §4.
 
-### 7.4 Đèn ngã tư cho phố thủ tục
-`extendTrafficGraph` đã góp tuyến vào `engine.traffic.graph`; đánh dấu `signalized: true` cho các
-ngã tư mới và gọi `bindVisual` của `TrafficSignalController` (xem
-`testbus/openworld/traffic/signalController.ts`) để cột đèn + đếm giây hiện ra như map chuẩn.
-
-### 7.5 Dải phân cách đại lộ
-Map chuẩn có tim kép vàng; đại lộ thành phố nên có dải phân cách cứng (bó vỉa 0,15 m + cỏ/bê tông)
-giữa hai chiều ở những đoạn dài > 40 m — hiện chỉ có vạch kẻ.
-
-### 7.6 Bus 06 chạy tuyến thành phố
-`engine.route` / `engine.traffic.busCircuit` là tuyến của map chuẩn. Nối thêm vòng thành phố bằng
-`cityTraffic` (đã có `edgeIds`), giữ nguyên luật dừng/đón khách của engine — **không** viết vòng lặp bus mới.
-
-### 7.7 Hiệu năng
-Ngân sách hiện tại: build 3,3 s; 4804 khối cản; 10 tuyến giao thông; 10 xe. Nếu thêm đai/nhà thì đo lại
-`perStepMs` của `engine.traffic` (mục tiêu < 0,5 ms/bước) và số draw call (< 260).
+### 7.2 Nếu phải mở rộng lưới đường
+`MAX_CORRIDORS` mặc định 10 và xếp hạng `dist - 140 (nếu là đại lộ)`: xếp "đại lộ trước" tuyệt đối thì
+mười suất bị các đại lộ xa chiếm hết và lưới quanh map chỉ còn vài tuyến. Tăng số tuyến thì đo lại
+`perStepMs` — bộ mô phỏng duyệt mọi cung mỗi khung.
 
 ---
 

@@ -100,6 +100,15 @@ export class SaigonTrafficManager {
   readonly busCircuit: BusCircuit;
   private busTurnId: string | null = null;
   private busHintD: number | undefined;
+  /**
+   * Con trỏ `d` theo từng xe buýt ngoài Bus 06.
+   *
+   * `planBus06`/`applyBusFix` chiếu vị trí xe lên vòng đường; với một vòng thứ hai (xe buýt thành phố
+   * của `/saigon`) thì con trỏ phải riêng, và **vòng** cũng phải riêng — nếu không nó chiếu lên vòng
+   * của map chuẩn và nhảy về đầu. Bus 06 giữ đường cũ (`busHintD`, `busCircuit`) nên `/testbus`
+   * không đổi.
+   */
+  private readonly extraBuses = new Map<string, { circuit: BusCircuit; hintD: number | undefined; turnId: string | null }>();
   /** Lane the bus has grabbed (lateral offset) and how long it keeps it. */
   private busLane = { target: BUS06_CURB_LAT, hold: 0 };
   /** What the bus decided last frame: the rider it honks at. */
@@ -461,24 +470,59 @@ export class SaigonTrafficManager {
     this.busTurnId = null;
   }
 
+  /** Trạng thái vòng riêng của một xe buýt ngoài Bus 06 (xe buýt thành phố của `/saigon`). */
+  private extraBus(agentId: string, circuit?: BusCircuit) {
+    let state = this.extraBuses.get(agentId);
+    if (!state) {
+      if (!circuit) return null;
+      state = { circuit, hintD: undefined, turnId: null };
+      this.extraBuses.set(agentId, state);
+    }
+    return state;
+  }
+
+  /** Đăng ký (hoặc cập nhật) vòng đường của một xe buýt ngoài Bus 06. */
+  registerExtraBus(agentId: string, circuit: BusCircuit) {
+    this.extraBuses.set(agentId, { circuit, hintD: undefined, turnId: null });
+  }
+
   /** Places the bus on its circuit (edge or junction arc, s, lateral offset) from its world pose. */
-  private applyBusFix(bus: VehicleAgent) {
-    const circuit = this.busCircuit;
-    const fix = circuit.project(bus.x, bus.z, bus.yaw, this.busHintD);
-    this.busHintD = fix.d;
+  private applyBusFix(bus: VehicleAgent, extra?: { circuit: BusCircuit; hintD: number | undefined; turnId: string | null } | null) {
+    const circuit = extra ? extra.circuit : this.busCircuit;
+    const fix = circuit.project(bus.x, bus.z, bus.yaw, extra ? extra.hintD : this.busHintD);
+    if (extra) extra.hintD = fix.d;
+    else this.busHintD = fix.d;
     const seg = fix.segment;
     if (seg.edge) {
-      this.releaseBusTurn();
+      if (extra) {
+        if (extra.turnId) {
+          const prev = this.graph.turns.get(extra.turnId);
+          if (prev) this.intersections.exitTurn(bus.id, prev.intersectionId);
+          extra.turnId = null;
+        }
+      } else {
+        this.releaseBusTurn();
+      }
       bus.onTurn = false;
       bus.turnId = null;
       bus.edgeId = seg.edge.id;
     } else {
       const turn = seg.turn!;
-      if (this.busTurnId !== turn.id) {
-        this.releaseBusTurn();
-        if (!this.busGhost) {
+      const currentTurn = extra ? extra.turnId : this.busTurnId;
+      if (currentTurn !== turn.id) {
+        if (extra) {
+          if (extra.turnId) {
+            const prev = this.graph.turns.get(extra.turnId);
+            if (prev) this.intersections.exitTurn(bus.id, prev.intersectionId);
+          }
           this.intersections.enterTurn(bus.id, turn, this.simTime);
-          this.busTurnId = turn.id;
+          extra.turnId = turn.id;
+        } else {
+          this.releaseBusTurn();
+          if (!this.busGhost) {
+            this.intersections.enterTurn(bus.id, turn, this.simTime);
+            this.busTurnId = turn.id;
+          }
         }
       }
       bus.onTurn = true;
@@ -509,6 +553,7 @@ export class SaigonTrafficManager {
     listenerX?: number,
     listenerZ?: number,
     agentId = this.busAgentId,
+    circuit?: BusCircuit,
   ) {
     const bus = agentId === this.busAgentId ? this.busAgent : this.vehicleById.get(agentId);
     if (!bus) return;
@@ -519,7 +564,7 @@ export class SaigonTrafficManager {
     bus.yaw = yaw;
     bus.speed = speed;
     bus.accel = accel;
-    this.applyBusFix(bus);
+    this.applyBusFix(bus, agentId === this.busAgentId ? undefined : this.extraBus(agentId, circuit));
 
     if (wasMoving && speed < 0.25 && listenerX !== undefined && listenerZ !== undefined) {
       this.audio.playBusAirBrake(x, z, listenerX, listenerZ);
@@ -544,14 +589,15 @@ export class SaigonTrafficManager {
     busX: number,
     busZ: number,
     desiredSpeed: number,
-    options: { yaw?: number; aggressive?: boolean } = {},
+    options: { yaw?: number; aggressive?: boolean; agentId?: string; circuit?: BusCircuit } = {},
   ): { speed: number; lat: number; reason: "free" | "signal" | "traffic" | "pedestrian" } {
-    const bus = this.busAgent;
-    const circuit = this.busCircuit;
+    const extra = options.agentId ? this.extraBus(options.agentId, options.circuit) : null;
+    const bus = extra ? this.vehicleById.get(options.agentId!) : this.busAgent;
+    const circuit = extra ? extra.circuit : this.busCircuit;
     const A = VN_TRAFFIC_TUNING.busAggression;
     const halfLength = bus?.halfLength ?? 5.55;
     const halfWidth = bus?.halfWidth ?? 1.32;
-    const fix = circuit.project(busX, busZ, options.yaw ?? bus?.yaw, this.busHintD);
+    const fix = circuit.project(busX, busZ, options.yaw ?? bus?.yaw, extra ? extra.hintD : this.busHintD);
     const frontD = fix.d + halfLength;
     let cap = desiredSpeed;
     let reason: "free" | "signal" | "traffic" | "pedestrian" = "free";
