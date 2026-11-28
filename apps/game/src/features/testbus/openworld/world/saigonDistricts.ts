@@ -1373,6 +1373,7 @@ export function buildSaigonDistricts(
   // Strictly placed far outside all playable districts & roadways
   // =========================================================================
   const chunkHorizon = new T.Group();
+  chunkHorizon.name = "hcmc-skyline-horizon";
   if (options.horizon !== false) root.add(chunkHorizon);
   plane(chunkHorizon, [35, -0.08, -140], [880, 880], material(0x282d30, 0.96), 0, -Math.PI / 2);
 

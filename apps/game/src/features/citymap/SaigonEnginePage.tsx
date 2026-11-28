@@ -67,6 +67,10 @@ export function SaigonEnginePage({ onBackToMenu }: { onBackToMenu?: () => void }
           qs.get("city") === "0"
             ? { anchors: {}, trees: 0, wind: null }
             : addCityLayer(engine.scene, city, { software, chunkMeters: Number(qs.get("chunk") ?? 0) || 0 });
+        // Vòng chân trời giả của map chuẩn (11 cụm tháp tối + tấm nền 880 m) thay cho thành phố ở
+        // phía xa khi map đứng một mình ở `/testbus`. Ở đây thành phố thật đã có, để nguyên thì mười
+        // một khối đen mọc giữa phố (đúng lỗi đã thấy trong ảnh kiểm tra của `/saigon` bản cũ).
+        if (qs.get("city") !== "0") engine.scene.getObjectByName("hcmc-skyline-horizon")?.removeFromParent();
         engine.renderer.shadowMap.needsUpdate = true;
         const buildMs = Math.round(performance.now() - t0);
 
