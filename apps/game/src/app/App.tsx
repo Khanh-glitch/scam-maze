@@ -34,6 +34,11 @@ const ProloguePage = lazy(() => import("../features/prologue").then((module) => 
 const KhuphoPage = lazy(() => import("../features/khupho").then((module) => ({ default: module.KhuphoPage })));
 // Bản đồ Sài Gòn sinh tự động (`cityGen`) — chunk riêng, chỉ tải khi mở /saigon.
 const CityPage = lazy(() => import("../features/citymap/CityPage").then((module) => ({ default: module.CityPage })));
+// `/saigon` chạy trên **chính** `OpenWorldEngine` của `/testbus` (xem `SaigonEnginePage`); bản
+// `CityPage` cũ vẫn giữ để đối chiếu/render offline và dùng khi `?engine=0`.
+const SaigonEnginePage = lazy(() =>
+  import("../features/citymap/SaigonEnginePage").then((module) => ({ default: module.SaigonEnginePage })),
+);
 const TestBusPage = lazy(() => import("../features/testbus").then((module) => ({ default: module.TestBusPage })));
 const RoomV2Page = lazy(() => import("../features/roomv2").then((module) => ({ default: module.RoomV2Page })));
 // The journey map of Chapter 1: a reader of the live scenario data, for design and QA.
@@ -619,7 +624,11 @@ export const App: React.FC = () => {
   if (route === "saigon") {
     return (
       <Suspense fallback={<div className="h-screen w-screen bg-[#10141c]" aria-busy="true" />}>
-        <CityPage onBackToMenu={() => navigateTo("menu")} />
+        {new URLSearchParams(window.location.search).get("engine") === "0" ? (
+          <CityPage onBackToMenu={() => navigateTo("menu")} />
+        ) : (
+          <SaigonEnginePage onBackToMenu={() => navigateTo("menu")} />
+        )}
       </Suspense>
     );
   }
