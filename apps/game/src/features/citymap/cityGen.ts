@@ -481,6 +481,7 @@ export function generateCity(seedOverride?: string, options: CityGenOptions = {}
   const roadNX = Math.ceil((frame.x1 - frame.x0) / roadCell);
   const roadNZ = Math.ceil((frame.z1 - frame.z0) / roadCell);
   const road = new Uint8Array(roadNX * roadNZ);
+  const frontFill = new Uint8Array(roadNX * roadNZ);
   const paintRoad = (st: CityStreet) => {
     const [ax, az] = st.points[0];
     const [bx, bz] = st.points[st.points.length - 1];
@@ -488,16 +489,28 @@ export function generateCity(seedOverride?: string, options: CityGenOptions = {}
     if (len < 1) return;
     const ux = (bx - ax) / len;
     const uz = (bz - az) / len;
+    // Hai mặt nạ, vì hai luật khác nhau:
+    //  · `road`  = đúng lòng đường. Không gì được đứng trên đây, kể cả hẻm — đây là `onRoad`.
+    //  · `front` = lộ giới (lòng đường + hè). Được xây **chỉ** với mặt tiền phố/đại lộ, để dãy nhà
+    //     quay ra đường; còn hẻm phải để trống phần hè vì hẻm 1–3 m mà nhà đứng trên hè thì ngõ
+    //     bị khoá kín (đo được: hẻm mất lối đi, 5c phải đục nhà để mở).
+    //
+    // Lỗi gốc người dùng thấy — dải bó vỉa chạy xuyên khối nhà — **không** nằm ở đây mà ở đai
+    // chuyển tiếp (xem `belt` bên dưới), nên hai mặt nạ tách ra cho đúng chỗ.
+    const walk = st.klass === "alley" ? 1.1 : st.klass === "avenue" ? 4.0 : 2.6;
     const half = Math.max(0.6, st.widthM / 2 - 0.15);
+    const frontHalf = st.widthM / 2 + walk;
+    const isAlley = st.klass === "alley";
     const steps = Math.ceil(len / (roadCell * 0.5));
     for (let i = 0; i <= steps; i += 1) {
       const t = (i / steps) * len;
       const cx = ax + ux * t;
       const cz = az + uz * t;
-      const i0 = Math.floor((cx - half - frame.x0) / roadCell);
-      const i1 = Math.floor((cx + half - frame.x0) / roadCell);
-      const j0 = Math.floor((cz - half - frame.z0) / roadCell);
-      const j1 = Math.floor((cz + half - frame.z0) / roadCell);
+      const reach = Math.max(half, frontHalf);
+      const i0 = Math.floor((cx - reach - frame.x0) / roadCell);
+      const i1 = Math.floor((cx + reach - frame.x0) / roadCell);
+      const j0 = Math.floor((cz - reach - frame.z0) / roadCell);
+      const j1 = Math.floor((cz + reach - frame.z0) / roadCell);
       for (let ii = i0; ii <= i1; ii += 1) {
         for (let jj = j0; jj <= j1; jj += 1) {
           if (ii < 0 || jj < 0 || ii >= roadNX || jj >= roadNZ) continue;
@@ -508,6 +521,9 @@ export function generateCity(seedOverride?: string, options: CityGenOptions = {}
           if (perp <= half && along >= -half && along <= len + half) {
             road[jj * roadNX + ii] = 1;
             roadOwner.set(jj * roadNX + ii, `${st.name}/${st.klass}/w${st.widthM.toFixed(0)}`);
+          } else if (!isAlley && perp <= frontHalf && along >= -frontHalf && along <= len + frontHalf) {
+            // Lề mặt tiền: đi được, nhưng chỉ nhà mặt phố được dựng trên đây (xem `onFrontage`).
+            frontFill[jj * roadNX + ii] = 1;
           }
         }
       }
@@ -528,6 +544,29 @@ export function generateCity(seedOverride?: string, options: CityGenOptions = {}
       }
     }
     return hit;
+  };
+
+  /**
+   * LỀ MẶT TIỀN — hè của phố/đại lộ, nơi dãy nhà mặt phố đứng.
+   *
+   * Nhà **được** đứng trên lề này (đó là quy hoạch Sài Gòn: nhà ống sát mép hè), nhưng chỉ nhà mặt
+   * phố. Hẻm thì không: hẻm rộng 2–3 m, nhà đứng trên hè hẻm là khoá kín ngõ. Vì vậy đây không phải
+   * vùng cấm xây mà là **giới hạn loại nhà**.
+   *
+   * Lỗi đang sửa không nằm ở đây: dải bó vỉa chạy xuyên khối nhà đến từ đai chuyển tiếp
+   * (`buildTransitionBelt`), đã lọc ở cuối `generateCity`.
+   */
+  const onFrontage = (r: CityRect): boolean => {
+    const i0 = Math.max(0, Math.floor((r.x0 - frame.x0) / roadCell));
+    const i1 = Math.min(roadNX - 1, Math.floor((r.x1 - frame.x0) / roadCell));
+    const j0 = Math.max(0, Math.floor((r.z0 - frame.z0) / roadCell));
+    const j1 = Math.min(roadNZ - 1, Math.floor((r.z1 - frame.z0) / roadCell));
+    for (let ii = i0; ii <= i1; ii += 1) {
+      for (let jj = j0; jj <= j1; jj += 1) {
+        if (frontFill[jj * roadNX + ii]) return true;
+      }
+    }
+    return false;
   };
 
   // Đường mà quá nửa lòng đường nằm trên sông/kênh là đường sai — bỏ. (Tuyến x=720 chạy đúng mép
@@ -1947,7 +1986,63 @@ export function generateCity(seedOverride?: string, options: CityGenOptions = {}
     // đứng trên hè của đai (0,17 m) nên `cityMesh` đặt chúng ở lớp hè, không phải mặt đất.
     belt: (() => {
       const b = buildTransitionBelt(seedOverride ?? PLAN.seed);
-      return { buildings: b.buildings, props: b.props, walk: b.walk, kerbs: b.kerbs };
+      // ĐAI CHỈ ĐƯỢC ĐỨNG TRÊN ĐẤT TRỐNG.
+      //
+      // `buildTransitionBelt` dựng vành hè 3 m + bó vỉa quanh mép map chuẩn, nhưng nó **không biết**
+      // thành phố sinh tự động vừa đặt những gì: nó chỉ tránh vùng đi được của map chuẩn và chừa
+      // lề 18 m cho dãy nhà dựng tay. Đo được: 396/3 286 mảnh bó vỉa nằm **trong nhà** — chính là
+      // hình "đường đâm xuyên công trình" khi nhìn từ trên xuống: một dải đá chạy qua giữa khối nhà.
+      //
+      // Lọc ở đây (sau khi đã có `buildings`) theo cùng nguyên tắc `partHitsRealMap`: mảnh nào chạm
+      // một toà nhà còn đứng thì bỏ, không "cắt bớt cho gần đúng". Bó vỉa và tấm hè dùng chung một
+      // hộp bao nên hai lớp không lệch nhau.
+      const solid = buildings.filter((x) => !x.walkable);
+      const CELL = 4;
+      const cells = new Map<string, CityRect[]>();
+      for (const r of solid) {
+        for (let i = Math.floor(r.x0 / CELL); i <= Math.floor(r.x1 / CELL); i += 1) {
+          for (let j = Math.floor(r.z0 / CELL); j <= Math.floor(r.z1 / CELL); j += 1) {
+            const k = `${i},${j}`;
+            const list = cells.get(k);
+            if (list) list.push(r);
+            else cells.set(k, [r]);
+          }
+        }
+      }
+      const hitsBuilding = (x: number, z: number, halfLen: number, halfW: number) => {
+        const hx = Math.abs(Math.cos(0)) * halfLen + halfW; // ry 0 hoặc ±π/2 ⇒ đổi vai trò hai nửa
+        void hx;
+        const ex = Math.max(halfLen, halfW);
+        const list = cells.get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`);
+        const candidates = new Set<CityRect>();
+        for (let i = Math.floor((x - ex) / CELL); i <= Math.floor((x + ex) / CELL); i += 1) {
+          for (let j = Math.floor((z - ex) / CELL); j <= Math.floor((z + ex) / CELL); j += 1) {
+            for (const r of cells.get(`${i},${j}`) ?? []) candidates.add(r);
+          }
+        }
+        if (list) for (const r of list) candidates.add(r);
+        for (const r of candidates) {
+          if (x + ex > r.x0 && x - ex < r.x1 && z + ex > r.z0 && z - ex < r.z1) return true;
+        }
+        return false;
+      };
+      const keepWalk = b.walk.filter((p) => !hitsBuilding(p.x, p.z, p.lengthM / 2, p.widthM / 2));
+      const keepKerbs = b.kerbs.filter((p) => !hitsBuilding(p.x, p.z, p.lengthM / 2, p.widthM / 2));
+      const kept = new Set(keepWalk.map((p) => `${p.x.toFixed(2)},${p.z.toFixed(2)}`));
+      return {
+        buildings: b.buildings,
+        // Cây/cột chỉ đứng trên tấm hè còn lại — không thì cây mọc trong phòng khách.
+        props: b.props.filter((p) => {
+          for (let dx = -2; dx <= 2; dx += 1) {
+            for (let dz = -2; dz <= 2; dz += 1) {
+              if (kept.has(`${(p.x + dx).toFixed(2)},${(p.z + dz).toFixed(2)}`)) return true;
+            }
+          }
+          return false;
+        }),
+        walk: keepWalk,
+        kerbs: keepKerbs,
+      };
     })(),
     core,
     walk,

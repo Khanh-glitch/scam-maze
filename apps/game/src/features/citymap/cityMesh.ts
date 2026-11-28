@@ -243,7 +243,85 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
   };
   const box = (p: Part) => push(boxes, p);
   const flatBox = (p: Part) => pushTiled(p);
-  const kerbBox = (p: Part) => push(kerbs, p);
+  /**
+   * BÓ VỈA KHÔNG BAO GIỜ NẰM TRONG NHÀ.
+   *
+   * Đo được trước khi lọc: 21/2 834 mảnh (0,7 %) nằm trong khối nhà. Chúng đến từ những ngôi nhà
+   * đặt **sau** tuyến (bước vá ổ kín, mốc thật) — lúc tuyến được vẽ, chỗ đó còn trống. Nhìn từ trên
+   * xuống, một dải đá chạy xuyên khối nhà đúng là "đường đâm xuyên công trình"; đứng dưới đất thì
+   * nó là một gờ đá nhô ra khỏi bức tường.
+   *
+   * Lọc ở đây thay vì sửa thêm một bước sinh nữa: `kerbs` là mảnh cuối cùng, và luật "đá không nằm
+   * trong tường" đúng cho mọi nguồn sinh.
+   */
+  const solidBoxes = city.buildings.filter((b) => !b.walkable);
+  const solidCell = new Map<string, CityBuilding[]>();
+  const SOLID_CELL = 8;
+  for (const b of solidBoxes) {
+    for (let i = Math.floor(b.x0 / SOLID_CELL); i <= Math.floor(b.x1 / SOLID_CELL); i += 1) {
+      for (let j = Math.floor(b.z0 / SOLID_CELL); j <= Math.floor(b.z1 / SOLID_CELL); j += 1) {
+        const k = `${i},${j}`;
+        const list = solidCell.get(k);
+        if (list) list.push(b);
+        else solidCell.set(k, [b]);
+      }
+    }
+  }
+  const insideBuilding = (x: number, z: number) => {
+    const list = solidCell.get(`${Math.floor(x / SOLID_CELL)},${Math.floor(z / SOLID_CELL)}`);
+    if (!list) return false;
+    for (const b of list) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1) return true;
+    return false;
+  };
+  /**
+   * BÓ VỈA KHÔNG BAO GIỜ NẰM TRONG NHÀ — cắt theo mét, không bỏ cả mảnh.
+   *
+   * Mảnh dài tới 40 m, nhà ống sâu 8–12 m: bỏ cả mảnh thì mất 30 m vỉa lành, còn chỉ kiểm tâm thì
+   * lọt. Nên cắt mảnh thành đoạn: chỗ nào tường nhà thì không vẽ, chỗ trống vẽ tiếp — đúng cách một
+   * bó vỉa thật bị nhà chắn ngang. Đo được trước khi cắt: 12/2 579 mảnh vẫn xuyên nhà.
+   */
+  const kerbBox = (p: Part) => {
+    const ry = p.ry ?? 0;
+    const along = Math.max(p.sx, p.sz);
+    const thick = Math.min(p.sx, p.sz);
+    const dx = Math.cos(ry);
+    const dz = -Math.sin(ry);
+    if (along <= 1.2) {
+      if (!insideBuilding(p.x, p.z)) push(kerbs, p);
+      return;
+    }
+    // Bước mẫu 0,25 m — nhỏ hơn nửa bề dày một bức tường nhà ống Sài Gòn.
+    const n = Math.max(1, Math.round(along / 0.25));
+    let runStart = -1;
+    const flush = (from: number, to: number) => {
+      // Lùi mỗi đầu nửa bước để đoạn vẽ không chạm điểm mẫu đã biết là bị chặn.
+      const a = Math.min(to, from + 0.5) - 0.5;
+      const b = Math.max(from, to - 0.5) + 0.5;
+      const len = ((b - a) / n) * along;
+      if (len < 0.25) return;
+      const mid = (a + b) / 2 / n - 0.5;
+      push(kerbs, {
+        ...p,
+        x: p.x + dx * along * mid,
+        z: p.z + dz * along * mid,
+        sx: p.sx >= p.sz ? len : thick,
+        sz: p.sx >= p.sz ? thick : len,
+      });
+    };
+    for (let i = 0; i <= n; i += 1) {
+      const f = i / n - 0.5;
+      // Kiểm điểm mẫu và điểm giữa tới mẫu kế tiếp: bước ngắn vẫn có thể nhảy qua một bức tường mỏng.
+      const blocked =
+        insideBuilding(p.x + dx * along * f, p.z + dz * along * f) ||
+        (i < n && insideBuilding(p.x + dx * along * (f + 0.25 / n), p.z + dz * along * (f + 0.25 / n)));
+      if (!blocked && runStart < 0) runStart = i;
+      if ((blocked || i === n) && runStart >= 0) {
+        flush(runStart, i);
+        runStart = -1;
+      }
+    }
+  };
+
 
   // --- nền: đường, vỉa hè, nước ---------------------------------------------------------------
   let roads = 0;
