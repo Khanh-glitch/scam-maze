@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { generateCity } from "./cityGen";
 import { addCityLayer } from "./cityLayer";
 import { extendTrafficGraph, spawnCityVehicles } from "./cityTraffic";
+import { signalizeCityIntersections } from "./citySignals";
+import { buildCityBusCircuit, spawnCityBus, type CityBus } from "./cityBus";
 import { buildCoreWorld, type CoreWorld } from "./coreWorld";
 import { OpenWorldEngine } from "../testbus/openworld/world/OpenWorldEngine";
 import { loadStreetFurniture } from "../khupho/world/streetFurniture";
@@ -36,6 +38,7 @@ export function SaigonEnginePage({ onBackToMenu }: { onBackToMenu?: () => void }
     if (!el) return;
     let engine: OpenWorldEngine | null = null;
     let coreWorld: CoreWorld | null = null;
+    let cityBus: CityBus | null = null;
     let cancelled = false;
     const qs = new URLSearchParams(window.location.search);
 
@@ -98,11 +101,47 @@ export function SaigonEnginePage({ onBackToMenu }: { onBackToMenu?: () => void }
           (err) => console.error("[saigon] xe thành phố lỗi", err),
         );
 
+        // ĐÈN Ở NGÃ TƯ CỦA PHỐ THỦ TỤC: bật `signalized` cho ngã tư thật (không bật đầu cụt — ở đó
+        // chỉ có vòng quay đầu), rồi dựng cột đèn bằng đúng `createMastArmSignal` +
+        // `TrafficSignalController` của engine. Một bộ điều khiển QCVN 41:2024 lo cả hai bản đồ.
+        const signals =
+          qs.get("signals") === "0"
+            ? { signalized: [] as string[], poles: 0, root: null }
+            : signalizeCityIntersections(engine.traffic.graph, engine.traffic, {
+                parent: engine.exteriorGroup,
+                junctions: extension.junctions,
+                maxIntersections: 4,
+                solids: engine.citySolids,
+              });
+
+        // BUS 06 CHẠY THÊM MỘT VÒNG QUA ĐẠI LỘ CỦA THÀNH PHỐ. Không phải vòng lặp xe buýt thứ hai:
+        // cùng `BusCircuit` + `BusRouteController` + `TrafficManager` của engine, chỉ thêm một vòng
+        // đường nối tiếp tuyến 06 của map chuẩn ở cổng `END_LTT_S`.
+        if (qs.get("bus") !== "0") {
+          const circuit = buildCityBusCircuit(engine.traffic.graph, extension.edgeIds);
+          if (circuit) {
+            void spawnCityBus(engine.traffic, circuit.circuit, { parent: engine.exteriorGroup })
+              .then((bus) => {
+                if (cancelled) {
+                  bus.dispose();
+                  return;
+                }
+                cityBus = bus;
+                console.info("[saigon] Bus 06 vòng thành phố ·", circuit.edgeIds.join(" → "), "·", Math.round(circuit.circuit.length), "m");
+              })
+              .catch((err) => console.error("[saigon] xe buýt thành phố lỗi", err));
+          }
+        }
+
         (window as unknown as { __saigonEngine?: unknown }).__saigonEngine = {
           buildMs,
           software,
           trees: layer.trees,
           corridors: extension.corridors,
+          junctions: extension.junctions.length,
+          portals: extension.portals,
+          signalized: signals.signalized,
+          signalPoles: signals.poles,
           citySolids: engine.citySolids.length,
           vehicles: extension.edgeIds.length,
           scene: engine.scene,
@@ -123,6 +162,12 @@ export function SaigonEnginePage({ onBackToMenu }: { onBackToMenu?: () => void }
         );
         // Giữ tham chiếu để shader gió của cây chạy theo thời gian của engine (engine đã tự vẽ
         // scene; uniform này chỉ cần một giá trị thời gian, đặt ở đây để không đụng vòng lặp).
+        // Vòng cập nhật của xe buýt thành phố chạy trong hook **sau** khối mô phỏng giao thông của
+        // engine — cùng `dt`, cùng thứ tự với Bus 06 của map chuẩn. Không mở vòng lặp thứ hai và
+        // cũng không bọc `traffic.step` (hook `afterTrafficStep` chỉ là một ô trống mặc định `null`,
+        // `/testbus` không bị ảnh hưởng).
+        engine.afterTrafficStep = (dt) => cityBus?.update(dt);
+
         const wind = layer.wind;
         if (wind) {
           const tick = () => {
@@ -189,6 +234,9 @@ export function SaigonEnginePage({ onBackToMenu }: { onBackToMenu?: () => void }
 
     return () => {
       cancelled = true;
+      if (engine) engine.afterTrafficStep = null;
+      cityBus?.dispose();
+      cityBus = null;
       coreWorld?.dispose();
       coreWorld = null;
       engine?.dispose();

@@ -254,6 +254,13 @@ export class OpenWorldEngine {
    * tường phòng ngủ và làm hỏng pha warmup.
    */
   public exteriorGroup = new T.Group();
+  /**
+   * Hook chạy **ngay sau** khối mô phỏng giao thông + Bus 06 mỗi khung (chỉ khi nhân vật đã ra khỏi
+   * phòng 6.07). `/saigon` dùng nó để lái xe buýt thứ hai của mình bằng chính `BusRouteController` —
+   * cùng chỗ, cùng `dt`, cùng thứ tự như Bus 06 của map chuẩn. Mặc định `null`, nên `/testbus` không
+   * đổi gì.
+   */
+  public afterTrafficStep: ((dt: number) => void) | null = null;
   private streetGroup = new T.Group();
   private busCastGroup = new T.Group();
   private roomLightsGroup = new T.Group();
@@ -2390,6 +2397,8 @@ export class OpenWorldEngine {
         this.route.doors.front.target = 0;
       }
       this.bus.update(dt);
+      // Thành phố thủ tục (nếu được cấy) lái xe buýt thứ hai của nó ở đây — cùng `dt`, cùng thời điểm.
+      this.afterTrafficStep?.(dt);
       // The bus moved after the camera was placed: place it again so the view rides with the bus.
       if (this.onBus && !viewMode) {
         this.carryOnBus();

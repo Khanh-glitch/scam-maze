@@ -16,6 +16,7 @@ import {
   inRealWorld,
 } from "./realWorldFootprint";
 import type { City, CityBuilding } from "./cityGen";
+import { CURB_HEIGHT } from "../testbus/openworld/simulation/boarding";
 
 /** Một khối đặc: hộp (hoặc lăng trụ vát góc / lăng trụ tam giác tuỳ danh sách chứa nó). */
 export interface Part {
@@ -351,6 +352,39 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
           });
         }
       }
+      // DẢI PHÂN CÁCH (median) cho đại lộ. Map chuẩn tách hai chiều của trục lớn bằng một dải bó vỉa
+      // + cỏ/bê tông ở giữa (`simulation/street.ts`), không phải chỉ hai vạch vàng. Thiếu nó thì đại
+      // lộ 21,2 m đọc ra "phố lớn trải nhựa", và mắt không có gì đo chiều rộng. Ở đây chỉ làm cho
+      // **đoạn dài hơn 40 m** — dải phân cách 3 m ở một đoạn 12 m là chặn hết lòng đường.
+      // Cao độ theo đúng bất biến: bó vỉa `CURB_HEIGHT` = 0,17 m so với mặt nhựa 0,0 m.
+      const medianW = s.widthM >= 18 ? 3.2 : 2.2;
+      for (const [t0, t1] of spans) {
+        const segLen = (t1 - t0) * len;
+        if (segLen <= 40) continue;
+        const mid = (t0 + t1) / 2;
+        const cx = ax + (bx - ax) * mid;
+        const cz = az + (bz - az) * mid;
+        // Thân dải: thấp hơn hè (người không đi trên đó) nhưng cao hơn nhựa đúng `CURB_HEIGHT`.
+        kerbBox({ x: cx, y: CURB_HEIGHT / 2, z: cz, sx: segLen, sy: CURB_HEIGHT, sz: medianW, ry, color: "#8f8d86" });
+        // Mặt trên: cỏ ở đại lộ có dải cây, bê tông ở đại lộ thuần giao thông — xen kẽ theo đoạn để
+        // phố không thành một dải xám tuyệt đối đều.
+        const grassy = hash01(mid * 37.1 + t0) > 0.45;
+        flatBox({
+          x: cx, y: CURB_HEIGHT + 0.02, z: cz,
+          sx: Math.max(0, segLen - 0.4), sy: 0.04, sz: medianW - 0.3, ry,
+          color: grassy ? "#3f4a2c" : "#9a978f",
+        });
+        // Bó vỉa hai bên dải: đá sáng, đúng mép — nhìn từ tầm mắt thấy được cạnh như bó vỉa hè.
+        for (const sgn of [-1, 1]) {
+          kerbBox({
+            x: cx + Math.sin(ry) * (medianW / 2) * sgn,
+            y: CURB_HEIGHT / 2,
+            z: cz + Math.cos(ry) * (medianW / 2) * sgn,
+            sx: segLen, sy: CURB_HEIGHT + 0.02, sz: 0.16, ry, color: "#c0bbac",
+          });
+        }
+      }
+
       // Vạch kẻ mặt đường: map chuẩn dùng **tim kép vàng** cho đại lộ và **vạch trắng** cho phố
       // (`simulation/street.ts` — "double yellow median & dashed lane markings"). Trước đây thành
       // phố chỉ có một hàng gạch vàng nhạt, nên đại lộ đọc ra "đường nháp".

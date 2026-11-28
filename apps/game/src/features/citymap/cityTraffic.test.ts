@@ -11,22 +11,31 @@ import { extendTrafficGraph } from "./cityTraffic";
 import { SaigonTrafficManager } from "../testbus/openworld/traffic";
 
 describe("giao thông trên phố thủ tục", () => {
-  const city = generateCity();
+  const city = generateCity(undefined, { realWorld: true });
 
   it("góp được tuyến của thành phố vào đồ thị của map chuẩn", () => {
     const traffic = new SaigonTrafficManager();
     const before = traffic.graph.edges.size;
     const ext = extendTrafficGraph(traffic.graph, city, { near: { x: 0, z: -60 }, radiusM: 520, maxCorridors: 10 });
     expect(ext.corridors).toBeGreaterThan(0);
-    expect(ext.edgeIds).toHaveLength(ext.corridors * 2);
-    // Hai làn mỗi tuyến, vào đúng đồ thị ấy — không phải đồ thị thứ hai.
-    expect(traffic.graph.edges.size).toBe(before + ext.corridors * 2);
+    // Mỗi tuyến được chia thành nhiều **đoạn** (mỗi ngã tư là một mối nối), và mỗi đoạn có đúng hai
+    // làn ngược chiều. Nên tổng số làn là bội của 2, và nhiều hơn 2 lần số tuyến.
+    expect(ext.edgeIds.length % 2).toBe(0);
+    expect(ext.edgeIds.length).toBeGreaterThanOrEqual(ext.corridors * 2);
+    // Vào đúng đồ thị ấy — không phải đồ thị thứ hai.
+    expect(traffic.graph.edges.size).toBe(before + ext.edgeIds.length);
     for (const id of ext.edgeIds) {
       const edge = traffic.graph.edges.get(id);
       expect(edge).toBeDefined();
-      expect(edge!.length).toBeGreaterThan(60);
-      expect(edge!.outgoingTurns.length).toBeGreaterThan(0); // có cung quay đầu ở đầu cụt
+      expect(edge!.length).toBeGreaterThan(8);
+      // Mọi làn đều phải có lối ra: cung đi tiếp/rẽ ở ngã tư, hoặc cung quay đầu ở đầu cụt.
+      expect(edge!.outgoingTurns.length).toBeGreaterThan(0);
     }
+    // Đồ thị có **ngã tư thật** (không chỉ đường cụt): node > 2 nhánh.
+    const junctionIds = new Set(ext.junctions.map((j) => j.id));
+    expect(junctionIds.size).toBeGreaterThan(4);
+    // Và phố thủ tục nối được vào cổng của map chuẩn.
+    expect(ext.portals.length).toBeGreaterThan(0);
   });
 
   it("xe chạy được trên tuyến thủ tục, không kẹt, không NaN, và đủ rẻ", () => {

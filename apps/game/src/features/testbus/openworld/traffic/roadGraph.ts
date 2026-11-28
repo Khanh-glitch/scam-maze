@@ -211,6 +211,24 @@ export class SaigonRoadGraph {
     this.addIntersection(spec);
   }
 
+  /**
+   * Nối hai đầu của **hai** tuyến thành phố bằng một cung — ngã tư hình chữ thập.
+   *
+   * `extendTrafficGraph` đặt hai đầu tuyến ở hai mép lòng đường (`trim` vuông góc), nên hai tuyến
+   * vuông góc nhau có bốn cặp đầu gần nhau tạo thành một hộp nhỏ; cung `straight` nối cặp thích hợp
+   * là cung rẽ phải thật, và cầu Bezier giữa hai điểm đúng bằng vòng cung `trim`. Không có cung này
+   * thì hai tuyến chỉ *trông* như cắt nhau: xe chạy hết tuyến rồi quay đầu, và đồ thị không có ngã
+   * tư nào để đặt đèn.
+   */
+  addCityLink(intersectionId: string, fromEdgeId: string, toEdgeId: string, kind: TurnKind = "straight"): boolean {
+    const key = `${fromEdgeId}__${toEdgeId}`;
+    if (this.turns.has(key)) return false;
+    if (!this.edges.has(fromEdgeId) || !this.edges.has(toEdgeId)) return false;
+    if (!this.intersections.has(intersectionId)) return false;
+    this.addTurn(intersectionId, fromEdgeId, toEdgeId, kind, { handleScale: 0.5 });
+    return true;
+  }
+
   /** Nối hai đầu tuyến bằng một cung (đường của thành phố chỉ cần `uturn` ở hai đầu cụt). */
   addCityTurn(
     intersectionId: string,

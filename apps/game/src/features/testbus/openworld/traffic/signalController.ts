@@ -64,6 +64,19 @@ export class TrafficSignalController {
     this.update(0);
   }
 
+  /**
+   * Đăng ký thêm một giao lộ vào bộ điều khiển.
+   *
+   * Bộ điều khiển chụp danh sách `IntersectionSpec` lúc construct, nên giao lộ được cấy **sau** (phố
+   * thủ tục của `/saigon`) phải được đăng ký thì mới có pha. Idempotent. `/testbus` gọi đúng một lần
+   * trong constructor với toàn bộ giao lộ của nó, nên hành vi của map chuẩn không đổi.
+   */
+  registerIntersection(spec: IntersectionSpec): void {
+    if (this.specs.has(spec.id)) return;
+    this.specs.set(spec.id, spec);
+    this.update(this.currentTime);
+  }
+
   /** Register a 3D traffic light head (and optional 2-digit Vietnamese LED countdown panel). */
   bindVisual(binding: SignalVisualBinding) {
     this.bindings.push(binding);

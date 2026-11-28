@@ -177,7 +177,7 @@ export async function buildRealWorld(opts: RealWorldOptions = {}): Promise<RealW
 
   // GIAO THÔNG LAN RA PHỐ THỦ TỤC: góp tuyến của thành phố vào **chính** đồ thị của bộ mô phỏng
   // map chuẩn, rồi đặt xe của map chuẩn lên đó. Không có bộ mô phỏng thứ hai nào ở đây.
-  let extension: CityTrafficExtension = { corridors: 0, edgeIds: [] };
+  let extension: CityTrafficExtension = { corridors: 0, edgeIds: [], junctions: [], portals: [], lengthM: 0 };
   if (opts.city) {
     try {
       extension = extendTrafficGraph(traffic.graph, opts.city, { near: { x: 0, z: -60 }, maxCorridors: 10, radiusM: 520 });

@@ -492,9 +492,25 @@ export class SaigonTrafficManager {
     bus.atBusStop = circuit.busStops.some((st) => Math.abs(circuit.delta(fix.d, st.d)) < 8);
   }
 
-  /** Sync Bus 06's live world pose & speed every frame from `BusRouteController`. */
-  syncBus06(x: number, z: number, yaw: number, speed: number, accel: number, listenerX?: number, listenerZ?: number) {
-    const bus = this.busAgent;
+  /**
+   * Sync Bus 06's live world pose & speed every frame from `BusRouteController`.
+   *
+   * `agentId` cho phép lái một xe buýt **khác** bằng cùng cơ chế: `/saigon` dựng thêm một vòng Bus 06
+   * qua phố sinh tự động (`citymap/cityBus.ts`) và cần đúng phép đồng bộ này — dùng chung một
+   * `BusRouteController` trên một `BusCircuit` khác. Mặc định vẫn là Bus 06 của map chuẩn, nên
+   * `/testbus` không đổi.
+   */
+  syncBus06(
+    x: number,
+    z: number,
+    yaw: number,
+    speed: number,
+    accel: number,
+    listenerX?: number,
+    listenerZ?: number,
+    agentId = this.busAgentId,
+  ) {
+    const bus = agentId === this.busAgentId ? this.busAgent : this.vehicleById.get(agentId);
     if (!bus) return;
     const wasMoving = bus.speed > 1.2;
     bus.yawRate = Math.abs(speed) > 0.1 ? wrapAngleDiff(yaw, bus.yaw) / Math.max(this.lastDt, 0.004) : 0;
