@@ -11,6 +11,23 @@ import type {
 
 const LUT_STEPS = 24;
 
+/** Đặc tả một làn đường đưa vào đồ thị; dùng chung cho `buildNetwork()` và cho phần mở rộng. */
+export interface CityEdgeSpec {
+  id: string;
+  streetName: string;
+  fromNode: string;
+  toNode: string;
+  axis: SignalAxis;
+  start: Vec2;
+  end: Vec2;
+  width?: number;
+  carLaneOffsets?: number[];
+  motoLatRange?: [number, number];
+  speedLimit?: number;
+  busStopS?: number;
+  curbObstructions?: { s: number; halfLen: number; latMin: number; latMax: number }[];
+}
+
 function evalCubicBezier(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2, t: number): {
   x: number;
   z: number;
@@ -175,21 +192,38 @@ export class SaigonRoadGraph {
     this.buildNetwork();
   }
 
-  private addEdge(spec: {
-    id: string;
-    streetName: string;
-    fromNode: string;
-    toNode: string;
-    axis: SignalAxis;
-    start: Vec2;
-    end: Vec2;
-    width?: number;
-    carLaneOffsets?: number[];
-    motoLatRange?: [number, number];
-    speedLimit?: number;
-    busStopS?: number;
-    curbObstructions?: { s: number; halfLen: number; latMin: number; latMax: number }[];
-  }) {
+  /**
+   * MỞ RỘNG ĐỒ THỊ RA NGOÀI MAP DỰNG TAY.
+   *
+   * Ba hàm dưới là cửa công khai cho thứ nằm ngoài `buildNetwork()`: thành phố sinh tự động
+   * (`features/citymap`) dựng thêm tuyến đường của nó vào **chính** đồ thị này, nên xe trên phố thủ
+   * tục vẫn dùng nguyên luật của map chuẩn — đèn QCVN 41:2024, ACC/IDM+, sublane, va chạm OBB —
+   * chứ không phải một bộ mô phỏng thứ hai. Không sửa gì trong `buildNetwork()`.
+   */
+  addCityEdge(spec: CityEdgeSpec): RoadEdge {
+    if (this.edges.has(spec.id)) throw new Error(`Edge đã tồn tại: ${spec.id}`);
+    this.addEdge(spec);
+    return this.edges.get(spec.id) as RoadEdge;
+  }
+
+  addCityIntersection(spec: Omit<IntersectionSpec, "turnIds" | "crosswalkIds">): void {
+    if (this.intersections.has(spec.id)) return;
+    this.addIntersection(spec);
+  }
+
+  /** Nối hai đầu tuyến bằng một cung (đường của thành phố chỉ cần `uturn` ở hai đầu cụt). */
+  addCityTurn(
+    intersectionId: string,
+    fromEdgeId: string,
+    toEdgeId: string,
+    kind: TurnKind,
+    opts?: { weight?: number; motoRtor?: boolean; handleScale?: number },
+  ): void {
+    if (this.turns.has(`${fromEdgeId}__${toEdgeId}`)) return;
+    this.addTurn(intersectionId, fromEdgeId, toEdgeId, kind, opts);
+  }
+
+  private addEdge(spec: CityEdgeSpec) {
     const dx = spec.end.x - spec.start.x;
     const dz = spec.end.z - spec.start.z;
     const length = Math.hypot(dx, dz);

@@ -356,6 +356,39 @@ mesh / 268 360 tam giác**, nhà trọ `DayTro_462_14` 39 con, `SaigonOpenWorldD
 `createInteriorMappingTowerMaterial`). Ảnh chụp trong sandbox phải hạ xuống 900×560 và chờ ~90–110 s
 mới lấy được một khung; ở 1152×720 CDP báo `Unable to capture screenshot`.
 
+### 4j. Giao thông map chuẩn chạy trên phố THỦ TỤC (kế thừa đồ thị, không viết lại)
+
+Đợt trước chỉ có 9 xe của phố Lý Thái Tổ chạy. Đợt này **đồ thị đường của bộ mô phỏng được mở rộng
+ra phố do `cityGen` sinh**, nên xe trên phố thủ tục vẫn do đúng bộ mô phỏng của map chuẩn lái — đèn
+QCVN 41:2024, ACC/IDM+, sublane Sài Gòn, OBB/SAT, người qua đường, còi, LOD 3 tầng. Không có bộ mô
+phỏng thứ hai nào.
+
+- `traffic/roadGraph.ts`: thêm ba cửa công khai `addCityEdge` / `addCityIntersection` / `addCityTurn`
+  (bọc đúng ba hàm private của `buildNetwork()`, không sửa gì trong `buildNetwork`), và kiểu
+  `CityEdgeSpec`. `buildNetwork()` vẫn nguyên.
+- `citymap/cityTraffic.ts`: `extendTrafficGraph()` góp 10 tuyến thủ tục gần map thật thành **20 làn**
+  (mỗi tuyến hai chiều, lệch nửa phần tư bề rộng như Lý Thái Tổ), mỗi đầu cụt nối bằng một cung
+  `uturn`; `spawnCityVehicles()` đặt xe **model của map chuẩn** (taxi Corolla, Savanna, Mula van) lên
+  các làn đó.
+- Tuyến được chọn (đo được): Nguyễn Trãi, Lê Hồng Phong, Pasteur, Võ Văn Kiệt, Trần Nhân Tôn,
+  Đỗ Ngọc Thạnh, Calmette, Lê Lợi, Nguyễn Tri Phương. Tuyến nằm trong đất map thật bị loại (đường
+  đó đã có trong đồ thị gốc — thêm nữa là hai bộ luật chồng nhau).
+
+**Hiệu năng — đo, không đoán.** `cityTraffic.test.ts` chạy `SaigonTrafficManager` thật trong node:
+10 tuyến, 20 làn, 16 xe, 900 khung → **0,106 ms mỗi khung** cho toàn bộ luật giao thông, cả 16 xe
+đều chạy, không NaN, không kẹt ở đầu phố cụt. Nút cổ chai **không phải CPU**: 10 model xe chi tiết
+làm khung hình trong sandbox chậm tới mức không chụp nổi ảnh, nên đã (a) hạ xuống 10 xe, (b) ẩn xe
+xa hơn 260 m (chỉ cắt chi phí vẽ, luật vẫn chạy đủ), (c) có `?citytraffic=0` để tắt hẳn.
+
+Đo trong app đang chạy: `__cityTrafficSpawn = {corridors:10, edges:20, spawned:10}`,
+`__cityTraffic.vehicles` = 26–29 xe (9 của Lý Thái Tổ + 10 của phố thủ tục + số còn lại do quận tự
+đặt), xe phố thủ tục chạy 5,7–8,4 m/s trên đúng làn của nó (`CITY_VEH_0` ở `CTY_0_A: Nguyễn Trãi`).
+
+**Chưa làm:** ngã tư phố thủ tục chưa có đèn (mới có cung quay đầu ở hai đầu tuyến) — muốn có đèn
+thì phải dựng `IntersectionSpec.signalized` + vạch đi bộ cho từng giao lộ, và
+`TrafficSignalController` được tạo trong constructor nên phải thêm hàm nạp lại đèn; bus 06 vẫn chưa
+nối; đèn đường và cây của map chuẩn vẫn chưa lan ra phố thành phố.
+
 ### 4g. Không thấy khu phố gốc trong `/saigon`?
 
 `/saigon` dựng thành phố ngay (khoảng 5 s) rồi mới cắm khu phố gốc. Trong sandbox 2 core

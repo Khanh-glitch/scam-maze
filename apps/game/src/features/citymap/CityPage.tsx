@@ -245,7 +245,7 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
   const [realState, setRealState] = useState<"off" | "pending" | "ready" | "error">("off");
   const [realLoad, setRealLoad] = useState<{ step: string; fraction: number } | null>(null);
   const [realError, setRealError] = useState<string>("");
-  const [realStats, setRealStats] = useState<{ chunks: number; ms: number } | null>(null);
+  const [realStats, setRealStats] = useState<{ chunks: number; ms: number; corridors: number; vehicles: number } | null>(null);
   const flyToRealRef = useRef<(() => void) | null>(null);
   const showLabelsRef = useRef(showLabels);
   showLabelsRef.current = showLabels;
@@ -491,6 +491,7 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
       const realT0 = performance.now();
       void buildRealWorld({
         renderer,
+        city,
         onStep: (step, fraction) => setRealLoad({ step, fraction }),
       })
         .then((world) => {
@@ -504,7 +505,7 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
           setRealState("ready");
           setRealLoad(null);
           const ms = Math.round(performance.now() - realT0);
-          setRealStats({ chunks: world.stats.chunks, ms });
+          setRealStats({ chunks: world.stats.chunks, ms, corridors: world.stats.cityCorridors, vehicles: world.stats.cityVehicles });
           const box = new THREE.Box3().setFromObject(world.root);
           (window as unknown as { __cityReal?: unknown }).__cityReal = {
             chunks: world.stats.chunks,
@@ -854,7 +855,9 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
             {realState === "ready" && (
               <div className="text-white/55">
                 Lý Thái Tổ · nhà trọ 59 · phòng 6.07 · Bitexco · Landmark 81
-                {realStats ? ` · ${realStats.chunks} ô · ${(realStats.ms / 1000).toFixed(0)} s` : ""}
+                {realStats
+                  ? ` · ${realStats.chunks} ô · ${realStats.corridors} tuyến phố thành phố · ${(realStats.ms / 1000).toFixed(0)} s`
+                  : ""}
               </div>
             )}
             <button

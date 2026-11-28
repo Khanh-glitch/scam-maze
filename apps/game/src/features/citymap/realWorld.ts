@@ -23,10 +23,14 @@ import { buildSaigonDistricts, type SaigonDistricts } from '../testbus/openworld
 import { buildBoardingHouse, type BoardingHouse } from '../testbus/openworld/world/boardingHouse';
 import { buildStreet } from '../testbus/openworld/simulation/street';
 import { SaigonTrafficManager } from '../testbus/openworld/traffic';
+import { extendTrafficGraph, spawnCityVehicles, type CityTrafficExtension } from './cityTraffic';
+import type { City } from './cityGen';
 
 type StreetWorld = ReturnType<typeof buildStreet>;
 
 export interface RealWorldOptions {
+  /** Thành phố đang dựng — để góp đường thủ tục vào đồ thị giao thông của map chuẩn. */
+  city?: City;
   /** Báo tiến độ để chip trên màn hình nói được đang dựng tới đâu. */
   onStep?: (step: 'street' | 'house' | 'districts', fraction: number) => void;
   /** Renderer của trang — chỉ dùng để nhận ra SwiftShader/llvmpipe mà hạ chi tiết như game gốc. */
@@ -39,6 +43,10 @@ export interface RealWorldHandle {
   stats: {
     /** Số ô mà `WorldStreamer` quản (phố Lý Thái Tổ chia ô + các quận + nhà trọ). */
     chunks: number;
+    /** Tuyến phố thủ tục đã góp vào đồ thị giao thông của map chuẩn. */
+    cityCorridors: number;
+    /** Xe thành phố đặt lên đồ thị đó. */
+    cityVehicles: number;
   };
   update(dt: number, t: number, camera: THREE.Camera): void;
   dispose(): void;
@@ -167,6 +175,18 @@ export async function buildRealWorld(opts: RealWorldOptions = {}): Promise<RealW
   // Bật hết chi tiết (268 000 tam giác) — xem `WorldStreamer.forceNear`.
   streamer.forceNear();
 
+  // GIAO THÔNG LAN RA PHỐ THỦ TỤC: góp tuyến của thành phố vào **chính** đồ thị của bộ mô phỏng
+  // map chuẩn, rồi đặt xe của map chuẩn lên đó. Không có bộ mô phỏng thứ hai nào ở đây.
+  let extension: CityTrafficExtension = { corridors: 0, edgeIds: [] };
+  if (opts.city) {
+    try {
+      extension = extendTrafficGraph(traffic.graph, opts.city, { near: { x: 0, z: -60 }, maxCorridors: 10, radiusM: 520 });
+      console.info("[citymap] nối", extension.corridors, "tuyến phố thành phố vào đồ thị giao thông");
+    } catch (err) {
+      console.warn('[citymap] không nối được đường thành phố vào đồ thị giao thông', err);
+    }
+  }
+
   opts.onStep?.('districts', 1);
 
   const player = { x: 0, y: 0, z: 0 };
@@ -198,9 +218,36 @@ export async function buildRealWorld(opts: RealWorldOptions = {}): Promise<RealW
     (window as unknown as { __cityRealEnv?: number }).__cityRealEnv = patched;
   }
 
+  // Móc kiểm tra: đọc được danh sách xe (vị trí, tốc độ) từ ngoài, không phải đoán qua ảnh.
+  (window as unknown as { __cityTraffic?: unknown }).__cityTraffic = traffic;
+
+  let cityVehicles = 0;
+  const cityTrafficOn = new URLSearchParams(window.location.search).get('citytraffic') !== '0';
+  if (extension.edgeIds.length && cityTrafficOn) {
+    // 10 xe, không phải 16: đo trong sandbox thấy 16 model xe chi tiết làm khung hình chậm tới mức
+    // không chụp nổi ảnh, trong khi bộ mô phỏng chỉ tốn 0,1 ms/khung cho 16 xe — nút cổ chai là **vẽ**,
+    // không phải luật giao thông. Xe ở xa còn bị ẩn hẳn (xem vòng update).
+    void spawnCityVehicles(traffic, extension, root, { perEdge: 1, maxVehicles: 10 })
+      .then((res) => {
+        cityVehicles = res.spawned;
+        (window as unknown as { __cityTrafficSpawn?: unknown }).__cityTrafficSpawn = {
+          corridors: extension.corridors,
+          edges: extension.edgeIds.length,
+          spawned: res.spawned,
+        };
+      })
+      .catch((err) => console.warn('[citymap] không đặt được xe thành phố', err));
+  }
+
   return {
     root,
-    stats: { chunks: streamer.update(0, 0, 0, software).totalChunks },
+    stats: {
+      chunks: streamer.update(0, 0, 0, software).totalChunks,
+      cityCorridors: extension.corridors,
+      get cityVehicles() {
+        return cityVehicles;
+      },
+    },
     update(dt: number, t: number, camera: THREE.Camera) {
       if (disposed) return;
       time = t;
@@ -224,6 +271,16 @@ export async function buildRealWorld(opts: RealWorldOptions = {}): Promise<RealW
       // con phố biến mất khi nhìn từ trên cao.
       street.update(dt, player, time, true);
       house.update(time);
+      // Cắt theo khoảng cách: model xe chi tiết chỉ hiện trong 260 m quanh camera. Bộ mô phỏng vẫn
+      // chạy đủ luật cho mọi xe (0,1 ms/khung); đây thuần là cắt chi phí **vẽ**.
+      if (frames % 10 === 0) {
+        for (const v of traffic.vehicles) {
+          const rigRoot = v.rig?.root;
+          if (!rigRoot) continue;
+          const far = Math.hypot(v.x - player.x, v.z - player.z) > 260;
+          if (rigRoot.visible === far) rigRoot.visible = !far;
+        }
+      }
       // Số liệu giao thông cho kiểm toán: bao nhiêu xe đang chạy (không phải xe dựng im).
       if (frames % 20 === 0) {
         let moving = 0;
