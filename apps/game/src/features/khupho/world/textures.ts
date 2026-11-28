@@ -451,6 +451,24 @@ function load(file: string, srgb: boolean, sx: number, sy: number): THREE.Textur
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
+/**
+ * NHỰA ĐƯỜNG CỦA MAP CHUẨN (`/testbus`): cùng ba tấm ảnh quét `survey/{map,rough,normal}.webp` mà
+ * `simulation/street.ts` dùng cho phố Lý Thái Tổ. Khu phố gốc vẫn giữ nguyên quy hoạch, bó vỉa,
+ * vỉa hè của nó — chỉ đổi **bộ đồ mặt đường** sang bộ của map thật, để chỗ giáp ranh hai map không
+ * còn "đổi chất" ngay dưới chân người chơi.
+ */
+export function surveyAsphaltTex(sx = 3.2): TexSet {
+  const loadSurvey = (file: string, srgb: boolean) => {
+    const t = loader.load(`/assets/testbus/ow/images/survey/${file}.webp`);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = texCfg.aniso;
+    t.repeat.set(1 / sx, 1 / sx);
+    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  };
+  return { map: loadSurvey('map', true), normal: loadSurvey('normal', false), rough: loadSurvey('rough', false), sx, sy: sx };
+}
+
 /** sx, sy: metres covered by one tile of the scan */
 export function realTex(key: string, sx: number, sy = sx): TexSet {
   return { map: load(key + '_d', true, sx, sy)!, normal: load(key + '_n', false, sx, sy), rough: load(key + '_r', false, sx, sy), sx, sy };

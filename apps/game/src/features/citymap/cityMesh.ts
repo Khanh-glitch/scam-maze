@@ -34,6 +34,8 @@ export interface CityMesh {
   boxes: Part[];
   /** Hộp phẳng: mặt đường, vỉa hè, mặt nước, sân, cột đèn, sạp, xe — một màu, không vân. */
   flat: Part[];
+  /** Bó vỉa: dải đá granite giữa lòng đường và hè — thứ làm mép phố có cạnh như phố thật. */
+  kerbs: Part[];
   /** Lăng trụ tám cạnh (bán kính 1, cao 1, đáy ở y=0): thân tháp vát góc. */
   prisms: Part[];
   /** Lăng trụ tam giác, sống nóc dọc trục x (rộng 1, sâu 1, cao 1): mái ngói. */
@@ -116,6 +118,7 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
   // Khối "phẳng": mặt đường, vỉa hè, mặt nước, sân, cột đèn, sạp, xe. Trước đây chúng nằm chung
   // `boxes` nên bị dán vân cửa sổ của toà nhà — mặt đường vì thế thành một tấm lưới đen.
   const flat: Part[] = [];
+  const kerbs: Part[] = [];
   const drums: Part[] = [];
   const byDistrict = new Map(city.districts.map((d) => [d.id, d]));
   let towers = 0;
@@ -133,6 +136,7 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
   };
   const box = (p: Part) => push(boxes, p);
   const flatBox = (p: Part) => push(flat, p);
+  const kerbBox = (p: Part) => push(kerbs, p);
 
   // --- nền: đường, vỉa hè, nước ---------------------------------------------------------------
   let roads = 0;
@@ -219,12 +223,46 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
           color: s.klass === "alley" ? "#605e6b" : "#5a5964",
         });
       }
-      // vạch tim đường cho đại lộ / phố: gạch 2 m cách nhau 6 m
-      if (s.klass === "avenue" || s.klass === "street") {
+      // BÓ VỈA: dải đá granite ở đúng mép lòng đường, cao bằng hè (0,17) và nhô khỏi mặt nhựa
+      // (0,08) đúng 9 cm như bó vỉa thật. Màu xen kẽ đá sáng / đá xỉn theo từng đoạn — bó vỉa thật
+      // không bao giờ đều một màu. Đây là thứ map chuẩn dựng bằng box 0,15 × 0,107 × 0,687 m
+      // (`simulation/street.ts`), nhìn từ tầm mắt chính là "mép phố có cạnh".
+      const kerbOff = w / 2 + 0.08;
+      for (const sgn of [-1, 1]) {
+        for (const [t0, t1] of spans) {
+          const segLen = (t1 - t0) * len;
+          const mid = (t0 + t1) / 2;
+          kerbBox({
+            x: ax + (bx - ax) * mid + Math.sin(ry) * kerbOff * sgn,
+            y: 0.08,
+            z: az + (bz - az) * mid + Math.cos(ry) * kerbOff * sgn,
+            sx: segLen, sy: 0.095, sz: 0.16, ry,
+            color: hash01(mid * 91.7 + t0 * 13.3 + sgn) > 0.78 ? "#8f8b80" : "#bdb7a8",
+          });
+        }
+      }
+      // Vạch kẻ mặt đường: map chuẩn dùng **tim kép vàng** cho đại lộ và **vạch trắng** cho phố
+      // (`simulation/street.ts` — "double yellow median & dashed lane markings"). Trước đây thành
+      // phố chỉ có một hàng gạch vàng nhạt, nên đại lộ đọc ra "đường nháp".
+      if (s.klass === "avenue") {
+        for (const sgn of [-1, 1]) {
+          for (const [t0, t1] of spans) {
+            const segLen = (t1 - t0) * len;
+            const mid = (t0 + t1) / 2;
+            const offY = 0.22 * sgn;
+            flatBox({
+              x: ax + (bx - ax) * mid + Math.sin(ry) * offY,
+              y: 0.086,
+              z: az + (bz - az) * mid + Math.cos(ry) * offY,
+              sx: segLen, sy: 0.02, sz: 0.13, ry, color: "#c8b264",
+            });
+          }
+        }
+      } else if (s.klass === "street") {
         const dash = Math.max(1, Math.floor(len / 7));
         for (let k = 0; k < dash; k += 1) {
           const t = (k + 0.5) / dash;
-          flatBox({ x: ax + (bx - ax) * t, y: 0.085, z: az + (bz - az) * t, sx: 2.2, sy: 0.02, sz: 0.18, ry, color: "#c9c08a" });
+          flatBox({ x: ax + (bx - ax) * t, y: 0.085, z: az + (bz - az) * t, sx: 2.2, sy: 0.02, sz: 0.16, ry, color: "#d7d5bc" });
         }
       }
       roads += 1;
@@ -622,6 +660,31 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
     } else if (p.kind === "moto") {
       flatBox({ x: p.x, y: 0, z: p.z, sx: 0.8, sy: 1.05, sz: 1.9, ry: hash01(p.x) * 3.14, color: "#5a5f6a" });
       props += 1;
+    } else if (p.kind === "bin") {
+      // Thùng rác nhựa xanh — đúng màu `binGreen` (0x2c4236) của `saigonProps.ts` bên map chuẩn.
+      push(drums, { x: p.x, y: 0, z: p.z, sx: 0.62, sy: 1.02, sz: 0.62, color: "#2c4236" });
+      props += 1;
+    } else if (p.kind === "sign") {
+      // Biển treo/băng-rôn trước quán: tấm dọc 0,1 m, cao 1,2 m, đặt ở 2,4 m như biển hiệu thật.
+      const c = BANNER[Math.floor(hash01(p.x * 2.3 + p.z * 5.1) * BANNER.length)];
+      push(details, { x: p.x, y: 2.4, z: p.z, sx: 0.12, sy: 1.2, sz: 0.8, ry: hash01(p.z) * 3.14, color: c });
+      props += 1;
+    } else if (p.kind === "shrine") {
+      // Bàn thờ Thổ Địa nhỏ trước cửa — có thật ở gần như mọi căn phố Sài Gòn.
+      push(details, { x: p.x, y: 0.35, z: p.z, sx: 0.62, sy: 0.7, sz: 0.46, color: "#8a3f34" });
+      push(details, { x: p.x, y: 1.05, z: p.z, sx: 0.72, sy: 0.1, sz: 0.56, color: "#c9a24a" });
+      props += 1;
+    } else if (p.kind === "hoarding") {
+      // Tôn chắn công trường: tấm 3,2 m × 1,8 m, KHÔNG dựng thành hàng rào liền — đặt sát nhau thì
+      // 98 tấm thành một bức tường xanh chạy dọc phố (đã thấy trong ảnh kiểm tra). Chỉ dựng khi ô
+      // đó thật sự là công trường, và dựng thấp, lùi vào trong hè.
+      if (hash01(p.x * 3.7 + p.z * 1.9) > 0.55) {
+        flatBox({ x: p.x, y: 0, z: p.z, sx: 3.2, sy: 1.8, sz: 0.08, ry: hash01(p.x + p.z) * 3.14, color: "#2f5f86" });
+      }
+      props += 1;
+    } else if (p.kind === "cone") {
+      push(drums, { x: p.x, y: 0, z: p.z, sx: 0.36, sy: 0.62, sz: 0.36, color: "#b8542f" });
+      props += 1;
     }
   }
 
@@ -659,7 +722,7 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
   }
 
   return {
-    boxes, flat, prisms, gables, trunks, canopies, details, drums, anchors,
+    boxes, flat, kerbs, prisms, gables, trunks, canopies, details, drums, anchors,
     stats: {
       buildings: city.buildings.filter((b) => !b.walkable).length,
       towers, gabledRoofs, parts, roads, props,

@@ -95,7 +95,8 @@ export function mat(key: string): THREE.Material {
     case 'brick': m = std(tex('brick', () => T.realTex('brick', 2.4)), arg || '#ffffff', 1, 0, 1.6, {}, WX); break;
     case 'conc': m = std(tex('conc', () => T.realTex('conc', 2.2)), arg || '#ffffff', 1, 0, 1.2, {}, WG); break;
     case 'roof': m = std(tex('roof', () => T.realTex('roof', 2.4)), '#ffffff', 1, 0, 1.6, { side: THREE.DoubleSide }, { macro: 1, grime: 0, streak: 0 }); break;
-    case 'asph': m = std(tex('asph', () => T.realTex('asph', 3.2)), '#ffffff', 1, 0, 1.6, {}, { macro: 1.1, grime: 0, streak: 0 }); break;
+    // Mặt đường: dùng bộ ảnh quét của map chuẩn (`/testbus`), không dùng bộ riêng của khu phố nữa.
+    case 'asph': m = std(tex('asph', () => T.surveyAsphaltTex(3.2)), '#ffffff', 1, 0, 1.6, {}, { macro: 1.1, grime: 0, streak: 0 }); break;
     case 'wood': m = std(tex('wood6', () => T.realTex('wood', 1.5)), arg, 1, 0, 0.8, {}, WS); break;
     case 'woodF': m = std(tex('wood2', () => T.realTex('woodF', 1.2)), arg, 1, 0, 0.7, {}, WS); break;
     case 'woodP': m = std(tex('wood1', () => T.realTex('woodF', 0.8)), arg, 1, 0, 0.6, {}, WS); break;

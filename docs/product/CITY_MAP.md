@@ -389,6 +389,50 @@ thì phải dựng `IntersectionSpec.signalized` + vạch đi bộ cho từng gi
 `TrafficSignalController` được tạo trong constructor nên phải thêm hàm nạp lại đèn; bus 06 vẫn chưa
 nối; đèn đường và cây của map chuẩn vẫn chưa lan ra phố thành phố.
 
+### 4k. Bộ đồ phố lấy từ map chuẩn (đợt "cả cụm 1→4")
+
+Trước đợt này, lớp thành phố sinh tự động (`cityMesh.ts` + `CityPage.tsx`) chỉ mượn đúng **một** thứ
+của map chuẩn (ảnh quét mặt đường). Cây là **nón 7 cạnh** (`ConeGeometry(0.5, 1, 7)`), mặt đứng là
+một canvas vẽ tay dán khắp nơi, chi tiết mặt tiền là hộp màu phẳng (những "khối xanh đen" trong ảnh
+kiểm tra), bó vỉa không có. Đợt này thay bốn hệ:
+
+1. **Mặt đường / bó vỉa / vạch kẻ.** `cityMesh.ts` sinh thêm lưới `kerbs`: dải đá granite 0,16 m ở
+   đúng mép lòng đường, cao 9 cm so với mặt nhựa, hai màu đá xen kẽ (`#bdb7a8` / `#8f8b80`) — cùng
+   tiết diện với bó vỉa của `simulation/street.ts`. Đại lộ có **tim kép vàng** (`#c8b264`), phố có
+   **vạch trắng** (`#d7d5bc`) thay cho hàng gạch vàng nhạt cũ.
+2. **Cây.** Thay nón bằng `SaigonBotanicalBatch` của map chuẩn (`foliageAndProps.ts`): thân phân
+   nhánh dùng chung 1 lưới instanced, 20 thẻ lá alpha mỗi cây dùng chung 1 lưới nữa, gió chạy bằng
+   shader (`uTime`/`uWind`). Đo trong app: **1 351 thân + 27 020 thẻ lá, 2 lưới, 2 lệnh vẽ**.
+3. **Mặt đứng + chi tiết mặt tiền.** `facadeTexture()` giờ phủ **ảnh quét thạch cao của map chuẩn**
+   (`q1/beige_wall_001`, `q1/grey_plaster_02`, `q1/clay_plaster`) lên tấm vân cửa sổ theo chế độ
+   `multiply`, và toà được chia 3 nhóm theo hash nên dãy phố không còn một bức tường dán khắp nơi.
+   Cửa cuốn/biển hiệu dán tấm **tôn cuốn** (`drive-look/tin-map.webp`) thay vì màu phẳng.
+4. **Đồ vỉa hè.** `placeStreetProps` (chính file GLB `streetPropsGlb.ts` mà phố Lý Thái Tổ dùng) đặt
+   24 bản sao xe bánh mì / tủ đổi pin / thùng rác inox trên mặt hè (y = 0,17 m). Thêm các loại prop
+   trước đây **bị bỏ qua hoàn toàn**: `bin` (1 278), `sign` (355), `shrine` (257), `hoarding` (98),
+   `cone` (6) — theo màu chuẩn của `saigonProps.ts` (`binGreen 0x2c4236`).
+
+**Khu phố gốc (đổi bộ đồ, giữ quy hoạch).** `khupho/world/textures.ts` thêm `surveyAsphaltTex()`:
+mặt đường khu phố giờ dùng đúng ba tấm `survey/{map,rough,normal}.webp` của map chuẩn, thay cho bộ
+quét riêng. Lô đất, bề rộng đường (3,6 m nửa đường), bó vỉa, collider, vùng đi bộ, quest — **không
+đổi một dòng nào**.
+
+**Hai lỗi tự tìm ra khi chụp ảnh kiểm tra (đã sửa):**
+- Mặt đường ra **tím**: `surveyTex()` gán cả ảnh `normal.webp` vào `roadMat.map`, ghi đè ảnh màu. Lỗi
+  chỉ lộ ở `?hq=1` vì trên máy phần mềm nhánh normal bị tắt. Nay ảnh màu → `map`, ảnh normal →
+  `normalMap` (và nhánh HQ dùng `MeshStandardMaterial`).
+- Vật liệu `drums` mang màu inox `#c9cdd2`, nên mọi thứ trong cùng lưới instanced (thùng rác, cọc
+  tiêu, bánh xe) bị nhân màu thép. Nay vật liệu để trắng, màu nằm ở từng instance.
+
+**Hiệu năng.** Mặc định (máy phần mềm) vẫn chạy đường Lambert + nón, đúng như trước. `?hq=1` bật bản
+đầy đủ; đo trong app ở chế độ HQ, chỉ thành phố thủ tục: **13 lưới instanced, 2,19 triệu tam giác**,
+khung hình ~3 phút trong sandbox SwiftShader (không phải máy thật). Vì vậy `?hq=1` là tuỳ chọn, còn
+tự nhận diện renderer phần mềm vẫn hạ chi tiết.
+
+**Chưa làm:** cây của khu phố gốc vẫn là cụm lá của bản demo (chưa thay bằng BotanicalBatch); cột
+đèn vẫn là hộp 0,16 × 4,6 (chưa lấy cột đèn + halo của `saigonDistricts.ts`); ngã tư phố thủ tục vẫn
+chưa có đèn; bus 06 chưa nối.
+
 ### 4g. Không thấy khu phố gốc trong `/saigon`?
 
 `/saigon` dựng thành phố ngay (khoảng 5 s) rồi mới cắm khu phố gốc. Trong sandbox 2 core

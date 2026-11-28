@@ -3,6 +3,9 @@ import * as THREE from "three";
 import { generateCity, type City } from "./cityGen";
 import { buildCityMesh, type Part } from "./cityMesh";
 import { buildCoreWorld, type CoreWorld } from "./coreWorld";
+import { SaigonBotanicalBatch } from "../testbus/openworld/world/foliageAndProps";
+import { placeStreetProps } from "../testbus/openworld/simulation/streetPropsGlb";
+import { createRealTreeBarkPBR } from "../testbus/openworld/world/pbrTextures";
 import { buildRealWorld, type RealWorldHandle } from "./realWorld";
 
 /**
@@ -47,7 +50,7 @@ const gableGeometry = (): THREE.BufferGeometry => {
  * Vân mặt đứng: một tấm tường có lưới cửa sổ. Không có nó thì toà nhà chỉ là khối màu — đúng thứ
  * "khối hình học ghép lại" cần tránh. Vân tô trắng để màu từng toà (instance colour) còn nhân lên.
  */
-const facadeTexture = (): THREE.Texture => {
+const facadeTexture = (plaster?: string): THREE.Texture => {
   const S = 256;
   const c = document.createElement("canvas");
   c.width = S;
@@ -105,6 +108,24 @@ const facadeTexture = (): THREE.Texture => {
   t.wrapS = THREE.RepeatWrapping;
   t.wrapT = THREE.RepeatWrapping;
   t.anisotropy = 4;
+  // BỘ ĐỒ CỦA MAP CHUẨN: phủ ảnh quét thạch cao/vôi thật (`q1/*-map.webp`, cùng bộ map chuẩn dùng
+  // cho mặt đứng) lên trên tấm vân vẽ tay, chế độ `multiply` — cửa sổ, dầm sàn, ống nước vẫn còn
+  // nhưng bề mặt là ảnh thật, không còn "tường nhựa phẳng". Ảnh về muộn thì vân vẽ tay vẫn dùng
+  // được ngay từ khung hình đầu.
+  if (plaster && g) {
+    const img = new Image();
+    img.onload = () => {
+      g.save();
+      g.globalCompositeOperation = "multiply";
+      g.globalAlpha = 0.85;
+      for (let i = 0; i < 2; i += 1) {
+        for (let j = 0; j < 2; j += 1) g.drawImage(img, i * S * 0.5, j * S * 0.5, S * 0.5, S * 0.5);
+      }
+      g.restore();
+      t.needsUpdate = true;
+    };
+    img.src = `/assets/testbus/ow/images/q1/${plaster}-map.webp`;
+  }
   return t;
 };
 
@@ -317,6 +338,20 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     ground.receiveShadow = true;
     scene.add(ground);
 
+    const SOFT_GL = (() => {
+      try {
+        const gl = renderer.getContext();
+        const ext = gl.getExtension("WEBGL_debug_renderer_info");
+        const info = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : "";
+        // `?hq=1` ép chạy bản đầy đủ (cây thật, mặt đứng PBR, normal map mặt đường) kể cả trên
+        // renderer phần mềm — để chụp/kiểm tra chất lượng, và để người dùng tự chọn trên máy yếu.
+        const forced = new URLSearchParams(window.location.search).get("hq") === "1";
+        return !forced && /swiftshader|llvmpipe|software|mesa offscreen/i.test(info);
+      } catch {
+        return false;
+      }
+    })();
+
     const cube = new THREE.BoxGeometry(1, 1, 1);
     cube.translate(0, 0.5, 0);
     const prism = new THREE.CylinderGeometry(1, 1, 1, 8);
@@ -324,19 +359,21 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     prism.rotateY(Math.PI / 8);
 
     // Mặt đứng có cửa sổ, mái có vân: hộp nhà đọc ra toà nhà.
-    const facade = new THREE.MeshLambertMaterial({ map: facadeTexture() });
-    // Sửa UV theo kích thước THẬT của từng instance: hộp 60 m cao mà dán 4 cửa sổ thì đọc ra "tường
-    // trơn có 4 ô đen". Một ô vân = 4 cửa sổ ≈ 13,5 m ngang, 14,5 m đứng.
-    facade.onBeforeCompile = (shader) => {
-      shader.vertexShader = shader.vertexShader
-        .replace(
-          "#include <common>",
-          `#include <common>
+    /**
+     * Sửa UV theo kích thước THẬT của từng instance: hộp 60 m cao mà dán 4 cửa sổ thì đọc ra "tường
+     * trơn có 4 ô đen". Một ô vân = 4 cửa sổ ≈ 13,5 m ngang, 14,5 m đứng.
+     */
+    const facadeUvPatch = (m: THREE.MeshLambertMaterial) => {
+      m.onBeforeCompile = (shader) => {
+        shader.vertexShader = shader.vertexShader
+          .replace(
+            "#include <common>",
+            `#include <common>
           float facadePitch(float size, float tile) { return max(1.0, floor(size / tile + 0.5)); }`,
-        )
-        .replace(
-          "#include <uv_vertex>",
-          `#include <uv_vertex>
+          )
+          .replace(
+            "#include <uv_vertex>",
+            `#include <uv_vertex>
           #ifdef USE_INSTANCING
             float fSX = length(instanceMatrix[0].xyz);
             float fSY = length(instanceMatrix[1].xyz);
@@ -344,11 +381,31 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
             float fU = abs(normal.x) > 0.5 ? fSZ : fSX;
             vMapUv *= vec2(facadePitch(fU, 13.5), facadePitch(fSY, 14.5));
           #endif`,
-        );
+          );
+      };
+      return m;
     };
     const roofMat = new THREE.MeshLambertMaterial({ map: roofTexture() });
     // BoxGeometry có 6 nhóm mặt: +x, -x, +y, -y, +z, -z
-    addChunked(scene, cube, meshData.boxes, { materials: [facade, facade, roofMat, roofMat, facade, facade] });
+    // MẶT ĐỨNG: ba bộ vân, mỗi bộ là **ảnh quét thạch cao của map chuẩn** phủ dưới lưới cửa sổ
+    // (`q1/beige_wall_001`, `q1/grey_plaster_02`, `q1/clay_plaster`). Toà được chia theo hash nên dãy
+    // phố không còn "một bức tường vẽ một lần rồi dán khắp thành phố", mà vẫn chỉ tốn 3 lệnh vẽ.
+    const facadeVariants = ["beige_wall_001", "grey_plaster_02", "clay_plaster"];
+    const facadeMats = facadeVariants.map((id) => facadeUvPatch(new THREE.MeshLambertMaterial({ map: facadeTexture(id) })));
+    const buckets: Part[][] = facadeVariants.map(() => []);
+    const hF = (n: number) => {
+      const v = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
+      return v - Math.floor(v);
+    };
+    for (const p of meshData.boxes) {
+      const b = Math.min(facadeVariants.length - 1, Math.floor(hF(p.x * 1.7 + p.z * 3.3 + p.y * 5.1) * facadeVariants.length));
+      buckets[b].push(p);
+    }
+    buckets.forEach((parts, i) => {
+      if (!parts.length) return;
+      const m = facadeMats[i];
+      addChunked(scene, cube, parts, { materials: [m, m, roofMat, roofMat, m, m] });
+    });
     // Đường, hè, nước, sân, vật thể: màu phẳng. Dán vân cửa sổ lên mặt đường là biến phố thành
     // một tấm lưới đen (lỗi nhìn thấy ngay ở khung ngang tầm mắt).
     // Mặt đường/sân/nước chỉ nhận bóng: cho 30 000 tấm phẳng ném bóng là tiền mất tật mang.
@@ -358,16 +415,7 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     // Máy chạy renderer phần mềm (SwiftShader/llvmpipe) thì giữ màu phẳng: nhựa đường có normal map
     // phủ toàn màn hình làm khung hình trong sandbox rớt tới mức không chụp nổi ảnh (đã đo: quá 150 s
     // cho một khung). Trên GPU thật thì bật — cùng cách map chuẩn tự hạ chi tiết khi gặp software.
-    const SOFT_GL = (() => {
-      try {
-        const gl = renderer.getContext();
-        const ext = gl.getExtension("WEBGL_debug_renderer_info");
-        const info = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : "";
-        return /swiftshader|llvmpipe|software|mesa offscreen/i.test(info);
-      } catch {
-        return false;
-      }
-    })();
+
     const ROAD_COLORS = new Set(["#5a5964", "#605e6b"]);
     const roadParts = meshData.flat
       .filter((p) => p.color && ROAD_COLORS.has(p.color))
@@ -379,7 +427,12 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     // khung hình vượt 150 s trong sandbox. Màu phẳng trước đây giữ làm nền khi ảnh chưa tải xong.
     // `#d4d8dc` là đúng màu nhân mà `street.ts` của map chuẩn dùng cho cùng tấm ảnh này
     // (`asphalt.color.set(0xd4d8dc)`); để trắng thì nhựa đường ra gần đen.
-    const roadMat = new THREE.MeshLambertMaterial({ color: "#d4d8dc" });
+    // Trên GPU thật: `MeshStandardMaterial` để dùng được ảnh normal + độ nhám của bản quét (mặt
+    // nhựa có hạt, có vệt bánh). Trên renderer phần mềm: Lambert, vì normal map phủ toàn màn hình
+    // từng làm khung hình quá 150 s (xem §4i).
+    const roadMat: THREE.Material = SOFT_GL
+      ? new THREE.MeshLambertMaterial({ color: "#d4d8dc" })
+      : new THREE.MeshStandardMaterial({ color: "#d4d8dc", roughness: 0.94, metalness: 0.02 });
     /**
      * Ảnh quét nhựa đường của map chuẩn, **hạ xuống 256²** qua canvas.
      *
@@ -387,7 +440,7 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
      * `complete: true`, 1024×1024, UV có, mà vẫn đen) — nghi bản WebP 1024² không lên được GPU ảo.
      * Vẽ lại qua canvas 256² vừa nhẹ cho SwiftShader, vừa không phụ thuộc định dạng file.
      */
-    const surveyTex = (file: string) => {
+    const surveyTex = (file: string, apply: (t: THREE.Texture) => void) => {
       const t = new THREE.Texture();
       const img = new Image();
       img.onload = () => {
@@ -402,7 +455,7 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
         ct.wrapS = ct.wrapT = THREE.RepeatWrapping;
         ct.anisotropy = 4;
         ct.needsUpdate = true;
-        roadMat.map = ct;
+        apply(ct);
         roadMat.needsUpdate = true;
       };
       img.onerror = () => console.warn("[citymap] không tải được", file);
@@ -410,25 +463,93 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
       return t;
     };
     // `surveyTex` tự gán `roadMat.map` khi ảnh giải mã xong (bất đồng bộ), nên không cần đặt ở đây.
-    surveyTex("map.webp");
-    if (!SOFT_GL) surveyTex("normal.webp");
+    // Ảnh màu gán vào `map`; ảnh normal chỉ gán khi vật liệu là Standard (Lambert không có normal map).
+    // Trước đây cả hai cùng gán `roadMat.map`, nên ảnh normal ghi đè ảnh màu và mặt đường ra **tím**
+    // (lỗi chỉ lộ ở `?hq=1` vì trên máy phần mềm nhánh normal bị tắt).
+    surveyTex("map.webp", (t) => {
+      (roadMat as THREE.MeshStandardMaterial).map = t;
+    });
+    if (!SOFT_GL) {
+      surveyTex("normal.webp", (t) => {
+        const std = roadMat as THREE.MeshStandardMaterial;
+        std.normalMap = t;
+        std.normalScale.set(0.45, 0.45);
+      });
+    }
     // Luôn dùng `roadParts` (màu instance = trắng): màu instance nhân vào map, để nguyên `#5a5964`
     // thì nhựa đường bị nhân hai lần và ra đen tuyền — đúng cái đã thấy ở ảnh kiểm tra thứ nhất.
     addChunked(scene, cube, roadParts, { materials: roadMat, castShadow: false });
     addChunked(scene, cube, otherFlat, { materials: new THREE.MeshLambertMaterial(), castShadow: false });
+    // Bó vỉa: đá granite hai màu, dựng từ cùng bộ hình khối nhưng **không** dùng chung vật liệu với
+    // hè — nếu dùng chung thì mép đường lại lẫn vào mặt hè và mất cạnh.
+    addChunked(scene, cube, meshData.kerbs, {
+      materials: new THREE.MeshLambertMaterial({ color: "#ffffff" }),
+      castShadow: false,
+    });
     addChunked(scene, prism, meshData.prisms);
     addChunked(scene, gableGeometry(), meshData.gables);
-    // Chi tiết mặt tiền (cửa cuốn, biển hiệu, mái hiên, ban công) không vân, màu phẳng.
-    addChunked(scene, cube, meshData.details, { materials: new THREE.MeshLambertMaterial(), castShadow: false });
-    const trunkGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 6);
-    trunkGeo.translate(0, 0.5, 0);
-    addChunked(scene, trunkGeo, meshData.trunks);
-    const canopyGeo = new THREE.ConeGeometry(0.5, 1, 7);
-    canopyGeo.translate(0, 0.5, 0);
-    addChunked(scene, canopyGeo, meshData.canopies);
+    // Chi tiết mặt tiền (cửa cuốn, biển hiệu, mái hiên, ban công): trước đây là **màu phẳng**, nên
+    // cả dãy cửa cuốn đọc ra những khối xanh đen không rõ là gì. Nay dán tấm tôn cuốn của map chuẩn
+    // (`drive-look/tin-map.webp`, cùng tấm mà map chuẩn dùng cho vách tôn) — màu của từng ô vẫn do
+    // instance quyết nên mỗi căn vẫn một màu, nhưng bề mặt đọc ra kim loại.
+    const tin = new THREE.TextureLoader().load("/assets/testbus/ow/images/drive-look/tin-map.webp");
+    tin.wrapS = THREE.RepeatWrapping;
+    tin.wrapT = THREE.RepeatWrapping;
+    tin.repeat.set(2, 2);
+    addChunked(scene, cube, meshData.details, {
+      materials: new THREE.MeshLambertMaterial({ map: tin }),
+      castShadow: false,
+    });
+    // CÂY: dùng **đúng bộ cây của map chuẩn** — `SaigonBotanicalBatch` (thân phân nhánh + 20 thẻ lá
+    // alpha mỗi cây, tất cả instanced nên cả thành phố chỉ tốn 2 draw call, có gió theo shader).
+    // Trước đây thành phố trồng cây bằng nón 7 cạnh (`ConeGeometry(0.5, 1, 7)`) — thứ đọc ra "cây
+    // nháp" trong ảnh kiểm tra. Nón chỉ còn là đường lui cho máy chạy renderer phần mềm: 27 000 thẻ
+    // lá alpha-test là overdraw, SwiftShader không gánh nổi.
+    let treeWind: { uTime: { value: number }; uWind: { value: number } } | null = null;
+    if (!SOFT_GL && meshData.trunks.length && meshData.trunks.length === meshData.canopies.length) {
+      const batch = new SaigonBotanicalBatch();
+      for (let i = 0; i < meshData.trunks.length; i += 1) {
+        const t = meshData.trunks[i];
+        const c = meshData.canopies[i];
+        // Cây đường phố thật cao 7–11 m; khung xương mẫu cao 5,2 m nên scale suy từ chiều cao cũ.
+        const scale = Math.min(2.1, Math.max(0.9, (t.sy + c.sy) / 5.2));
+        batch.addShadeTree(t.x, t.y, t.z, scale);
+      }
+      const wind = { uTime: { value: 0 }, uWind: { value: 0.55 } };
+      const trees = new THREE.Group();
+      trees.name = "city-trees";
+      batch.commit(trees, createRealTreeBarkPBR(1, 3), wind, true);
+      scene.add(trees);
+      treeWind = wind;
+    }
+    if (!treeWind) {
+      const trunkGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 6);
+      trunkGeo.translate(0, 0.5, 0);
+      addChunked(scene, trunkGeo, meshData.trunks);
+      const canopyGeo = new THREE.ConeGeometry(0.5, 1, 7);
+      canopyGeo.translate(0, 0.5, 0);
+      addChunked(scene, canopyGeo, meshData.canopies);
+    }
+    // ĐỒ VỈA HÈ THẬT của map chuẩn: xe bánh mì, tủ đổi pin, thùng rác inox — **chính file GLB** mà
+    // phố Lý Thái Tổ dùng (`simulation/streetPropsGlb.ts`, các node `Prop_BanhMi` / `Prop_BatterySwap`
+    // / `Prop_TrashBin`). Đặt thưa (24 chỗ trên 408 sạp) để không thành rừng bản sao và không phá
+    // ngân sách khung hình; mỗi chỗ là một bản sao trên mặt hè (y = 0,17 m).
+    {
+      const spots = city.props.filter((p) => p.kind === "stall").filter((_, i) => i % 17 === 0).slice(0, 24);
+      const nodes = ["Prop_BanhMi", "Prop_BatterySwap", "Prop_TrashBin"] as const;
+      if (spots.length) {
+        void placeStreetProps(
+          scene,
+          spots.map((p, i) => ({ node: nodes[i % nodes.length], x: p.x, y: 0.17, z: p.z, yaw: (i * 1.7) % (Math.PI * 2) })),
+        ).catch((err) => console.warn("[citymap] không đặt được đồ vỉa hè GLB", err));
+      }
+    }
     const drumGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 10);
     drumGeo.translate(0, 0.5, 0);
-    addChunked(scene, drumGeo, meshData.drums, { materials: new THREE.MeshLambertMaterial({ color: "#c9cdd2" }), castShadow: false });
+    // Vật liệu để **trắng**: màu nằm ở từng instance (bồn inox `#c9cdd2`, thùng rác `#2c4236`,
+    // cọc tiêu `#b8542f`, bánh xe). Trước đây vật liệu mang màu inox nên mọi thứ khác trong cùng
+    // lưới bị nhân màu thép và mất màu riêng.
+    addChunked(scene, drumGeo, meshData.drums, { materials: new THREE.MeshLambertMaterial({ color: "#ffffff" }), castShadow: false });
 
     // KHU PHỐ GỐC: cắm nguyên thế giới đang chơi được của game vào đây — nhà ống, mặt đường, vỉa hè,
     // hẻm, sân chung, dây điện, cây, đồ vỉa hè, người và xe máy chạy theo đúng luật của map gốc.
@@ -671,6 +792,7 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     const loop = () => {
       const dt = Math.min(0.05, clock.getDelta());
       const now = clock.elapsedTime;
+      if (treeWind) treeWind.uTime.value = now;
       coreWorld?.update(dt, now);
       realWorld?.update(dt, now, camera);
       const boost = keys.has("shift") ? 4 : 1;
