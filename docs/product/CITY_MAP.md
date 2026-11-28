@@ -304,6 +304,21 @@ dây/bánh) — kiểm bằng ảnh chụp thật.
 
 Số khối: 44 175 → **97 331** (vẫn dưới ngưỡng `maxParts` 120 000).
 
+### 4g. Không thấy khu phố gốc trong `/saigon`?
+
+`/saigon` dựng thành phố ngay (khoảng 5 s) rồi mới cắm khu phố gốc. Trong sandbox 2 core
+SwiftShader, **nhà + đường của khu phố mất 48–104 s**, toàn bộ (thêm người, xe, cây) ~128 s.
+Trước đây màn hình không báo gì nên rất dễ tưởng map gốc không có trong thành phố.
+
+Từ `450449e`, góc trên trái `/saigon` có chip trạng thái:
+
+- `Đang dựng khu phố gốc (…)` + phần trăm,
+- `Khu phố gốc · Nguyễn Du ✓` khi xong,
+- `Khu phố gốc: dựng thất bại` + thông điệp lỗi (không còn im lặng),
+
+kèm nút **Bay tới khu phố gốc** để camera nhảy thẳng tới Nguyễn Du (x≈57, z≈−330) thay vì
+phải tự bay đi tìm. Ảnh: `docs/product/audit/_g-status.jpg`.
+
 ## 5. Giới hạn — cái bài đo này **không** nói được
 
 - Khung hình `/saigon` đã được chụp thật (§4d) bằng Chromium + SwiftShader ở 1152 × 720. Nhưng đó là
