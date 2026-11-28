@@ -356,6 +356,13 @@ vì hình học lẫn dữ liệu đều đọc từ cùng một nguồn `featur
 - Thời gian: `onWorldReady` gắn nhà + mặt phố vào scene **ngay khi dựng xong**, trước phần người và
   đồ GLB (đo trong sandbox: mặt phố hiện trước ~4 s). `?nolife=1` chỉ dựng nhà/đường/vỉa hè cho máy
   yếu; `?humans=1` / `?baothu=1` bật model nặng.
+- Hiệu năng `/saigon`: các lớp instanced được chia ô 320 m và bật frustum culling (`?chunk=1`), bóng
+  thu về ±330 m quanh điểm nhìn, mặt đường/chi tiết/bồn nước không ném bóng. **Chưa đo được lợi ích**:
+  máy sandbox chỉ 2 nhân, GPU phần mềm, fps dao động 1,3–2,3 (đo cùng một khung hình, có/không bóng
+  đều vậy) — số đo ở đây không nói được gì về máy thật. Mặc định chia ô TẮT vì dưới SwiftShader 250
+  lệnh vẽ chậm hơn hẳn 8 lệnh vẽ.
+- Bóng: giữ vẽ mỗi khung. Đã thử `shadowMap.autoUpdate = false` — ảnh `_g-shadow.jpg` cho thấy phố
+  mất bóng hoàn toàn, nên quay lại.
 - Nền khu phố dùng đúng màu nền thành phố (`#55544a`) nên mép dải không còn vệt sáng.
 - `/saigon` mở màn **ngay trên khu phố gốc**, có nhãn "Khu phố gốc · Lê Thánh Tôn" và thanh tải riêng
   ("Đang cắm khu phố gốc"). Người mẫu GLB (~50 MB) mặc định tắt để trang mở nhanh — người đi đường

@@ -154,11 +154,57 @@ const addInstanced = (
   });
   mesh.instanceMatrix.needsUpdate = true;
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  mesh.frustumCulled = false;
+  mesh.frustumCulled = true;
+  mesh.computeBoundingSphere();
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   scene.add(mesh);
   return mesh;
+};
+
+/**
+ * Cạnh ô chia thành phố (m). Chia ô để mỗi ô cull được riêng theo khung nhìn — trên GPU thật đây là
+ * cách cắt số hình phải vẽ khi đứng trong phố. Nhưng mỗi ô là một lệnh vẽ: ở trình duyệt phần mềm
+ * (SwiftShader, GPU ảo) 250 lệnh vẽ đắt hơn 8 lệnh vẽ kèm cull hỏng — đo được 2,3 fps so với 20 fps.
+ * Vì vậy mặc định TẮT, bật bằng `?chunk=1` (hoặc `?chunk=640` để đổi cạnh ô).
+ */
+let CHUNK = 0;
+
+/**
+ * Như `addInstanced` nhưng chia theo ô 320 m: mỗi ô là một `InstancedMesh` riêng, có bao cầu riêng,
+ * nên khi nhìn dọc một con phố máy chỉ vẽ những ô trong khung hình thay vì **toàn bộ 97 000 khối**.
+ * Bản cũ đặt `frustumCulled = false` cho tất cả: đứng ở đâu cũng vẽ cả thành phố 1,3 km.
+ */
+const addChunked = (
+  scene: THREE.Scene,
+  geometry: THREE.BufferGeometry,
+  parts: Part[],
+  opts: { materials?: THREE.Material | THREE.Material[]; castShadow?: boolean; receiveShadow?: boolean } = {},
+) => {
+  if (!parts.length) return [] as THREE.InstancedMesh[];
+  if (CHUNK <= 0) {
+    const mesh = addInstanced(scene, geometry, parts, opts.materials);
+    if (!mesh) return [];
+    mesh.castShadow = opts.castShadow ?? true;
+    mesh.receiveShadow = opts.receiveShadow ?? true;
+    return [mesh];
+  }
+  const buckets = new Map<string, Part[]>();
+  for (const p of parts) {
+    const key = `${Math.floor(p.x / CHUNK)}|${Math.floor(p.z / CHUNK)}`;
+    const list = buckets.get(key);
+    if (list) list.push(p);
+    else buckets.set(key, [p]);
+  }
+  const out: THREE.InstancedMesh[] = [];
+  for (const list of buckets.values()) {
+    const mesh = addInstanced(scene, geometry, list, opts.materials);
+    if (!mesh) continue;
+    mesh.castShadow = opts.castShadow ?? true;
+    mesh.receiveShadow = opts.receiveShadow ?? true;
+    out.push(mesh);
+  }
+  return out;
 };
 
 export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
@@ -196,6 +242,7 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     const H = el.clientHeight || window.innerHeight;
 
     const qs = new URLSearchParams(window.location.search);
+    CHUNK = Number(qs.get("chunk") ?? 0) || 0;
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     renderer.setSize(W, H);
@@ -208,7 +255,10 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     renderer.shadowMap.enabled = true;
     // Thành phố tĩnh: chỉ vẽ lại bản đồ bóng khi camera pan đủ xa, nếu không mỗi khung hình phải
     // dựng lại cả 43.000 khối thêm một lần nữa.
+    // Bóng vẽ mỗi khung (thử tắt autoUpdate: khu phố và nhà mất bóng hoàn toàn — ảnh kiểm tra
+    // `_g-shadow.jpg` cho thấy phố phẳng lì, nên giữ vẽ mỗi khung; chỉ thu nhỏ khung bóng cho sắc).
     renderer.shadowMap.autoUpdate = !qs.has("noshadow");
+    renderer.shadowMap.needsUpdate = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     el.appendChild(renderer.domElement);
 
@@ -282,23 +332,24 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     };
     const roofMat = new THREE.MeshLambertMaterial({ map: roofTexture() });
     // BoxGeometry có 6 nhóm mặt: +x, -x, +y, -y, +z, -z
-    addInstanced(scene, cube, meshData.boxes, [facade, facade, roofMat, roofMat, facade, facade]);
+    addChunked(scene, cube, meshData.boxes, { materials: [facade, facade, roofMat, roofMat, facade, facade] });
     // Đường, hè, nước, sân, vật thể: màu phẳng. Dán vân cửa sổ lên mặt đường là biến phố thành
     // một tấm lưới đen (lỗi nhìn thấy ngay ở khung ngang tầm mắt).
-    addInstanced(scene, cube, meshData.flat, new THREE.MeshLambertMaterial());
-    addInstanced(scene, prism, meshData.prisms);
-    addInstanced(scene, gableGeometry(), meshData.gables);
+    // Mặt đường/sân/nước chỉ nhận bóng: cho 30 000 tấm phẳng ném bóng là tiền mất tật mang.
+    addChunked(scene, cube, meshData.flat, { materials: new THREE.MeshLambertMaterial(), castShadow: false });
+    addChunked(scene, prism, meshData.prisms);
+    addChunked(scene, gableGeometry(), meshData.gables);
     // Chi tiết mặt tiền (cửa cuốn, biển hiệu, mái hiên, ban công) không vân, màu phẳng.
-    addInstanced(scene, cube, meshData.details, new THREE.MeshLambertMaterial());
+    addChunked(scene, cube, meshData.details, { materials: new THREE.MeshLambertMaterial(), castShadow: false });
     const trunkGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 6);
     trunkGeo.translate(0, 0.5, 0);
-    addInstanced(scene, trunkGeo, meshData.trunks);
+    addChunked(scene, trunkGeo, meshData.trunks);
     const canopyGeo = new THREE.ConeGeometry(0.5, 1, 7);
     canopyGeo.translate(0, 0.5, 0);
-    addInstanced(scene, canopyGeo, meshData.canopies);
+    addChunked(scene, canopyGeo, meshData.canopies);
     const drumGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 10);
     drumGeo.translate(0, 0.5, 0);
-    addInstanced(scene, drumGeo, meshData.drums, new THREE.MeshLambertMaterial({ color: "#c9cdd2" }));
+    addChunked(scene, drumGeo, meshData.drums, { materials: new THREE.MeshLambertMaterial({ color: "#c9cdd2" }), castShadow: false });
 
     // KHU PHỐ GỐC: cắm nguyên thế giới đang chơi được của game vào đây — nhà ống, mặt đường, vỉa hè,
     // hẻm, sân chung, dây điện, cây, đồ vỉa hè, người và xe máy chạy theo đúng luật của map gốc.
@@ -311,6 +362,9 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
         onWorldReady: (root) => {
           if (cancelled) return;
           scene.add(root);
+          // Bản đồ bóng giờ là tĩnh: phải vẽ lại một lần khi có hình mới vào scene, nếu không khu
+          // phố đứng không bóng cho tới khi người xem đi xa 30 m.
+          renderer.shadowMap.needsUpdate = true;
           (window as unknown as { __cityCoreWorldAt?: number }).__cityCoreWorldAt = performance.now();
         },
         humans: qs.get("humans") === "1",
@@ -324,6 +378,7 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
           }
           coreWorld = world;
           if (!world.root.parent) scene.add(world.root);
+          renderer.shadowMap.needsUpdate = true;
           setCoreLoad(null);
           {
             const box = new THREE.Box3().setFromObject(world.root);
@@ -348,11 +403,14 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
     const sun = new THREE.DirectionalLight("#ffe6c8", Number.isFinite(sunLevel) && qs.has("sun") ? sunLevel : 1.9);
     sun.position.set(-520, 1150, 640);
     sun.castShadow = true;
+    // Bóng chỉ cần đúng quanh chỗ đang xem. Trước đây khung bóng phủ ±900 m với bản đồ 2048²:
+    // mỗi texel ~0,88 m nên bóng nhoè thành vệt xám, mà vẫn phải vẽ cả thành phố vào bản đồ bóng.
+    // ±330 m → ~0,32 m/texel: bóng sắc hơn và rẻ hơn nhiều.
     sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.left = -900;
-    sun.shadow.camera.right = 900;
-    sun.shadow.camera.top = 900;
-    sun.shadow.camera.bottom = -900;
+    sun.shadow.camera.left = -330;
+    sun.shadow.camera.right = 330;
+    sun.shadow.camera.top = 330;
+    sun.shadow.camera.bottom = -330;
     sun.shadow.camera.near = 1;
     sun.shadow.camera.far = 3000;
     sun.shadow.bias = -0.0008;
@@ -476,7 +534,8 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
       if (keys.has("e")) target.y += step * 0.6;
       if (keys.size) applyCamera();
       // nguồn nắng đi theo điểm nhìn để bản đồ bóng luôn phủ vùng đang xem
-      if (sun.target.position.distanceToSquared(new THREE.Vector3(target.x, 0, target.z)) > 400) {
+      // Bóng tĩnh: chỉ vẽ lại bản đồ bóng khi điểm nhìn đã đi xa hơn 30 m, không phải mỗi khung.
+      if (sun.target.position.distanceToSquared(new THREE.Vector3(target.x, 0, target.z)) > 900) {
         renderer.shadowMap.needsUpdate = true;
       }
       sun.position.set(target.x - 520, 1150, target.z + 640);
