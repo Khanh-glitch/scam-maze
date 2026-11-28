@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { generateCity } from "./cityGen";
 import { buildCityMesh, type Part } from "./cityMesh";
-import { REAL_WORLD_MARGIN_M, REAL_WORLD_RECTS, inRealWorld } from "./realWorldFootprint";
+import { REAL_WORLD_BUILD_MARGIN_M, REAL_WORLD_MARGIN_M, REAL_WORLD_RECTS, inRealWorld } from "./realWorldFootprint";
 import { CITY_AVENUE_WIDTH, CITY_MINOR_WIDTH, CITY_STREET_WIDTH } from "./roadSpec";
 import { ROAD_WIDTH } from "../testbus/openworld/simulation/boarding";
 
@@ -13,6 +13,7 @@ import { ROAD_WIDTH } from "../testbus/openworld/simulation/boarding";
  * giữa sân nhà trọ — đều là lỗi mà ảnh chụp dễ bỏ sót. Test này đọc thẳng dữ liệu hình học.
  */
 const hits = (p: Part): boolean => {
+  const margin = p.sy > 2 ? REAL_WORLD_BUILD_MARGIN_M : REAL_WORLD_MARGIN_M;
   const ry = p.ry ?? 0;
   const c = Math.abs(Math.cos(ry));
   const s = Math.abs(Math.sin(ry));
@@ -20,10 +21,10 @@ const hits = (p: Part): boolean => {
   const hz = (s * p.sx + c * p.sz) / 2;
   return REAL_WORLD_RECTS.some(
     (r) =>
-      p.x + hx > r.x0 - REAL_WORLD_MARGIN_M &&
-      p.x - hx < r.x1 + REAL_WORLD_MARGIN_M &&
-      p.z + hz > r.z0 - REAL_WORLD_MARGIN_M &&
-      p.z - hz < r.z1 + REAL_WORLD_MARGIN_M,
+      p.x + hx > r.x0 - margin &&
+      p.x - hx < r.x1 + margin &&
+      p.z + hz > r.z0 - margin &&
+      p.z - hz < r.z1 + margin,
   );
 };
 
@@ -51,7 +52,11 @@ describe("thành phố không dựng vào vùng của map chuẩn", () => {
   });
 
   it("không khối nhà, sạp, cây nào đứng trong vùng dựng tay", () => {
-    expect(city.buildings.filter((b) => !b.walkable && inRealWorld((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, 1)).length).toBe(0);
+    expect(
+      city.buildings.filter(
+        (b) => !b.walkable && inRealWorld((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, REAL_WORLD_BUILD_MARGIN_M),
+      ).length,
+    ).toBe(0);
     expect(city.props.filter((p) => inRealWorld(p.x, p.z, 1)).length).toBe(0);
   });
 });

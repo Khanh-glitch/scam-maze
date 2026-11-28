@@ -41,6 +41,22 @@ export const addCityLayer = (scene: THREE.Scene, city: City, opts: CityLayerOpti
   const SOFT_GL = Boolean(opts.software);
   const meshData = opts.meshData ?? buildCityMesh(city);
 
+  /**
+   * NỀN ĐẤT. Không có tấm này thì giữa các tuyến phố là **hố**: mặt phố chỉ là những dải hẹp, còn
+   * khoảng trống giữa chúng chỉ có trời. Ở `/testbus`, tấm nền 880 m của vòng chân trời giả từng
+   * che chỗ đó; khi thành phố được cấy vào thì tấm đó bị bỏ (nó nằm dưới cả thành phố), nên nền
+   * phải do lớp thành phố tự mang theo — như bản `/saigon` cũ vẫn làm.
+   */
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(9000, 9000),
+    new THREE.MeshLambertMaterial({ color: "#55544a" }),
+  );
+  ground.name = "city-ground";
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.12;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
 const gableGeometry = (): THREE.BufferGeometry => {
   const g = new THREE.BufferGeometry();
   // 6 đỉnh: hai tam giác đầu hồi + bốn đỉnh mái dốc

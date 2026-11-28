@@ -156,16 +156,6 @@ export const CityPage: React.FC<CityPageProps> = ({ onBackToMenu }) => {
       console.warn("[citymap] không nướng được env map", err);
     }
 
-    // Đất ngoài đô thị: một tấm lớn, cùng tông với nền xám lục của ảnh kiểm toán.
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(9000, 9000),
-      new THREE.MeshLambertMaterial({ color: "#55544a" }),
-    );
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.12;
-    ground.receiveShadow = true;
-    scene.add(ground);
-
     // Phát hiện renderer phần mềm (SwiftShader/llvmpipe): hạ chi tiết y như map chuẩn tự hạ.
     const SOFT_GL = (() => {
       try {

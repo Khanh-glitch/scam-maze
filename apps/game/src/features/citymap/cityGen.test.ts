@@ -25,7 +25,9 @@ describe("generateCity", () => {
   // vỉa hè nay bị cắt, nên phần đất đó thành đi-được thật thay vì bị một toà nhà chiếm chỗ.
   it("diện tích đi được nằm trong khung 0,30–0,52 km²", () => {
     expect(walkableKm2).toBeGreaterThan(0.3);
-    expect(walkableKm2).toBeLessThan(0.52);
+    // Trần nới 0,52 → 0,56: lề dành đất cho map chuẩn là 18 m (đủ chiều sâu dãy nhà của nó), nên
+    // vành đai quanh map chuẩn không còn lô nào — diện tích đi được tăng thêm ~0,003 km².
+    expect(walkableKm2).toBeLessThan(0.56);
   });
 
   it("đi được liền một mảnh, và phòng là điểm xuất phát", () => {
@@ -134,7 +136,8 @@ describe("generateCity", () => {
     const missing = city.anchors.filter((a) => !city.buildings.some((b) => b.anchor === a.id) && !served.has(a.id));
     expect(missing.map((a) => a.id)).toEqual([]);
     expect(city.metrics.anchorsMissing).toEqual([]);
-    expect([...served].sort()).toEqual(["bitexco", "landmark81"]);
+    // 'room' (nhà trọ 59 / phòng 6.07) cũng do map chuẩn dựng — xem `anchorsServedByRealWorld`.
+    expect([...served].sort()).toEqual(["bitexco", "landmark81", "room"]);
   });
 
   it("không toà thủ tục nào mọc trong đất của map thật", () => {

@@ -44,6 +44,16 @@ export const REAL_WORLD_TOWERS: Readonly<Record<string, { x: number; z: number }
 /** Lề quanh vùng map thật: lô sinh tự động không được chạm mép đường của map thật. */
 export const REAL_WORLD_MARGIN_M = 2;
 
+/**
+ * Lề dành cho **nhà** của thành phố quanh map chuẩn.
+ *
+ * `openWorldBounds.json` là vùng **đi được**, không phải vùng **đã dựng**: dãy nhà phố Lý Thái Tổ,
+ * dãy trọ 462/14, nhà trong hẻm đều nằm ngoài hình chữ nhật đi được, sâu 10–18 m. Thành phố sinh
+ * tự động mà chỉ chừa 2 m thì nhà của nó mọc xuyên qua nhà của map chuẩn — đúng hiện tượng "nhà
+ * cửa ngỗn ngang chồng lấn". Mặt đường thì vẫn chỉ cần 2 m (đường nối vào đường).
+ */
+export const REAL_WORLD_BUILD_MARGIN_M = 18;
+
 const hit = (r: RealWorldRect, x: number, z: number, margin: number) =>
   x >= r.x0 - margin && x <= r.x1 + margin && z >= r.z0 - margin && z <= r.z1 + margin;
 

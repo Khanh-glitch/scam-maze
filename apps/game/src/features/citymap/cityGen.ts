@@ -17,6 +17,7 @@
 import { cityPlan, type CityPlan } from "./cityPlan.ts";
 import { CITY_AVENUE_WIDTH, CITY_MINOR_WIDTH, CITY_RING_WIDTH, CITY_STREET_WIDTH } from "./roadSpec.ts";
 import {
+  REAL_WORLD_BUILD_MARGIN_M,
   REAL_WORLD_TOWERS,
   inRealWorld,
   isRealWorldTower,
@@ -881,7 +882,7 @@ export function generateCity(seedOverride?: string, options: CityGenOptions = {}
     // Đất của map thật: hẻm 462/14 Lý Thái Tổ, nhà trọ 59, Đại lộ 3/2, Hải Triều, bến sông, quảng
     // trường Landmark 81… Nhà thủ tục ở đây sẽ đâm xuyên phố thật, nên chừa nguyên. Cầu thì đi qua
     // sông được phép (mặt cầu là hình học riêng, không phải toà).
-    if (realWorldOn && b.kind !== "bridge" && rectHitsRealWorld(b)) {
+    if (realWorldOn && b.kind !== "bridge" && rectHitsRealWorld(b, REAL_WORLD_BUILD_MARGIN_M)) {
       rejectedRealWorld += 1;
       return null;
     }
@@ -1881,7 +1882,25 @@ export function generateCity(seedOverride?: string, options: CityGenOptions = {}
   stats.phaseById = phaseById;
   stats.hemSkipped = hemSkipped;
   stats.anchorsPlaced = anchorsPlaced;
-  stats.anchorsMissing = anchorsMissing;
+  // MỐC NẰM TRONG MAP CHUẨN.
+  //
+  // 'room' là nhà trọ 59 / phòng 6.07: map chuẩn dựng nó bằng tay, nên thành phố **không** dựng toà
+  // nào mang mốc đó. Trước đây chỗ đó vẫn có một lô của thành phố nên mốc "có toà"; từ khi lề dành
+  // đất cho map chuẩn là 18 m (đủ cho chiều sâu dãy nhà của nó), lô đó không còn — và mốc bị coi là
+  // thiếu. Sự thật là mốc đó **đã có toà thật**, do map chuẩn dựng.
+  if (realWorldOn) {
+    for (const a of anchors) {
+      if (inRealWorld(a.x, a.z, REAL_WORLD_BUILD_MARGIN_M) && !anchorsServedByRealWorld.includes(a.id)) {
+        anchorsServedByRealWorld.push(a.id);
+      }
+    }
+    stats.anchorsMissing = anchorsMissing.filter((m) => {
+      const id = m.split(" ").pop() ?? "";
+      return !anchorsServedByRealWorld.includes(id);
+    });
+  } else {
+    stats.anchorsMissing = anchorsMissing;
+  }
   stats.anchorsServedByRealWorld = anchorsServedByRealWorld;
   // Toà cao nhất của thành phố giờ là Landmark 81 **của map thật** (461 m, dựng trong `realWorld.ts`).
   // Không cộng nó vào thì con số "cao nhất" chỉ còn 117 m và mô tả thành phố thành sai.
@@ -1909,7 +1928,7 @@ export function generateCity(seedOverride?: string, options: CityGenOptions = {}
     // Đồ vỉa hè của thành phố KHÔNG được rơi vào vùng của map chuẩn: ở đó đã có sạp, thùng rác,
     // cột điện, xe dựng của phố Lý Thái Tổ. 540 món đang nằm chồng lên chúng (đếm được) trước khi
     // lọc ở đây — cùng lý do với `partHitsRealMap` bên `cityMesh`.
-    props: props.filter((p) => !inRealWorld(p.x, p.z, 1)),
+    props: props.filter((p) => !inRealWorld(p.x, p.z, REAL_WORLD_BUILD_MARGIN_M)),
     core,
     walk,
     decks,

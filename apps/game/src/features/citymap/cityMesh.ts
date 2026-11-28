@@ -8,7 +8,13 @@
 // Nguyên tắc hình khối: một toà nhà KHÔNG phải một cái hộp. Tháp = bệ + thân thụt hai cấp (mặt
 // bằng vát góc) + hộp kỹ thuật. Nhà ống = thân + mái ngói dốc + tum. Chợ = nhà lớn + mái dốc.
 // Độ thụt co theo bề rộng lô, để tháp 9 m không thành cây kim.
-import { REAL_WORLD_MARGIN_M, REAL_WORLD_RECTS, REAL_WORLD_TOWERS } from "./realWorldFootprint";
+import {
+  REAL_WORLD_BUILD_MARGIN_M,
+  REAL_WORLD_MARGIN_M,
+  REAL_WORLD_RECTS,
+  REAL_WORLD_TOWERS,
+  inRealWorld,
+} from "./realWorldFootprint";
 import type { City, CityBuilding } from "./cityGen";
 
 /** Một khối đặc: hộp (hoặc lăng trụ vát góc / lăng trụ tam giác tuỳ danh sách chứa nó). */
@@ -142,6 +148,10 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
    * phải "cắt bớt cho gần đúng".
    */
   const partHitsRealMap = (p: Part): boolean => {
+    // Vật đứng (nhà, cột, cây, biển hiệu) phải lùi đủ xa: map chuẩn dựng nhà sâu 10–18 m ngoài vùng
+    // đi được. Mặt phẳng (nhựa, hè, cỏ) chỉ cần 2 m — nếu lùi 18 m thì quanh map chuẩn thành vành
+    // đai đất trống, còn tệ hơn.
+    const margin = p.sy > 2 ? REAL_WORLD_BUILD_MARGIN_M : REAL_WORLD_MARGIN_M;
     const ry = p.ry ?? 0;
     const c = Math.abs(Math.cos(ry));
     const sn = Math.abs(Math.sin(ry));
@@ -149,15 +159,43 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
     const hz = (sn * p.sx + c * p.sz) / 2;
     for (const r of REAL_WORLD_RECTS) {
       if (
-        p.x + hx > r.x0 - REAL_WORLD_MARGIN_M &&
-        p.x - hx < r.x1 + REAL_WORLD_MARGIN_M &&
-        p.z + hz > r.z0 - REAL_WORLD_MARGIN_M &&
-        p.z - hz < r.z1 + REAL_WORLD_MARGIN_M
+        p.x + hx > r.x0 - margin &&
+        p.x - hx < r.x1 + margin &&
+        p.z + hz > r.z0 - margin &&
+        p.z - hz < r.z1 + margin
       ) {
         return true;
       }
     }
     return false;
+  };
+
+  /**
+   * Tấm phẳng lớn (nền công viên, mặt nước, sàn quảng trường) bị **chia thành ô 24 m** trước khi
+   * lọc. Trước đây cả tấm 200 × 150 m bị bỏ nguyên vì mép nó chạm vùng map chuẩn — kết quả là một
+   * hố vuông giữa thành phố, đúng hiện tượng "mất nền". Chia ô thì chỉ ô chạm mới mất.
+   */
+  const SLAB_TILE_M = 24;
+  const pushTiled = (p: Part) => {
+    if ((p.ry ?? 0) !== 0 || (p.sx <= SLAB_TILE_M && p.sz <= SLAB_TILE_M)) {
+      push(flat, p);
+      return;
+    }
+    const nx = Math.ceil(p.sx / SLAB_TILE_M);
+    const nz = Math.ceil(p.sz / SLAB_TILE_M);
+    const w = p.sx / nx;
+    const d = p.sz / nz;
+    for (let i = 0; i < nx; i += 1) {
+      for (let j = 0; j < nz; j += 1) {
+        push(flat, {
+          ...p,
+          x: p.x - p.sx / 2 + w * (i + 0.5),
+          z: p.z - p.sz / 2 + d * (j + 0.5),
+          sx: w,
+          sz: d,
+        });
+      }
+    }
   };
 
   const push = (list: Part[], p: Part) => {
@@ -169,7 +207,7 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
     maxY = Math.max(maxY, p.y + p.sy);
   };
   const box = (p: Part) => push(boxes, p);
-  const flatBox = (p: Part) => push(flat, p);
+  const flatBox = (p: Part) => pushTiled(p);
   const kerbBox = (p: Part) => push(kerbs, p);
 
   // --- nền: đường, vỉa hè, nước ---------------------------------------------------------------
@@ -807,6 +845,11 @@ export const buildCityMesh = (city: City, opts: { maxParts?: number } = {}): Cit
       const real = REAL_WORLD_TOWERS[a.id];
       if (real && servedByRealWorld.has(a.id)) {
         return { id: a.id, name: a.name, x: real.x, y: (a.heightM || 12) + 4, z: real.z };
+      }
+      // Mốc nằm trong vùng map chuẩn (nhà trọ 59 / phòng 6.07): toà là của map chuẩn, nhãn đặt ngay
+      // trên toạ độ mốc — thành phố không dựng bản sao và cũng không bỏ mất nhãn.
+      if (inRealWorld(a.x, a.z, REAL_WORLD_BUILD_MARGIN_M)) {
+        return { id: a.id, name: a.name, x: a.x, y: (a.heightM || 12) + 4, z: a.z };
       }
       return null;
     })

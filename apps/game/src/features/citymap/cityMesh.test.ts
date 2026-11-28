@@ -33,9 +33,10 @@ describe("buildCityMesh", () => {
 
   it("có tháp cao, có mái dốc, có chi tiết mặt tiền — thành phố không phải toàn hộp", () => {
     expect(mesh.stats.towers).toBeGreaterThan(300);
-    // Ngưỡng cũ 800. Map thật (9 dải đất của `openWorldBounds.json`) lấy lại ~40 lô có mái dốc, nên
-    // thành phố thủ tục còn ~752 mái — vẫn là "không phải toàn hộp", chỉ là đất đó giờ do map thật dựng.
-    expect(mesh.stats.gabledRoofs).toBeGreaterThan(700);
+    // Ngưỡng cũ 800, rồi 700. Từ khi lề dành cho map chuẩn là 18 m (đủ chiều sâu dãy nhà của nó,
+    // không phải chỉ 2 m như lề đường), thành phố mất thêm ~90 lô sát mép map chuẩn — còn ~661 mái
+    // dốc: vẫn là "thành phố không phải toàn hộp", chỉ khác là đất đó do map chuẩn dựng.
+    expect(mesh.stats.gabledRoofs).toBeGreaterThan(600);
     expect(mesh.details.length).toBeGreaterThan(5_000);
     expect(mesh.drums.length).toBeGreaterThan(300);
     expect(mesh.stats.maxY).toBeGreaterThan(200);
