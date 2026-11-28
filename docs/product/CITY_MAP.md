@@ -1,5 +1,7 @@
 # Bản đồ thành phố 1:8 — Sài Gòn 2026
 
+> Bàn giao phần cuối (trạng thái, hợp đồng kiến trúc, việc còn lại): `docs/product/CITY_MAP_HANDOFF.md`.
+
 Tài liệu này là bản kiểm toán của **bản đồ thành phố dùng trong game** (`cityGen.ts`), khác với bản
 kiểm toán vùng mở cũ trong [`MAP_AUDIT.md`](MAP_AUDIT.md). Ở đây thành phố **được sinh ra từ dữ liệu
 quy hoạch có kiểu** (`cityPlan.ts`) chứ không phải vẽ tay từng hình chữ nhật, và **mỗi lần sinh đều
